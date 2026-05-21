@@ -1,0 +1,212 @@
+:root {
+  --bg: #f5f6f8;
+  --panel: #ffffff;
+  --border: #e3e6ea;
+  --primary: #3370ff; /* 飞书蓝 */
+  --text: #1f2329;
+  --muted: #8a919e;
+  font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei",
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+/* === Sidebar === */
+.sidebar {
+  width: 240px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+}
+.sidebar-title {
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--primary);
+  padding: 8px 4px;
+}
+.sidebar-section {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 12px 4px 6px;
+  text-transform: uppercase;
+}
+.hint {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 4px;
+}
+.agent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+}
+.agent-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.agent-list li:hover {
+  background: var(--bg);
+}
+.agent-list li.active {
+  background: #e8f0ff;
+}
+.agent-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+}
+.agent-meta {
+  display: flex;
+  flex-direction: column;
+}
+.agent-name {
+  font-size: 14px;
+  font-weight: 500;
+}
+.agent-role {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* === Main / Chat === */
+.main {
+  flex: 1;
+  display: flex;
+}
+.chat-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.chat-view.empty,
+.chat-view .empty {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.chat-header {
+  height: 52px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  font-weight: 600;
+  background: var(--panel);
+}
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.status-dot.online {
+  background: #2ecc71;
+}
+.status-dot.offline {
+  background: #c4c8cf;
+}
+
+.message-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.empty-hint {
+  color: var(--muted);
+  text-align: center;
+  margin-top: 40px;
+}
+.bubble {
+  max-width: 70%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.bubble-user {
+  align-self: flex-end;
+  background: var(--primary);
+  color: #fff;
+}
+.bubble-assistant {
+  align-self: flex-start;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+.bubble-system {
+  align-self: center;
+  background: #fff4e5;
+  color: #a15c00;
+  font-size: 13px;
+}
+.cursor {
+  animation: blink 1s steps(2, start) infinite;
+}
+@keyframes blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+.message-input {
+  border-top: 1px solid var(--border);
+  padding: 12px;
+  display: flex;
+  gap: 8px;
+  background: var(--panel);
+}
+.message-input textarea {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  outline: none;
+}
+.message-input textarea:focus {
+  border-color: var(--primary);
+}
+.message-input button {
+  align-self: flex-end;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.message-input button:disabled {
+  background: #c4c8cf;
+  cursor: not-allowed;
+}

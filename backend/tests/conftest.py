@@ -1,0 +1,37 @@
+"""测试夹具：SQLite in-memory + 有效加密密钥，隔离外部依赖。"""
+
+from __future__ import annotations
+
+import base64
+import os
+
+# 必须在导入 app.* 之前设置环境变量（settings 启动即读取并缓存）
+os.environ.setdefault(
+    "SECRET_KEY", base64.b64encode(b"0" * 32).decode("ascii")
+)
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+os.environ.setdefault("LLM_ADAPTER_MODE", "mock")
+os.environ.setdefault("ENV", "test")
+
+from collections.abc import AsyncIterator  # noqa: E402
+
+import pytest_asyncio  # noqa: E402
+from sqlalchemy.ext.asyncio import (  # noqa: E402
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+
+import app.infrastructure.db.models  # noqa: E402,F401
+from app.infrastructure.db.base import Base  # noqa: E402
+
+
+@pytest_asyncio.fixture
+async def db_session() -> AsyncIterator[AsyncSession]:
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as session:
+        yield session
+    await engine.dispose()

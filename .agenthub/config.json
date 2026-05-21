@@ -1,0 +1,27 @@
+{
+  "name": "AgentHub",
+  "version": "0.1.0",
+  "description": "IM 聊天式多 Agent 协作平台",
+  "architecture": "5-layer-onion",
+  "layers": [
+    "L1-infrastructure",
+    "L2-domain",
+    "L3-application",
+    "L4-api",
+    "L5-presentation"
+  ],
+  "mvp_phase": 1,
+  "mvp_features": [
+    "scaffold",
+    "websocket",
+    "session-message-crud",
+    "claude-adapter",
+    "streaming",
+    "l1-memory"
+  ],
+  "domains": {
+    "domain1": "IM 聊天：会话/消息/WebSocket/ChatUI",
+    "domain2": "Agent 编排：Orchestrator/TaskEngine/Adapter",
+    "domain3": "工具链+知识：Diff/Deploy/Memory/CLI/IDE"
+  }
+}

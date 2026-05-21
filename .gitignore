@@ -1,0 +1,40 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# === Node ===
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# === Env / secrets ===
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# === IDE ===
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# === Project runtime ===
+.agent_workspace/
+*.log
+logs/
+
+# === Docker ===
+docker/data/

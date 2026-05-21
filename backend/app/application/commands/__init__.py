@@ -1,0 +1,95 @@
+"""Command 对象目录（架构文档 §2.2）。L4 校验后构造，传给 L3 Service。"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from uuid import UUID
+
+from app.domain.enums import DispatchMode
+
+# === Agent Commands ===
+
+
+@dataclass
+class CreateAgentCommand:
+    name: str
+    avatar: str
+    role: str
+    provider: str
+    model: str
+    api_key: str                       # 明文传入，L3 加密后交 L1
+    skills: list[str] = field(default_factory=list)
+    system_prompt: str | None = None
+
+
+@dataclass
+class UpdateAgentCommand:
+    agent_id: UUID
+    name: str | None = None
+    avatar: str | None = None
+    role: str | None = None
+    provider: str | None = None
+    model: str | None = None
+    api_key: str | None = None
+    skills: list[str] | None = None
+    capability_tags: list[str] | None = None
+    settings: dict | None = None
+    system_prompt: str | None = None
+
+
+@dataclass
+class DeleteAgentCommand:
+    agent_id: UUID
+
+
+# === Session / Chat Commands ===
+
+
+@dataclass
+class CreateSessionCommand:
+    type: str                          # "group" | "private"
+    group_id: UUID | None = None
+    agent_id: UUID | None = None
+    title: str = ""
+
+
+@dataclass
+class SendMessageCommand:
+    session_id: UUID
+    content: str
+    content_type: str = "text"
+    mentions: list[str] = field(default_factory=list)
+    reply_to: UUID | None = None
+    dispatch_mode: DispatchMode = DispatchMode.AUTO
+
+
+@dataclass
+class PinMessageCommand:
+    session_id: UUID
+    message_id: UUID
+
+
+# === Task Commands ===
+
+
+@dataclass
+class CreateTaskCommand:
+    title: str
+    description: str = ""
+    assignee_id: UUID | None = None
+    assignee_type: str | None = None
+    due_date: datetime | None = None
+    priority: str = "medium"
+    tags: list[str] = field(default_factory=list)
+    parent_task_id: UUID | None = None
+
+
+@dataclass
+class UpdateTaskCommand:
+    task_id: UUID
+    status: str | None = None
+    priority: str | None = None
+    assignee_id: UUID | None = None
+    due_date: datetime | None = None
+    tags: list[str] | None = None
