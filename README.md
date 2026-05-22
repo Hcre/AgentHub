@@ -2,7 +2,7 @@
 
 IM 聊天式多 Agent 协作平台。用户通过类飞书聊天界面与 AI Agent 对话，支持单聊、群聊（@mentions 多 Agent）、任务自动分解与并行调度。
 
-> 脚手架基于 `docs/PRD_AgentHub.md` 与 `docs/架构设计_分层与数据流.md` 生成。ljx
+> 脚手架基于 `docs/PRD_AgentHub.md` 与 `docs/架构设计_分层与数据流.md` 生成。
 
 ## 架构
 
