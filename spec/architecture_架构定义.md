@@ -29,7 +29,8 @@ L2  Domain           Agent / Group / Session / Message / Task (聚合根)
         │                          ↑
         ▼                          │
 L1  Infrastructure   PostgreSQL (SQLAlchemy) / Redis / Celery / FileSystem
-                    LLM Adapters: ClaudeAdapter / CodexAdapter / TraeAdapter
+                    LLM Adapters (API): ClaudeAdapter / OpenAICompatAdapter / MockAdapter
+                    Agent Runtimes (CLI): ClaudeCodeRuntime / CodexRuntime / TraeRuntime
                     WS Bridge (Redis→WS Broadcast)
 ```
 
@@ -57,52 +58,66 @@ L5 → L4 → L3 → L2 ← L1
 
 ## 二、核心模块
 
-### 2.1 Adapter 内部代理架构
+### 2.1 双轨适配架构
 
-借鉴 cccswitch 模式，每个 Adapter 内部通过**本地协议代理**完成 API 格式转换：
+> v2.1 变更：原 LiteLLM Proxy 方案替换为双轨架构。详见 `DOC-15-claude-adapter-design.md`。
+
+CLI 工具（Claude Code / Codex / Trae）自带完整 Harness（tool 执行、会话记忆、权限控制），与 HTTP API 的无状态调用有本质差异。强行统一到同一抽象会丢失 CLI 的免费 Harness 能力。因此 L2 定义两个并行抽象基类：
 
 ```
-ClaudeAdapter 内部:
-┌─────────────────────────────────────────────────────┐
-│                                                     │
-│  Claude Code CLI                                    │
-│  │ (通过 ANTHROPIC_BASE_URL 重定向到本地代理)        │
-│  ▼                                                  │
-│  ┌──────────────────────────────────┐               │
-│  │  LiteLLM Proxy (子进程, 动态端口)  │               │
-│  │                                  │               │
-│  │  if provider == "anthropic":     │               │
-│  │    → 直通, 不转换                │               │
-│  │                                  │               │
-│  │  if provider == "deepseek":      │               │
-│  │    → Anthropic Messages 格式     │               │
-│  │    → 转换为 OpenAI Chat 格式     │               │
-│  │    → POST https://api.deepseek.com              │
-│  │                                  │               │
-│  │  if provider == "openai":        │               │
-│  │    → 同样的转换逻辑               │               │
-│  │                                  │               │
-│  │  转换规则:                        │               │
-│  │    messages[].role → 透传        │               │
-│  │    system prompt → system role   │               │
-│  │    stop_sequences → stop         │               │
-│  │    stream: true → stream: true   │               │
-│  │    响应: chunk delta → 透传      │               │
-│  └──────────────────────────────────┘               │
-│                                                     │
-│  三种 Adapter 都复用同一个 LiteLLM 代理模块:          │
-│  ClaudeAdapter → ANTHROPIC_BASE_URL=localhost:{port} │
-│  CodexAdapter  → OPENAI_BASE_URL=localhost:{port}    │
-│  TraeAdapter   → TRAE 特定配置                       │
-│                                                     │
-│  Adapter 工厂:                                       │
-│  adapter_factory(agent_system, provider, model,      │
-│                  api_key, base_url) → LLMAdapter:    │
-│    claude → ClaudeAdapter(model, api_key, base_url)  │
-│    codex  → CodexAdapter(model, api_key, base_url)   │
-│    trae   → TraeAdapter(model, api_key, base_url)    │
-└─────────────────────────────────────────────────────┘
+L2 Domain — 接口定义
+  UnifiedAgent (ABC)                    ← 顶层抽象，L3 只依赖此接口
+    │
+    ├── LLMAdapter (ABC)                ← API 模式：无状态，AgentHub 控制 tool loop
+    │   stream(AgentRequest) → AsyncIterator[StreamEvent]
+    │   chat_structured(prompt) → dict
+    │
+    └── AgentRuntime (ABC)              ← CLI 模式：有状态，CLI 自控 tool loop
+        run(task) → AsyncIterator[StreamEvent]
+        send_decision(decision) → None
+
+L1 Infrastructure — 实现
+  LLMAdapter 实现（API 轨道）
+    ├── ClaudeAdapter           (Anthropic API)              ✅ 已实现
+    ├── OpenAICompatAdapter     (DeepSeek / Groq / vLLM)     [未来扩展]
+    └── MockAdapter             (本地假数据)                   ✅ 已实现
+
+  AgentRuntime 实现（CLI 轨道）                               ← 当前优先
+    ├── ClaudeCodeRuntime       (claude --resume + stdout)
+    ├── CodexRuntime            (codex CLI)                   [未来]
+    └── TraeRuntime             (trae CLI)                    [未来]
 ```
+
+**L3 ChatService 对两轨的消费方式不同**：
+
+```
+LLMAdapter（API 模式）：
+  ChatService 自己管 tool loop（M3 自建或引入 Agent SDK 作为 Harness）
+  每次调用是一次无状态的 LLM 请求
+
+AgentRuntime（CLI 模式）：
+  ChatService 委托整个任务，只转发事件 + 拦截 HITL 审批
+  CLI 自己管理 tool 调用、会话记忆、多轮推理
+```
+
+**适配器工厂**：
+```python
+build_adapter(mode, **kwargs) → UnifiedAgent:
+  "anthropic_api" → ClaudeAdapter(api_key, model)
+  "claude_code"   → ClaudeCodeRuntime(session_dir)
+  "mock"          → MockAdapter()
+```
+
+**未来 API 多模型扩展路线**（不影响 CLI 轨道）：
+
+| 方案 | 说明 | 适用时机 |
+|------|------|---------|
+| 直接 SDK | `OpenAICompatAdapter` 对接 DeepSeek/Groq | 短期，单个 provider |
+| Agent SDK | OpenAI Agents SDK / Pydantic AI 做 Harness | 中期，需要 tool loop |
+| 协议适配 | LiteLLM Proxy 统一 100+ 模型 | 长期，需要负载均衡/降级 |
+
+> 注：Claude Agent SDK 仅支持 Anthropic 模型，不可用于多模型场景。
+> Pydantic AI 和 OpenAI Agents SDK 支持运行时切换模型（含 DeepSeek）。
 
 ### 2.2 审批模式
 

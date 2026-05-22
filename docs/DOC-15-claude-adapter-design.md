@@ -1,6 +1,6 @@
 # Claude Adapter 详细设计
 
-> 版本：v1.1 | 日期：2026-05-22 | 基于 adapter_interface_spec.md v0.2 + 架构设计文档
+> 版本：v1.2 | 日期：2026-05-22 | 基于 adapter_interface_spec.md v0.2 + 架构设计文档
 
 ## 与 adapter_interface_spec.md 的差异说明
 
@@ -17,49 +17,81 @@ spec v0.2 已同步更新。
 
 ---
 
-## 一、定位
+## 一、定位与双轨架构
 
-Claude Adapter 是 L1 基础设施层组件，实现 L2 定义的 `UnifiedAgent` 抽象接口，是 AgentHub 与外部 LLM 之间的**唯一通信桥梁**。
+AgentHub 与外部 AI 系统的通信存在两种本质不同的模式，不应强行统一到同一抽象中：
+
+| | LLMAdapter（API 模式） | AgentRuntime（CLI 模式） |
+|---|---|---|
+| 本质 | 一次 LLM 调用的管道 | 完整 Agent 会话的运行时 |
+| 谁管 tool loop | AgentHub（ChatService + ToolScheduler） | CLI 自身（自带 tool use） |
+| 谁管会话状态 | AgentHub（L1 Redis + L2 摘要） | CLI 自身（`--resume`、session） |
+| 流式输出 | SDK stream（结构化事件） | stdout 逐行解析（JSON Lines） |
+| Harness | AgentHub 自建或引入 Agent SDK | CLI 自带，零成本 |
 
 ```
 L3 Application (ChatService / CoordinatorService)
-    │ 调用 UnifiedAgent.stream(request)                    ← 只依赖抽象
+    │
+    │  统一消费 AsyncIterator[StreamEvent]
     ▼
-L2 Domain (UnifiedAgent ABC + AgentRequest/StreamEvent)     ← 接口定义
+L2 Domain — 接口定义
+    ├── UnifiedAgent (ABC)           ← 顶层抽象
+    │   ├── LLMAdapter (ABC)         ← API 模式：AgentHub 控制 tool loop
+    │   └── AgentRuntime (ABC)       ← CLI 模式：运行时自控 tool loop
     ▲
-    │ 实现 UnifiedAgent                                     ← 依赖倒置
-L1 Infrastructure (ClaudeAdapter / ClaudeCliAdapter / MockAdapter)
-    │ 调用 Anthropic SDK / CLI 子进程
-    ▼
-外部 LLM (Anthropic API / Claude Code CLI)
+    │  依赖倒置
+L1 Infrastructure — 实现
+    ├── LLMAdapter 实现
+    │   ├── ClaudeAdapter            (Anthropic API)        ✅ 已实现
+    │   ├── OpenAICompatAdapter      (DeepSeek/Groq/vLLM)  [未来扩展]
+    │   └── MockAdapter              (本地假数据)            ✅ 已实现
+    │
+    └── AgentRuntime 实现
+        ├── ClaudeCodeRuntime        (claude CLI)           ← 当前优先
+        ├── CodexRuntime             (codex CLI)            [未来扩展]
+        └── TraeRuntime              (trae CLI)             [未来扩展]
 ```
+
+### 为什么分两轨
+
+CLI 工具（Claude Code / Codex / Trae）不是"LLM 的 HTTP 代理"，它们是**自带 Harness 的完整 Agent 运行时**：
+- 自己管理 tool 调用（文件编辑、bash、MCP）
+- 自己管理会话记忆（`--resume`）
+- 自己处理审批（permission 机制）
+
+如果用 `--print` 把 CLI 降格为一次性 LLM 调用，等于丢弃了免费的 Harness 设施，然后在 AgentHub 侧花大量人力重建。
+
+**当前优先级**：CLI Runtime 先行（Harness 零成本）→ API 接口保留（未来扩展）。
 
 ---
 
 ## 二、职责边界
 
-### 适配器负责
+### LLMAdapter 职责（API 模式）
 
 | 职责 | 说明 |
 |------|------|
 | 接收 `AgentRequest`，组装 prompt + messages | 将 MemoryContext L1-L4 注入 system_prompt |
-| 调用 LLM（Anthropic SDK 或 CLI 子进程） | 唯一的外部通信出口 |
+| 调用 LLM API | 唯一的外部通信出口 |
 | 流式产出 `StreamEvent` | 逐事件 yield，不缓冲 |
 | 重试退避 | 网络波动/限流时指数退避，最多 3 次 |
 | 错误标准化 | 所有异常包装为 `StreamEvent(type=ERROR)` |
 
-### 适配器不负责
+**LLMAdapter 不负责**：Tool 执行、Tool 循环编排、审批流程、记忆获取、会话管理、任务分解。这些由 L3 ChatService / L2 Harness 负责。
 
-| 非职责 | 由谁负责 |
-|--------|---------|
-| Tool 执行 | L2 Harness / ToolScheduler |
-| Tool 循环编排（多轮 tool_use） | L3 ChatService / CoordinatorService |
-| 审批流程（HITL） | L3 InboxService + L2 Harness |
-| 记忆获取（L1-L4 数据） | L3 MemoryContextBuilder（域3） |
-| 会话管理 | L3 ChatService |
-| 任务分解逻辑 | L2 CoordinatorService |
+### AgentRuntime 职责（CLI 模式）
 
-**核心原则**：适配器是纯粹的"输入→LLM→流式输出"管道，不包含任何业务逻辑。
+| 职责 | 说明 |
+|------|------|
+| 接收任务指令，启动 CLI 进程 | `claude --resume` / `codex` / `trae` |
+| 管理进程生命周期 | spawn、communicate、timeout、kill |
+| 解析 stdout → `StreamEvent` | JSON Lines 格式逐行映射 |
+| 转发 HITL 审批请求 | CLI 请求权限时 → `REQUEST_APPROVAL` 事件 |
+| 进程级错误处理 | 崩溃 / 超时 → `StreamEvent(type=ERROR)` |
+
+**AgentRuntime 不负责**：Tool 执行（CLI 自己做）、Tool 循环编排（CLI 自己做）、prompt 拼装（CLI 有自己的 context 管理）。
+
+**核心原则**：LLMAdapter 是"输入→LLM→流式输出"的无状态管道；AgentRuntime 是"委托任务→转发事件"的有状态进程管理器。
 
 ---
 
@@ -161,15 +193,68 @@ L5 前端 useWebSocket                 ← 消费者 #3（渲染）
 
 ---
 
-## 六、三种适配模式
+## 六、适配模式总览
 
-| 模式 | 配置值 | 实现类 | 通信方式 |
-|------|--------|--------|---------|
-| Mock | `mock` | `MockAdapter` | 本地生成假数据 |
-| Anthropic API | `anthropic_api` | `ClaudeAdapter` | `AsyncAnthropic.messages.stream()` |
-| Claude CLI | `claude_cli` | `ClaudeCliAdapter` | `subprocess.Popen("claude", ...)` |
+### 6.1 当前实现
+
+| 轨道 | 模式 | 配置值 | 实现类 | 状态 |
+|------|------|--------|--------|------|
+| — | Mock | `mock` | `MockAdapter` | ✅ 可用 |
+| API | Anthropic | `anthropic_api` | `ClaudeAdapter` | ✅ 可用 |
+| CLI | Claude Code | `claude_code` | `ClaudeCodeRuntime` | ← **当前优先实现** |
 
 工厂 `build_adapter()` 按 `LLM_ADAPTER_MODE` 配置选择实现。API Key 缺失时自动降级为 Mock。
+
+### 6.2 未来 API 扩展规划
+
+#### 多模型接入路线
+
+```
+方案一：直接 SDK 接入（逐个对接）
+  OpenAICompatAdapter → DeepSeek / Groq / Together / vLLM
+  GeminiAdapter       → Google AI
+  优点：最大控制力，无中间层
+  缺点：每个 provider 一个实现，维护成本随数量增长
+
+方案二：Agent SDK 作为 Harness 层
+  OpenAI Agents SDK   → 任何 OpenAI-compatible 模型（含 DeepSeek）
+  Pydantic AI         → Claude / OpenAI / Gemini / DeepSeek
+  优点：Harness（tool loop + HITL）免费获得，无需自建
+  缺点：引入框架依赖
+
+方案三：协议适配（LiteLLM）
+  LiteLLM proxy       → 100+ 模型统一接口
+  优点：通用性最强，可实现负载均衡 + 自动降级
+  缺点：多一个运行组件，调试链路变长
+```
+
+#### Agent SDK 兼容性矩阵
+
+| SDK | Claude | OpenAI-compat (DeepSeek等) | Gemini | 多模型切换 |
+|-----|--------|---------------------------|--------|-----------|
+| **Claude Agent SDK** | ✅ | ❌ 不支持 | ❌ | ❌ 仅 Anthropic |
+| **OpenAI Agents SDK** | ❌ 原生不支持 | ✅ | ❌ | ✅ 任何 OpenAI-compat |
+| **Pydantic AI** | ✅ | ✅ | ✅ | ✅ 运行时切换 |
+| **LiteLLM** | ✅ | ✅ | ✅ | ✅ 代理层统一 |
+
+> **推荐路线**：短期用 `OpenAICompatAdapter` 直接对接 DeepSeek（最简单）；
+> 中期引入 Pydantic AI 或 OpenAI Agents SDK 获得 Harness 能力；
+> 长期按需加 LiteLLM 做负载均衡。
+
+#### 决策约束
+
+- Claude Agent SDK **不支持非 Anthropic 模型**，排除作为通用 Harness
+- OpenAI Agents SDK 可用于 DeepSeek/Groq 等 OpenAI-compatible 模型
+- Pydantic AI 覆盖面最广但需评估与现有 Pydantic v2 栈的集成成本
+- 任何方案均不影响 CLI Runtime 轨道（两轨独立演进）
+
+### 6.3 未来 CLI 扩展
+
+| CLI 工具 | 运行时 | 优先级 | 备注 |
+|----------|--------|--------|------|
+| Claude Code | `ClaudeCodeRuntime` | P0 当前 | `claude --resume` + JSON stdout |
+| Codex | `CodexRuntime` | P2 | OpenAI CLI，类似模式 |
+| Trae | `TraeRuntime` | P3 | 需评估 CLI 接口成熟度 |
 
 ---
 
@@ -240,38 +325,66 @@ if agent_settings.thinking_enabled:
 
 ---
 
-## 八、claude_cli 模式实现 [M2 待实现]
+## 八、CLI Runtime 模式设计 ← 当前优先实现
 
-> 当前 `factory.py` 中 `claude_cli` 分支 fallback 到 MockAdapter。`ClaudeCliAdapter` 文件尚未创建。
+### 8.0 设计原则
 
-### 8.1 调用流程
+CLI 工具自带完整 Harness（tool 执行、会话管理、权限控制）。AgentRuntime 的职责是**进程管理 + 事件转发**，不重复实现 Harness 逻辑。
+
+### 8.1 ClaudeCodeRuntime 架构
 
 ```
-ClaudeCliAdapter.stream(request: AgentRequest) → AsyncIterator[StreamEvent]:
+ClaudeCodeRuntime
   │
-  ├─ 1. 检查 CLI 可用性: shutil.which("claude")
+  ├── 进程管理
+  │   ├─ spawn: claude --print --output-format=stream-json --verbose
+  │   ├─ resume: claude --resume --session-id {id} (跨调用保持会话)
+  │   └─ kill: 超时/取消时优雅终止
   │
-  ├─ 2. 将 messages 写为临时 JSON → stdin
+  ├── stdout 解析 (JSON Lines)
+  │   ├─ {"type":"assistant","content":[{"type":"text","text":"..."}]}  → TEXT
+  │   ├─ {"type":"assistant","content":[{"type":"tool_use",...}]}       → TOOL_CALL (仅通知)
+  │   ├─ {"type":"result","result":"...","duration_ms":...}            → DONE
+  │   └─ 其他/异常行                                                    → ERROR
   │
-  ├─ 3. spawn: claude --model {m} --max-tokens {t} --stream --input-format json
-  │
-  ├─ 4. 逐行读 stdout → 解析 → yield TEXT event
-  │
-  ├─ 5. stderr 非空 → yield ERROR event
-  │
-  ├─ 6. 进程退出 → yield DONE event
-  │
-  └─ 7. 超时: asyncio.wait_for(process.wait(), timeout=settings.claude_cli_timeout)
+  └── HITL 桥接
+      └─ CLI 的 permission 请求 → REQUEST_APPROVAL → 用户决策 → stdin 回写
 ```
 
-### 8.2 与 anthropic_api 的区别
+### 8.2 两种调用模式
 
-| 特性 | anthropic_api | claude_cli |
-|------|-------------|-----------|
-| THINKING 事件 | 支持 | 不支持（CLI 不暴露） |
-| TOOL_CALL 事件 | 支持 | 不支持（CLI 自己管理工具） |
-| 需要 API Key | 是 | 否（由 CLI 配置管理） |
-| 适用场景 | 生产环境 | 本地开发 |
+| 模式 | 命令 | 适用场景 | 会话状态 |
+|------|------|---------|----------|
+| **one-shot** | `claude --print -p "..." --output-format stream-json` | 简单问答、无需 tool | 无状态 |
+| **session** | `claude --resume --session-id {uuid} --output-format stream-json` | 多轮对话、工具调用 | CLI 内部维护 |
+
+私聊场景默认用 session 模式（利用 CLI 原生会话记忆）；
+协调者分解子任务时用 one-shot 模式（每个子任务独立执行）。
+
+### 8.3 ChatService 消费 Runtime 的方式
+
+```python
+# CLI Runtime 模式：委托整个任务，只转发事件
+async for event in runtime.run(task):
+    if event.type == REQUEST_APPROVAL:
+        # CLI 请求执行危险操作 → 转发给前端 HITL
+        decision = await hitl_service.prompt(event)
+        await runtime.send_decision(decision)
+    yield event   # 透传给 WS → 前端
+```
+
+与 API 模式的关键区别：**ChatService 不管 tool loop**，CLI 自己决定何时调用工具、何时结束。
+
+### 8.4 与 LLMAdapter 的对比
+
+| 维度 | LLMAdapter (API) | AgentRuntime (CLI) |
+|------|-------------------|---------------------|
+| Tool loop | AgentHub 管理（M3 待建） | CLI 自管（零成本） |
+| 会话记忆 | AgentHub L1/L2 | CLI `--resume` |
+| Harness | 需自建或引入 Agent SDK | CLI 自带 |
+| HITL 粒度 | tool_call 级别精确拦截 | CLI permission 级别 |
+| 多模型支持 | 按 provider 扩展 | 按 CLI 工具扩展 |
+| 适用阶段 | 未来扩展 | **当前优先** |
 
 ---
 
@@ -346,15 +459,23 @@ thinking_budget: int = 4000          # 思考 token 预算
 ## 十二、文件结构
 
 ```
+backend/app/domain/llm/
+├── protocol.py             # UnifiedAgent + LLMAdapter + AgentRuntime ABC
+└── __init__.py
+
 backend/app/infrastructure/llm/
 ├── __init__.py
-├── factory.py              # build_adapter() 工厂                    ✅
-├── mock_adapter.py         # MockAdapter — 无 API Key 时使用          ✅
-├── claude_adapter.py       # ClaudeAdapter — anthropic_api 模式       ✅ (含 _build_system_prompt / _build_tool_definitions)
-└── claude_cli_adapter.py   # ClaudeCliAdapter — claude_cli 子进程模式  [M2 待创建]
+├── factory.py              # build_adapter() 工厂                        ✅
+├── mock_adapter.py         # MockAdapter — 无 API Key 时使用              ✅
+├── claude_adapter.py       # ClaudeAdapter (LLMAdapter) — Anthropic API   ✅
+└── runtimes/
+    ├── __init__.py
+    ├── claude_code.py      # ClaudeCodeRuntime (AgentRuntime)             ← 当前优先
+    ├── codex.py            # CodexRuntime                                 [未来]
+    └── trae.py             # TraeRuntime                                  [未来]
 ```
 
-> v1.0 原计划的 `_prompt_builder.py` 已内联到 `claude_adapter.py` 中作为模块级纯函数，不再单独拆文件。
+> API 适配器和 CLI 运行时在文件系统上也物理分离，避免职责混淆。
 
 ---
 
@@ -369,3 +490,13 @@ backend/app/infrastructure/llm/
 | `build_adapter()` | `infrastructure/llm/factory.py` | claude_cli 分支已有（fallback mock） |
 | `adapter_interface_spec.md` | `docs/` | ✅ v0.2 已同步更新接口定义 |
 | `config.py` | `core/config.py` | ✅ 新增 max_tokens / max_tool_turns / claude_cli_timeout |
+
+---
+
+## 十四、版本记录
+
+| 版本 | 日期 | 变更 |
+|------|------|------|
+| v1.0 | 2026-05-22 | 初稿：单轨 adapter 设计 |
+| v1.1 | 2026-05-22 | 审查裁决：加差异说明 + [待实现] 标记，实现 ClaudeAdapter |
+| v1.2 | 2026-05-22 | 双轨架构：LLMAdapter(API) + AgentRuntime(CLI) 分离，API 扩展规划，CLI 优先实现 |
