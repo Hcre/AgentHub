@@ -38,3 +38,4 @@ logs/
 
 # === Docker ===
 docker/data/
+.ace-tool/
