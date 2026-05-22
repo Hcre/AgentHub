@@ -80,7 +80,16 @@ git commit -m "feat: <功能简述>"
 git push origin HEAD
 ```
 
-### 7. 创建 PR（自动）
+### 7. Checkpoint 冒烟测试
+
+```bash
+scripts\checkpoint.bat
+```
+
+验证 8 项：Health / Agent CRUD / Session CRUD / Search / Frontend / API Docs / Code quality。
+全部通过才能继续。
+
+### 8. 创建 PR
 
 ```bash
 gh pr create --title "feat: <功能简述>" --body "<改动说明>" --base main
