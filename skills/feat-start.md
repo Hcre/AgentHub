@@ -5,6 +5,9 @@ description: Start a new feature — read spec, create branch, update STATUS, ge
 
 # feat-start: 开始新功能
 
+> **一键执行**: `scripts\feat-start.bat`
+> **Linux/WSL**: `bash scripts/feat-start.sh`
+
 ## 适用时机
 
 - 领取 roadmap 中的一个任务

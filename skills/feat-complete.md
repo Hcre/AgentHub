@@ -5,6 +5,9 @@ description: Complete a feature — run validation, update roadmap, create PR, w
 
 # feat-complete: 功能完成流程
 
+> **一键执行**: `scripts\feat-complete.bat`
+> **Linux/WSL**: `bash scripts/feat-complete.sh`
+
 ## 适用时机
 
 - 功能分支开发完毕，准备合并
