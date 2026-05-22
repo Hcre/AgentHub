@@ -1,0 +1,38 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.0
+    hooks:
+      - id: ruff
+        name: ruff (backend)
+        files: ^backend/
+        args: [--config, backend/pyproject.toml]
+      - id: ruff-format
+        name: ruff format (backend)
+        files: ^backend/
+        args: [--config, backend/pyproject.toml]
+
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v9.23.0
+    hooks:
+      - id: eslint
+        name: eslint (frontend)
+        files: ^frontend/
+        args: [--config, frontend/.eslintrc.json]
+        additional_dependencies:
+          - eslint@9.23.0
+
+  - repo: local
+    hooks:
+      - id: tsc-typecheck
+        name: TypeScript 类型检查
+        entry: bash -c "cd frontend && npx tsc --noEmit"
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+
+      - id: branch-name
+        name: 分支命名检查
+        entry: python scripts/check_branch.py
+        language: python
+        always_run: true
+        pass_filenames: false
