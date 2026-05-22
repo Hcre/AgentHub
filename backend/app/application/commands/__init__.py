@@ -70,6 +70,18 @@ class PinMessageCommand:
     message_id: UUID
 
 
+@dataclass
+class UnpinMessageCommand:
+    session_id: UUID
+    message_id: UUID
+
+
+@dataclass
+class UpdateSessionCommand:
+    session_id: UUID
+    title: str | None = None
+
+
 # === Task Commands ===
 
 

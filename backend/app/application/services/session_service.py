@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from app.application.commands import CreateSessionCommand, PinMessageCommand
+from app.application.commands import (
+    CreateSessionCommand,
+    PinMessageCommand,
+    UnpinMessageCommand,
+    UpdateSessionCommand,
+)
 from app.application.dto import MessageResponse, SessionResponse
 from app.core.events import EventBus
 from app.core.exceptions import NotFoundError
@@ -41,8 +46,8 @@ class SessionService:
         )
         return SessionResponse.from_domain(session)
 
-    async def list(self, *, type: str | None = None) -> list[SessionResponse]:
-        sessions = await self._sessions.list(type=type)
+    async def list(self, *, type: str | None = None, query: str | None = None) -> list[SessionResponse]:
+        sessions = await self._sessions.list(type=type, query=query)
         return [SessionResponse.from_domain(s) for s in sessions]
 
     async def get(self, session_id: UUID) -> SessionResponse:
@@ -59,6 +64,27 @@ class SessionService:
         )
         return [MessageResponse.from_domain(m) for m in msgs]
 
+    async def update(self, cmd: UpdateSessionCommand) -> SessionResponse:
+        session = await self._sessions.get_by_id(cmd.session_id)
+        if session is None:
+            raise NotFoundError(f"会话不存在: {cmd.session_id}")
+        if cmd.title is not None:
+            session.title = cmd.title
+        await self._sessions.save(session)
+        return SessionResponse.from_domain(session)
+
+    async def delete_session(self, session_id: UUID) -> None:
+        session = await self._sessions.get_by_id(session_id)
+        if session is None:
+            raise NotFoundError(f"会话不存在: {session_id}")
+        await self._sessions.delete(session_id)
+
+    async def delete_message(self, message_id: UUID) -> None:
+        msg = await self._messages.get_by_id(message_id)
+        if msg is None:
+            raise NotFoundError(f"消息不存在: {message_id}")
+        await self._messages.delete(message_id)
+
     async def pin_message(self, cmd: PinMessageCommand) -> None:
         msg = await self._messages.get_by_id(cmd.message_id)
         if msg is None:
@@ -67,3 +93,9 @@ class SessionService:
         await self._bus.publish(
             MessagePinned(session_id=cmd.session_id, message_id=cmd.message_id)
         )
+
+    async def unpin_message(self, cmd: UnpinMessageCommand) -> None:
+        msg = await self._messages.get_by_id(cmd.message_id)
+        if msg is None:
+            raise NotFoundError(f"消息不存在: {cmd.message_id}")
+        await self._messages.set_pinned(cmd.message_id, False)

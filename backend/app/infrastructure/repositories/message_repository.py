@@ -84,3 +84,9 @@ class PostgresMessageRepository(MessageRepository):
         if m is not None:
             m.pinned = pinned
             await self._s.flush()
+
+    async def delete(self, message_id: UUID) -> None:
+        m = await self._s.get(MessageModel, message_id)
+        if m is not None:
+            await self._s.delete(m)
+            await self._s.flush()

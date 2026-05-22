@@ -210,3 +210,73 @@ body {
   background: #c4c8cf;
   cursor: not-allowed;
 }
+
+/* === Session List === */
+.session-list {
+  flex: 1;
+  overflow-y: auto;
+}
+.session-search {
+  padding: 4px 0 8px;
+}
+.session-search input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 13px;
+  outline: none;
+}
+.session-search input:focus {
+  border-color: var(--primary);
+}
+.session-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.session-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.session-list li:hover {
+  background: var(--bg);
+}
+.session-list li.active {
+  background: #e8f0ff;
+}
+.session-icon {
+  font-weight: 700;
+  color: var(--primary);
+  width: 20px;
+  text-align: center;
+}
+.session-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* === Bubble Label === */
+.bubble-label {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+.bubble-code-badge {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 6px;
+  background: #e8f0ff;
+  color: var(--primary);
+  font-size: 10px;
+  border-radius: 4px;
+  font-weight: 600;
+}

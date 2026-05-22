@@ -33,6 +33,16 @@ export const useChatStore = create<ChatState>((set) => ({
       const idx = messages.findIndex((m) => m.id === STREAMING_ID);
 
       switch (event.type) {
+        case "thinking": {
+          if (event.content) {
+            messages.push({
+              id: crypto.randomUUID(),
+              role: "system",
+              content: `[thinking] ${event.content}`,
+            });
+          }
+          return { messages };
+        }
         case "text": {
           if (idx === -1) {
             messages.push({

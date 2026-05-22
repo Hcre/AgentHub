@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useChatStore } from "@/stores/chatStore";
-import { StreamingText } from "@/components/chat/StreamingText";
+import { MessageBubble } from "@/components/chat/MessageBubble";
 
 export function MessageList() {
   const messages = useChatStore((s) => s.messages);
@@ -13,10 +13,10 @@ export function MessageList() {
   return (
     <div className="message-list">
       {messages.length === 0 && (
-        <p className="empty-hint">开始与 Agent 对话吧</p>
+        <p className="empty-hint">Start chatting with an Agent</p>
       )}
       {messages.map((m) => (
-        <StreamingText key={m.id} message={m} />
+        <MessageBubble key={m.id} message={m} />
       ))}
       <div ref={bottomRef} />
     </div>
