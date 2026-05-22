@@ -5,7 +5,7 @@
 
 | 我 | 正在做 | 阻塞？ | 这周完成了 |
 |----|--------|--------|-----------|
-| 黎 | 支援域2: Agent详情页前端 + 对话式创建组件 | token计量条(后端) | M2域1: 会话CRUD+聊天UI+WS重连+thinking事件+checkpoint自动化 ✅ PR已合并 |
+| 黎 | 域2: ClaudeCliAdapter(M2) + Agent settings 扩展 | 无 | ClaudeAdapter 完整重写(5种事件+memory注入+重试) ✅ + spec v0.2 对齐 ✅ + DOC-15 v1.1 裁决 ✅ |
 | 董 | | | |
 | 袁 | | | |
 

@@ -11,7 +11,7 @@
 ```
 ┌──────────────────────────────────────────────────────┐
 │  Domain 1 (Chat)                                     │
-│  send_message() → AsyncIterator[StreamEvent]         │
+│  stream() → AsyncIterator[StreamEvent]                │
 │  只依赖 UnifiedAgent 抽象，不感知实现                  │
 └────────────────────────┬─────────────────────────────┘
                          │
@@ -111,38 +111,26 @@ class StreamEvent(BaseModel):
 
 ### 2.3 抽象接口
 
+> **v0.2 变更**：接口精简为 `stream()` + `chat_structured()`，与代码 `domain/llm/protocol.py` 对齐。
+> 原 v0.1 的 `send_message()`、`agent_id`、`capabilities`、`health_check()`、`get_supported_tools()` 已移除。
+> 理由：agent_id / capabilities 已在 Agent 实体层管理（`domain/entities/agent.py`），不属于适配器职责；
+> health_check 通过基础设施监控实现；supported_tools 由 ToolRegistry 管理。
+
 ```python
 from abc import ABC, abstractmethod
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 class UnifiedAgent(ABC):
-    """所有 Agent 适配器的统一接口"""
+    """所有 Agent 适配器的统一接口。"""
 
-    @property
     @abstractmethod
-    def agent_id(self) -> str:
-        """唯一标识，如 'claude-sonnet-4'"""
-        ...
-
-    @property
-    @abstractmethod
-    def capabilities(self) -> list[str]:
-        """能力标签，如 ['python', 'fastapi', 'react', 'postgresql']"""
+    def stream(self, request: AgentRequest) -> AsyncIterator[StreamEvent]:
+        """流式执行一次 Agent 调用，逐事件 yield。"""
         ...
 
     @abstractmethod
-    async def send_message(self, request: AgentRequest) -> AsyncIterator[StreamEvent]:
-        """核心接口：发送消息，返回流式事件"""
-        ...
-
-    @abstractmethod
-    async def health_check(self) -> bool:
-        """检查 Agent 是否可用"""
-        ...
-
-    @abstractmethod
-    async def get_supported_tools(self) -> list[str]:
-        """返回本 Agent 支持的 Tool 名称列表"""
+    async def chat_structured(self, prompt: str) -> dict:
+        """非流式结构化调用（协调者任务分解用）。"""
         ...
 ```
 
@@ -218,7 +206,7 @@ Agent 输出 tool_use 块
   → await tool.execute(tool_call.call_id, tool_call.arguments, session_id)
   → result = ToolResult(...)
   → emit StreamEvent(tool_result)
-  → ClaudeAdapter.send(result) → Agent 继续推理
+  → 回注 messages → llm.stream(request) → Agent 继续推理
 ```
 
 ### 3.3 错误处理规范
@@ -548,5 +536,6 @@ class CallbackEvents(StrEnum):
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | v0.1 | 2026-05-21 | 初稿：UnifiedAgent + Tool 协议 + 9 个 Tool 定义 + MemoryContext + 验收清单 |
+| v0.2 | 2026-05-22 | 接口精简：`send_message()` → `stream()`，移除 `agent_id/capabilities/health_check/get_supported_tools`，与代码 `domain/llm/protocol.py` 对齐 |
 
-**下一步**：域 3 审查本协议后，域 2 在 `backend/app/adapters/base.py` 落地 `UnifiedAgent` 和 `BaseTool` 抽象类，域 3 在 `backend/app/tools/` 下实现本域 Tool。
+**下一步**：域 3 审查本协议后，在 `backend/app/tools/` 下实现本域 Tool。UnifiedAgent 和 StreamEvent 已在 `backend/app/domain/llm/protocol.py` 落地并冻结。

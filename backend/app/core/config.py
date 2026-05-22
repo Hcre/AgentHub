@@ -35,6 +35,9 @@ class Settings(BaseSettings):
 
     # --- 上下文 / L1 记忆 ---
     l1_window_size: int = 20
+    max_tokens: int = 16000
+    max_tool_turns: int = 10
+    claude_cli_timeout: int = 300
 
     # --- CORS ---
     cors_origins: str = "http://localhost:5173"

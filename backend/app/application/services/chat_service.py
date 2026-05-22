@@ -153,4 +153,4 @@ class ChatService:
 
 
 def settings_max_tokens() -> int:
-    return getattr(settings, "max_tokens", 16000)
+    return settings.max_tokens
