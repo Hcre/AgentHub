@@ -66,12 +66,12 @@ def main() -> int:
     filepath = user_dir / filename
 
     if filepath.exists():
-        print(f"⚠️  文件已存在: {filepath}")
+        print(f"[EXISTS] {filepath}")
         return 1
 
     filepath.write_text(content, encoding="utf-8")
-    print(f"✅ 已创建: {filepath.relative_to(repo_root)}")
-    print(f"   请编辑填写具体内容后 commit。")
+    print(f"[OK] {filepath.relative_to(repo_root)}")
+    print(f"    Edit and fill content, then commit.")
     return 0
 
 

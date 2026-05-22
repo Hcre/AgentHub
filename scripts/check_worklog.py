@@ -22,22 +22,22 @@ def check_today_worklog_exists() -> bool:
         if d.is_dir() and d.name not in ("template.md", "STATUS.md", ".gitkeep"):
             for f in d.iterdir():
                 if f.suffix == ".md" and today in f.name:
-                    print(f"✅ 找到今日 worklog: {f.relative_to(REPO_ROOT)}")
+                    print(f"[OK] Found today worklog: {f.relative_to(REPO_ROOT)}")
                     return True
-    print(f"❌ 未找到今日 ({today}) worklog 文件")
+    print(f"[FAIL] No worklog found for today ({today})")
     return False
 
 
 def check_status_updated() -> bool:
     if not STATUS_FILE.exists():
-        print("❌ STATUS.md 不存在")
+        print("[FAIL] STATUS.md not found")
         return False
     content = STATUS_FILE.read_text(encoding="utf-8")
     today = get_today_str()
     if today in content:
-        print(f"✅ STATUS.md 包含今日日期 ({today})")
+        print(f"[OK] STATUS.md has today date ({today})")
         return True
-    print(f"❌ STATUS.md 日期未更新 (缺少 {today})")
+    print(f"[FAIL] STATUS.md date not updated (missing {today})")
     return False
 
 
@@ -48,9 +48,10 @@ def main() -> int:
     if not check_status_updated():
         errors += 1
     if errors == 0:
-        print("🎉 worklog 检查通过")
+        print("[OK] Worklog check passed")
     else:
-        print(f"\n请执行: 1) 写 worklog  2) 更新 STATUS.md '最后更新' 日期")
+        print(f"\nAction: 1) write worklog  2) update STATUS.md date")
+    return 1 if errors > 0 else 0
     return 1 if errors > 0 else 0
 
 

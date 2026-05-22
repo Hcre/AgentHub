@@ -5,7 +5,7 @@
 
 | 我 | 正在做 | 阻塞？ | 这周完成了 |
 |----|--------|--------|-----------|
-| 黎 | 核心 Skills 创建 | 无 | spec整合、rules精简、CLAUDE.md、自动化验证、Docker环境部署、Rules→Script映射完成 |
+| 黎 | M2 域1: 聊天UI完善 + 会话CRUD + 流式细节 | 无 | spec整合、rules精简、CLAUDE.md、自动化验证、Docker部署、Skills可执行脚本 |
 | 董 | | | |
 | 袁 | | | |
 
