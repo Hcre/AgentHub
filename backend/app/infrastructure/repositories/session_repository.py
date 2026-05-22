@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import false
 
 from app.domain.entities.session import Session
 from app.domain.enums import SessionType
@@ -49,9 +50,21 @@ class PostgresSessionRepository(SessionRepository):
         m = await self._s.get(SessionModel, session_id)
         return _to_domain(m) if m else None
 
-    async def list(self, *, type: str | None = None) -> list[Session]:
+    async def list(self, *, type: str | None = None, query: str | None = None) -> list[Session]:
         stmt = select(SessionModel).order_by(SessionModel.updated_at.desc())
         if type:
             stmt = stmt.where(SessionModel.type == type)
+        if query:
+            stmt = stmt.where(
+                or_(
+                    SessionModel.title.ilike(f"%{query}%"),
+                )
+            )
         rows = (await self._s.execute(stmt)).scalars().all()
         return [_to_domain(m) for m in rows]
+
+    async def delete(self, session_id: UUID) -> None:
+        m = await self._s.get(SessionModel, session_id)
+        if m is not None:
+            await self._s.delete(m)
+            await self._s.flush()

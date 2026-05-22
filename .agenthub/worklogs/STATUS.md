@@ -5,7 +5,7 @@
 
 | 我 | 正在做 | 阻塞？ | 这周完成了 |
 |----|--------|--------|-----------|
-| 黎 | 完善协作体系 | 无 | spec整合、rules精简、CLAUDE.md、自动化验证（ruff/eslint/pre-commit） |
+| 黎 | M2 域1 支援域2 前端组件 | token计量条待后端暴露 | M2域1基础: 会话CRUD+聊天UI+WebSocket重连+thinking事件 |
 | 董 | | | |
 | 袁 | | | |
 

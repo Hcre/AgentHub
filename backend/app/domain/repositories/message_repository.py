@@ -24,3 +24,6 @@ class MessageRepository(ABC):
 
     @abstractmethod
     async def set_pinned(self, message_id: UUID, pinned: bool) -> None: ...
+
+    @abstractmethod
+    async def delete(self, message_id: UUID) -> None: ...

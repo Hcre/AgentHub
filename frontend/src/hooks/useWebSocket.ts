@@ -3,37 +3,59 @@ import { WS_BASE } from "@/api/client";
 import { useChatStore } from "@/stores/chatStore";
 import type { StreamEvent } from "@/types";
 
-/**
- * 管理某个会话的 WebSocket 连接，将流式事件喂给 chatStore。
- * 返回 sendMessage 供输入框调用。
- */
+const MAX_RECONNECT_DELAY = 10000;
+const BASE_DELAY = 1000;
+
 export function useWebSocket(sessionId: string | null) {
   const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const attemptRef = useRef(0);
   const applyStreamEvent = useChatStore((s) => s.applyStreamEvent);
   const setConnected = useChatStore((s) => s.setConnected);
   const addUserMessage = useChatStore((s) => s.addUserMessage);
 
+  const connect = useCallback(
+    (id: string) => {
+      const ws = new WebSocket(`${WS_BASE}/ws/sessions/${id}`);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        setConnected(true);
+        attemptRef.current = 0;
+      };
+
+      ws.onclose = () => {
+        setConnected(false);
+        const delay = Math.min(
+          BASE_DELAY * Math.pow(2, attemptRef.current),
+          MAX_RECONNECT_DELAY
+        );
+        attemptRef.current += 1;
+        reconnectTimer.current = setTimeout(() => connect(id), delay);
+      };
+
+      ws.onmessage = (e) => {
+        try {
+          const event = JSON.parse(e.data) as StreamEvent;
+          applyStreamEvent(event);
+        } catch {
+          // ignore non-JSON
+        }
+      };
+    },
+    [applyStreamEvent, setConnected]
+  );
+
   useEffect(() => {
     if (!sessionId) return;
-    const ws = new WebSocket(`${WS_BASE}/ws/sessions/${sessionId}`);
-    wsRef.current = ws;
-
-    ws.onopen = () => setConnected(true);
-    ws.onclose = () => setConnected(false);
-    ws.onmessage = (e) => {
-      try {
-        const event = JSON.parse(e.data) as StreamEvent;
-        applyStreamEvent(event);
-      } catch {
-        // 忽略非 JSON 帧
-      }
-    };
+    connect(sessionId);
 
     return () => {
-      ws.close();
+      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
+      wsRef.current?.close();
       wsRef.current = null;
     };
-  }, [sessionId, applyStreamEvent, setConnected]);
+  }, [sessionId, connect]);
 
   const sendMessage = useCallback(
     (content: string) => {
@@ -42,7 +64,7 @@ export function useWebSocket(sessionId: string | null) {
       addUserMessage(content);
       ws.send(JSON.stringify({ type: "message", content }));
     },
-    [addUserMessage],
+    [addUserMessage]
   );
 
   return { sendMessage };

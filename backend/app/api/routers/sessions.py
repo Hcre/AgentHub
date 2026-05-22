@@ -12,7 +12,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.api.deps import get_session_service
-from app.application.commands import CreateSessionCommand, PinMessageCommand
+from app.application.commands import (
+    CreateSessionCommand,
+    PinMessageCommand,
+    UnpinMessageCommand,
+    UpdateSessionCommand,
+)
 from app.application.services import SessionService
 from app.schemas.session import MessageOut, SessionCreateRequest, SessionOut
 
@@ -36,9 +41,9 @@ async def create_session(body: SessionCreateRequest, svc: ServiceDep) -> Session
 
 @router.get("/sessions", response_model=list[SessionOut])
 async def list_sessions(
-    svc: ServiceDep, type: str | None = None
+    svc: ServiceDep, type: str | None = None, q: str | None = None
 ) -> list[SessionOut]:
-    items = await svc.list(type=type)
+    items = await svc.list(type=type, query=q)
     return [SessionOut(**i.__dict__) for i in items]
 
 
@@ -58,11 +63,43 @@ async def list_messages(
     return [MessageOut(**i.__dict__) for i in items]
 
 
+@router.patch("/sessions/{session_id}", response_model=SessionOut)
+async def update_session(
+    session_id: UUID, body: dict, svc: ServiceDep
+) -> SessionOut:
+    resp = await svc.update(
+        UpdateSessionCommand(session_id=session_id, title=body.get("title"))
+    )
+    return SessionOut(**resp.__dict__)
+
+
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_session(session_id: UUID, svc: ServiceDep) -> Response:
+    await svc.delete_session(session_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_message(message_id: UUID, svc: ServiceDep) -> Response:
+    await svc.delete_message(message_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.post("/messages/{message_id}/pin", status_code=status.HTTP_204_NO_CONTENT)
 async def pin_message(
     message_id: UUID, session_id: UUID, svc: ServiceDep
 ) -> Response:
     await svc.pin_message(
         PinMessageCommand(session_id=session_id, message_id=message_id)
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/messages/{message_id}/pin", status_code=status.HTTP_204_NO_CONTENT)
+async def unpin_message(
+    message_id: UUID, session_id: UUID, svc: ServiceDep
+) -> Response:
+    await svc.unpin_message(
+        UnpinMessageCommand(session_id=session_id, message_id=message_id)
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
