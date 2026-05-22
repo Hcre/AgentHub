@@ -72,17 +72,21 @@ python scripts/gen_worklog.py 黎 fix-websocket-reconnect
 - 更新"正在做"为你下一个任务
 - 更新"这周完成了"加上本次完成的功能
 
-### 6. Commit + Push + PR
+### 6. Commit + Push
 
 ```bash
 git add .
 git commit -m "feat: <功能简述>"
-git push origin <当前分支>
+git push origin HEAD
 ```
 
-然后去 GitHub 创建 PR。PR 标题用 Conventional Commits 格式。
+### 7. 创建 PR（自动）
 
-### 7. 日志检查（自动）
+```bash
+gh pr create --title "feat: <功能简述>" --body "<改动说明>" --base main
+```
+
+### 8. 日志检查（自动）
 
 push 之前 pre-commit 的 `worklog-check` 钩子会自动检查：
 - 今天是否写了 worklog
@@ -99,4 +103,4 @@ push 之前 pre-commit 的 `worklog-check` 钩子会自动检查：
 - [ ] roadmap 验收状态已更新
 - [ ] worklog 已写（内容完整）
 - [ ] STATUS.md 已更新
-- [ ] PR 已创建
+- [ ] PR 已创建（gh pr create）
