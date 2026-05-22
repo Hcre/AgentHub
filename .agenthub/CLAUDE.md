@@ -49,6 +49,33 @@ IM 聊天式多 Agent 协作平台。5 层洋葱架构（L1 Infrastructure → L
 - **SQL**: Alembic migration。禁止手动改表。
 - **提交**: Conventional Commits。分支 `feature/<domain>/<desc>`
 
+## 可用 Skills
+
+位于 `skills/` 目录，定义了可复用的 AI 工作流程：
+
+| Skill | 何时用 |
+|-------|--------|
+| `feat-start` | 开始新功能：读 spec → 建分支 → 更新 STATUS → 生成 worklog 模板 |
+| `feat-complete` | 完成功能：跑验证 → 更新 roadmap → 提 PR → 写 worklog |
+| `code-review` | CR 自查/互查：对照三大红线逐条检查 |
+| `deploy` | 部署项目：docker compose up → 验证 |
+| `spec-driven-development` | 新功能无 spec 时，先写规格再写代码 |
+
+每个 Skill 内置检查清单，按步执行。
+
+## 自动化检查
+
+| 检查 | 方式 | 触发时机 |
+|------|------|---------|
+| ruff (禁 print/同步阻塞) | `verify.bat` / pre-commit | commit |
+| eslint (no-console/max-lines) | `verify.bat` / pre-commit | commit |
+| tsc typecheck | `verify.bat` / pre-commit | commit |
+| 分支命名 (PR-02) | `check_branch.py` / pre-commit | commit |
+| **worklog 更新** | `check_worklog.py` / pre-commit | **push** |
+| STATUS.md 日期 | `check_worklog.py` / pre-commit | **push** |
+
+push 之前 worklog 检查自动运行，不通过会阻止 push。
+
 ## 协作流程
 
 ### 每次工作前

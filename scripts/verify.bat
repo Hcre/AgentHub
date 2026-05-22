@@ -70,6 +70,18 @@ if %errorlevel% neq 0 (
 )
 cd /d "%~dp0.."
 
+REM 日志: worklog 更新检查
+echo.
+echo ► worklog 更新检查...
+cd /d "%~dp0.."
+python scripts/check_worklog.py
+if %errorlevel% neq 0 (
+    echo ❌ worklog 未更新
+    set fail=1
+) else (
+    echo ✅ worklog 已更新
+)
+
 echo.
 if %fail% equ 0 (
     echo 🎉 全部通过

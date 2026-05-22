@@ -36,3 +36,11 @@ repos:
         language: python
         always_run: true
         pass_filenames: false
+
+      - id: worklog-check
+        name: 日志更新检查
+        entry: python scripts/check_worklog.py
+        language: python
+        always_run: true
+        pass_filenames: false
+        stages: [pre-push]

@@ -60,6 +60,16 @@ else
 fi
 cd "$(dirname "$0")/.." || exit 1
 
+# 日志: worklog 更新检查
+echo ""
+echo "► worklog 更新检查..."
+if python scripts/check_worklog.py; then
+    echo "✅ worklog 已更新"
+else
+    echo "❌ worklog 未更新"
+    fail=1
+fi
+
 echo ""
 if [ "$fail" -eq 0 ]; then
     echo "🎉 全部通过"
