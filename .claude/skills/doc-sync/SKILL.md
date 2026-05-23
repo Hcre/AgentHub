@@ -1,176 +1,239 @@
 ---
 name: doc-sync
-description: Synchronize project documentation — review docs/, spec/, worklogs/, 决策/ for consistency, outdated references, and conflicts. Update CLAUDE.md doc index. Use after any design decision, architecture change, or feature milestone.
+description: 文档同步与治理 — 个人探索归档、团队决策落地、旧版本文档归档、文档索引一致性检查。任何涉及 docs/ spec/ explore/ archive/ 的变更都应触发此 skill。
 ---
 
-# doc-sync: 文档同步审查
+# doc-sync: 文档同步与治理
 
-> 本 skill 是 neat-freak 的项目级定制版，聚焦 AgentHub 特定的文档结构。
+> 确保每次技术探索和团队决策都落在正确的目录、正确的命名、正确的引用。
 
 ## 适用时机
 
-- 完成设计决策后（新增/修改 ADR、PRD 版本迭代）
-- 完成里程碑后（M2→M3 等）
+- 完成一段技术探索，结论需要归档
+- 团队达成设计决策，需要更新 PRD/架构/ADR
 - 新增/删除/重命名文档后
-- 发现文档间引用不一致时
-- `STATUS.md` 或 `CLAUDE.md` 过期时
+- 发现文档引用不一致或过期
+- push 前文档检查不通过（待实现 `check_docs.py`）
+
+## 目录职责速查
+
+| 目录 | 职责 | 读者 | 命名规则 |
+|------|------|------|----------|
+| `docs/` 根 | 当前权威文档（PRD、架构、接口契约） | 人类 | `{English}_{中文}.md` |
+| `docs/explore/` | 技术探索过程 + ADR + 演进日志 | 人类 | 见下文分类 |
+| `docs/archive/` | 过期/被取代的版本文档 | 溯源 | `DEPRECATED_{原名}.md` |
+| `spec/` | 结构化规格（数据模型、API、红线） | Agent | `{english}_{中文}.md` |
+| `.agenthub/worklogs/` | 个人每日工作日志 | 队友 | `YYYY-MM-DD_{描述}.md` |
 
 ## 执行流程
 
-### 第一步：盘查文件清单
+### 第一步：识别场景
 
-强制机械枚举，不凭记忆：
+问自己（或问用户）：这次变更属于哪种？
 
-```bash
-# 逐一列出四个目录
-ls docs/
-ls spec/ && ls spec/domains/ && ls spec/rules/
-ls 决策/
-ls .agenthub/worklogs/ && for d in .agenthub/worklogs/*/; do echo "=== $d ===" && ls "$d"; done
+| 场景 | 触发条件 | 去哪个流程 |
+|------|----------|------------|
+| **A. 个人探索归档** | 刚完成技术调研/踩坑/分析，结论需要留存 | → 流程 A |
+| **B. 团队决策落地** | 团队达成共识，需要更新 PRD/架构/ADR | → 流程 B |
+| **C. 例行审查** | 不确定文档有没有问题，想全量检查 | → 流程 C |
+
+---
+
+### 流程 A：个人探索归档
+
+#### A1. 确定归属
+
+```
+探索结论是否影响项目文档？
+├─ 否 → 只写 worklog（.agenthub/worklogs/{你}/YYYY-MM-DD_{描述}.md）
+└─ 是 → 写 worklog + 归档到 docs/explore/
 ```
 
-确认 `CLAUDE.md`、`README.md`、`.agenthub/worklogs/STATUS.md` 存在。
+#### A2. 归档到 explore/
 
-### 第二步：docs/ 审查
-
-对 `docs/` 下每个文件逐条检查：
-
-| 检查项 | 方法 |
-|--------|------|
-| PRD 版本 | 当前权威 PRD 是否为 v4？旧版本是否标记废弃？ |
-| 架构文档 | 是否引用了 Celery/LiteLLM/12 表？→ 需更新 |
-| ADR 文件 | 是否在 `docs/`？（应在 `决策/`） |
-| 废弃文档 | 是否仍在 `docs/` 而非 `决策/`？ |
-| 交叉引用 | 文档内链接是否指向存在的文件？ |
-| 版本头 | 每个设计文档是否有版本号+日期？ |
-| 过时引用 | `grep -n "Celery\|LiteLLM\|task_events\|task_artifacts\|PRD v1\|PRD v2" docs/*.md` → 有则修复 |
-
-**权威文档清单（这些必须在 docs/，其余移入 决策/）**：
-- `PRD_AgentHub_v4_统一方案.md`
-- `adapter-cli-flow-analysis.md`
-- `架构设计_分层与数据流.md`
-- `task_assignment_v3.md`
-
-### 第三步：spec/ 审查
-
-对 `spec/` 下每个文件：
-
-| 检查项 | 方法 |
-|--------|------|
-| architecture | 技术栈是否含 Celery/LiteLLM？→ 改为 Redis + 双轨 SDK/CLI |
-| architecture | AgentRuntime 接口是否 `stream() + kill() + send_decision()`？ |
-| architecture | 审批模式是否描述了 `permission_denials` 检测 + `bypassPermissions` 重试？ |
-| data-model | 是否有「12 表→6 表」警告头？ |
-| commands | 环境变量是否包含 `CLAUDE_CLI_TIMEOUT`、`AGENT_WORKSPACE_DIR`？ |
-| commands | 是否有 `GET /api/sessions/{id}/history` 端点？ |
-| roadmap | 里程碑日期是否匹配 v4（M2: 5/23-27, M3: 5/28-6/1...）？ |
-| boundaries | 权限边界是否包含了 CLI 代理模式的说明？ |
-| testing | 是否包含 `ClaudeCodeRuntime` 的测试策略？ |
-
-### 第四步：worklogs/ 审查
-
-先枚举所有人员目录：
+文件命名：`{作者}-{英文主题}.md`
 
 ```bash
-ls .agenthub/worklogs/ && for d in .agenthub/worklogs/*/; do echo "=== $d ===" && ls "$d"; done
+# 示例
+mv 踩坑记录.md docs/explore/dong-claude-code-adapter-pitfalls.md
 ```
 
-| 检查项 | 方法 |
-|--------|------|
-| STATUS.md | 日期是否为绝对日期（不写「今天」）？ |
-| STATUS.md | 每人行是否更新？只改自己的行，不动别人 |
-| 个人 worklog | 每人目录下的最新日志是否在 3 天内？ |
-| template.md | 是否存在？ |
-| 日志格式 | 是否包含「谁/日期/分支/关联 Spec」头？是否包含「给下一位的交接」段？ |
+#### A3. 更新 explore/README.md
 
-#### 工作日志创建指引
-
-完成阶段性工作后，按以下规范写入自己的目录。
-
-**写入前强制检查**：
-
-1. **确认身份**：读 `.agenthub/worklogs/STATUS.md`，核对当前会话的身份与 STATUS.md 中人员对齐。不知道你是谁就写不了正确的日志。
-2. **查看分工**：写「给下一位的交接」前，必须先读 `docs/task_assignment_v3.md`，了解各域归属和各人当前任务，确保交接对象正确、阻塞项说清楚等谁配合。
-
-**文件命名**：`.agenthub/worklogs/<你的名字>/YYYY-MM-DD_<简短描述>.md`
-
-**模板**：
+在「个人探索笔记」表格追加一行：
 
 ```markdown
-# 工作日志：<简短标题>
-
-- **谁**: <你的名字>
-- **日期**: YYYY-MM-DD
-- **分支**: <分支名>
-- **关联 Spec**: <引用的 spec/docs 文件>
-
-## 目标
-<!-- 一句话 -->
-
-## 产出
-- [x] <产出项> — <说明>
-
-## 关键决策
-| 决策 | 原因 | 影响 |
-|------|------|------|
-
-## 未完成 / 阻塞
-- [ ] <待做项> — <原因>
-
-## 给下一位的交接
-> 下一步该做什么 / 容易踩坑 / 临时约定 / 需要谁配合
+| [文件名](文件名) | 作者 | 主题一句话 |
 ```
 
-**写入时机**：结束一个阶段工作后、会话结束时。写完后同步更新 `STATUS.md` 中自己的行。
+#### A4. 判断是否需要升级
 
-### 第五步：决策/ 审查
+探索结论具备以下条件之一，走流程 B 升级为 EXP 或 ADR：
+- 影响了架构方向
+- 被团队采纳为设计依据
+- 后续工作会反复引用
+
+---
+
+### 流程 B：团队决策落地
+
+#### B1. 识别影响范围
+
+```
+这个决策影响了什么？
+├─ 架构方向 → 写/更新 ADR → 追加 EVOLUTION.md
+├─ 产品需求 → 更新 docs/PRD_AgentHub_统一方案.md
+├─ 架构设计 → 更新 docs/architecture-design_*.md
+├─ 接口契约 → 更新 docs/adapter-interface_*.md 或 spec/commands_*.md
+├─ 数据模型 → 更新 spec/data-model_数据模型.md
+├─ 开发计划 → 更新 spec/roadmap_开发路线图.md
+└─ 探索结论被正式采纳 → 个人笔记升级为 EXP-NN
+```
+
+#### B2. 升级个人探索 → EXP 报告
+
+```
+命名: EXP-{下一编号}_{中文描述}.md
+更新: docs/explore/README.md 的「团队探索报告」表
+```
+
+#### B3. 写 ADR（如果是架构决策）
+
+```markdown
+# ADR-{NN}: {标题}
+
+- **日期**: YYYY-MM-DD
+- **状态**: 采纳 / 提议 / 已废弃
+- **上下文**: 为什么需要做这个决定
+- **决策**: 我们选择了什么
+- **后果**: 带来的影响（正面和负面）
+- **备选方案**: 考虑过但没选的方案及原因
+```
+
+命名：`ADR-{NN}-{英文简述}.md`，放入 `docs/explore/`
+
+#### B4. 归档旧版本
+
+如果本次更新取代了现有文档：
+- 旧文件移到 `docs/archive/`
+- 加 `DEPRECATED_` 前缀
+- 如果用新版本完全替代旧版本，旧版可以删除（git 历史保留）
+
+#### B5. 追加 EVOLUTION.md
+
+在 `docs/explore/EVOLUTION.md` 顶部追加：
+
+```markdown
+## YYYY-MM-DD — {决策一句话摘要}
+- **决策**: {具体决定}
+- **原因**: {为什么}
+- **影响文件**: {文件路径列表}
+```
+
+#### B6. 更新 CLAUDE.md 索引
+
+检查 `CLAUDE.md` 文档索引表：
+- 新增的文档是否已列入
+- 已删除/归档的文档是否已移除
+- 每个路径是否指向存在的文件
+
+---
+
+### 流程 C：例行审查
+
+#### C1. 枚举文件
+
+```bash
+ls docs/ && ls docs/explore/ && ls docs/archive/
+ls spec/ && ls spec/domains/ && ls spec/rules/
+ls .agenthub/worklogs/ && for d in .agenthub/worklogs/*/; do ls "$d"; done
+```
+
+#### C2. 逐目录检查
+
+**docs/ 根：**
 
 | 检查项 | 方法 |
 |--------|------|
-| 文件数 | 是否与 CLAUDE.md 的统计一致？ |
-| 命名 | ADR 文件是否以 `ADR-` 前缀命名？其余是否保持原名？ |
+| 命名合规 | 所有 `.md` 文件名匹配 `{English}_{中文}.md` |
+| 无版本号 | 文件名不含 `_v\d+`、`_final`、`_最新` |
+| 无废弃文件 | 过时文档是否已移入 archive/ |
+| 无 .html | 不应有 HTML 文件（markdown 为源） |
 
-### 第六步：CLAUDE.md 更新
+**docs/explore/：**
 
-检查 CLAUDE.md 文档索引表：
+| 检查项 | 方法 |
+|--------|------|
+| 命名合规 | EXP 用 `EXP-NN_中文.md`，ADR 用 `ADR-NN-en.md`，个人用 `作者-en.md` |
+| README 同步 | 每个文件是否在 README.md 索引表中 |
+| EVOLUTION 时效 | 最近一次重大决策是否已记录 |
 
-- 每行路径指向的文件是否真实存在
-- 是否有新增文档未列入索引
-- 是否有已废弃/移走的文档仍在索引中
-- 技术栈描述是否与当前一致（Celery 已摘除、双轨架构已体现）
+**docs/archive/：**
 
-### 第七步：自检清单
+| 检查项 | 方法 |
+|--------|------|
+| DEPRECATED 前缀 | 所有文件以 `DEPRECATED_` 开头 |
+| 无重复 | 同一文档不存在多份归档 |
 
-- [ ] `grep -rn "Celery" docs/ spec/` 只出现在历史/废弃文档或明确标注「已移除」的上下文
-- [ ] `grep -rn "LiteLLM" docs/ spec/` 同上
-- [ ] `grep -rn "PRD v1\|PRD v2" docs/` 不出现在当前权威文档中
-- [ ] `grep -rn "今天\|昨天\|最近\|上周" docs/ spec/ .agenthub/worklogs/` 清零
-- [ ] `grep -rn "task_events\|task_artifacts" docs/` 不出现在当前权威文档中
-- [ ] `CLAUDE.md` 的文档索引每行都指向存在的文件
-- [ ] `STATUS.md` 的日期为 `2026-05-XX` 格式
-- [ ] docs/ 只有最终设计文档，决策过程文档在 决策/
+**worklogs/：**
 
-### 第八步：输出变更摘要
+| 检查项 | 方法 |
+|--------|------|
+| 日期前缀 | 日志文件以 `YYYY-MM-DD_` 开头 |
+| 无文档混入 | worklogs 下不应有 PRD/ADR/EXP 等正式文档 |
+| STATUS.md | 日期为绝对日期，每人在一行 |
 
-```
-## doc-sync 完成
+#### C3. CLAUDE.md 索引一致性
 
-### docs/ 变更
-- xxx — 更新xxx引用
-
-### spec/ 变更
-- xxx — 摘除Celery
-
-### worklogs/ 变更
-- 更新 STATUS.md 日期
-
-### 决策/ 变更
-- 移入 xxx（废弃文档）
-
-### CLAUDE.md
-- 更新文档索引
+```bash
+# 提取 CLAUDE.md 中所有文件路径引用，逐一检查是否存在
+grep -oP '`[^`]+\.md`' CLAUDE.md | tr -d '`' | while read f; do
+  [ -f "$f" ] || echo "MISSING: $f"
+done
 ```
 
-## 参考
+#### C4. 输出审查报告
 
-本 skill 基于 neat-freak 的精简版，移除了 Agent 记忆系统操作（AgentHub 不使用 memory 文件）。如果想做全局级的目录结构整理，使用全局 neat-freak。
+```
+## doc-sync 审查报告
+
+### 命名违规
+- xxx.md — 缺少英文前缀
+
+### 位置错误
+- xxx.md — 应在 archive/ 而非 explore/
+
+### 索引缺失
+- xxx.md — 未列入 explore/README.md
+- CLAUDE.md — 引用了已删除的 xxx.md
+
+### 已修复
+- xxx → 重命名为 yyy
+```
+
+---
+
+## 文件命名参考
+
+| 所在目录 | 格式 | 正确示例 | 错误示例 |
+|----------|------|----------|----------|
+| `docs/` | `{English}_{中文}.md` | `PRD_AgentHub_统一方案.md` | `PRD_v4.md`、`最终版PRD.md` |
+| `docs/explore/` | `EXP-{NN}_{中文}.md` | `EXP-01_架构模式对比矩阵.md` | `01_架构.md` |
+| `docs/explore/` | `ADR-{NN}-{en-slug}.md` | `ADR-01-cli-first-pivot.md` | `ADR_v1.md` |
+| `docs/explore/` | `{作者}-{en-topic}.md` | `dong-sendmessage-flow-analysis.md` | `cc-haha.md` |
+| `docs/archive/` | `DEPRECATED_{原名}.md` | `DEPRECATED_PRD_v3.md` | `old_PRD.md` |
+| `spec/` | `{english}_{中文}.md` | `data-model_数据模型.md` | `数据模型.md` |
+| `worklogs/` | `YYYY-MM-DD_{描述}.md` | `2026-05-23_修复一致性.md` | `修复一致性.md` |
+
+## 自检清单
+
+完成后逐条确认：
+
+- [ ] 新增文件命名符合所在目录规则
+- [ ] 旧版本文件已移入 archive/ 或删除
+- [ ] `docs/explore/README.md` 索引已更新
+- [ ] `EVOLUTION.md` 已追加（如果是方向变更）
+- [ ] `CLAUDE.md` 文档索引路径全部有效
+- [ ] `grep -rn "_v\d\|_final\|_最新" docs/` 无结果（archive/ 除外）
+- [ ] `grep -rn "\.html" docs/` 无结果（不应有 HTML 文件）
+- [ ] worklogs/ 下无正式文档混入

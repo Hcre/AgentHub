@@ -14,20 +14,27 @@ IM 聊天式多 Agent 协作平台。5 层洋葱架构（L1 Infrastructure → L
 
 | 文档 | 何时读 |
 |------|--------|
-| `docs/PRD_AgentHub_v4_统一方案.md` ⬅️ | 做任何功能前，当前权威 PRD |
-| `docs/架构设计_分层与数据流.md` | 写后端逻辑前，查数据流场景 |
-| `docs/adapter-cli-flow-analysis.md` ⬅️ | CLI 模式每个场景的完整调用链 |
-| `docs/DOC-15-claude-adapter-design.md` | 双轨架构实现细节 |
-| `docs/adapter_interface_spec.md` | 接入新 Agent 系统前（接口契约） |
-| `docs/task_assignment_v3.md` | 任务分配与分工 |
-| `决策/` | 架构决策过程（ADR-01、v1→v4 演变、被否决方案、调研分析等 15 份） |
+| `docs/PRD_AgentHub_统一方案.md` ⬅️ | 做任何功能前，当前权威 PRD |
+| `docs/architecture-design_架构设计_分层与数据流.md` | 写后端逻辑前，查数据流场景 |
+| `docs/adapter-cli-flow_适配器CLI流程分析.md` ⬅️ | CLI 模式每个场景的完整调用链 |
+| `docs/adapter-interface_适配器接口规范.md` | 接入新 Agent 系统前（接口契约） |
+| `docs/task-assignment_任务分配.md` | 任务分配与分工 |
+| `docs/community-research_社区调研与架构对比分析.md` | 竞品调研与架构选型参考 |
+| `docs/explore/` | 技术探索文档 → [README.md](docs/explore/README.md) 索引 + [EVOLUTION.md](docs/explore/EVOLUTION.md) 演进日志 |
+| `docs/explore/ADR-01-cli-first-pivot.md` | 双轨架构决策记录 |
+| `docs/archive/` | 历史版本文档归档 |
 | `spec/AgentHub_SPEC_项目主规格.md` | 首次接触，了解全貌 |
+| `spec/architecture_架构定义.md` | 做架构决策前 |
 | `spec/data-model_数据模型.md` | 改数据库前 |
+| `spec/commands_命令接口.md` | 写 API/WS endpoint 前 |
 | `spec/boundaries_边界矩阵.md` | 写权限/审批逻辑前 |
+| `spec/assumptions_假设清单.md` | 理解隐含假设前提 |
 | `spec/testing-strategy_测试策略.md` | 写测试前 |
 | `spec/roadmap_开发路线图.md` | 领任务前，看当前进度 |
+| `spec/domains/` | 深入某个域时读对应文件 |
 | `spec/rules/arch-rules_架构红线.md` | 违反 = 方案打回 |
 | `spec/rules/code-rules_代码红线.md` | 违反 = CR 不通过 |
+| `spec/rules/process-rules_流程红线.md` | 违反 = 流程违规 |
 
 ## 行为准则
 
@@ -58,6 +65,7 @@ IM 聊天式多 Agent 协作平台。5 层洋葱架构（L1 Infrastructure → L
 | `feat-start` | 开始新功能：读 spec → 建分支 → 更新 STATUS → 生成 worklog 模板 |
 | `feat-complete` | 完成功能：跑验证 → 更新 roadmap → 提 PR → 写 worklog |
 | `code-review` | CR 自查/互查：对照三大红线逐条检查 |
+| `doc-sync` | 文档同步：个人探索归档 / 团队决策落地 / 例行审查 |
 | `deploy` | 部署项目：docker compose up → 验证 |
 | `spec-driven-development` | 新功能无 spec 时，先写规格再写代码 |
 
@@ -73,6 +81,8 @@ IM 聊天式多 Agent 协作平台。5 层洋葱架构（L1 Infrastructure → L
 | 分支命名 (PR-02) | `check_branch.py` / pre-commit | commit |
 | **worklog 更新** | `check_worklog.py` / pre-commit | **push** |
 | STATUS.md 日期 | `check_worklog.py` / pre-commit | **push** |
+| **文档命名合规** | `check_docs.py` / pre-commit | **push** |
+| CLAUDE.md 路径有效 | `check_docs.py` / pre-commit | **push** |
 
 push 之前 worklog 检查自动运行，不通过会阻止 push。
 
@@ -80,29 +90,32 @@ push 之前 worklog 检查自动运行，不通过会阻止 push。
 
 ### 每次工作前
 1. `git pull` 同步最新代码
-2. 读 `STATUS.md` 了解其他人在做什么
+2. 读 `.agenthub/worklogs/STATUS.md` 了解其他人在做什么
 3. 读 `spec/roadmap_开发路线图.md` 确认当前进度
 
 ### 每次工作后
 1. 在自己的 `worklogs/` 目录下写日志（文件名: `YYYY-MM-DD_<简短描述>.md`）
-2. 更新 `STATUS.md` 中你那一行（正在做 / 阻塞 / 完成了什么）
+2. 更新 `.agenthub/worklogs/STATUS.md` 中你那一行（正在做 / 阻塞 / 完成了什么）
 3. 如果完成了 roadmap 中的任务，按 PR-08 更新验收状态
 4. Commit + Push（feature branch → PR）
 
 ### 日志模板
-见 `worklogs/template.md`。重点是「给下一位的交接」那一段 —— 让接手的人能无缝继续。
+见 `.agenthub/worklogs/template.md`。重点是「给下一位的交接」那一段 —— 让接手的人能无缝继续。
 
 ## 目录结构
 
 ```
 agenthub/
-├── .agenthub/           # AI 入口 + 工作日志
-│   ├── CLAUDE.md        # ← 你正在读的文件
-│   └── worklogs/        # 个人日志 + STATUS.md
+├── CLAUDE.md            # ← 你正在读的文件（AI/Agent 入口）
+├── README.md            # 人类入口
 ├── docs/                # 人类阅读（高频）：PRD、架构
-├── spec/                # AI 参考（结构化）：数据模型、API、红线
-│   ├── rules/           # 三大红线
-│   └── domains/         # 按域拆分
+│   ├── explore/         #   技术探索文档 + EVOLUTION.md 演进日志
+│   └── archive/         #   历史版本文档归档
+├── spec/                # Agent 参考（结构化）：数据模型、API、红线
+│   ├── rules/           #   三大红线
+│   └── domains/         #   按域拆分
+├── .agenthub/           # 工作日志
+│   └── worklogs/        #   个人日志 + STATUS.md
 ├── skills/              # 可复用 AI 技能
 ├── backend/app/
 │   ├── api/             # L4 路由 + WS

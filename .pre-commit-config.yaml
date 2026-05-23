@@ -44,3 +44,11 @@ repos:
         always_run: true
         pass_filenames: false
         stages: [pre-push]
+
+      - id: doc-check
+        name: 文档结构检查
+        entry: python scripts/check_docs.py
+        language: python
+        always_run: true
+        pass_filenames: false
+        stages: [pre-push]
