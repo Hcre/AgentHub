@@ -1,9 +1,12 @@
 import {
   Activity,
+  AtSign,
+  Bold,
   Brain,
   Calendar,
   Check,
   ChevronDown,
+  ChevronUp,
   FileDiff,
   FileText,
   Files,
@@ -16,9 +19,12 @@ import {
   MoreHorizontal,
   PanelLeft,
   PanelRight,
+  Paperclip,
   Plus,
   Search,
+  Send,
   Settings,
+  Smile,
   Sparkles,
   Sun,
   type LucideIcon,
@@ -48,6 +54,12 @@ const MAP: Record<IconName, LucideIcon> = {
   doc: FileText,
   sun: Sun,
   moon: Moon,
+  send: Send,
+  paperclip: Paperclip,
+  bold: Bold,
+  smile: Smile,
+  atSign: AtSign,
+  chevronUp: ChevronUp,
 }
 
 export interface IconProps {
