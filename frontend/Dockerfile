@@ -4,6 +4,6 @@ FROM nginx:alpine
 
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY AgentHub-v0.html /usr/share/nginx/html/AgentHub-v0.html
-COPY v0/ /usr/share/nginx/html/v0/
+COPY src/ /usr/share/nginx/html/src/
 
 EXPOSE 80
