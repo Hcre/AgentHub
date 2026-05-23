@@ -39,14 +39,12 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
     if system == AgentSystem.CLAUDE_CODE:
         from app.infrastructure.llm.claude_code_runtime import ClaudeCodeRuntime
 
-        # CLI 使用本机 claude 认证，api_key 可选
-        api_key = decrypt_secret(agent.api_key_encrypted) if agent.api_key_encrypted else ""
-
         s = agent.settings or {}
+
         return ClaudeCodeRuntime(
-            api_key=api_key,
             model=agent.model,
-            base_url=agent.base_url,
+            agent_id=str(agent.id),
+            proxy_base=settings.proxy_base_url,
             permission_mode=s.get("permission_mode", "acceptEdits"),
             max_turns=s.get("max_turns", 10),
             timeout=s.get("cli_timeout", settings.claude_cli_timeout),
@@ -74,7 +72,6 @@ def build_adapter() -> UnifiedAgent:
         from app.infrastructure.llm.claude_code_runtime import ClaudeCodeRuntime
 
         return ClaudeCodeRuntime(
-            api_key=settings.anthropic_api_key,
             model=settings.default_model,
             timeout=settings.claude_cli_timeout,
         )

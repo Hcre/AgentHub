@@ -83,26 +83,29 @@ class TestParseLineResult:
 class TestConstructor:
     def test_defaults(self) -> None:
         runtime = ClaudeCodeRuntime()
-        assert runtime._api_key == ""
         assert runtime._model == ""
+        assert runtime._proxy_url == ""
         assert runtime._permission_mode == "acceptEdits"
         assert runtime._max_turns == 10
 
     def test_full_config(self) -> None:
         runtime = ClaudeCodeRuntime(
-            api_key="sk-test",
             model="claude-opus-4",
-            base_url="https://api.example.com",
+            agent_id="test-agent-id",
+            proxy_base="http://127.0.0.1:8000",
             permission_mode="bypassPermissions",
             max_turns=5,
             timeout=120,
         )
-        assert runtime._api_key == "sk-test"
         assert runtime._model == "claude-opus-4"
-        assert runtime._base_url == "https://api.example.com"
+        assert "test-agent-id" in runtime._proxy_url
         assert runtime._permission_mode == "bypassPermissions"
         assert runtime._max_turns == 5
         assert runtime._timeout == 120
+
+    def test_global_mode_no_proxy(self) -> None:
+        runtime = ClaudeCodeRuntime(model="claude-sonnet-4")
+        assert runtime._proxy_url == ""
 
 
 class TestBuildCmd:
@@ -131,16 +134,25 @@ class TestBuildEnv:
         env = runtime._build_env()
         assert "PATH" in env
 
-    def test_sets_anthropic_vars(self) -> None:
+    def test_proxy_mode_env(self) -> None:
         runtime = ClaudeCodeRuntime(
-            api_key="sk-test",
             model="claude-opus-4",
-            base_url="https://api.example.com",
+            agent_id="agent-001",
+            proxy_base="http://127.0.0.1:8000",
         )
         env = runtime._build_env()
-        assert env["ANTHROPIC_API_KEY"] == "sk-test"
+        assert env["ANTHROPIC_API_KEY"] == "agenthub-proxy"
         assert env["ANTHROPIC_MODEL"] == "claude-opus-4"
-        assert env["ANTHROPIC_BASE_URL"] == "https://api.example.com"
+        assert "agent-001" in env["ANTHROPIC_BASE_URL"]
+
+    def test_global_mode_preserves_shell_env(self) -> None:
+        """全局模式不覆盖 ANTHROPIC_API_KEY/BASE_URL，继承 os.environ。"""
+        import os
+        runtime = ClaudeCodeRuntime(model="claude-sonnet-4")
+        env = runtime._build_env()
+        assert env["ANTHROPIC_MODEL"] == "claude-sonnet-4"
+        # 代理模式下不设置这些
+        assert env.get("ANTHROPIC_API_KEY") != "agenthub-proxy"
 
 
 class TestParseLineText:

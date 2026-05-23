@@ -5,11 +5,12 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routers import agents, groups, inbox, sessions, tasks
+from app.api.routers import agents, groups, inbox, proxy, sessions, tasks
 from app.api.ws import router as ws_router
 from app.core.config import settings
 from app.core.exceptions import (
@@ -23,9 +24,12 @@ from app.infrastructure.cache.redis_client import close_redis
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     setup_logging()
+    client = httpx.AsyncClient(timeout=300.0)
+    app.state.client = client
     yield
+    await client.aclose()
     await close_redis()
 
 
@@ -70,6 +74,7 @@ async def _app_error(_: Request, exc: AgentHubError) -> JSONResponse:
 
 # --- 路由注册 ---
 
+app.include_router(proxy.router)
 app.include_router(agents.router)
 app.include_router(sessions.router)
 app.include_router(groups.router)

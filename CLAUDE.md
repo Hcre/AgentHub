@@ -17,10 +17,10 @@ IM 聊天式多 Agent 协作平台。5 层洋葱架构（L1 Infrastructure → L
 | `docs/PRD_AgentHub_v4_统一方案.md` ⬅️ | 做任何功能前，当前权威 PRD |
 | `docs/架构设计_分层与数据流.md` | 写后端逻辑前，查数据流场景 |
 | `docs/adapter-cli-flow-analysis.md` ⬅️ | CLI 模式每个场景的完整调用链 |
-| `docs/DOC-15-claude-adapter-design.md` | 双轨架构实现细节 |
-| `docs/adapter_interface_spec.md` | 接入新 Agent 系统前（接口契约） |
 | `docs/task_assignment_v3.md` | 任务分配与分工 |
-| `决策/` | 架构决策过程（ADR-01、v1→v4 演变、被否决方案、调研分析等 15 份） |
+| `docs/DEPLOYMENT_GUIDE.md` | 部署与测试指南（环境搭建、前后端启动、踩坑速查） |
+| `决策/` | 架构决策过程（01-08 + dong/ 分析文档、被否决方案） |
+| `.agenthub/worklogs/董/解决cli只能接入官方api问题/CLI多模型代理方案.md` | CLI 多模型接入方案（代理模式） |
 | `spec/AgentHub_SPEC_项目主规格.md` | 首次接触，了解全貌 |
 | `spec/data-model_数据模型.md` | 改数据库前 |
 | `spec/boundaries_边界矩阵.md` | 写权限/审批逻辑前 |
@@ -42,6 +42,9 @@ IM 聊天式多 Agent 协作平台。5 层洋葱架构（L1 Infrastructure → L
 - 质疑与 architecture 或 arch-rules 矛盾的方案
 - 增量交付，每步验证
 - 自行补充边界条件（参考 boundaries.md）
+- 若有疑问或不确认，直接询问，禁止猜测幻想
+- 依据的信息必须可信、可验证
+- **合并前审查**：先执行 `scripts/pre-merge-check.sh [target]` 审查差异。安全的问题直接修；模糊项列出经确认后再处理。禁止跳过此步骤直接 `git merge` 或 `gh pr create`。
 
 ### 技术约束
 - **Python**: FastAPI async + Pydantic v2 + SQLAlchemy ORM + ruff。禁止同步阻塞。
