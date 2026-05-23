@@ -7,7 +7,8 @@ import { RightPanel } from './RightPanel'
 
 export function AppShell() {
   const { sidebarCollapsed, rightCollapsed, section, toggleSidebar } = useUIStore()
-  const showRight = (section === 'chat' || section === 'group') && !rightCollapsed
+  // 右侧「阶段/产出」面板仅在私聊有意义；群聊为全宽频道视图
+  const showRight = section === 'chat' && !rightCollapsed
 
   return (
     <div className="flex h-full">

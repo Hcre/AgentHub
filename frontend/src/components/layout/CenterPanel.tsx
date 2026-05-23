@@ -2,19 +2,24 @@ import { cn } from '../../lib/cn'
 import { agents, centerTabs } from '../../data/mock'
 import { useUIStore } from '../../stores/uiStore'
 import { ChatView } from '../chat/ChatView'
+import { GroupChatView } from '../group/GroupChatView'
 import { TasksTabView } from '../tasks/TasksTabView'
 import { Avatar, Badge, Button, Icon } from '../ui'
 
 const SECTION_TITLE: Record<string, string> = {
   inbox: '收件箱',
   calendar: '日历',
-  group: '群组频道',
   'agent-detail': '助手详情',
 }
 
 export function CenterPanel() {
   const { section, activeTab, activeAgentId, theme, setActiveTab, toggleTheme, toggleRight } =
     useUIStore()
+
+  // 群聊：整屏频道视图
+  if (section === 'group') {
+    return <GroupChatView />
+  }
 
   // 左侧导航「任务」：整屏任务看板
   if (section === 'tasks') {

@@ -94,6 +94,56 @@ export interface Task {
   due?: string
 }
 
+// ── 群组 / 协调者（Phase 4） ──
+
+export interface Group {
+  id: string
+  name: string
+  description: string
+  members: string[] // agentId[]
+  pinnedTask?: string
+}
+
+/** 协调者：编排群组工作的特殊 agent。 */
+export interface Coordinator {
+  id: 'coordinator'
+  name: string
+  role: string
+  color: AgentColor
+  online: boolean
+  bio: string
+}
+
+/** 协调者分发方案中的单个子任务步骤。 */
+export interface PlanStep {
+  id: string
+  who: string // agentId
+  label: string
+  eta: number // 分钟
+  depends: string[] // 依赖的 step id
+}
+
+export interface CoordinatorPlan {
+  summary: string
+  steps: PlanStep[]
+  watchouts: string[]
+}
+
+/**
+ * 群聊消息。`who` 取值：agentId | 'coordinator' | 'user'。
+ * `kind === 'plan'` 时带结构化分发方案 `plan`。
+ */
+export interface GroupMessage {
+  id: string
+  from: 'user' | 'agent'
+  who: string
+  time: string
+  text?: string
+  kind?: 'plan'
+  plan?: CoordinatorPlan
+  requiresApproval?: boolean
+}
+
 /** Icon 组件支持的图标名（映射到 lucide-react），见 components/ui/Icon.tsx */
 export type IconName =
   | 'inbox'
@@ -127,3 +177,8 @@ export type IconName =
   | 'list'
   | 'grid'
   | 'x'
+  | 'network'
+  | 'zap'
+  | 'clock'
+  | 'shieldCheck'
+  | 'pin'

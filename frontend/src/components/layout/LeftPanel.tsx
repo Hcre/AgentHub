@@ -72,8 +72,10 @@ export function LeftPanel() {
     section,
     activeAgentId,
     activeConversationId,
+    activeGroupId,
     setSection,
     openConversation,
+    openGroup,
     toggleSidebar,
   } = useUIStore()
   const [openCh, setOpenCh] = useState(true)
@@ -131,8 +133,8 @@ export function LeftPanel() {
                 label={c.name}
                 dotted
                 badge={c.unread}
-                active={section === 'group'}
-                onClick={() => setSection('group')}
+                active={section === 'group' && activeGroupId === c.id}
+                onClick={() => openGroup(c.id)}
               />
             ))}
           </div>
