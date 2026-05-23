@@ -4,23 +4,31 @@
 > 当前生效的规格在 `docs/` 根目录和 `spec/`。
 > 项目方向变更时间线见 [EVOLUTION.md](EVOLUTION.md)。
 
+## 目录结构
+
+```
+docs/explore/
+├── README.md              ← 你在读的文件
+├── EVOLUTION.md           ← 项目决策演进日志
+├── ADR-NN-*.md            ← 架构决策记录（团队级）
+├── EXP-NN_*.md            ← 技术探索报告（团队级）
+├── 黎/                    ← 黎的个人探索
+├── 董/                    ← 董的个人探索
+│   ├── claude-code-haha-analysis.md
+│   ├── sendmessage-flow-analysis.md
+│   └── claude-code-adapter-pitfalls.md
+└── 袁/                    ← 袁的个人探索
+```
+
 ## 分类
 
-| 前缀 | 含义 | 示例 |
-|------|------|------|
-| `EXP-NN_` | 团队技术探索报告（编号） | `EXP-01_架构模式对比矩阵.md` |
-| `ADR-NN-` | 架构决策记录 | `ADR-01-cli-first-pivot.md` |
-| `dong-` / `黎-` | 个人探索笔记 | `dong-claude-code-haha-analysis.md` |
+| 层级 | 位置 | 命名 | 含义 |
+|------|------|------|------|
+| 团队 | explore/ 根 | `EXP-NN_{中文}.md` | 团队技术探索报告，经评审后编号 |
+| 团队 | explore/ 根 | `ADR-NN-{en-slug}.md` | 架构决策记录，影响项目方向 |
+| 个人 | `explore/{你}/` | 自由命名 `.md` | 个人技术探索笔记，放入自己的子目录 |
 
-## 文件清单
-
-### 架构决策记录
-
-| 文件 | 决策摘要 |
-|------|----------|
-| [ADR-01-cli-first-pivot.md](ADR-01-cli-first-pivot.md) | CLI优先双轨架构：SDK/CLI 双路径，CLI 为主 |
-
-### 团队探索报告
+## 团队探索报告
 
 | 编号 | 文件 | 主题 |
 |------|------|------|
@@ -36,29 +44,42 @@
 | EXP-10 | [结构化上下文设计](EXP-10_structured-context-design.md) | Agent 上下文结构设计 |
 | EXP-11 | [上下文注入问题](EXP-11_context-injection-problem.md) | 上下文注入方案分析 |
 
-### 个人探索笔记
+## 架构决策记录
 
-| 文件 | 作者 | 主题 |
-|------|------|------|
-| [dong-claude-code-haha-analysis](dong-claude-code-haha-analysis.md) | 董 | Claude Code 行为分析 |
-| [dong-sendmessage-flow-analysis](dong-sendmessage-flow-analysis.md) | 董 | SendMessage 流程分析 |
-| [dong-claude-code-adapter-pitfalls](dong-claude-code-adapter-pitfalls.md) | 董 | Claude Code 适配器踩坑记录 |
+| 文件 | 决策摘要 |
+|------|----------|
+| [ADR-01-cli-first-pivot.md](ADR-01-cli-first-pivot.md) | CLI优先双轨架构：SDK/CLI 双路径，CLI 为主 |
+
+## 个人探索
+
+### 董/
+| 文件 | 主题 |
+|------|------|
+| [claude-code-haha-analysis](董/claude-code-haha-analysis.md) | Claude Code 行为分析 |
+| [sendmessage-flow-analysis](董/sendmessage-flow-analysis.md) | SendMessage 流程分析 |
+| [claude-code-adapter-pitfalls](董/claude-code-adapter-pitfalls.md) | Claude Code 适配器踩坑记录 |
+
+### 黎/
+暂无个人探索文档。
+
+### 袁/
+暂无个人探索文档。
 
 ## 文档生命周期
 
 ```
-个人探索笔记                 团队评审通过              EXP 编号报告
-(dong-xxx.md)  ────────→  影响架构/PRD   ────────→  (EXP-NN_xxx.md)
-                              │
-                              ├── 落地为正式决策 → ADR-NN-xxx.md
-                              ├── 更新 docs/ 根文件 → docs/xxx.md
-                              └── 旧版 → docs/archive/
+个人探索笔记                    团队评审通过              EXP 编号报告
+(黎/xxx.md 或 董/xxx.md) ──→ 影响架构/PRD ────────→ (EXP-NN_xxx.md)
+                                │
+                                ├── 落地为正式决策 → ADR-NN-xxx.md
+                                ├── 更新 docs/ 根文件 → docs/xxx.md
+                                └── 旧版 → docs/archive/
 ```
 
 ## 规则
 
-1. **新探索报告**：用 `EXP-{下一编号}_{中文描述}.md`，更新本 README
-2. **新 ADR**：用 `ADR-{下一编号}-{英文简述}.md`，更新本 README + EVOLUTION.md
-3. **个人探索**：用 `{作者}-{英文主题}.md`，有结论后评审是否升级为 EXP
+1. **个人探索**：在自己的子目录（`黎/` `董/` `袁/`）下自由创建 `.md` 文件
+2. **升级为团队报告**：经评审后，用 `EXP-{下一编号}_{中文描述}.md` 放到 explore/ 根，更新本 README
+3. **新 ADR**：用 `ADR-{下一编号}-{英文简述}.md`，更新本 README + EVOLUTION.md
 4. **过时 PRD/规格不进 explore**：直接进 `docs/archive/`
 5. **接口契约/当前规格不进 explore**：放 `docs/` 根或 `spec/`

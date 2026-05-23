@@ -2,12 +2,14 @@
 
 Checks:
   1. docs/ root naming: {English}_{Chinese}.md
-  2. docs/explore/ naming: EXP-NN_ / ADR-NN- / author- / README / EVOLUTION
-  3. docs/archive/ naming: DEPRECATED_ prefix
-  4. worklogs/ naming: YYYY-MM-DD_ prefix (STATUS.md, template.md exempt)
-  5. No version suffixes (_vNN, _final, _new, _old)
-  6. No .html files in docs/
-  7. CLAUDE.md references all resolve to existing files
+  2. docs/explore/ root: EXP-NN_ / ADR-NN- / README / EVOLUTION
+  3. docs/explore/ personal subdirs: {黎,董,袁}/topic.md
+  4. docs/archive/ naming: DEPRECATED_ prefix
+  5. worklogs/ naming: YYYY-MM-DD_ prefix
+  6. No version suffixes (_vNN, _final, _new, _old)
+  7. No .html files in docs/
+  8. CLAUDE.md references all resolve
+  9. pre-commit hooks are installed
 """
 
 from __future__ import annotations
@@ -21,17 +23,16 @@ ROOT = Path(__file__).resolve().parent.parent
 # -- Naming patterns --
 
 DOCS_PATTERN = re.compile(r"^[a-zA-Z][a-zA-Z0-9-]*_.+\.md$")
-EXPLORE_PATTERNS = {
+EXPLORE_ROOT_PATTERNS = {
     "EXP": re.compile(r"^EXP-\d{2}_.+\.md$"),
     "ADR": re.compile(r"^ADR-\d{2}-[a-z0-9-]+\.md$"),
-    "personal": re.compile(r"^[a-zA-Z]+-[a-z0-9-]+\.md$"),
     "special": {"README.md", "EVOLUTION.md"},
 }
+EXPLORE_MEMBERS = {"黎", "董", "袁"}
 ARCHIVE_PATTERN = re.compile(r"^DEPRECATED_.+\.md$")
 WORKLOG_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}_.+\.md$")
 WORKLOG_SPECIAL = {"STATUS.md", "template.md"}
 VERSION_SUFFIX = re.compile(r"_(v\d+|final|最新|old|new|副本)")
-HTML_FILE = re.compile(r"\.html$", re.IGNORECASE)
 
 errors: list[str] = []
 
@@ -64,21 +65,35 @@ explore_dir = docs_root / "explore"
 if explore_dir.is_dir():
     for f in explore_dir.iterdir():
         if f.is_dir():
+            # Personal subdirectory: check it's a known member
+            if f.name not in EXPLORE_MEMBERS:
+                error(
+                    f"docs/explore/{f.name}/: unknown personal directory, "
+                    f"allowed: {', '.join(sorted(EXPLORE_MEMBERS))}"
+                )
+                continue
+            # Check files inside personal subdir
+            for sub in f.iterdir():
+                if sub.suffix != ".md":
+                    continue
+                if VERSION_SUFFIX.search(sub.stem):
+                    error(
+                        f"docs/explore/{f.name}/{sub.name}: "
+                        f"filename contains version suffix"
+                    )
             continue
         if f.suffix != ".md":
             continue
         name = f.name
-        if name in EXPLORE_PATTERNS["special"]:
+        if name in EXPLORE_ROOT_PATTERNS["special"]:
             continue
-        if EXPLORE_PATTERNS["EXP"].match(name):
+        if EXPLORE_ROOT_PATTERNS["EXP"].match(name):
             continue
-        if EXPLORE_PATTERNS["ADR"].match(name):
-            continue
-        if EXPLORE_PATTERNS["personal"].match(name):
+        if EXPLORE_ROOT_PATTERNS["ADR"].match(name):
             continue
         error(
-            f"docs/explore/{name}: naming violation, "
-            f"must be EXP-NN_{{desc}}.md / ADR-NN-{{slug}}.md / {{author}}-{{topic}}.md"
+            f"docs/explore/{name}: must be EXP-NN_{{desc}}.md / ADR-NN-{{slug}}.md "
+            f"/ README.md / EVOLUTION.md, or put in personal subdirectory (黎/董/袁/)"
         )
 
 # 3. docs/archive/
@@ -137,7 +152,6 @@ if claude_md.is_file():
     content = claude_md.read_text(encoding="utf-8")
     refs = re.findall(r"`([^`]+\.md)`", content)
     for ref in refs:
-        # Skip template placeholders like `YYYY-MM-DD_<desc>.md`
         if "<" in ref or ">" in ref:
             continue
         link_match = re.match(r"\[.*\]\((.+)\)", ref)
@@ -146,6 +160,22 @@ if claude_md.is_file():
         resolved = ROOT / ref
         if not resolved.exists():
             error(f"CLAUDE.md references missing file: `{ref}`")
+
+# 8. Pre-commit hooks installed
+hooks_dir = ROOT / ".git" / "hooks"
+for hook_name in ["pre-commit", "pre-push"]:
+    hook_file = hooks_dir / hook_name
+    if not hook_file.exists():
+        error(
+            f".git/hooks/{hook_name} not installed. "
+            f"Run: pre-commit install --hook-type pre-push && pre-commit install"
+        )
+    elif hook_file.stat().st_size < 100:
+        # Sample files are small; real pre-commit hooks are larger
+        error(
+            f".git/hooks/{hook_name} appears to be a sample. "
+            f"Run: pre-commit install --hook-type pre-push && pre-commit install"
+        )
 
 # -- Output --
 

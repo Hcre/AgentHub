@@ -64,6 +64,7 @@ IM 聊天式多 Agent 协作平台。5 层洋葱架构（L1 Infrastructure → L
 |-------|--------|
 | `feat-start` | 开始新功能：读 spec → 建分支 → 更新 STATUS → 生成 worklog 模板 |
 | `feat-complete` | 完成功能：跑验证 → 更新 roadmap → 提 PR → 写 worklog |
+| `git-workflow` | Git 分支管理：同步 main、diff 审查、合并前检查 |
 | `code-review` | CR 自查/互查：对照三大红线逐条检查 |
 | `doc-sync` | 文档同步：个人探索归档 / 团队决策落地 / 例行审查 |
 | `deploy` | 部署项目：docker compose up → 验证 |
@@ -78,18 +79,22 @@ IM 聊天式多 Agent 协作平台。5 层洋葱架构（L1 Infrastructure → L
 | ruff (禁 print/同步阻塞) | `verify.bat` / pre-commit | commit |
 | eslint (no-console/max-lines) | `verify.bat` / pre-commit | commit |
 | tsc typecheck | `verify.bat` / pre-commit | commit |
-| 分支命名 (PR-02) | `check_branch.py` / pre-commit | commit |
 | **worklog 更新** | `check_worklog.py` / pre-commit | **push** |
 | STATUS.md 日期 | `check_worklog.py` / pre-commit | **push** |
+| **分支命名** | `check_branch.py` / pre-commit | **push** |
 | **文档命名合规** | `check_docs.py` / pre-commit | **push** |
+| **hooks 已安装** | `check_docs.py` / pre-commit | **push** |
 | CLAUDE.md 路径有效 | `check_docs.py` / pre-commit | **push** |
+
+> **首次克隆后必须运行**：`pre-commit install --hook-type pre-push && pre-commit install`
+> 否则以上所有检查都不会触发。
 
 push 之前 worklog 检查自动运行，不通过会阻止 push。
 
 ## 协作流程
 
 ### 每次工作前
-1. `git pull` 同步最新代码
+1. `/git-workflow` 检查分支 + 同步 main（不要在 main 上开发）
 2. 读 `.agenthub/worklogs/STATUS.md` 了解其他人在做什么
 3. 读 `spec/roadmap_开发路线图.md` 确认当前进度
 
