@@ -1,7 +1,7 @@
 # 域2：Agent 编排系统 — 任务清单
 
 > 职责：Agent 管理、群组管理、任务分解、DAG 执行、HITL 审批、Worker 调度
-> 技术栈：FastAPI (Coordinator/TaskEngine) + Celery + PostgreSQL (tasks/events) + Redis (限流)
+> 技术栈：FastAPI (Coordinator/TaskEngine) + asyncio.gather + PostgreSQL (tasks/events) + Redis (限流)
 
 ---
 
@@ -33,7 +33,7 @@
 └────────────┬───────────────────────┘
              │
 ┌────────────┴───────────────────────┐
-│ L1: Celery Workers + Redis 限流    │
+│ L1: asyncio.gather + Redis 限流    │
 │   PostgreSQL (tasks/agents/groups) │
 └────────────────────────────────────┘
 ```
@@ -71,10 +71,10 @@
 | 2.13 | dispatch_mode=auto + @mentions 路由 | 6h | @协调者→触发 / @Agent→路由 / 无@→检测 |
 | 2.14 | Coordinator Agent Prompt + Few-shot | 10h | 输入需求→结构化 TaskPlan JSON |
 | 2.15 | Harness: TaskPlan 校验 + 环检测 | 4h | 非法 plan 拒绝 |
-| 2.16 | Harness: DAG → Celery Canvas 编译 | 4h | canvas.apply_async() 入队 |
-| 2.17 | Worker 并行执行 (Celery group/chord) | 6h | 2 Agent 并行→结果各自产出 |
+| 2.16 | Harness: DAG → asyncio.gather 编译 | 4h | asyncio.gather() 入队 |
+| 2.17 | Worker 并行执行 (asyncio.gather) | 6h | 2 Agent 并行→结果各自产出 |
 | 2.18 | Task FSM (8态) + Guard Functions | 6h | 合法转换通过/非法拒绝 |
-| 2.19 | task_events 事件溯源 | 4h | 追加不可变，崩溃可恢复 |
+| 2.19 | tasks.status 状态字段 | 4h | 追加不可变，崩溃可恢复 |
 | 2.20 | Budget Controller (四道硬闸) | 2h | 超限自动终止 |
 
 ### M4（6/2-5）：Agent 管理 + 审批 + 任务看板
@@ -142,6 +142,5 @@ backend/app/
 └── infrastructure/
     ├── repositories/          # L1 PG Repos
     ├── redis.py               # L1 Redis: Pub/Sub + 热上下文 + 限流
-    ├── celery_app.py          # L1 Celery 配置
     └── encryption.py          # L1 API Key AES 加密
 ```

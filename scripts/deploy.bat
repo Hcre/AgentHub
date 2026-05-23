@@ -18,7 +18,7 @@ wsl -d Ubuntu -u root -- bash -c "service docker start 2>/dev/null; sleep 1; doc
 
 echo.
 echo ► 部署项目...
-wsl -d Ubuntu -u root -- bash -c "cd /mnt/d/AgentHub/repo && docker compose -f docker/docker-compose.yml up --build -d"
+wsl -d Ubuntu -u root -- bash -c "cd "$(dirname "$0")/.." && docker compose -f docker/docker-compose.yml up --build -d"
 
 echo.
 echo ► 验证...

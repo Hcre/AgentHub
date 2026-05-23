@@ -45,7 +45,7 @@
 |---|------|------|
 | D1 | Coordinator Agent (LLM) 和 Harness (代码) 可干净分离 | ⚠️ |
 | D2 | 5 层依赖倒置（L2 定义接口，L1 实现）可工程化执行 | 🔶 |
-| D3 | Celery 足以支撑 MVP 任务队列 | ✅ |
+| D3 | Celery 足以支撑 MVP 任务队列 | ❌ REMOVED — v4 asyncio.gather 替代 |
 | D4 | LLM 输出的 JSON Schema 总是可解析的 | ⚠️ |
 
 ---

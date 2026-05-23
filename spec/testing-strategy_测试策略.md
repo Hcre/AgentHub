@@ -1,6 +1,6 @@
 # AgentHub 测试策略
 
-> 版本: v2.0 | 基于 PRD v1.0 M1-M6 + 架构设计 v1.0
+> 版本: v2.0 | 基于 PRD v4 M1-M6 + 架构设计 v1.0
 > 目标覆盖率：后端 >= 80%，前端 >= 70%
 
 ---
@@ -32,7 +32,7 @@
 | Claude Code / Codex / TRAE → JSON fixture | PostgreSQL → Testcontainers |
 | LLM API → fixture (正常/异常/流式/超时) | Redis → Testcontainers |
 | GitHub Actions → Mock webhook | WebSocket → 真实连接 |
-| Cloudflare Tunnel → Mock HTTP | Celery → 真实 broker |
+| Cloudflare Tunnel → Mock HTTP | Celery → 真实 broker | (v4: Celery 已移除，集成测试无需 broker)
 
 ---
 

@@ -26,7 +26,7 @@ description: Synchronize project documentation — review docs/, spec/, worklogs
 ls docs/
 ls spec/ && ls spec/domains/ && ls spec/rules/
 ls 决策/
-ls .agenthub/worklogs/ && ls .agenthub/worklogs/黎/
+ls .agenthub/worklogs/ && for d in .agenthub/worklogs/*/; do echo "=== $d ===" && ls "$d"; done
 ```
 
 确认 `CLAUDE.md`、`README.md`、`.agenthub/worklogs/STATUS.md` 存在。
@@ -48,8 +48,6 @@ ls .agenthub/worklogs/ && ls .agenthub/worklogs/黎/
 **权威文档清单（这些必须在 docs/，其余移入 决策/）**：
 - `PRD_AgentHub_v4_统一方案.md`
 - `adapter-cli-flow-analysis.md`
-- `DOC-15-claude-adapter-design.md`
-- `adapter_interface_spec.md`
 - `架构设计_分层与数据流.md`
 - `task_assignment_v3.md`
 
@@ -71,12 +69,59 @@ ls .agenthub/worklogs/ && ls .agenthub/worklogs/黎/
 
 ### 第四步：worklogs/ 审查
 
+先枚举所有人员目录：
+
+```bash
+ls .agenthub/worklogs/ && for d in .agenthub/worklogs/*/; do echo "=== $d ===" && ls "$d"; done
+```
+
 | 检查项 | 方法 |
 |--------|------|
 | STATUS.md | 日期是否为绝对日期（不写「今天」）？ |
-| STATUS.md | 每人的「正在做」「阻塞」「完成了」是否更新？ |
-| 个人 worklog | `ls .agenthub/worklogs/黎/` 最新日志日期是否在 3 天内？ |
+| STATUS.md | 每人行是否更新？只改自己的行，不动别人 |
+| 个人 worklog | 每人目录下的最新日志是否在 3 天内？ |
 | template.md | 是否存在？ |
+| 日志格式 | 是否包含「谁/日期/分支/关联 Spec」头？是否包含「给下一位的交接」段？ |
+
+#### 工作日志创建指引
+
+完成阶段性工作后，按以下规范写入自己的目录。
+
+**写入前强制检查**：
+
+1. **确认身份**：读 `.agenthub/worklogs/STATUS.md`，核对当前会话的身份与 STATUS.md 中人员对齐。不知道你是谁就写不了正确的日志。
+2. **查看分工**：写「给下一位的交接」前，必须先读 `docs/task_assignment_v3.md`，了解各域归属和各人当前任务，确保交接对象正确、阻塞项说清楚等谁配合。
+
+**文件命名**：`.agenthub/worklogs/<你的名字>/YYYY-MM-DD_<简短描述>.md`
+
+**模板**：
+
+```markdown
+# 工作日志：<简短标题>
+
+- **谁**: <你的名字>
+- **日期**: YYYY-MM-DD
+- **分支**: <分支名>
+- **关联 Spec**: <引用的 spec/docs 文件>
+
+## 目标
+<!-- 一句话 -->
+
+## 产出
+- [x] <产出项> — <说明>
+
+## 关键决策
+| 决策 | 原因 | 影响 |
+|------|------|------|
+
+## 未完成 / 阻塞
+- [ ] <待做项> — <原因>
+
+## 给下一位的交接
+> 下一步该做什么 / 容易踩坑 / 临时约定 / 需要谁配合
+```
+
+**写入时机**：结束一个阶段工作后、会话结束时。写完后同步更新 `STATUS.md` 中自己的行。
 
 ### 第五步：决策/ 审查
 

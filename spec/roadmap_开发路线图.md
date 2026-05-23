@@ -1,6 +1,6 @@
 # AgentHub 开发路线图
 
-> 版本: v2.0 | 基于 PRD v1.0 §九
+> 版本: v2.0 | 基于 PRD v4 §里程碑
 
 ---
 
@@ -28,7 +28,7 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 | # | 任务 | 工时 | 验收标准 |
 |---|------|------|---------|
 | 1.1 | 项目脚手架：FastAPI + React + Vite + Docker Compose | 4h | `docker compose up` 前后端通信 |
-| 1.2 | PostgreSQL + Redis + Alembic 初始 migration | 4h | 12 张表可创建/回滚 |
+| 1.2 | PostgreSQL + Redis + Alembic 初始 migration | 4h | 6 张表可创建/回滚 |
 | 1.3 | ClaudeAdapter 框架（调用 Claude Code CLI）+ 流式适配 | 8h | 发送 prompt → 收到流式响应 |
 | 1.4 | CodexAdapter 框架 | 4h | 同上 |
 | 1.5 | TraeAdapter 框架 | 4h | 同上 |
@@ -61,9 +61,9 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 | 3.2 | 协调者自动创建（群组创建时）+ 成员列表系统蓝标 | 4h | 协调者可见、不可移除 |
 | 3.3 | @mentions 解析 + dispatch_mode=auto 路由 | 6h | @协调者→触发 / @Agent→路由 / 无@→LLM检测 |
 | 3.4 | Coordinator Agent Prompt + 任务分解 | 10h | 输入需求 → 输出结构化 TaskPlan JSON |
-| 3.5 | Harness: DAG 编译 + 环检测 + Celery 入队 | 8h | TaskPlan → Canvas → 入队执行 |
+| 3.5 | Harness: DAG 编译 + 环检测 + asyncio.gather 并发 | 8h | TaskPlan → asyncio.gather 并发执行 |
 | 3.6 | 多 Agent 并行执行 + 结果合并 | 8h | 两个 Agent 并行产出 → 群聊分别展示 |
-| 3.7 | Task FSM + Guard Functions + task_events | 6h | 状态转换合法，事件可追溯 |
+| 3.7 | Task FSM + Guard Functions + tasks.status 状态字段 | 6h | 状态转换合法，事件可追溯 |
 
 **M3 出口**: 复杂任务自动拆解分派到 ≥2 Agent，产物在群聊中展示。
 

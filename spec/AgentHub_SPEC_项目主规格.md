@@ -1,6 +1,6 @@
-# AgentHub SPEC v2.1
+# AgentHub SPEC v3.0
 
-> 基于 [`PRD_AgentHub.md`](PRD_AgentHub.md) v1.0 + [`架构设计_分层与数据流.md`](架构设计_分层与数据流.md) v1.0
+> 版本: v3.0 | 日期: 2026-05-23 | 基于 PRD v4 | v4: Celery→asyncio.gather, LiteLLM→暂缓, 12表→6表, CLI优先
 > 六大要素：Objective · Commands · Project Structure · Code Style · Testing · Boundaries
 
 ---
@@ -75,7 +75,7 @@ L5  Presentation    React + TypeScript  UI (ChatView/AgentPanel/TaskBoard/Inbox)
 L4  API Gateway      FastAPI Routers + WS Handlers + Auth Middleware
 L3  Application      AgentService / ChatService / TaskService / InboxService...
 L2  Domain           Agent/Group/Task 聚合根 + TaskEngine (Coordinator+Harness分离)
-L1  Infrastructure   PostgreSQL/Redis/Celery/ClaudeAdapter/CodexAdapter/TraeAdapter
+L1  Infrastructure   PostgreSQL/Redis/ClaudeCodeRuntime/ClaudeAdapter/MockAdapter
 ```
 
 完整架构见 [`architecture_架构定义.md`](architecture_架构定义.md)。
@@ -92,7 +92,7 @@ Agent 系统 (选运行时)            底层模型 (任意 API)
 
 Adapter 内部:
   Claude Code CLI → ANTHROPIC_BASE_URL=localhost:{port}
-    → LiteLLM Proxy (子进程)
+    → SDK 直连 (v4: LiteLLM 暂缓，降级为未来选项)
       if provider != anthropic:
         Anthropic Messages ↔ OpenAI Chat 格式转换
       → 转发到实际 API
@@ -123,7 +123,7 @@ agenthub/
 │   ├── services/      # L3: AgentService, ChatService, TaskService...
 │   ├── domain/        # L2: Agent, Group, Task, TaskFSM, TaskEngine...
 │   ├── adapters/      # L1: ClaudeAdapter, CodexAdapter, TraeAdapter
-│   ├── infrastructure/# L1: PG Repos, Redis, Celery, FileSystem
+│   ├── infrastructure/# L1: PG Repos, Redis, asyncio.gather, FileSystem
 │   └── schemas/       # Pydantic v2
 ├── docker/
 ├── spec/              # SPEC 文档
@@ -132,7 +132,7 @@ agenthub/
 
 ### 3.4 数据模型
 
-见 [`data-model_数据模型.md`](data-model_数据模型.md)。核心 12 张表：users / agents / agent_capabilities / groups / group_members / sessions / messages / tasks / task_events / task_artifacts / notifications / deploy_logs。
+见 [`data-model_数据模型.md`](data-model_数据模型.md)。核心 6 张表：agents / groups / group_members / sessions / messages / tasks（v4 精简，status 字段替代 task_events）。
 
 ### 3.5 任务状态机
 
@@ -213,10 +213,10 @@ PENDING → QUEUED → RUNNING → COMPLETED (终态)
 
 | 文档 | 内容 |
 |------|------|
-| [`PRD_AgentHub.md`](PRD_AgentHub.md) | 产品需求文档（User Stories + 功能需求） |
+| [`PRD_AgentHub_v4_统一方案.md`](../docs/PRD_AgentHub_v4_统一方案.md) | 产品需求文档（User Stories + 功能需求） |
 | [`架构设计_分层与数据流.md`](架构设计_分层与数据流.md) | 24 个场景完整数据流 + 时序图 |
 | [`architecture_架构定义.md`](architecture_架构定义.md) | 5 层架构 + 核心模块定义 |
-| [`data-model_数据模型.md`](data-model_数据模型.md) | 12 张表 DDL + Pydantic Schema |
+| [`data-model_数据模型.md`](data-model_数据模型.md) | 6 张表 DDL + Pydantic Schema |
 | [`commands_命令接口.md`](commands_命令接口.md) | REST API + WS + CLI 全集 |
 | [`boundaries_边界矩阵.md`](boundaries_边界矩阵.md) | Always/Ask First/Never |
 | [`testing-strategy_测试策略.md`](testing-strategy_测试策略.md) | 测试策略 + Mock 边界 |

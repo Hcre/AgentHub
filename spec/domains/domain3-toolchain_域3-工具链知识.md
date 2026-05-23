@@ -42,7 +42,7 @@
 
 | # | 任务 | 工时 | 验收 |
 |---|------|------|------|
-| 3.1 | Docker Compose (PG+Redis+Celery Worker) | 4h | 一键启动全部服务 |
+| 3.1 | Docker Compose (PG+Redis+FastAPI) | 4h | 一键启动全部服务 |
 | 3.2 | .env.example + Makefile | 2h | install/dev/test/build 命令 |
 
 ### M2（5/23-27）：代码渲染 + 上下文

@@ -39,7 +39,7 @@ Agent A 不能直接给 Agent B 发消息。必须通过：
 
 禁止直接修改 `tasks.status`。所有变更必须：
 1. Guard Functions 校验合法性
-2. 写入 `task_events` 事件日志（只追加，不可变）
+2. 通过 FSM 状态机转换，写入 `tasks.status` 字段（记录变更历史）
 3. 幂等键防重
 
 ## AR-06：Agent 系统与模型解耦

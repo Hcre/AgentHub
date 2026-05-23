@@ -52,7 +52,6 @@ def main() -> int:
     else:
         print(f"\nAction: 1) write worklog  2) update STATUS.md date")
     return 1 if errors > 0 else 0
-    return 1 if errors > 0 else 0
 
 
 if __name__ == "__main__":

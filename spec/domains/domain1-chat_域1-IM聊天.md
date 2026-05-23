@@ -25,7 +25,7 @@
              │
 ┌────────────┴────────────────────────┐
 │ L3 Application                      │
-│ ChatService: send_message()          │
+│ ChatService: stream()  (v4: 统一 streaming 接口)          │
 │ InboxService: 通知创建/已读/日历     │
 └────────────┬────────────────────────┘
              │

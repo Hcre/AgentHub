@@ -15,39 +15,36 @@
 | **正常模式**（默认） | Always | Ask First | 捕获 → 转 AgentHub 审批卡片 | 日常开发 |
 | **执行模式** | Always | Always | `--dangerously-skip-permissions` | 信任的批量任务 |
 
-### 0.2 嵌套权限处理（正常模式下的 Claude Code 权限传递）
+### 0.2 CLI 权限处理（v4: permission_denials 检测方案）
+
+> v4 更新：`--print` 模式非交互式，CLI 不产出 `permission_request` 事件，也不等待 stdin 输入。改为事后检测 `permission_denials` + `bypassPermissions` 重试。
 
 ```
-Claude Code 内部触发权限检查
+CLI 执行危险操作（如 Bash: rm -f /tmp/build）
+  │
+  ├─ CLI 阻断 → tool_result: {is_error: true, content: "was blocked..."}
+  ├─ 多次重试后耗尽 → result: {is_error: true, permission_denials: [...]}
   │
   ▼
-Adapter 捕获 stdout 中的 permission_request 事件
+ChatService 检测 DONE event 中的 permission_denials
   │
-  ├─ Always 操作 (创建/编辑文件)
-  │   → Adapter 自动写入 "yes\n" 到 Claude Code stdin
-  │   → Claude Code 继续执行, 用户无感知
-  │
-  ├─ Ask First 操作 (删除文件/Git push/部署/外网)
-  │   → Adapter 暂停 Claude Code (不回复)
-  │   → 创建 AgentHub 审批卡片 → 推送收件箱
-  │   → 用户 APPROVE → Adapter 写 "yes\n" → Claude Code 继续
-  │   → 用户 REJECT  → Adapter 写 "no\n"  → Claude Code 取消该操作
-  │
-  └─ Never 操作 (路径遍历/.env)
-      → Adapter 自动写 "no\n" → 通知用户被拒绝
+  └─ emit REQUEST_APPROVAL → 前端审批卡片
+       │
+       ├─ 用户 [信任并重试] → ChatService 重新调用
+       │   CLI: --permission-mode bypassPermissions
+       │
+       ├─ 用户 [换个方式] → ChatService 重新调用
+       │   stdin: feedback 文本 + 安全方式要求
+       │
+       └─ 用户 [忽略] → 消息卡片折叠，不重试
 ```
 
-### 0.3 执行模式
+### 0.3 权限模式配置
 
-```
-执行模式下 Claude Code 启动参数:
-  claude --dangerously-skip-permissions -p "..."
-
-→ Claude Code 内部不弹任何权限
-→ AgentHub boundaries 也全部放宽为 Always
-→ 仅 Never 操作保留硬禁止
-→ 用户通过全局开关显式启用
-```
+| Agent `permission_mode` | CLI `--permission-mode` | 行为 |
+|------------------------|------------------------|------|
+| `acceptEdits`（推荐默认） | `--permission-mode acceptEdits` | 编辑自动通过，Bash/git 等被阻断 |
+| `bypassPermissions` | `--permission-mode bypassPermissions` | 全自动，不阻断 |
 
 ---
 

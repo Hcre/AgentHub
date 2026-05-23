@@ -27,6 +27,7 @@ TEMPLATE = """# 工作日志：{title}
 - [ ]
 
 ## 给下一位的交接
+> 写之前先查看 docs/task_assignment_v3.md，明确下游任务分配和等待对象。
 >
 """
 
