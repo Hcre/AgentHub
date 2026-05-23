@@ -35,6 +35,7 @@ dist-ssr/
 .agent_workspace/
 *.log
 logs/
+*.stackdump
 
 # === Docker ===
 docker/data/
