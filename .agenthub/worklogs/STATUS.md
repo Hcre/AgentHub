@@ -7,7 +7,7 @@
 |----|--------|--------|-----------|
 | 黎 | 域2: ClaudeCliAdapter(M2) + Agent settings 扩展 | 无 | ClaudeAdapter 完整重写(5种事件+memory注入+重试) ✅ + spec v0.2 对齐 ✅ + DOC-15 v1.1 裁决 ✅ |
 | 董 | 域2: adapter-cli-flow-analysis v1.3 + session/permission 方案落地 | 无 | ADR-01(API→CLI 重心转移) ✅ + v4 PRD 统一方案 ✅ + adapter-cli-flow-analysis v1.3 ✅ + doc-sync(spec 同步/架构文档更新) ✅ |
-| 袁 | 前端 Phase 2 完成，下一步 Phase 3 任务看板 | 无 | Phase 0 基座 + Phase 1 三栏布局 + Phase 2 聊天 UI(chatStore/会话切换/气泡/打字/Composer/右栏绑定)✅ 验收全绿 + 截图确认 ✅ |
+| 袁 | 前端 Phase 3 完成，下一步 Phase 4/5 | 无 | Phase 0-2 ✅ + Phase 3 任务看板(taskStore/kanban+列表/筛选/拖拽/创建弹窗)✅ 验收全绿 + 截图确认 4 列看板 ✅ |
 
 ## 图例
 - ⚠️ 阻塞中（写明等谁/等什么）

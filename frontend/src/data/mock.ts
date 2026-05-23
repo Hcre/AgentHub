@@ -11,6 +11,7 @@ import type {
   OrgInfo,
   OutputFile,
   StageTask,
+  Task,
   UserInfo,
 } from '../types'
 
@@ -136,4 +137,63 @@ export const stage: StageTask[] = [
 export const outputs: OutputFile[] = [
   { id: 'f1', name: 'pricing-v3.mdx', kind: 'doc', size: '8.4 KB', status: 'input' },
   { id: 'f2', name: 'pricing-v3-edited.diff', kind: 'diff', size: '—', status: 'pending' },
+]
+
+export const tasks: Task[] = [
+  {
+    id: 'MO-1',
+    title: 'Rewrite three plan openers',
+    status: 'todo',
+    priority: 'high',
+    assignee: 'editor',
+    due: 'Today',
+  },
+  {
+    id: 'MO-2',
+    title: 'Move pricing table below value props',
+    status: 'todo',
+    priority: 'normal',
+    assignee: 'editor',
+    due: 'Wed',
+  },
+  {
+    id: 'MO-3',
+    title: 'Tighten comparison footnotes',
+    status: 'todo',
+    priority: 'low',
+    assignee: 'editor',
+    due: 'Fri',
+  },
+  {
+    id: 'MO-4',
+    title: 'Draft 3 hero directions',
+    status: 'doing',
+    priority: 'high',
+    assignee: 'copywriter',
+    due: 'Today',
+  },
+  {
+    id: 'MO-5',
+    title: 'Source competitor pricing pages',
+    status: 'doing',
+    priority: 'normal',
+    assignee: 'researcher',
+    due: 'Mon',
+  },
+  {
+    id: 'MO-6',
+    title: 'Audit footnote citations vs source',
+    status: 'blocked',
+    priority: 'normal',
+    assignee: 'editor',
+    due: '—',
+  },
+  {
+    id: 'MO-7',
+    title: 'Reconcile copy ↔ design tokens',
+    status: 'done',
+    priority: 'normal',
+    assignee: 'editor',
+    due: 'Mon',
+  },
 ]

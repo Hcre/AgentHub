@@ -2,11 +2,11 @@ import { cn } from '../../lib/cn'
 import { agents, centerTabs } from '../../data/mock'
 import { useUIStore } from '../../stores/uiStore'
 import { ChatView } from '../chat/ChatView'
+import { TasksTabView } from '../tasks/TasksTabView'
 import { Avatar, Badge, Button, Icon } from '../ui'
 
 const SECTION_TITLE: Record<string, string> = {
   inbox: '收件箱',
-  tasks: '任务',
   calendar: '日历',
   group: '群组频道',
   'agent-detail': '助手详情',
@@ -15,6 +15,15 @@ const SECTION_TITLE: Record<string, string> = {
 export function CenterPanel() {
   const { section, activeTab, activeAgentId, theme, setActiveTab, toggleTheme, toggleRight } =
     useUIStore()
+
+  // 左侧导航「任务」：整屏任务看板
+  if (section === 'tasks') {
+    return (
+      <div className="glass-panel h-full overflow-hidden rounded-2xl border shadow-sm">
+        <TasksTabView />
+      </div>
+    )
+  }
 
   if (section !== 'chat') {
     return (
@@ -77,6 +86,8 @@ export function CenterPanel() {
       <div className="min-h-0 flex-1">
         {activeTab === 'chat' ? (
           <ChatView agent={agent} />
+        ) : activeTab === 'tasks' ? (
+          <TasksTabView />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             「{centerTabs.find((t) => t.id === activeTab)?.label ?? activeTab}」视图将在后续 Phase
