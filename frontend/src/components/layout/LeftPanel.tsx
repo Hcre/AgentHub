@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { cn } from '../../lib/cn'
-import { agents, channels, conversations, nav, org, user } from '../../data/mock'
+import { channels, nav, org, user } from '../../data/mock'
+import { useAgentStore } from '../../stores/agentStore'
+import { useChatStore } from '../../stores/chatStore'
 import { useUIStore, type Section } from '../../stores/uiStore'
+import { CreateAgentModal } from '../agent/CreateAgentModal'
 import { Avatar, Button, Icon, Kbd } from '../ui'
 import type { IconName } from '../../types'
 
@@ -48,22 +51,37 @@ function SectionHeader({
   label,
   collapsed,
   onToggle,
+  onAdd,
+  addTitle,
 }: {
   label: string
   collapsed: boolean
   onToggle: () => void
+  onAdd?: () => void
+  addTitle?: string
 }) {
   return (
-    <button
-      onClick={onToggle}
-      className="mb-1 mt-3 flex items-center gap-1 px-2 font-mono text-[10.5px] uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
-    >
-      <Icon
-        name="chevronDown"
-        className={cn('h-2.5 w-2.5 transition-transform', collapsed && '-rotate-90')}
-      />
-      <span>{label}</span>
-    </button>
+    <div className="group mb-1 mt-3 flex items-center justify-between px-2">
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <Icon
+          name="chevronDown"
+          className={cn('h-2.5 w-2.5 transition-transform', collapsed && '-rotate-90')}
+        />
+        <span>{label}</span>
+      </button>
+      {onAdd && (
+        <button
+          onClick={onAdd}
+          title={addTitle}
+          className="grid h-4 w-4 place-items-center rounded opacity-0 transition-opacity hover:bg-accent group-hover:opacity-100"
+        >
+          <Icon name="plus" className="h-3 w-3" />
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -78,9 +96,12 @@ export function LeftPanel() {
     openGroup,
     toggleSidebar,
   } = useUIStore()
+  const agents = useAgentStore((s) => s.agents)
+  const conversations = useChatStore((s) => s.conversations)
   const [openCh, setOpenCh] = useState(true)
   const [openAI, setOpenAI] = useState(true)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ editor: true })
+  const [createOpen, setCreateOpen] = useState(false)
 
   return (
     <aside className="glass-panel flex h-full w-full flex-col overflow-hidden rounded-2xl border shadow-sm">
@@ -140,11 +161,18 @@ export function LeftPanel() {
           </div>
         )}
 
-        <SectionHeader label="AI 队友" collapsed={!openAI} onToggle={() => setOpenAI((v) => !v)} />
+        <SectionHeader
+          label="AI 队友"
+          collapsed={!openAI}
+          onToggle={() => setOpenAI((v) => !v)}
+          onAdd={() => setCreateOpen(true)}
+          addTitle="创建助手"
+        />
         {openAI && (
           <div className="space-y-px">
             {agents.map((a) => {
               const convs = conversations[a.id] ?? []
+              const firstConv = convs[0]?.id ?? 'c1'
               const isActive = section === 'chat' && activeAgentId === a.id
               const isOpen = expanded[a.id] ?? false
               return (
@@ -153,11 +181,11 @@ export function LeftPanel() {
                     role="button"
                     tabIndex={0}
                     data-active={isActive ? 'true' : undefined}
-                    onClick={() => convs[0] && openConversation(a.id, convs[0].id)}
+                    onClick={() => openConversation(a.id, firstConv)}
                     onKeyDown={(e) => {
-                      if ((e.key === 'Enter' || e.key === ' ') && convs[0]) {
+                      if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault()
-                        openConversation(a.id, convs[0].id)
+                        openConversation(a.id, firstConv)
                       }
                     }}
                     className={cn(
@@ -240,6 +268,8 @@ export function LeftPanel() {
           </Button>
         </div>
       </footer>
+
+      <CreateAgentModal open={createOpen} onClose={() => setCreateOpen(false)} />
     </aside>
   )
 }

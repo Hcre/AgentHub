@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { agents } from '../../data/mock'
-import { agentProfiles } from '../../data/extra'
+import { useAgentStore } from '../../stores/agentStore'
 import { useUIStore } from '../../stores/uiStore'
 import { Avatar, Badge, Button, Icon, Tabs, TabsList, TabsTrigger } from '../ui'
 
@@ -23,10 +22,12 @@ function Field({ label, value }: { label: string; value: string | number }) {
 export function AgentDetailPage() {
   const activeAgentId = useUIStore((s) => s.activeAgentId)
   const setSection = useUIStore((s) => s.setSection)
+  const { agents, profiles, updateConfig, removeAgent } = useAgentStore()
   const [tab, setTab] = useState('overview')
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const agent = agents.find((a) => a.id === activeAgentId)
-  const profile = activeAgentId ? agentProfiles[activeAgentId] : undefined
+  const profile = activeAgentId ? profiles[activeAgentId] : undefined
   if (!agent || !profile) {
     return (
       <div className="glass-panel flex h-full items-center justify-center rounded-2xl border text-sm text-muted-foreground shadow-sm">
@@ -122,13 +123,76 @@ export function AgentDetailPage() {
         )}
 
         {tab === 'settings' && (
-          <div className="mx-auto max-w-md rounded-xl border bg-card p-4">
-            <Field label="Provider" value={profile.config.provider} />
-            <Field label="Model" value={profile.config.model} />
-            <Field label="API Key" value="••••••••••••" />
-            <Field label="Max tokens" value={profile.config.maxTokens} />
-            <Field label="并发数" value={profile.config.concurrency} />
-            <Field label="Temperature" value={profile.config.temperature} />
+          <div className="mx-auto max-w-md space-y-4">
+            <div className="rounded-xl border bg-card p-4">
+              <Field label="Provider" value={profile.config.provider} />
+              <Field label="Model" value={profile.config.model} />
+              <Field label="API Key" value="••••••••••••" />
+              <div className="flex items-center justify-between border-b py-2">
+                <span className="text-[12.5px] text-muted-foreground">Max tokens</span>
+                <input
+                  type="number"
+                  value={profile.config.maxTokens}
+                  onChange={(e) => updateConfig(agent.id, { maxTokens: Number(e.target.value) })}
+                  className="h-7 w-24 rounded border border-input bg-transparent px-2 text-right font-mono text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
+              <div className="flex items-center justify-between border-b py-2">
+                <span className="text-[12.5px] text-muted-foreground">并发数</span>
+                <input
+                  type="number"
+                  value={profile.config.concurrency}
+                  onChange={(e) => updateConfig(agent.id, { concurrency: Number(e.target.value) })}
+                  className="h-7 w-24 rounded border border-input bg-transparent px-2 text-right font-mono text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-[12.5px] text-muted-foreground">Temperature</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="2"
+                  value={profile.config.temperature}
+                  onChange={(e) => updateConfig(agent.id, { temperature: Number(e.target.value) })}
+                  className="h-7 w-24 rounded border border-input bg-transparent px-2 text-right font-mono text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-destructive/40 p-4">
+              <div className="text-[12.5px] font-medium text-destructive">危险区</div>
+              <p className="mt-1 text-[12px] text-muted-foreground">
+                删除后该助手的会话与配置不可恢复。
+              </p>
+              {confirmDelete ? (
+                <div className="mt-3 flex items-center gap-2">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      removeAgent(agent.id)
+                      setSection('chat')
+                    }}
+                  >
+                    确认删除
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>
+                    取消
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 text-destructive"
+                  onClick={() => setConfirmDelete(true)}
+                >
+                  <Icon name="x" className="h-3.5 w-3.5" />
+                  删除助手
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </div>
