@@ -1,12 +1,12 @@
-"""Check worklog updated: current user has today's log + STATUS.md has today's date.
+"""Check worklog updated: every push with diffs must include worklog update.
 
-Reads Git-to-person mapping from STATUS.md to identify the pusher.
+Reads Git-to-person mapping from STATUS.md, then checks if the commits
+being pushed include changes to the current user's worklog directory.
 Exit 0 = pass, Exit 1 = fail.
 """
 
 from __future__ import annotations
 
-import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -24,19 +24,12 @@ def get_today_str() -> str:
 def get_git_user() -> str:
     result = subprocess.run(
         ["git", "config", "user.name"],
-        capture_output=True, text=True
+        capture_output=True, text=True, encoding="utf-8"
     )
     return result.stdout.strip()
 
 
 def parse_git_mapping(content: str) -> dict[str, str]:
-    """Parse the Git-to-person mapping table from STATUS.md.
-
-    Expected format:
-    | Git用户名 | 日志目录 |
-    |-----------|----------|
-    | oldmanpushbike | 黎 |
-    """
     mapping: dict[str, str] = {}
     in_table = False
     for line in content.splitlines():
@@ -48,39 +41,49 @@ def parse_git_mapping(content: str) -> dict[str, str]:
                 break
             parts = [p.strip() for p in line.split("|") if p.strip()]
             if len(parts) >= 2 and parts[0] not in ("Git用户名", "-----------"):
-                # Skip placeholder entries like "（待补充）"
                 if "待补充" not in parts[0] and "待补充" not in parts[1]:
                     mapping[parts[0]] = parts[1]
     return mapping
 
 
-def check_my_worklog(person_dir: str) -> bool:
-    """Check if the current user's worklog directory has today's log."""
-    today = get_today_str()
-    user_dir = WORKLOG_DIR / person_dir
-    if not user_dir.is_dir():
-        print(f"[FAIL] Worklog directory not found: {person_dir}")
-        print(f"  Create it: mkdir .agenthub/worklogs/{person_dir}")
-        return False
-    for f in user_dir.iterdir():
-        if f.suffix == ".md" and today in f.name:
-            print(f"[OK] Your today worklog: {f.relative_to(REPO_ROOT)}")
+def get_pushed_files() -> list[str]:
+    result = subprocess.run(
+        ["git", "-c", "core.quotepath=false", "diff", "--name-only", "origin/main...HEAD"],
+        capture_output=True, text=True, encoding="utf-8"
+    )
+    return [f.strip().replace("\\", "/") for f in result.stdout.splitlines() if f.strip()]
+
+
+def has_commits_to_push() -> bool:
+    result = subprocess.run(
+        ["git", "rev-list", "--count", "origin/main..HEAD"],
+        capture_output=True, text=True, encoding="utf-8"
+    )
+    count = int(result.stdout.strip())
+    if count == 0:
+        print("[OK] Nothing to push (already up to date)")
+    return count > 0
+
+
+def check_worklog_in_push(person_dir: str, pushed_files: list[str]) -> bool:
+    prefix = f".agenthub/worklogs/{person_dir}/"
+    for f in pushed_files:
+        if f.startswith(prefix):
+            print(f"[OK] Worklog in this push: {f}")
             return True
-    print(f"[FAIL] No worklog for today ({today}) in {person_dir}/")
-    print(f"  Run: /feat-complete or write your log manually")
+    today = get_today_str()
+    print(f"[FAIL] No worklog update in {person_dir}/ included in this push")
+    print(f"  Expected: .agenthub/worklogs/{person_dir}/{today}_<desc>.md")
     return False
 
 
-def check_any_worklog() -> bool:
-    """Fallback: check if anyone has a worklog for today."""
+def check_any_worklog_in_push(pushed_files: list[str]) -> bool:
+    for f in pushed_files:
+        if ".agenthub/worklogs/" in f and "/20" in f:
+            print(f"[OK] Worklog in this push: {f}")
+            return True
     today = get_today_str()
-    for d in WORKLOG_DIR.iterdir():
-        if d.is_dir() and d.name not in ("template.md", "STATUS.md", ".gitkeep"):
-            for f in d.iterdir():
-                if f.suffix == ".md" and today in f.name:
-                    print(f"[OK] Found today worklog: {f.relative_to(REPO_ROOT)}")
-                    return True
-    print(f"[FAIL] No worklog found for today ({today})")
+    print(f"[FAIL] No worklog update included in this push ({today})")
     return False
 
 
@@ -100,19 +103,21 @@ def check_status_updated() -> bool:
 def main() -> int:
     errors = 0
 
-    # Identify the pusher
+    if not has_commits_to_push():
+        return 0
+
+    pushed_files = get_pushed_files()
     git_user = get_git_user()
     content = STATUS_FILE.read_text(encoding="utf-8") if STATUS_FILE.exists() else ""
     mapping = parse_git_mapping(content)
 
     if git_user in mapping:
         person = mapping[git_user]
-        if not check_my_worklog(person):
+        if not check_worklog_in_push(person, pushed_files):
             errors += 1
     else:
-        # Fallback: git user not in mapping, check anyone has log
-        print(f"[WARN] Git user '{git_user}' not in STATUS.md mapping, fallback to any-check")
-        if not check_any_worklog():
+        print(f"[WARN] Git user '{git_user}' not in STATUS.md mapping, fallback")
+        if not check_any_worklog_in_push(pushed_files):
             errors += 1
 
     if not check_status_updated():
@@ -121,7 +126,7 @@ def main() -> int:
     if errors == 0:
         print("[OK] Worklog check passed")
     else:
-        print(f"\nAction: 1) write your worklog  2) update STATUS.md date")
+        print("\nAction: update your worklog and amend the commit")
     return 1 if errors > 0 else 0
 
 
