@@ -1,7 +1,25 @@
 // Phase 5 次要视图 mock 数据（结构对照 prototype/src/data.js + data-extra.js）。
 // 正式接入见各视图与 PRD §6。
 
-import type { Activity, AgentProfile, CalendarEvent, InboxItem, MemoryItem, Skill } from '../types'
+import type {
+  Activity,
+  AgentProfile,
+  CalendarEvent,
+  InboxItem,
+  MemoryItem,
+  Provider,
+  Skill,
+} from '../types'
+
+export const providers: Provider[] = [
+  {
+    id: 'anthropic',
+    label: 'Anthropic',
+    models: ['claude-sonnet-4-5', 'claude-opus-4-5', 'claude-haiku-4-5'],
+  },
+  { id: 'openai', label: 'OpenAI', models: ['gpt-4o', 'gpt-4o-mini', 'o3'] },
+  { id: 'azure', label: 'Azure', models: ['gpt-4o-azure', 'gpt-4o-mini-azure'] },
+]
 
 export const activity: Activity[] = [
   {

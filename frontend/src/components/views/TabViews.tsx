@@ -1,4 +1,5 @@
-import { agentProfiles, memory, skills } from '../../data/extra'
+import { memory, skills } from '../../data/extra'
+import { useAgentStore } from '../../stores/agentStore'
 import { useUIStore } from '../../stores/uiStore'
 import { Badge, Icon } from '../ui'
 import type { MemoryStatus } from '../../types'
@@ -59,7 +60,8 @@ export function MemoryView() {
 
 export function SettingsView() {
   const activeAgentId = useUIStore((s) => s.activeAgentId)
-  const cfg = activeAgentId ? agentProfiles[activeAgentId]?.config : undefined
+  const profiles = useAgentStore((s) => s.profiles)
+  const cfg = activeAgentId ? profiles[activeAgentId]?.config : undefined
   if (!cfg) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">

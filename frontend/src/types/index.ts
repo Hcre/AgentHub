@@ -227,6 +227,12 @@ export interface AgentProfile {
   config: AgentConfig
 }
 
+export interface Provider {
+  id: string
+  label: string
+  models: string[]
+}
+
 /** Icon 组件支持的图标名（映射到 lucide-react），见 components/ui/Icon.tsx */
 export type IconName =
   | 'inbox'

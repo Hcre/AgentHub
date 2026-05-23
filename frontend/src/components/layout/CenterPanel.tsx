@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { cn } from '../../lib/cn'
-import { agents, centerTabs } from '../../data/mock'
+import { centerTabs } from '../../data/mock'
+import { useAgentStore } from '../../stores/agentStore'
 import { useUIStore } from '../../stores/uiStore'
 import { ActivityFeed } from '../activity/ActivityFeed'
 import { AgentDetailPage } from '../agent/AgentDetailPage'
@@ -50,6 +51,7 @@ function Panel({ children }: { children: ReactNode }) {
 export function CenterPanel() {
   const { section, activeTab, activeAgentId, theme, setActiveTab, toggleTheme, toggleRight } =
     useUIStore()
+  const agents = useAgentStore((s) => s.agents)
 
   if (section === 'group') return <GroupChatView />
   if (section === 'agent-detail') return <AgentDetailPage />
