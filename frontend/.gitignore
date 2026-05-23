@@ -1,4 +1,32 @@
-# v0 原型设计过程产物，部署不需要，不入库（文件保留在本地）
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# vite 临时脚手架目录
+.vite-init/
+
+# v0 原型设计过程产物（prototype/ 下），部署不需要，不入库（文件保留在本地）
 docs/
 screenshots/
 uploads/
