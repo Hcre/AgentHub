@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(/home/huishuohuademao/workspace/AgentHub/backend/.venv/bin/python scripts/smoke_claude_runtime.py 2>&1)",
+      "Bash(/home/huishuohuademao/workspace/AgentHub/backend/.venv/bin/python -m pytest tests/ -x -q --no-header --tb=short --no-cov 2>&1)",
+      "Bash(docker ps:*)",
+      "Bash(pg_isready)",
+      "Bash(redis-cli ping:*)",
+      "Bash(. /home/huishuohuademao/workspace/AgentHub/backend/.venv/bin/activate)",
+      "Bash(python -c \":*)"
     ]
   }
 }

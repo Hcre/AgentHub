@@ -39,3 +39,6 @@ logs/
 # === Docker ===
 docker/data/
 .ace-tool/
+
+# === Git worktrees ===
+.worktrees/
