@@ -67,17 +67,13 @@ services:
         condition: service_healthy
     command: celery -A app.infrastructure.queue.celery_app worker --loglevel=info
 
+  # 新前端：v0.dev 静态原型（nginx 托管，纯 mock 数据，不连后端）
   frontend:
     build:
       context: ../frontend
       dockerfile: Dockerfile
-    environment:
-      VITE_API_BASE_URL: http://localhost:8000
-      VITE_WS_BASE_URL: ws://localhost:8000
-    depends_on:
-      - backend
     ports:
-      - "5173:5173"
+      - "5173:80"
 
 volumes:
   pg_data:
