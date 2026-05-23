@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgentHub — v0 refactor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" />
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        container: { center: true, padding: '1rem' },
+        extend: {
+          fontFamily: {
+            sans: ['Geist', 'ui-sans-serif', 'system-ui', '-apple-system', 'PingFang SC', 'Microsoft YaHei', 'sans-serif'],
+            serif: ['"Source Serif 4"', '"Tiempos Headline"', 'Georgia', 'serif'],
+            mono: ['Geist Mono', 'ui-monospace', 'monospace'],
+          },
+          colors: {
+            border: 'hsl(var(--border))',
+            input: 'hsl(var(--input))',
+            ring: 'hsl(var(--ring))',
+            background: 'hsl(var(--background))',
+            foreground: 'hsl(var(--foreground))',
+            primary: { DEFAULT: 'hsl(var(--primary))', foreground: 'hsl(var(--primary-foreground))' },
+            secondary: { DEFAULT: 'hsl(var(--secondary))', foreground: 'hsl(var(--secondary-foreground))' },
+            muted: { DEFAULT: 'hsl(var(--muted))', foreground: 'hsl(var(--muted-foreground))' },
+            accent: { DEFAULT: 'hsl(var(--accent))', foreground: 'hsl(var(--accent-foreground))' },
+            destructive: { DEFAULT: 'hsl(var(--destructive))', foreground: 'hsl(var(--destructive-foreground))' },
+            popover: { DEFAULT: 'hsl(var(--popover))', foreground: 'hsl(var(--popover-foreground))' },
+            card: { DEFAULT: 'hsl(var(--card))', foreground: 'hsl(var(--card-foreground))' },
+            brand: { DEFAULT: 'hsl(var(--brand))', foreground: 'hsl(var(--brand-foreground))', soft: 'hsl(var(--brand-soft))', deep: 'hsl(var(--brand-deep))' },
+          },
+          backgroundColor: {
+            'glass':        'hsl(var(--glass) / var(--glass-alpha))',
+            'glass-strong': 'hsl(var(--glass) / var(--glass-strong-alpha))',
+            'glass-soft':   'hsl(var(--glass) / var(--glass-soft-alpha))',
+          },
+          borderRadius: { lg: 'var(--radius)', md: 'calc(var(--radius) - 2px)', sm: 'calc(var(--radius) - 4px)' },
+          backdropBlur: { glass: '22px' },
+          keyframes: {
+            'fade-in':  { from: { opacity: 0, transform: 'translateY(4px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
+            'slide-in': { from: { opacity: 0, transform: 'translateY(8px) scale(0.98)' }, to: { opacity: 1, transform: 'translateY(0) scale(1)' } },
+            'pulse-dot':{ '0%, 100%': { boxShadow: '0 0 0 0 hsl(var(--brand) / 0.5)' }, '60%': { boxShadow: '0 0 0 6px transparent' } },
+            'bounce-dot':{ '0%, 60%, 100%': { transform: 'translateY(0)', opacity: 0.4 }, '30%': { transform: 'translateY(-3px)', opacity: 1 } },
+          },
+          animation: {
+            'fade-in':   'fade-in .3s cubic-bezier(.22,1,.36,1) both',
+            'slide-in':  'slide-in .25s cubic-bezier(.22,1,.36,1) both',
+            'pulse-dot': 'pulse-dot 2.2s ease-out infinite',
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    :root {
+      /* Warm cream + coral, frosted-glass aesthetic */
+      --background: 36 36% 87%;          /* warm cream outer */
+      --background-2: 38 42% 93%;
+      --foreground: 30 24% 9%;
+      --muted: 36 24% 92%;
+      --muted-foreground: 30 10% 38%;
+      --popover: 38 50% 98%;
+      --popover-foreground: 30 24% 9%;
+      --card: 36 50% 98%;                /* warm white panel base */
+      --card-foreground: 30 24% 9%;
+      --border: 30 22% 84%;
+      --input: 30 22% 84%;
+      --primary: 30 24% 9%;
+      --primary-foreground: 36 50% 98%;
+      --secondary: 36 24% 92%;
+      --secondary-foreground: 30 24% 9%;
+      --accent: 36 28% 90%;
+      --accent-foreground: 30 24% 9%;
+      --destructive: 14 70% 42%;
+      --destructive-foreground: 36 50% 98%;
+      --ring: 17 60% 53%;
+      --radius: 0.875rem;
+      /* Coral brand */
+      --brand: 17 56% 53%;               /* #c96342 */
+      --brand-foreground: 36 50% 98%;
+      --brand-soft: 22 60% 91%;          /* #f4e5db */
+      --brand-deep: 16 60% 33%;          /* #8a3a23 */
+      /* Frosted glass: a tint + alpha applied via bg-glass class */
+      --glass: 38 60% 97%;               /* warm white */
+      --glass-alpha: 0.66;
+      --glass-strong-alpha: 0.82;
+      --glass-soft-alpha: 0.50;
+      /* Atmospheric washes (visible through the glass) */
+      --wash-1: 17 56% 53% / 0.25;       /* coral */
+      --wash-2: 36 60% 60% / 0.22;       /* amber */
+      --wash-3: 150 14% 49% / 0.18;      /* sage */
+    }
+    .dark {
+      --background: 28 14% 10%;
+      --background-2: 28 16% 14%;
+      --foreground: 36 38% 92%;
+      --muted: 28 8% 16%;
+      --muted-foreground: 36 12% 60%;
+      --popover: 28 14% 10%;
+      --popover-foreground: 36 38% 92%;
+      --card: 28 12% 12%;
+      --card-foreground: 36 38% 92%;
+      --border: 28 8% 22%;
+      --input: 28 8% 22%;
+      --primary: 36 38% 92%;
+      --primary-foreground: 28 14% 10%;
+      --secondary: 28 8% 16%;
+      --secondary-foreground: 36 38% 92%;
+      --accent: 28 8% 16%;
+      --accent-foreground: 36 38% 92%;
+      --destructive: 14 60% 36%;
+      --destructive-foreground: 36 38% 92%;
+      --ring: 17 60% 60%;
+      --brand: 17 70% 60%;
+      --brand-foreground: 28 14% 10%;
+      --brand-soft: 17 28% 18%;
+      --brand-deep: 22 65% 80%;
+      --glass: 28 14% 14%;
+      --glass-alpha: 0.66;
+      --glass-strong-alpha: 0.84;
+      --glass-soft-alpha: 0.46;
+      --wash-1: 17 56% 53% / 0.18;
+      --wash-2: 36 60% 60% / 0.13;
+      --wash-3: 150 14% 49% / 0.11;
+    }
+
+    html, body { height: 100%; }
+    body {
+      font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+      color: hsl(var(--foreground));
+      -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.005em;
+      background:
+        radial-gradient(60% 50% at 14% 8%,  hsl(var(--wash-1)), transparent 70%),
+        radial-gradient(46% 40% at 92% 18%, hsl(var(--wash-2)), transparent 70%),
+        radial-gradient(60% 50% at 82% 96%, hsl(var(--wash-3)), transparent 72%),
+        radial-gradient(50% 60% at 4% 88%,  hsl(var(--wash-2)), transparent 70%),
+        linear-gradient(180deg, hsl(var(--background-2)), hsl(var(--background)));
+      background-attachment: fixed;
+    }
+    /* Subtle paper grain */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background-image:
+        radial-gradient(hsl(var(--foreground) / 0.04) 1px, transparent 1px),
+        radial-gradient(hsl(var(--foreground) / 0.025) 1px, transparent 1px);
+      background-size: 3px 3px, 7px 7px;
+      background-position: 0 0, 1px 1px;
+      mix-blend-mode: multiply;
+      opacity: 0.55;
+    }
+    .dark body::before { mix-blend-mode: screen; opacity: 0.18; }
+    #root { position: relative; z-index: 1; }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    /* Frosted-glass panel utility */
+    .glass-panel {
+      background: hsl(var(--glass) / var(--glass-alpha));
+      backdrop-filter: saturate(160%) blur(22px);
+      -webkit-backdrop-filter: saturate(160%) blur(22px);
+    }
+    .glass-strong {
+      background: hsl(var(--glass) / var(--glass-strong-alpha));
+      backdrop-filter: saturate(160%) blur(22px);
+      -webkit-backdrop-filter: saturate(160%) blur(22px);
+    }
+    .glass-soft {
+      background: hsl(var(--glass) / var(--glass-soft-alpha));
+      backdrop-filter: saturate(160%) blur(14px);
+      -webkit-backdrop-filter: saturate(160%) blur(14px);
+    }
+    .heading-serif {
+      font-family: 'Source Serif 4', 'Tiempos Headline', Georgia, serif;
+      letter-spacing: -0.015em;
+    }
+
+    /* shadcn-y scrollbars */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
+    ::-webkit-scrollbar-track { background: transparent; }
+
+    /* AI typing dots */
+    .typing-dot { animation: bounce-dot 1.2s ease-in-out infinite; }
+    .typing-dot:nth-child(2) { animation-delay: .15s; }
+    .typing-dot:nth-child(3) { animation-delay: .3s; }
+    @keyframes bounce-dot {
+      0%,60%,100% { transform: translateY(0); opacity: 0.4; }
+      30% { transform: translateY(-3px); opacity: 1; }
+    }
+
+    /* prose-style block for AI replies */
+    .ai-prose p { margin: 0 0 .5em; }
+    .ai-prose p:last-child { margin: 0; }
+
+    /* Tweaks-driven overrides: heading font + density */
+    .heading-serif { font-family: var(--ah-head-font, "Source Serif 4", "Tiempos Headline", Georgia, serif); }
+    [data-density="compact"] .ah-shell { gap: 8px; }
+    [data-density="compact"] header.py-3\.5 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+    [data-density="compact"] .ah-msgs > * + * { margin-top: 12px !important; }
+    [data-density="comfort"] header.py-3\.5 { padding-top: 1rem; padding-bottom: 1rem; }
+    [data-glass="frosted"] .glass-panel { backdrop-filter: saturate(180%) blur(28px); }
+    [data-glass="solid"] .glass-panel { backdrop-filter: none; background: hsl(var(--card)); }
+    [data-glass="solid"] .glass-strong { backdrop-filter: none; background: hsl(var(--card)); }
+    [data-glass="solid"] .glass-soft { backdrop-filter: none; background: hsl(var(--muted) / 0.3); }
+  </style>
+</head>
+<body class="h-full">
+  <div id="root" class="h-full"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script src="v0/data.js"></script>
+  <script src="v0/data-extra.js"></script>
+  <script type="text/babel" data-presets="env,react" src="v0/icons.jsx"></script>
+  <script type="text/babel" data-presets="env,react" src="v0/ui.jsx"></script>
+  <script type="text/babel" data-presets="env,react" src="v0/tweaks-panel.jsx"></script>
+  <script type="text/babel" data-presets="env,react" src="v0/chrome.jsx"></script>
+  <script type="text/babel" data-presets="env,react" src="v0/views.jsx"></script>
+  <script type="text/babel" data-presets="env,react" src="v0/groups.jsx"></script>
+  <script type="text/babel" data-presets="env,react" src="v0/inbox.jsx"></script>
+  <script type="text/babel" data-presets="env,react" src="v0/agent-detail.jsx"></script>
+  <script type="text/babel" data-presets="env,react" src="v0/create-agent.jsx"></script>
+  <script type="text/babel" data-presets="env,react" src="v0/app.jsx"></script>
+</body>
+</html>

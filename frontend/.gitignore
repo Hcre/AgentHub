@@ -1,0 +1,5 @@
+# v0 原型设计过程产物，部署不需要，不入库（文件保留在本地）
+docs/
+screenshots/
+uploads/
+.thumbnail

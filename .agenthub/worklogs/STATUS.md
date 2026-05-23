@@ -7,7 +7,6 @@
 |----|--------|--------|-----------|
 | 黎 | 文档治理体系建立 + check_docs.py pre-push hook | 无 | ClaudeAdapter 完整重写 ✅ + 文档治理 ✅ |
 | 董 | 域2: CLI 多模型代理实现（cc-haha 分析 + 代理方案设计 + 代码实现） | 待端到端验证（需要真实 API Key） | ADR-01 ✅ + v4 PRD ✅ + adapter-cli-flow-analysis v1.3 ✅ + CLI 多模型代理方案设计 ✅ + proxy handler/router 实现 ✅ + ClaudeCodeRuntime 适配代理模式 ✅ |
-| 袁 | | | |
 
 ## Git ↔ 目录映射
 
