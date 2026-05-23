@@ -1,7 +1,7 @@
 # AgentHub 命令接口
 
-> 版本: v2.0 | 基于 PRD v1.0 §六 + 架构设计 v1.0 §四
-> 代码实现必须与此文档一致。
+> 版本: v2.1 | 基于 PRD v4.0 + 架构设计 v1.0 | 2026-05-23
+> v2.1: 环境变量摘除 Celery/LiteLLM，新增 CLI 相关配置
 
 ---
 
@@ -17,11 +17,21 @@ AGENTHUB_ENV=development
 DATABASE_URL=postgresql://agenthub:password@localhost:5432/agenthub
 REDIS_URL=redis://localhost:6379/0
 
+# LLM 适配器
+LLM_ADAPTER_MODE=mock|anthropic_api|claude_code
+ANTHROPIC_API_KEY=sk-ant-...
+DEFAULT_MODEL=claude-sonnet-4-20250514
+
+# CLI 模式
+CLAUDE_CLI_TIMEOUT=300
+AGENT_WORKSPACE_DIR=.agenthub/workspaces
+CLAUDE_ALLOWED_TOOLS=Read,Write,Edit,Grep,Glob
+
 # 可选
 AGENTHUB_PORT=8000
 AGENTHUB_LOG_LEVEL=INFO
-AGENTHUB_MAX_CONCURRENT_TASKS=10
-AGENTHUB_TOKEN_BUDGET_PER_DAY=1000000
+MAX_TOKENS=16000
+MAX_TOOL_TURNS=10
 ```
 
 ---
@@ -145,6 +155,7 @@ POST   /api/sessions
 GET    /api/sessions
 GET    /api/sessions/{id}
 GET    /api/sessions/{id}/messages  ?before=uuid&limit=50
+GET    /api/sessions/{id}/history   ← 读取 CLI transcript.jsonl 完整回放（含 tool_call/thinking）
 
 POST   /api/sessions/{id}/messages
   body: { "content": "...", "mentions": ["AgentName"], "dispatch_mode": "auto"|"direct",

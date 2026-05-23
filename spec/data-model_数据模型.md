@@ -1,6 +1,7 @@
 # AgentHub 数据模型
 
 > 版本: v2.0 | 基于 PRD v1.0 §五 + 架构设计 v1.0
+> ⚠️ v4 PRD 已将 12 表简化为 6 表（砍掉 agent_capabilities / task_events / task_artifacts / notifications / deploy_logs / users）。本文件尚未同步，实现以 v4 PRD 为准。
 > 所有 SQL 以 Alembic migration 形式管理。
 
 ---

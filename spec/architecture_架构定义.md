@@ -1,7 +1,7 @@
 # AgentHub 分层架构定义
 
-> 版本：v2.0 | 基于 PRD v1.0 + 架构设计 v1.0
-> 详细场景数据流见 [`架构设计_分层与数据流.md`](架构设计_分层与数据流.md)
+> 版本：v2.2 | 基于 PRD v4.0 + 架构设计 v1.0 | 2026-05-23
+> v2.2: 摘除 Celery（asyncio.gather 替代）、LiteLLM（降级为未来方案）、对齐 v4 接口
 
 ---
 
@@ -28,10 +28,10 @@ L2  Domain           Agent / Group / Session / Message / Task (聚合根)
                     TaskFSM + Validators + DomainEvents
         │                          ↑
         ▼                          │
-L1  Infrastructure   PostgreSQL (SQLAlchemy) / Redis / Celery / FileSystem
+L1  Infrastructure   PostgreSQL (SQLAlchemy) / Redis / FileSystem
                     LLM Adapters (API): ClaudeAdapter / OpenAICompatAdapter / MockAdapter
                     Agent Runtimes (CLI): ClaudeCodeRuntime / CodexRuntime / TraeRuntime
-                    WS Bridge (Redis→WS Broadcast)
+                    WS Bridge (Redis→WS Broadcast) + SessionStore (Redis)
 ```
 
 ### 层级边界
@@ -73,8 +73,10 @@ L2 Domain — 接口定义
     │   chat_structured(prompt) → dict
     │
     └── AgentRuntime (ABC)              ← CLI 模式：有状态，CLI 自控 tool loop
-        run(task) → AsyncIterator[StreamEvent]
-        send_decision(decision) → None
+        stream(AgentRequest) → AsyncIterator[StreamEvent]
+        chat_structured(prompt) → dict
+        kill(session_id) → None
+        send_decision(session_id, decision) → None
 
 L1 Infrastructure — 实现
   LLMAdapter 实现（API 轨道）
@@ -121,22 +123,21 @@ build_adapter(mode, **kwargs) → UnifiedAgent:
 
 ### 2.2 审批模式
 
-| 模式 | 说明 | Agent 工作区操作 | 危险操作 | Claude Code 内置权限 |
-|------|------|:---:|:---:|:---:|
-| **正常模式**（默认） | 捕获 Claude Code 权限请求 → 转为 AgentHub 审批卡片 | Always | Ask First | 捕获 permission_request 事件 → 转审批 |
-| **执行模式** | 用户明确信任当前会话 | Always | Always | `--dangerously-skip-permissions` 完全跳过 |
+> v2.2 更新：`--print` 模式非交互式，不支持 stdin 写 `y/n`。权限通过检测 result 中的 `permission_denials` + 用户确认后 `--permission-mode bypassPermissions` 重试实现。
+
+| 模式 | Agent `permission_mode` | CLI `--permission-mode` | 行为 |
+|------|------------------------|------------------------|------|
+| **正常模式**（默认） | `acceptEdits` | `--permission-mode acceptEdits` | 编辑自动通过，Bash/git 等危险操作被阻断 |
+| **执行模式** | `bypassPermissions` | `--permission-mode bypassPermissions` | 全自动，不阻断 |
 
 ```
-正常模式下 Claude Code 权限传递:
-Claude Code 输出: { type: "permission_request", path: "src/xxx", action: "write" }
-  → Adapter 截获 → 查询 AgentHub boundaries 矩阵
-    ├─ Always 操作 (创建/编辑文件) → 自动写 "yes\n" 到 Claude Code stdin
-    ├─ Ask First 操作 (删除/Git/部署) → 创建审批卡片 → 用户点击 → 写 "yes/no\n"
-    └─ Never 操作 (../ / .env) → 自动写 "no\n" → 通知用户被拒绝
-
-执行模式下:
-  Claude Code 启动参数加 --dangerously-skip-permissions
-  → 所有操作自动通过
+正常模式下危险操作:
+  1. CLI 执行 Bash: rm -f /tmp/build
+  2. CLI 阻断 → tool_result: {is_error: true, content: "was blocked..."}
+  3. result 中汇总 permission_denials
+  4. ChatService 检测 → emit REQUEST_APPROVAL → 前端审批卡片
+  5. 用户 [信任并重试] → ChatService 用 --permission-mode bypassPermissions 重新调用
+  6. 用户 [换个方式] → ChatService 重新调用 + feedback 文本
 ```
 
 ### 2.3 Agent 系统
@@ -223,9 +224,9 @@ PENDING → QUEUED → RUNNING → COMPLETED (终态)
     │   · 无@ → LLM 意图检测
     └─ dispatch_mode == "direct" (私聊固定) → 直接发给目标
   → L2 CoordinatorService.decompose_and_dispatch()
-    ├─ Coordinator Agent (LLM): 任务分解 → JSON
-    └─ Harness: 校验 → DAG 编译 → Celery 入队
-  → L1 Celery Worker → LLMAdapter.chat() → 流式输出
+    ├─ Coordinator Agent (LLM, API 模式): 任务分解 → JSON
+    └─ Harness: 校验 → DAG 编译 → asyncio.gather 并发执行
+  → L1 AgentRuntime.stream() 或 LLMAdapter.stream() → 流式输出
   → Redis Pub/Sub → L4 WS Bridge → L5 StreamingText
 ```
 
@@ -246,8 +247,12 @@ agenthub/
 │   │   ├── api/           # L4: Routers + WS Handlers
 │   │   ├── services/      # L3: AgentService, ChatService, TaskService...
 │   │   ├── domain/        # L2: Agent, Group, Task, TaskFSM, TaskEngine...
-│   │   ├── adapters/      # L1: ClaudeAdapter, CodexAdapter, TraeAdapter
-│   │   ├── infrastructure/# L1: PG Repos, Redis, Celery, FileSystem
+│   │   ├── infrastructure/llm/
+│   │   │   ├── claude_adapter.py         # ClaudeAdapter (API)
+│   │   │   ├── mock_adapter.py           # MockAdapter
+│   │   │   └── runtimes/                # AgentRuntime (CLI)
+│   │   │       ├── claude_code.py        # ClaudeCodeRuntime
+│   │   ├── infrastructure/# L1: PG Repos, Redis, SessionStore
 │   │   └── schemas/       # Pydantic v2 Request/Response
 │   ├── migrations/        # Alembic
 │   └── tests/
@@ -265,8 +270,7 @@ agenthub/
 | 前端 | React 18 + TypeScript Strict + Vite + Tailwind 3 + Zustand 4 | |
 | 后端 | FastAPI (Python 3.12+) + Pydantic v2 + SQLAlchemy | |
 | 数据库 | PostgreSQL 16 + pgvector 0.7+ | |
-| 缓存/队列 | Redis 7 + Celery 5 | |
-| 实时通信 | WebSocket (socket.io) + SSE | |
-| LLM 网关 | LiteLLM | |
+| 缓存/队列 | Redis 7 | |
+| 实时通信 | WebSocket | |
+| LLM 接入 | SDK/CLI 双轨（ClaudeAdapter + ClaudeCodeRuntime） | |
 | 部署 | Docker 24+ + Nginx 1.25+ | |
-| CLI/PWA | Click 8.x + Rich 13.x / Workbox 7.x | |
