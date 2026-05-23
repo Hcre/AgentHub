@@ -7,7 +7,7 @@
 |----|--------|--------|-----------|
 | 黎 | 域2: ClaudeCliAdapter(M2) + Agent settings 扩展 | 无 | ClaudeAdapter 完整重写(5种事件+memory注入+重试) ✅ + spec v0.2 对齐 ✅ + DOC-15 v1.1 裁决 ✅ |
 | 董 | 域2: adapter-cli-flow-analysis v1.3 + session/permission 方案落地 | 无 | ADR-01(API→CLI 重心转移) ✅ + v4 PRD 统一方案 ✅ + adapter-cli-flow-analysis v1.3 ✅ + doc-sync(spec 同步/架构文档更新) ✅ |
-| 袁 | 前端 Phase 4 完成(假群聊)，下一步 Phase 5 | 无 | Phase 0-3 ✅ + Phase 4 假群聊(groupStore/协调者方案卡/@mention/需批准/MOCK 接缝 + HANDOFF 交接文档)✅ 验收全绿 + 截图确认 ✅ |
+| 袁 | 前端 Phase 5 完成，下一步 Phase 6/7 | 无 | Phase 0-4 ✅ + Phase 5 次要视图(活动/日历月周日/收件箱审批/助手详情/技能·记忆·设置 + inboxStore)✅ 验收全绿 + 截图确认日历 ✅ |
 
 ## 图例
 - ⚠️ 阻塞中（写明等谁/等什么）

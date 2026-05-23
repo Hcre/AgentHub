@@ -6,6 +6,8 @@ import {
   Calendar,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   FileDiff,
   FileText,
@@ -76,6 +78,8 @@ const MAP: Record<IconName, LucideIcon> = {
   clock: Clock,
   shieldCheck: ShieldCheck,
   pin: Pin,
+  chevronLeft: ChevronLeft,
+  chevronRight: ChevronRight,
 }
 
 export interface IconProps {
