@@ -39,16 +39,18 @@ class ClaudeCodeRuntime(AgentRuntime):
     def __init__(
         self,
         *,
-        api_key: str = "",
         model: str = "",
-        base_url: str | None = None,
+        agent_id: str = "",
+        proxy_base: str = "",
         permission_mode: str = _DEFAULT_PERMISSION_MODE,
         max_turns: int = _DEFAULT_MAX_TURNS,
         timeout: int = _DEFAULT_TIMEOUT,
     ) -> None:
-        self._api_key = api_key
         self._model = model
-        self._base_url = base_url
+        self._proxy_url = (
+            f"{proxy_base.rstrip('/')}/agents/{agent_id}"
+            if proxy_base and agent_id else ""
+        )
         self._permission_mode = permission_mode
         self._max_turns = max_turns
         self._timeout = timeout
@@ -160,14 +162,17 @@ class ClaudeCodeRuntime(AgentRuntime):
         return cmd
 
     def _build_env(self) -> dict[str, str]:
-        """构造 CLI 子进程环境变量，继承当前环境并覆盖 agent 配置。"""
+        """构造 CLI 子进程环境变量。
+
+        代理模式（proxy_url 非空）：ANTHROPIC_BASE_URL 指向本地代理，API Key 为占位。
+        全局模式（proxy_url 为空）：继承当前 shell 环境（用户自己的 Claude Code 配置）。
+        """
         env = os.environ.copy()
-        if self._api_key:
-            env["ANTHROPIC_API_KEY"] = self._api_key
+        if self._proxy_url:
+            env["ANTHROPIC_BASE_URL"] = self._proxy_url
+            env["ANTHROPIC_API_KEY"] = "agenthub-proxy"
         if self._model:
             env["ANTHROPIC_MODEL"] = self._model
-        if self._base_url:
-            env["ANTHROPIC_BASE_URL"] = self._base_url
         return env
 
     @staticmethod

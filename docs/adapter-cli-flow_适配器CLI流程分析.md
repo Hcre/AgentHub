@@ -1,6 +1,7 @@
 # Adapter → CLI 全场景流程分析
 
-> 版本：v1.3 | 日期：2026-05-23 | 基于 ADR-01 + v4 统一方案
+> 版本：v1.4 | 日期：2026-05-23 | 基于 ADR-01 + v4 统一方案
+> v1.4: 新增 §九 CLI 多模型代理场景（鉴权适配 + 透明转发 + 错误处理）
 > v1.3: §8 Session 生命周期补充完整前端↔后端↔CLI 交互流程 / §6 权限补充完整检测→通知→重试流程
 
 ---
@@ -27,7 +28,12 @@ ChatService.send_and_stream(cmd)
              │
              ├─ _resolve_session()    ← AgentHub session_id 即 CLI session_id
              ├─ _build_command()      ← --resume or --session-id
+             ├─ _build_env()           ← ANTHROPIC_BASE_URL → 本地代理
              ├─ _spawn()              ← subprocess, per-agent env
+             │     │  CLI HTTP 请求 → ProxyHandler
+             │     │  ├─ 鉴权适配（解密 api_key → x-api-key）
+             │     │  ├─ URL 路由（agent.base_url + path）
+             │     │  └─ 流式透明转发
              ├─ _read_loop()          ← stdout JSON Lines → StreamEvent（含 stdin 写入）
              └─ _cleanup()            ← on exit/error/timeout
 ```
@@ -73,9 +79,9 @@ ChatService.send_and_stream()
       │   ]
       │
       ├─ env = {
-      │     "ANTHROPIC_API_KEY": decrypt(agent.api_key),
+      │     "ANTHROPIC_API_KEY": "agenthub-proxy",           ← 占位，真实 key 由代理注入
       │     "ANTHROPIC_MODEL": agent.model,
-      │     "ANTHROPIC_BASE_URL": agent.base_url,
+      │     "ANTHROPIC_BASE_URL": f"http://127.0.0.1:8000/proxy/agents/{agent.id}",  ← 指向本地代理
       │   }
       │
       ├─ process = subprocess.Popen(cmd, env=env, stdin=PIPE, stdout=PIPE, stderr=PIPE)
@@ -815,7 +821,266 @@ CLI 磁盘                    ~/.claude/sessions/{id}/         CLI 内部
 
 ---
 
-## 九、设计决策速查表
+## 九、场景八：CLI 多模型代理
+
+### 9.1 问题
+
+Claude Code CLI 默认向 `https://api.anthropic.com` 发送 Anthropic Messages API 格式请求。要让 CLI 使用 DeepSeek、Kimi、GLM 等第三方模型，有两个障碍：
+
+1. **鉴权不兼容**：CLI 固定使用 `x-api-key` header，第三方端点可能是 Bearer Token 或其他鉴权方式
+2. **协议差异**：部分 Provider（GPT、Qwen）不提供 Anthropic 兼容端点，只支持 OpenAI Chat 格式
+
+### 9.2 方案：内置透明代理
+
+所有 CLI 流量统一经过 AgentHub 进程内的 ProxyHandler，不直连第三方。
+
+#### 代理架构
+
+```
+Claude Code CLI (子进程)
+    │  ANTHROPIC_BASE_URL = http://127.0.0.1:8000/proxy/agents/{agent_id}
+    │  ANTHROPIC_API_KEY  = "agenthub-proxy"  (占位)
+    │  ANTHROPIC_MODEL    = "deepseek-v4-pro"
+    ▼
+┌──────────────────────────────────────────────────────────────┐
+│  ProxyHandler (AgentHub 进程内)                              │
+│                                                              │
+│  handle(agent_id, path, request):                            │
+│    1. agent_repo.get_by_id(agent_id) → Agent 实体            │
+│    2. decrypt(agent.api_key_encrypted) → 真实 API Key         │
+│    3. 鉴权适配：forward_headers["x-api-key"] = real_key       │
+│    4. target_url = f"{agent.base_url}/{path}"                │
+│    5. httpx.stream(method, target_url, headers, body)        │
+│    6. StreamingResponse(aiter_raw()) → 字节级透明回传         │
+│                                                              │
+│  ★ 不解析请求体/响应体 — 字节级透传                            │
+│  ★ 过滤 hop-by-hop headers（host, transfer-encoding 等）      │
+└──────────────────────────┬───────────────────────────────────┘
+                           │ 真实 x-api-key + 原样 body
+                           ▼
+第三方 API (https://api.deepseek.com/anthropic/v1/messages)
+```
+
+### 9.3 场景 A：Agent 创建与代理配置
+
+**触发**：用户通过 API 创建一个使用 DeepSeek 的 Agent
+
+```
+POST /api/agents
+{
+  "name": "DeepSeek代理测试",
+  "agent_system": "claude_code",
+  "model": "deepseek-v4-pro",
+  "base_url": "https://api.deepseek.com/anthropic",
+  "api_key": "sk-你的DeepSeek API Key"
+}
+│
+├─ L4: AgentCreateRequest → CreateAgentCommand
+├─ L3: AgentService.create()
+│   ├─ encrypt_secret("sk-xxx") → api_key_encrypted (AES-256-GCM 密文)
+│   ├─ Agent(base_url="https://api.deepseek.com/anthropic", ...)
+│   └─ agent_repo.save(agent)
+│
+├─ L1: INSERT INTO agents:
+│   │ agent_system  = "claude_code"
+│   │ model         = "deepseek-v4-pro"
+│   │ base_url      = "https://api.deepseek.com/anthropic"
+│   │ api_key_encrypted = "<AES-256-GCM 密文>"   ← 永不落盘为明文
+│
+└─ 响应: AgentOut（不包含 api_key 和 base_url）
+```
+
+**关键**：`api_key` 只在内存中短暂存在。L3 加密后，明文丢弃。代理时 L1 解密 → 注入 header → 用完丢弃。
+
+### 9.4 场景 B：CLI 启动 + 代理转发（正常流）
+
+**触发**：用户在该 Agent 的会话中发送消息 "帮我写一个登录页面"
+
+```
+ChatService.send_and_stream()
+│
+├─ ContextBuilder.build() → AgentRequest
+│
+├─ factory.build_adapter_for_agent(agent)
+│   │ agent.agent_system == CLAUDE_CODE
+│   │
+│   └─ ClaudeCodeRuntime(
+│         model="deepseek-v4-pro",
+│         agent_id="<UUID>",
+│         proxy_base="http://127.0.0.1:8000",
+│       )
+│
+└─ ClaudeCodeRuntime.stream(request)
+      │
+      ├─ _build_env():
+      │   env["ANTHROPIC_API_KEY"]  = "agenthub-proxy"     ← 占位
+      │   env["ANTHROPIC_MODEL"]    = "deepseek-v4-pro"
+      │   env["ANTHROPIC_BASE_URL"] = "http://127.0.0.1:8000/proxy/agents/<UUID>"
+      │
+      ├─ cmd = ["claude", "--print", "--session-id", session_key,
+      │         "--output-format", "stream-json", "--verbose",
+      │         "--system-prompt", system_prompt]
+      │
+      ├─ subprocess.Popen(cmd, env=env, stdin=PIPE, stdout=PIPE)
+      ├─ stdin.write("帮我写一个登录页面")
+      ├─ stdin.write_eof()
+      │
+      │   ─── CLI 内部发 HTTP 请求 ───
+      │   POST http://127.0.0.1:8000/proxy/agents/<UUID>/v1/messages
+      │   Headers:
+      │     x-api-key: agenthub-proxy           ← 占位
+      │     anthropic-version: 2023-06-01
+      │     content-type: application/json
+      │   Body (Anthropic Messages 格式):
+      │     {
+      │       "model": "deepseek-v4-pro",
+      │       "max_tokens": 16000,
+      │       "messages": [{"role": "user", "content": "帮我写一个登录页面"}],
+      │       "system": "你是 FrontendAgent，前端开发专家...",
+      │       "stream": true
+      │     }
+      │   ──────────────────────────▶
+      │
+      │   ProxyHandler.handle(agent_id="UUID", path="v1/messages", request):
+      │     ├─ agent = agent_repo.get_by_id(UUID)
+      │     │   → base_url = "https://api.deepseek.com/anthropic"
+      │     │   → api_key_encrypted = "<密文>"
+      │     ├─ real_key = decrypt(api_key_encrypted) → "sk-xxx"
+      │     ├─ target_url = "https://api.deepseek.com/anthropic/v1/messages"
+      │     ├─ forward_headers = {**req.headers, "x-api-key": "sk-xxx"}
+      │     │   (替换占位 key 为真实 key)
+      │     ├─ httpx.stream("POST", target_url, headers, body)
+      │     │        ─────────────────────────────────────▶
+      │     │        第三方 API 返回 Anthropic 格式流式响应
+      │     │        ◀─────────────────────────────────────
+      │     └─ StreamingResponse(upstream.aiter_raw())   ← 字节级透明回传
+      │
+      │   CLI 收到 Anthropic 格式响应 ← 完全无感知，以为在调 Anthropic 官方 API
+      │   ──────────────────────────
+      │
+      ├─ for line in process.stdout:
+      │     event = _parse_line(line)
+      │     yield event
+      │
+      └─ yield DONE
+```
+
+### 9.5 场景 C：Anthropic 兼容端点（pass-through）
+
+当 Provider 提供 Anthropic 原生兼容端点时（DeepSeek、Kimi、GLM），代理做**纯透明转发**：
+
+```
+CLI 请求 → ProxyHandler:
+  │
+  │  请求体：Anthropic Messages 格式（Model、Messages、System、Stream 等）
+  │  请求头：x-api-key (占位)、anthropic-version、content-type
+  │
+  ├─ 替换 x-api-key: "agenthub-proxy" → "sk-real-deepseek-key"
+  ├─ 过滤 hop-by-hop headers
+  ├─ URL 拼接: https://api.deepseek.com/anthropic + /v1/messages
+  │
+  └─ 原样转发 → 第三方以 Anthropic 格式理解和响应 → 原样回传
+
+请求体和响应体：零改动，字节级透传
+```
+
+| Provider | Anthropic 端点 | 鉴权 | 需要协议转换 |
+|----------|---------------|------|:---:|
+| DeepSeek | `api.deepseek.com/anthropic` | x-api-key | 否 |
+| Kimi | `api.moonshot.cn/anthropic` | x-api-key | 否 |
+| 智谱 GLM | `open.bigmodel.cn/api/anthropic` | x-api-key | 否 |
+| MiniMax | 内置 | x-api-key | 否 |
+| Ollama | `localhost:11434` | 无需 | 否 |
+| LM Studio | `localhost:1234` | 无需 | 否 |
+| OpenAI (GPT-4o) | `api.openai.com/v1` | Bearer | **需要** |
+| 百炼 (Qwen) | `dashscope.aliyuncs.com/compatible-mode` | Bearer | **需要** |
+
+### 9.6 场景 D：错误处理
+
+#### Agent 不存在
+
+```
+CLI → POST /proxy/agents/nonexistent-id/v1/messages
+│
+├─ agent_repo.get_by_id("nonexistent-id") → None
+└─ Response: 404 {"error": "agent not found"}
+
+CLI stdout:
+{"type":"result","subtype":"error_during_execution","is_error":true,...}
+→ StreamEvent(ERROR, "Claude CLI 退出码 1: HTTP 404...")
+```
+
+#### API Key 未配置
+
+```
+agent.api_key_encrypted == "" 或 为空
+│
+└─ Response: 400 {"error": "agent has no api_key"}
+
+→ 前端提示：Agent 配置缺少 API Key
+```
+
+#### 第三方 API 超时
+
+```
+httpx.stream() → ReadTimeout (300s)
+│
+├─ StreamingResponse 中断
+├─ CLI 收到不完整响应 → exit code != 0
+└─ StreamEvent(ERROR, "Claude CLI 退出码 1: ...")
+```
+
+#### 第三方返回错误
+
+```
+DeepSeek API → HTTP 401 Unauthorized
+│
+├─ ProxyHandler: upstream.status_code → StreamingResponse(401, body=error)
+├─ CLI 收到 401 → stdout: error result
+└─ StreamEvent(ERROR, "Claude CLI 退出码 1: HTTP 401...")
+
+★ 代理不做错误转换 — 上游错误原样透传给 CLI
+```
+
+### 9.7 场景 E：后续扩展 — 协议转换
+
+当接入 GPT、Qwen 等不提供 Anthropic 兼容端点的 Provider 时，在 ProxyHandler 中叠加协议转换：
+
+```
+CLI 请求 (Anthropic 格式)
+│
+├─ ProxyHandler:
+│   ├─ 判断 api_format == "openai_chat"
+│   ├─ transform.anthropic_to_openai_chat(body)
+│   │   ├─ system → messages[0] {role:"system", content:"..."}
+│   │   ├─ tools[].input_schema → tools[].function.parameters
+│   │   └─ content blocks → string content
+│   ├─ 转发到 OpenAI API (https://api.openai.com/v1/chat/completions)
+│   ├─ transform.openai_chat_to_anthropic(sse_chunks)
+│   │   ├─ choices[0].delta.content → content_block_delta text
+│   │   ├─ choices[0].delta.tool_calls → content_block_start/delta tool_use
+│   │   └─ finish_reason → message_delta stop_reason
+│   └─ StreamingResponse(Anthropic SSE 格式)
+│
+└─ CLI 收到 Anthropic 格式流式响应（无感知）
+```
+
+当前阶段不实现：GPT/Qwen 覆盖范围小，Anthropic SSE 和 OpenAI SSE 事件结构差异大，测试矩阵复杂。DeepSeek/Kimi/GLM 的 Anthropic 兼容端点已覆盖主流需求。
+
+### 9.8 代理关键设计决策
+
+| 决策 | 原因 |
+|------|------|
+| 所有 CLI 流量走代理，不直连 | 鉴权机制不兼容（x-api-key vs Bearer），直连前提不可靠 |
+| URL 路径编码 agent_id | 无需自定义 header，CLI 零改动 |
+| 字节级透明转发（aiter_raw） | 不解析请求/响应体，对 Anthropic 兼容 Provider 零适配成本 |
+| 协议转换后置 | 覆盖 80%+ Provider（DeepSeek/Kimi/GLM），GPT/Qwen ROI 低 |
+| 代理与 AgentHub 同进程 | 延迟 <1ms，无需额外服务 |
+| API Key 占位 → 代理注入 | API Key 只在代理内存中短暂存在为明文,落库永远是密文 |
+
+---
+
+## 十、设计决策速查表
 
 | 决策 | 理由 |
 |------|------|
@@ -834,10 +1099,15 @@ CLI 磁盘                    ~/.claude/sessions/{id}/         CLI 内部
 | 讨论超时 Agent 静默跳过 | 讨论非强制任务，沉默是合法行为 |
 | 群聊 session_id 格式：`{group_session}:{agent_id}` | 同一群聊中每个 Agent 独立 CLI session |
 | 权限：预设 acceptEdits + 检测 permission_denials | --print 模式无交互式提示，阻断后通知用户重试 |
+| **代理**：所有 CLI 流量走内置代理 | 鉴权不兼容（x-api-key vs Bearer），统一适配 |
+| **代理**：URL 路径编码 agent_id | 无需自定义 header，CLI 零改动 |
+| **代理**：字节级透明转发（aiter_raw） | 覆盖 Anthropic 兼容 Provider，零适配成本 |
+| **代理**：协议转换后置 | DeepSeek/Kimi/GLM 已覆盖 80% 场景 |
+| **代理**：API Key 占位 → 代理注入 | 明文只在代理内存中短暂存在，落库永远是密文 |
 
 ---
 
-## 十、相关文档
+## 十一、相关文档
 
 | 文档 | 内容 |
 |------|------|
@@ -845,3 +1115,5 @@ CLI 磁盘                    ~/.claude/sessions/{id}/         CLI 内部
 | `PRD_AgentHub_v4_统一方案.md` §三 | 接口签名 + 双轨定义 |
 | `DOC-15-claude-adapter-design.md` | 双轨架构详细设计 |
 | `DOC-17-context-injection-problem.md` | CLI 上下文注入问题分析 |
+| `CLI多模型代理方案.md` | CLI 多模型代理方案设计（含 ProxyHandler + 路由 + 鉴权适配） |
+| `cc-haha-multi-model-analysis.md` | cc-haha 多模型支持机制深度分析 |

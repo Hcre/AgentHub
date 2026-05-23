@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     max_tokens: int = 16000
     max_tool_turns: int = 10
     claude_cli_timeout: int = 300
+    proxy_base_url: str = "http://127.0.0.1:8000"
 
     # --- CORS ---
     cors_origins: str = "http://localhost:5173"
