@@ -14,6 +14,7 @@ interface UIState {
   activeTab: string
   activeAgentId: string | null
   activeConversationId: string | null
+  activeGroupId: string | null
 
   toggleTheme: () => void
   toggleSidebar: () => void
@@ -22,6 +23,10 @@ interface UIState {
   setActiveTab: (tab: string) => void
   /** 打开某助手的某会话（默认进入聊天） */
   openConversation: (agentId: string, conversationId: string) => void
+  /** 进入某频道的群聊 */
+  openGroup: (groupId: string) => void
+  /** 查看某助手详情 */
+  viewAgent: (agentId: string) => void
 }
 
 /**
@@ -36,6 +41,7 @@ export const useUIStore = create<UIState>((set) => ({
   activeTab: 'chat',
   activeAgentId: 'editor',
   activeConversationId: 'c2',
+  activeGroupId: 'design',
 
   toggleTheme: () => set((s) => ({ theme: s.theme === 'light' ? 'dark' : 'light' })),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
@@ -49,4 +55,6 @@ export const useUIStore = create<UIState>((set) => ({
       activeAgentId: agentId,
       activeConversationId: conversationId,
     }),
+  openGroup: (groupId) => set({ section: 'group', activeGroupId: groupId }),
+  viewAgent: (agentId) => set({ section: 'agent-detail', activeAgentId: agentId }),
 }))

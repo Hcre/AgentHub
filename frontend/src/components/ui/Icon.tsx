@@ -16,20 +16,25 @@ import {
   LayoutGrid,
   List,
   ListChecks,
+  Clock,
   MessageSquare,
   Moon,
   MoreHorizontal,
+  Network,
   PanelLeft,
   PanelRight,
   Paperclip,
+  Pin,
   Plus,
   Search,
   Send,
   Settings,
+  ShieldCheck,
   Smile,
   Sparkles,
   Sun,
   X,
+  Zap,
   type LucideIcon,
 } from 'lucide-react'
 import type { IconName } from '../../types'
@@ -66,6 +71,11 @@ const MAP: Record<IconName, LucideIcon> = {
   list: List,
   grid: LayoutGrid,
   x: X,
+  network: Network,
+  zap: Zap,
+  clock: Clock,
+  shieldCheck: ShieldCheck,
+  pin: Pin,
 }
 
 export interface IconProps {
