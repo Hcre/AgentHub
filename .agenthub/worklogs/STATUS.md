@@ -9,6 +9,16 @@
 | 董 | 域2: adapter-cli-flow-analysis v1.3 + session/permission 方案落地 | 无 | ADR-01(API→CLI 重心转移) ✅ + v4 PRD 统一方案 ✅ + adapter-cli-flow-analysis v1.3 ✅ + doc-sync(spec 同步/架构文档更新) ✅ |
 | 袁 | | | |
 
+## Git ↔ 目录映射
+
+> check_worklog.py 用它来判断「你是谁」，从而检查对应目录的日志。
+
+| Git用户名 | 日志目录 |
+|-----------|----------|
+| oldmanpushbike | 黎 |
+| （待补充） | 董 |
+| （待补充） | 袁 |
+
 ## 图例
 - ⚠️ 阻塞中（写明等谁/等什么）
 - 🔀 涉及跨域接口，需协调
