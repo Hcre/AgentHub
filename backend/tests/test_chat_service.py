@@ -17,16 +17,22 @@ from app.infrastructure.repositories import (
 
 @pytest.mark.asyncio
 async def test_send_and_stream_private(db_session) -> None:  # type: ignore[no-untyped-def]
-    from uuid import uuid4
+    from app.domain.entities.agent import Agent
 
     bus = InMemoryEventBus()
+
+    # 先创建一个 mock agent
+    agent_repo = PostgresAgentRepository(db_session)
+    agent = Agent(name="test-mock", avatar="🤖", role="tester")
+    await agent_repo.save(agent)
+
     session_svc = SessionService(
         PostgresSessionRepository(db_session),
         PostgresMessageRepository(db_session),
         bus,
     )
     session = await session_svc.create(
-        CreateSessionCommand(type="private", agent_id=uuid4())
+        CreateSessionCommand(type="private", agent_id=agent.id)
     )
 
     l1 = InMemoryL1Store(window=20)

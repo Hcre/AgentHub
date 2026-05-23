@@ -12,11 +12,11 @@ from app.domain.llm.protocol import (
     AgentRequest,
     StreamEvent,
     StreamEventType,
-    UnifiedAgent,
+    LLMAdapter,
 )
 
 
-class MockAdapter(UnifiedAgent):
+class MockAdapter(LLMAdapter):
     def __init__(self, delay: float = 0.02) -> None:
         self._delay = delay
 

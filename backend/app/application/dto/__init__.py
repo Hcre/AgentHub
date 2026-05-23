@@ -17,6 +17,7 @@ class AgentResponse:
     name: str
     avatar: str
     role: str
+    agent_system: str
     provider: str
     model: str
     status: str
@@ -33,6 +34,7 @@ class AgentResponse:
             name=a.name,
             avatar=a.avatar,
             role=a.role,
+            agent_system=str(a.agent_system),
             provider=str(a.provider),
             model=a.model,
             status=str(a.status),

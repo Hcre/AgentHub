@@ -5,6 +5,8 @@ L2 定义 UnifiedAgent 抽象 + StreamEvent 协议，L1 提供 Claude/Mock 等�
 
 from app.domain.llm.protocol import (
     AgentRequest,
+    AgentRuntime,
+    LLMAdapter,
     MemoryContext,
     StreamEvent,
     StreamEventType,
@@ -15,6 +17,8 @@ from app.domain.llm.protocol import (
 
 __all__ = [
     "AgentRequest",
+    "AgentRuntime",
+    "LLMAdapter",
     "MemoryContext",
     "StreamEvent",
     "StreamEventType",

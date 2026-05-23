@@ -15,7 +15,7 @@ from app.core.events import EventBus
 from app.core.exceptions import DomainError, NotFoundError
 from app.core.security import encrypt_secret
 from app.domain.entities.agent import Agent
-from app.domain.enums import Provider
+from app.domain.enums import AgentSystem, Provider
 from app.domain.events import AgentCreated, AgentDeleted, AgentUpdated
 from app.domain.repositories import AgentRepository
 
@@ -33,9 +33,11 @@ class AgentService:
             name=cmd.name,
             avatar=cmd.avatar,
             role=cmd.role,
+            agent_system=AgentSystem(cmd.agent_system),
             provider=Provider(cmd.provider),
             model=cmd.model,
-            api_key_encrypted=encrypt_secret(cmd.api_key),  # L3 负责加密
+            api_key_encrypted=encrypt_secret(cmd.api_key) if cmd.api_key else "",
+            base_url=cmd.base_url,
             skills=cmd.skills,
             system_prompt=cmd.system_prompt,
         )
@@ -60,11 +62,14 @@ class AgentService:
             "avatar": cmd.avatar,
             "role": cmd.role,
             "model": cmd.model,
+            "base_url": cmd.base_url,
             "skills": cmd.skills,
             "capability_tags": cmd.capability_tags,
             "settings": cmd.settings,
             "system_prompt": cmd.system_prompt,
         }
+        if cmd.agent_system is not None:
+            changes["agent_system"] = AgentSystem(cmd.agent_system)
         if cmd.provider is not None:
             changes["provider"] = Provider(cmd.provider)
         if cmd.api_key is not None:

@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from app.core.exceptions import DomainError
-from app.domain.enums import AgentStatus, Provider
+from app.domain.enums import AgentStatus, AgentSystem, Provider
 
 
 def _now() -> datetime:
@@ -25,9 +25,11 @@ class Agent:
     name: str
     avatar: str
     role: str
-    provider: Provider
-    model: str
-    api_key_encrypted: str
+    agent_system: AgentSystem = AgentSystem.MOCK
+    provider: Provider = Provider.ANTHROPIC
+    model: str = ""
+    api_key_encrypted: str = ""
+    base_url: str | None = None
     id: UUID = field(default_factory=uuid4)
     skills: list[str] = field(default_factory=list)
     capability_tags: list[str] = field(default_factory=list)
@@ -45,14 +47,19 @@ class Agent:
     def validate(self) -> None:
         if not self.name or not self.name.strip():
             raise DomainError("Agent name 不能为空")
-        if not self.is_system and not self.api_key_encrypted:
-            raise DomainError("非系统 Agent 必须提供 api_key")
+        # CLI 运行时和 mock 不需要 API key
+        needs_api_key = self.agent_system in (
+            AgentSystem.ANTHROPIC_API,
+            AgentSystem.OPENAI_API,
+        )
+        if not self.is_system and needs_api_key and not self.api_key_encrypted:
+            raise DomainError("API 模式 Agent 必须提供 api_key")
 
     def update(self, **changed: object) -> list[str]:
         """部分更新，返回实际变更的字段名列表（用于 AgentUpdated 事件）。"""
         allowed = {
-            "name", "avatar", "role", "provider", "model",
-            "api_key_encrypted", "skills", "capability_tags",
+            "name", "avatar", "role", "agent_system", "provider", "model",
+            "api_key_encrypted", "base_url", "skills", "capability_tags",
             "system_prompt", "settings", "status",
         }
         changed_fields: list[str] = []

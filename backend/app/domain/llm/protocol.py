@@ -66,15 +66,41 @@ class StreamEvent(BaseModel):
     metadata: dict[str, Any] = {}      # token_usage / model / latency_ms
 
 
-class UnifiedAgent(ABC):
-    """所有 Agent 适配器的统一接口。"""
+class LLMAdapter(ABC):
+    """无状态 API 管道（Anthropic API / OpenAI-compatible API）。
+
+    每次调用独立，不持有进程或会话状态。
+    L3 负责记忆注入和工具编排。
+    """
 
     @abstractmethod
     def stream(self, request: AgentRequest) -> AsyncIterator[StreamEvent]:
-        """流式执行一次 Agent 调用，逐事件 yield。"""
+        """流式执行一次 LLM 调用，逐事件 yield。"""
         ...
 
     @abstractmethod
     async def chat_structured(self, prompt: str) -> dict:
         """非流式结构化调用（协调者任务分解用）。"""
         ...
+
+
+class AgentRuntime(ABC):
+    """有状态 CLI 运行时（Claude Code / Codex 等自带 Harness 的工具）。
+
+    管理子进程生命周期，解析 stream-json 输出。
+    工具执行、会话记忆、权限由 CLI 自身 Harness 处理。
+    """
+
+    @abstractmethod
+    def stream(self, request: AgentRequest) -> AsyncIterator[StreamEvent]:
+        """启动 CLI 进程并流式解析输出。"""
+        ...
+
+    @abstractmethod
+    async def stop(self) -> None:
+        """终止运行中的 CLI 进程。"""
+        ...
+
+
+# 联合类型：factory 返回值
+UnifiedAgent = LLMAdapter | AgentRuntime

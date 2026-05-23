@@ -16,9 +16,11 @@ class CreateAgentCommand:
     name: str
     avatar: str
     role: str
-    provider: str
-    model: str
-    api_key: str                       # 明文传入，L3 加密后交 L1
+    agent_system: str = "mock"
+    provider: str = "anthropic"
+    model: str = ""
+    api_key: str | None = None         # 明文传入，L3 加密后交 L1；CLI 模式可为空
+    base_url: str | None = None
     skills: list[str] = field(default_factory=list)
     system_prompt: str | None = None
 
@@ -29,9 +31,11 @@ class UpdateAgentCommand:
     name: str | None = None
     avatar: str | None = None
     role: str | None = None
+    agent_system: str | None = None
     provider: str | None = None
     model: str | None = None
     api_key: str | None = None
+    base_url: str | None = None
     skills: list[str] | None = None
     capability_tags: list[str] | None = None
     settings: dict | None = None

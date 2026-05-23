@@ -7,16 +7,18 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.domain.enums import Provider
+from app.domain.enums import AgentSystem, Provider
 
 
 class AgentCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=128)
     avatar: str = Field(max_length=512)
     role: str = Field(max_length=256)
-    provider: Provider
-    model: str = Field(min_length=1, max_length=128)
-    api_key: str = Field(min_length=1, repr=False)  # 密码模式，不回显
+    agent_system: AgentSystem = AgentSystem.MOCK
+    provider: Provider = Provider.ANTHROPIC
+    model: str = Field(default="", max_length=128)
+    api_key: str | None = Field(default=None, repr=False)
+    base_url: str | None = None
     skills: list[str] = []
     system_prompt: str | None = None
 
@@ -25,9 +27,11 @@ class AgentUpdateRequest(BaseModel):
     name: str | None = None
     avatar: str | None = None
     role: str | None = None
+    agent_system: AgentSystem | None = None
     provider: Provider | None = None
     model: str | None = None
     api_key: str | None = Field(default=None, repr=False)
+    base_url: str | None = None
     skills: list[str] | None = None
     capability_tags: list[str] | None = None
     settings: dict | None = None
@@ -39,6 +43,7 @@ class AgentOut(BaseModel):
     name: str
     avatar: str
     role: str
+    agent_system: str
     provider: str
     model: str
     status: str

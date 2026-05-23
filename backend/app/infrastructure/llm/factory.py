@@ -1,17 +1,63 @@
-"""适配器工厂：按配置选择 LLM 实现（mock / anthropic_api / claude_cli）。"""
+"""适配器工厂：per-agent 构造（根据 agent_system 字段路由到对应实现）。"""
 
 from __future__ import annotations
 
 import logging
 
 from app.core.config import settings
+from app.core.security import decrypt_secret
+from app.domain.entities.agent import Agent
+from app.domain.enums import AgentSystem
 from app.domain.llm.protocol import UnifiedAgent
 from app.infrastructure.llm.mock_adapter import MockAdapter
 
 logger = logging.getLogger(__name__)
 
 
+def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
+    """根据 Agent 实体的 agent_system 字段构造对应的适配器/运行时。"""
+    system = agent.agent_system
+
+    if system == AgentSystem.ANTHROPIC_API:
+        api_key = decrypt_secret(agent.api_key_encrypted)
+        if not api_key:
+            logger.warning("Agent %s 无 API key，降级为 mock", agent.name)
+            return MockAdapter()
+        from app.infrastructure.llm.claude_adapter import ClaudeAdapter
+
+        return ClaudeAdapter(api_key=api_key, model=agent.model or settings.default_model)
+
+    if system == AgentSystem.OPENAI_API:
+        api_key = decrypt_secret(agent.api_key_encrypted)
+        if not api_key:
+            logger.warning("Agent %s 无 API key，降级为 mock", agent.name)
+            return MockAdapter()
+        # TODO: 实现 OpenAIAdapter，暂降级 mock
+        logger.warning("OpenAI API 适配器待实现，Agent %s 降级为 mock", agent.name)
+        return MockAdapter()
+
+    if system == AgentSystem.CLAUDE_CODE:
+        from app.infrastructure.llm.claude_code_runtime import ClaudeCodeRuntime
+
+        # CLI 使用本机 claude 认证，api_key 可选
+        api_key = decrypt_secret(agent.api_key_encrypted) if agent.api_key_encrypted else ""
+
+        s = agent.settings or {}
+        return ClaudeCodeRuntime(
+            api_key=api_key,
+            model=agent.model,
+            base_url=agent.base_url,
+            permission_mode=s.get("permission_mode", "acceptEdits"),
+            max_turns=s.get("max_turns", 10),
+            timeout=s.get("cli_timeout", settings.claude_cli_timeout),
+        )
+
+    # AgentSystem.MOCK 或未知
+    return MockAdapter()
+
+
 def build_adapter() -> UnifiedAgent:
+    """全局默认适配器（兼容旧调用，按全局配置构造）。"""
     mode = settings.llm_adapter_mode
 
     if mode == "anthropic_api":
@@ -25,7 +71,12 @@ def build_adapter() -> UnifiedAgent:
         )
 
     if mode == "claude_cli":
-        logger.warning("claude_cli 适配器待 M2 实现，暂用 mock")
-        return MockAdapter()
+        from app.infrastructure.llm.claude_code_runtime import ClaudeCodeRuntime
+
+        return ClaudeCodeRuntime(
+            api_key=settings.anthropic_api_key,
+            model=settings.default_model,
+            timeout=settings.claude_cli_timeout,
+        )
 
     return MockAdapter()

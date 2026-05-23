@@ -37,6 +37,7 @@ from app.domain.repositories import (
     SessionRepository,
 )
 from app.infrastructure.cache.memory_l1 import L1MemoryStore
+from app.infrastructure.llm.factory import build_adapter_for_agent
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ class ChatService:
         self._messages = message_repo
         self._agents = agent_repo
         self._l1 = l1_memory
-        self._llm = llm
+        self._llm = llm  # 全局默认，per-agent 覆盖时优先
         self._bus = event_bus
 
     async def send_and_stream(
@@ -90,17 +91,24 @@ class ChatService:
         # 2. 解析目标 Agent（MVP：私聊固定 session.agent_id）
         agent_id = self._resolve_target_agent(session)
 
-        # 3. 构造带 L1 记忆的请求
+        # 3. 按 Agent 构造适配器（per-agent 路由）
+        agent = await self._agents.get_by_id(agent_id)
+        if agent is None:
+            raise NotFoundError(f"Agent 不存在: {agent_id}")
+        adapter = build_adapter_for_agent(agent)
+
+        # 4. 构造带 L1 记忆的请求
         window = await self._l1.get_window(cmd.session_id)
         request = AgentRequest(
             request_id=str(uuid.uuid4()),
             session_id=cmd.session_id,
             messages=window,
+            system_prompt=agent.system_prompt,
             memory=MemoryContext(l1_working=window),
             max_tokens=settings_max_tokens(),
         )
 
-        # 4. 流式执行
+        # 5. 流式执行
         assistant_msg = Message(
             session_id=cmd.session_id,
             role=MessageRole.ASSISTANT,
@@ -113,10 +121,12 @@ class ChatService:
         )
 
         buffer: list[str] = []
+        last_event: StreamEvent | None = None
         try:
-            async for event in self._llm.stream(request):
+            async for event in adapter.stream(request):
                 if event.type == StreamEventType.TEXT and event.content:
                     buffer.append(event.content)
+                last_event = event
                 yield event
         except Exception as exc:  # noqa: BLE001 - 边界统一兜底
             logger.exception("流式执行失败")
@@ -130,7 +140,24 @@ class ChatService:
             )
             raise
 
-        # 5. 完成：落库 + 写 L1
+        # 6. 权限阻断检测
+        if (
+            last_event
+            and last_event.type == StreamEventType.DONE
+            and last_event.metadata.get("permission_denials")
+        ):
+            yield StreamEvent(
+                type=StreamEventType.REQUEST_APPROVAL,
+                seq=last_event.seq + 1,
+                content="以下操作被安全策略阻断",
+                metadata={
+                    "message_id": str(assistant_msg.id),
+                    "session_id": str(cmd.session_id),
+                    "denied_ops": last_event.metadata["permission_denials"],
+                },
+            )
+
+        # 7. 完成：落库 + 写 L1
         full = "".join(buffer)
         assistant_msg.content = full
         assistant_msg.status = MessageStatus.COMPLETED

@@ -25,7 +25,7 @@ from app.domain.llm.protocol import (
     StreamEvent,
     StreamEventType,
     ToolCall,
-    UnifiedAgent,
+    LLMAdapter,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ _BASE_DELAY = 1.0  # 秒
 _RETRYABLE = (RateLimitError, APIStatusError)
 
 
-class ClaudeAdapter(UnifiedAgent):
+class ClaudeAdapter(LLMAdapter):
     """Anthropic Messages API 适配器（anthropic_api 模式）。"""
 
     def __init__(self, api_key: str, model: str) -> None:
