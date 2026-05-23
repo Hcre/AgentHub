@@ -144,6 +144,89 @@ export interface GroupMessage {
   requiresApproval?: boolean
 }
 
+// ── 次要视图（Phase 5） ──
+
+export interface Activity {
+  id: string
+  when: string
+  count: number
+  tools: string[]
+  text: string
+  latest?: boolean
+  running?: boolean
+}
+
+export type DiffKind = 'add' | 'del' | 'neutral'
+export interface DiffLine {
+  kind: DiffKind
+  text: string
+}
+
+export type InboxType = 'approval' | 'task' | 'system'
+export interface InboxItem {
+  id: string
+  type: InboxType
+  title: string
+  summary: string
+  actor?: string
+  actorName?: string
+  when: string
+  diff?: DiffLine[]
+  impact?: string
+  unread: boolean
+}
+
+export interface Skill {
+  id: string
+  name: string
+  desc: string
+  locked: boolean
+}
+
+export type MemoryStatus = 'accepted' | 'pending' | 'archived'
+export interface MemoryItem {
+  id: string
+  title: string
+  body: string
+  tags: string[]
+  status: MemoryStatus
+  when: string
+}
+
+export type CalendarTone = 'brand' | 'sage'
+export interface CalendarEvent {
+  id: string
+  date: string // YYYY-MM-DD
+  startHour: number
+  endHour: number
+  title: string
+  tone: CalendarTone
+}
+
+export interface MemoryLevel {
+  level: string
+  name: string
+  count: number
+  hint: string
+}
+
+export interface AgentConfig {
+  provider: string
+  model: string
+  maxTokens: number
+  concurrency: number
+  temperature: number
+}
+
+export interface AgentProfile {
+  bio: string
+  load: number
+  groups: string[]
+  capabilities: string[]
+  memoryByLevel: MemoryLevel[]
+  config: AgentConfig
+}
+
 /** Icon 组件支持的图标名（映射到 lucide-react），见 components/ui/Icon.tsx */
 export type IconName =
   | 'inbox'
@@ -182,3 +265,5 @@ export type IconName =
   | 'clock'
   | 'shieldCheck'
   | 'pin'
+  | 'chevronLeft'
+  | 'chevronRight'

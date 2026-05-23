@@ -1,43 +1,76 @@
+import type { ReactNode } from 'react'
 import { cn } from '../../lib/cn'
 import { agents, centerTabs } from '../../data/mock'
 import { useUIStore } from '../../stores/uiStore'
+import { ActivityFeed } from '../activity/ActivityFeed'
+import { AgentDetailPage } from '../agent/AgentDetailPage'
+import { CalendarView } from '../calendar/CalendarView'
 import { ChatView } from '../chat/ChatView'
 import { GroupChatView } from '../group/GroupChatView'
+import { InboxView } from '../inbox/InboxView'
 import { TasksTabView } from '../tasks/TasksTabView'
+import { MemoryView, SettingsView, SkillsView } from '../views/TabViews'
 import { Avatar, Badge, Button, Icon } from '../ui'
+import type { Agent } from '../../types'
 
-const SECTION_TITLE: Record<string, string> = {
-  inbox: '收件箱',
-  calendar: '日历',
-  'agent-detail': '助手详情',
+/** 中心区 chat tab 内各子视图 */
+function TabContent({ tab, agent }: { tab: string; agent: Agent }) {
+  switch (tab) {
+    case 'chat':
+      return <ChatView agent={agent} />
+    case 'tasks':
+      return <TasksTabView />
+    case 'activity':
+      return <ActivityFeed />
+    case 'calendar':
+      return <CalendarView />
+    case 'skills':
+      return <SkillsView />
+    case 'memory':
+      return <MemoryView />
+    case 'settings':
+      return <SettingsView />
+    default:
+      return (
+        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+          「{centerTabs.find((t) => t.id === tab)?.label ?? tab}」视图将在后续 Phase 实现。
+        </div>
+      )
+  }
+}
+
+function Panel({ children }: { children: ReactNode }) {
+  return (
+    <div className="glass-panel h-full overflow-hidden rounded-2xl border shadow-sm">
+      {children}
+    </div>
+  )
 }
 
 export function CenterPanel() {
   const { section, activeTab, activeAgentId, theme, setActiveTab, toggleTheme, toggleRight } =
     useUIStore()
 
-  // 群聊：整屏频道视图
-  if (section === 'group') {
-    return <GroupChatView />
-  }
-
-  // 左侧导航「任务」：整屏任务看板
-  if (section === 'tasks') {
+  if (section === 'group') return <GroupChatView />
+  if (section === 'agent-detail') return <AgentDetailPage />
+  if (section === 'tasks')
     return (
-      <div className="glass-panel h-full overflow-hidden rounded-2xl border shadow-sm">
+      <Panel>
         <TasksTabView />
-      </div>
+      </Panel>
     )
-  }
-
-  if (section !== 'chat') {
+  if (section === 'inbox')
     return (
-      <div className="glass-panel flex h-full flex-col items-center justify-center rounded-2xl border text-muted-foreground shadow-sm">
-        <h2 className="text-lg font-medium text-foreground">{SECTION_TITLE[section] ?? section}</h2>
-        <p className="mt-1 text-sm">该视图将在后续 Phase 实现。</p>
-      </div>
+      <Panel>
+        <InboxView />
+      </Panel>
     )
-  }
+  if (section === 'calendar')
+    return (
+      <Panel>
+        <CalendarView />
+      </Panel>
+    )
 
   const agent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
   if (!agent) return null
@@ -89,16 +122,7 @@ export function CenterPanel() {
       </div>
 
       <div className="min-h-0 flex-1">
-        {activeTab === 'chat' ? (
-          <ChatView agent={agent} />
-        ) : activeTab === 'tasks' ? (
-          <TasksTabView />
-        ) : (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            「{centerTabs.find((t) => t.id === activeTab)?.label ?? activeTab}」视图将在后续 Phase
-            实现。
-          </div>
-        )}
+        <TabContent tab={activeTab} agent={agent} />
       </div>
     </div>
   )

@@ -24,6 +24,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 | 袁 | 前端 Phase 0: 重建 Vite + React + TS 工程基座 | 无 | 部署 v0 原型 ✅ + Phase 0 重建(Vite8/React19/TS6/Tailwind4/Zustand)✅ 原型移入 prototype/ ✅ 多阶段 Docker 部署 ✅ 验收 Gate 全绿(tsc/build/eslint/prettier/容器 5173)✅ |
 >>>>>>> b0e8bdb (feat(frontend): Phase 0 — 重建 Vite + React + TS 工程基座)
 =======
@@ -38,6 +39,9 @@
 =======
 | 袁 | 前端 Phase 4 完成(假群聊)，下一步 Phase 5 | 无 | Phase 0-3 ✅ + Phase 4 假群聊(groupStore/协调者方案卡/@mention/需批准/MOCK 接缝 + HANDOFF 交接文档)✅ 验收全绿 + 截图确认 ✅ |
 >>>>>>> 8d2d223 (feat(frontend): Phase 4 — 假群聊 + 协调者 (mock))
+=======
+| 袁 | 前端 Phase 5 完成，下一步 Phase 6/7 | 无 | Phase 0-4 ✅ + Phase 5 次要视图(活动/日历月周日/收件箱审批/助手详情/技能·记忆·设置 + inboxStore)✅ 验收全绿 + 截图确认日历 ✅ |
+>>>>>>> 14af172 (feat(frontend): Phase 5 — 次要视图（活动/日历/收件箱/助手详情/技能·记忆·设置）)
 
 ## 图例
 - ⚠️ 阻塞中（写明等谁/等什么）
