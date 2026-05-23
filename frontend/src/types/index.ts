@@ -124,3 +124,6 @@ export type IconName =
   | 'smile'
   | 'atSign'
   | 'chevronUp'
+  | 'list'
+  | 'grid'
+  | 'x'

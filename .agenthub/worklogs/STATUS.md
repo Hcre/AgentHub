@@ -22,6 +22,7 @@
 | 董 | 域2: adapter-cli-flow-analysis v1.3 + session/permission 方案落地 | 无 | ADR-01(API→CLI 重心转移) ✅ + v4 PRD 统一方案 ✅ + adapter-cli-flow-analysis v1.3 ✅ + doc-sync(spec 同步/架构文档更新) ✅ |
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 | 袁 | 前端 Phase 0: 重建 Vite + React + TS 工程基座 | 无 | 部署 v0 原型 ✅ + Phase 0 重建(Vite8/React19/TS6/Tailwind4/Zustand)✅ 原型移入 prototype/ ✅ 多阶段 Docker 部署 ✅ 验收 Gate 全绿(tsc/build/eslint/prettier/容器 5173)✅ |
 >>>>>>> b0e8bdb (feat(frontend): Phase 0 — 重建 Vite + React + TS 工程基座)
 =======
@@ -30,6 +31,9 @@
 =======
 | 袁 | 前端 Phase 2 完成，下一步 Phase 3 任务看板 | 无 | Phase 0 基座 + Phase 1 三栏布局 + Phase 2 聊天 UI(chatStore/会话切换/气泡/打字/Composer/右栏绑定)✅ 验收全绿 + 截图确认 ✅ |
 >>>>>>> b751d77 (feat(frontend): Phase 2 — 聊天 UI 升级)
+=======
+| 袁 | 前端 Phase 3 完成，下一步 Phase 4/5 | 无 | Phase 0-2 ✅ + Phase 3 任务看板(taskStore/kanban+列表/筛选/拖拽/创建弹窗)✅ 验收全绿 + 截图确认 4 列看板 ✅ |
+>>>>>>> 4a2d604 (feat(frontend): Phase 3 — 任务管理看板)
 
 ## 图例
 - ⚠️ 阻塞中（写明等谁/等什么）

@@ -13,6 +13,8 @@ import {
   Hash,
   Inbox,
   Info,
+  LayoutGrid,
+  List,
   ListChecks,
   MessageSquare,
   Moon,
@@ -27,6 +29,7 @@ import {
   Smile,
   Sparkles,
   Sun,
+  X,
   type LucideIcon,
 } from 'lucide-react'
 import type { IconName } from '../../types'
@@ -60,6 +63,9 @@ const MAP: Record<IconName, LucideIcon> = {
   smile: Smile,
   atSign: AtSign,
   chevronUp: ChevronUp,
+  list: List,
+  grid: LayoutGrid,
+  x: X,
 }
 
 export interface IconProps {
