@@ -1,10 +1,8 @@
-import { useState } from 'react'
 import { cn } from '../../lib/cn'
-import { outputs as mockOutputs, stage as mockStage } from '../../data/mock'
+import { convKey, useChatStore } from '../../stores/chatStore'
+import { useUIStore } from '../../stores/uiStore'
 import { Badge, Button, Icon } from '../ui'
-import type { StageStatus, StageTask } from '../../types'
-
-const NEXT: Record<StageStatus, StageStatus> = { todo: 'doing', doing: 'done', done: 'todo' }
+import type { StageStatus } from '../../types'
 
 function TaskCheck({ state, onClick }: { state: StageStatus; onClick: () => void }) {
   return (
@@ -24,10 +22,16 @@ function TaskCheck({ state, onClick }: { state: StageStatus; onClick: () => void
 }
 
 export function RightPanel() {
-  const [stage, setStage] = useState<StageTask[]>(mockStage)
+  const { activeAgentId, activeConversationId } = useUIStore()
+  const { stages, outputs, toggleStage } = useChatStore()
+  const key =
+    activeAgentId && activeConversationId ? convKey(activeAgentId, activeConversationId) : null
+  const stage = key ? (stages[key] ?? []) : []
+  const files = key ? (outputs[key] ?? []) : []
 
-  const toggle = (id: string) =>
-    setStage((list) => list.map((t) => (t.id === id ? { ...t, state: NEXT[t.state] } : t)))
+  const toggle = (id: string) => {
+    if (activeAgentId && activeConversationId) toggleStage(activeAgentId, activeConversationId, id)
+  }
 
   return (
     <aside className="flex h-full w-full flex-col gap-3">
@@ -42,6 +46,9 @@ export function RightPanel() {
           </Button>
         </header>
         <div className="flex-1 overflow-y-auto px-2 py-2">
+          {stage.length === 0 && (
+            <div className="px-3 py-6 text-center text-xs text-muted-foreground">暂无任务</div>
+          )}
           {stage.map((t) => (
             <div
               key={t.id}
@@ -98,7 +105,10 @@ export function RightPanel() {
           </Button>
         </header>
         <div className="flex-1 overflow-y-auto p-2">
-          {mockOutputs.map((f) => (
+          {files.length === 0 && (
+            <div className="px-3 py-6 text-center text-xs text-muted-foreground">尚无产出文件</div>
+          )}
+          {files.map((f) => (
             <div
               key={f.id}
               className="my-0.5 flex items-center gap-2.5 rounded-md border border-border/60 p-2.5 transition-all glass-soft hover:-translate-y-px"
