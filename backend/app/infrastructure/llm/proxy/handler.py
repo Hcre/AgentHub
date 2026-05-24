@@ -20,10 +20,18 @@ from app.core.security import decrypt_secret
 
 logger = logging.getLogger(__name__)
 
-_HOP_BY_HOP_HEADERS = frozenset({
-    "host", "connection", "transfer-encoding", "te", "trailer",
-    "upgrade", "proxy-authorization", "proxy-authenticate",
-})
+_HOP_BY_HOP_HEADERS = frozenset(
+    {
+        "host",
+        "connection",
+        "transfer-encoding",
+        "te",
+        "trailer",
+        "upgrade",
+        "proxy-authorization",
+        "proxy-authenticate",
+    }
+)
 
 
 class ProxyHandler:
@@ -33,7 +41,11 @@ class ProxyHandler:
         self._agent_repo = agent_repo
 
     async def handle(
-        self, agent_id: str, path: str, request: Request, client: httpx.AsyncClient,
+        self,
+        agent_id: str,
+        path: str,
+        request: Request,
+        client: httpx.AsyncClient,
     ) -> Response:
         # 1. 查 Agent
         try:
@@ -50,13 +62,21 @@ class ProxyHandler:
         if not real_key:
             return JSONResponse({"error": "agent has no api_key"}, status_code=400)
 
-        # 3. 拼接目标 URL
+        # 3. HEAD 请求直接返回 200（CLI 连通性检查）
+        if request.method == "HEAD":
+            return Response(status_code=200)
+
+        # 4. 拼接目标 URL
         base = (agent.base_url or "").rstrip("/")
         if not base:
             return JSONResponse({"error": "agent has no base_url"}, status_code=400)
         target_url = f"{base}/{path}"
         if request.url.query:
-            target_url += f"?{request.url.query.decode()}" if isinstance(request.url.query, bytes) else f"?{request.url.query}"
+            target_url += (
+                f"?{request.url.query.decode()}"
+                if isinstance(request.url.query, bytes)
+                else f"?{request.url.query}"
+            )
 
         logger.info("proxy %s %s → %s", request.method, agent_id, target_url[:120])
 
@@ -81,13 +101,14 @@ class ProxyHandler:
         )
 
         response_headers = {
-            k: v for k, v in upstream.headers.items()
-            if k.lower() not in _HOP_BY_HOP_HEADERS
+            k: v for k, v in upstream.headers.items() if k.lower() not in _HOP_BY_HOP_HEADERS
         }
 
         if upstream.status_code >= 400:
             logger.warning(
-                "proxy upstream error agent=%s status=%d", agent_id, upstream.status_code,
+                "proxy upstream error agent=%s status=%d",
+                agent_id,
+                upstream.status_code,
             )
 
         return StreamingResponse(

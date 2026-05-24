@@ -1,6 +1,4 @@
 import { create } from 'zustand'
-import { agents as seedAgents } from '../data/mock'
-import { agentProfiles as seedProfiles } from '../data/extra'
 import { agentsApi } from '../api/agents'
 import { uid } from '../lib/id'
 import type { Agent, AgentColor, AgentProfile, ApiAgent, MemoryLevel } from '../types'
@@ -72,8 +70,8 @@ interface AgentState {
 }
 
 export const useAgentStore = create<AgentState>((set, get) => ({
-  agents: seedAgents,
-  profiles: { ...seedProfiles },
+  agents: [],
+  profiles: {},
 
   loadAgents: async () => {
     try {
@@ -112,8 +110,10 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         profiles: { ...s.profiles, [agent.id]: profile },
       }))
       return agent.id
-    } catch {
-      // 后端不可用 → 本地降级 mock，保证 UI 不卡
+    } catch (e) {
+      // 后端返回具体错误 → 抛出给 UI 展示
+      if (e instanceof Error && e.message.startsWith('API ')) throw e
+      // 后端完全不可用（网络断开等）→ 本地降级 mock，保证 UI 不卡
       const id = uid('ag')
       const color = COLOR_CYCLE[get().agents.length % COLOR_CYCLE.length] ?? 'neutral'
       const agent: Agent = {

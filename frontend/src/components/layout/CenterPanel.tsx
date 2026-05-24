@@ -75,7 +75,16 @@ export function CenterPanel() {
     )
 
   const agent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
-  if (!agent) return null
+  if (!agent)
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="text-center text-muted-foreground">
+          <div className="mb-2 text-4xl">🤖</div>
+          <div className="text-sm">还没有 Agent</div>
+          <div className="mt-1 text-xs">在左侧面板点击 AI 队友旁的 + 创建第一个</div>
+        </div>
+      </div>
+    )
 
   return (
     <div className="glass-panel flex h-full flex-col overflow-hidden rounded-2xl border shadow-sm">

@@ -22,6 +22,16 @@ export const providers: Provider[] = [
     label: 'DeepSeek',
     models: ['deepseek-chat', 'deepseek-reasoner'],
   },
+  {
+    id: 'minimax',
+    label: 'MiniMax',
+    models: ['abab6.5s-chat', 'abab7-chat'],
+  },
+  {
+    id: 'mimo',
+    label: 'Xiaomi MiMo',
+    models: ['mimo-7b', 'mimo-14b'],
+  },
   { id: 'openai', label: 'OpenAI', models: ['gpt-4o', 'gpt-4o-mini', 'o3'] },
   { id: 'azure', label: 'Azure', models: ['gpt-4o-azure', 'gpt-4o-mini-azure'] },
 ]

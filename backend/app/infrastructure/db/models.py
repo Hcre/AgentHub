@@ -32,7 +32,7 @@ class AgentModel(Base):
     __tablename__ = "agents"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    name: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(128), index=True)
     avatar: Mapped[str] = mapped_column(String(512), default="")
     role: Mapped[str] = mapped_column(String(256), default="")
     agent_system: Mapped[str] = mapped_column(String(32), default="mock")
@@ -84,9 +84,7 @@ class MessageModel(Base):
     pinned: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     status: Mapped[str] = mapped_column(String(16), default="completed")
     extra: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_now, index=True
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
 
 
 class TaskModel(Base):
@@ -99,13 +97,9 @@ class TaskModel(Base):
     priority: Mapped[str] = mapped_column(String(16), default="medium")
     assignee_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True, index=True)
     assignee_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
-    due_date: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     tags: Mapped[list] = mapped_column(JSON, default=list)
-    parent_task_id: Mapped[UUID | None] = mapped_column(
-        Uuid, nullable=True, index=True
-    )
+    parent_task_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True, index=True)
     source: Mapped[str] = mapped_column(String(16), default="manual")
     session_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
     retry_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -125,9 +119,7 @@ class TaskEventModel(Base):
     event_type: Mapped[str] = mapped_column(String(48))
     event_data: Mapped[dict] = mapped_column(JSON, default=dict)
     actor: Mapped[str] = mapped_column(String(64), default="system")
-    idempotency_key: Mapped[str | None] = mapped_column(
-        String(128), nullable=True, unique=True
-    )
+    idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
