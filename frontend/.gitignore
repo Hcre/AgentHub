@@ -26,8 +26,8 @@ dist-ssr
 # vite 临时脚手架目录
 .vite-init/
 
-# v0 原型设计过程产物（prototype/ 下），部署不需要，不入库（文件保留在本地）
-docs/
+# v0 原型设计过程产物（prototype/ 下，27MB 图片资产），部署不需要，不入库
 screenshots/
 uploads/
 .thumbnail
+# 注：frontend/docs/（实施计划、转换方案）已入库，作为团队参考

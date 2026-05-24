@@ -27,6 +27,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 | 袁 | 前端 Phase 0: 重建 Vite + React + TS 工程基座 | 无 | 部署 v0 原型 ✅ + Phase 0 重建(Vite8/React19/TS6/Tailwind4/Zustand)✅ 原型移入 prototype/ ✅ 多阶段 Docker 部署 ✅ 验收 Gate 全绿(tsc/build/eslint/prettier/容器 5173)✅ |
 >>>>>>> b0e8bdb (feat(frontend): Phase 0 — 重建 Vite + React + TS 工程基座)
 =======
@@ -50,6 +51,9 @@
 =======
 | 袁 | 前端 §1-6 + §7.3 视觉打磨完成，仅剩 §7.1/7.2 API 联调(待后端) | 无 | Phase 0-6 ✅ + 视觉打磨(三档主题/4 色 accent/密度/字体/Tweaks 面板)✅ 验收全绿 + 截图确认 ✅ |
 >>>>>>> 25dd68f (feat(frontend): Phase 7（视觉打磨）— 主题/强调色/密度/字体 + Tweaks 面板)
+=======
+| 袁 | 前端 §1-6 + §7.3 完成 + 交接文档补齐，仅剩 §7.1/7.2 API 联调(待后端) | 无 | Phase 0-6 + 视觉打磨 ✅ + 总览交接 HANDOFF.md/README 重写/docs 入库 ✅ |
+>>>>>>> d44ac4b (docs(frontend): 补齐交接文档 — 总览 HANDOFF + README 重写 + 规划文档入库)
 
 ## 图例
 - ⚠️ 阻塞中（写明等谁/等什么）
