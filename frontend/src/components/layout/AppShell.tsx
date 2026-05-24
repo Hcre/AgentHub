@@ -1,5 +1,6 @@
 import { cn } from '../../lib/cn'
 import { useUIStore } from '../../stores/uiStore'
+import { TweaksPanel } from '../tweaks/TweaksPanel'
 import { Icon } from '../ui'
 import { CenterPanel } from './CenterPanel'
 import { LeftPanel } from './LeftPanel'
@@ -44,6 +45,8 @@ export function AppShell() {
           <RightPanel />
         </div>
       )}
+
+      <TweaksPanel />
     </div>
   )
 }

@@ -41,7 +41,7 @@ export function ChatView({ agent }: { agent: Agent }) {
       />
 
       <div className="flex-1 overflow-y-auto px-4 py-5">
-        <div className="mx-auto flex max-w-3xl flex-col gap-5">
+        <div className="ah-msgs mx-auto flex max-w-3xl flex-col gap-5">
           {list.map((m) => (
             <MessageBubble key={m.id} msg={m} agent={agent} user={user} />
           ))}

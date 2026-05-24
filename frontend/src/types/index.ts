@@ -273,3 +273,4 @@ export type IconName =
   | 'pin'
   | 'chevronLeft'
   | 'chevronRight'
+  | 'sliders'

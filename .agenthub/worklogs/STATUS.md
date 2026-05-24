@@ -26,6 +26,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 | 袁 | 前端 Phase 0: 重建 Vite + React + TS 工程基座 | 无 | 部署 v0 原型 ✅ + Phase 0 重建(Vite8/React19/TS6/Tailwind4/Zustand)✅ 原型移入 prototype/ ✅ 多阶段 Docker 部署 ✅ 验收 Gate 全绿(tsc/build/eslint/prettier/容器 5173)✅ |
 >>>>>>> b0e8bdb (feat(frontend): Phase 0 — 重建 Vite + React + TS 工程基座)
 =======
@@ -46,6 +47,9 @@
 =======
 | 袁 | 前端 Phase 6 完成，剩 Phase 7(接 API/打磨) | 无 | Phase 0-5 ✅ + Phase 6 Agent CRUD(agentStore/创建表单/设置编辑/删除确认)✅ 验收全绿 + 截图确认创建表单 ✅ |
 >>>>>>> c6f9393 (feat(frontend): Phase 6 — Agent 创建与编辑)
+=======
+| 袁 | 前端 §1-6 + §7.3 视觉打磨完成，仅剩 §7.1/7.2 API 联调(待后端) | 无 | Phase 0-6 ✅ + 视觉打磨(三档主题/4 色 accent/密度/字体/Tweaks 面板)✅ 验收全绿 + 截图确认 ✅ |
+>>>>>>> 25dd68f (feat(frontend): Phase 7（视觉打磨）— 主题/强调色/密度/字体 + Tweaks 面板)
 
 ## 图例
 - ⚠️ 阻塞中（写明等谁/等什么）
