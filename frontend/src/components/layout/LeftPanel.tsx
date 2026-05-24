@@ -98,6 +98,7 @@ export function LeftPanel() {
   } = useUIStore()
   const agents = useAgentStore((s) => s.agents)
   const conversations = useChatStore((s) => s.conversations)
+  const addConversation = useChatStore((s) => s.addConversation)
   const [openCh, setOpenCh] = useState(true)
   const [openAI, setOpenAI] = useState(true)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ editor: true })
@@ -200,6 +201,17 @@ export function LeftPanel() {
                       online={a.online}
                     />
                     <span className="flex-1 truncate text-left">{a.name}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const id = addConversation(a.id)
+                        openConversation(a.id, id)
+                      }}
+                      title="新建对话"
+                      className="grid h-5 w-5 place-items-center rounded text-muted-foreground opacity-0 transition-all hover:bg-accent hover:text-foreground group-hover/agent:opacity-100"
+                    >
+                      <Icon name="plus" className="h-3 w-3" />
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation()

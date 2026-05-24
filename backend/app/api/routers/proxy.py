@@ -19,13 +19,13 @@ router = APIRouter(prefix="/proxy", tags=["proxy"])
 
 @router.api_route(
     "/agents/{agent_id}/{path:path}",
-    methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
 )
 async def proxy_request(
     agent_id: str,
     path: str,
     request: Request,
-    db: AsyncSession = Depends(get_session),
+    db: AsyncSession = Depends(get_session),  # noqa: B008
 ):
     client: httpx.AsyncClient = request.app.state.client
     handler = ProxyHandler(PostgresAgentRepository(db))

@@ -7,7 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.domain.enums import AgentSystem, Provider
+from app.domain.enums import AgentSystem
 
 
 class AgentCreateRequest(BaseModel):
@@ -15,7 +15,7 @@ class AgentCreateRequest(BaseModel):
     avatar: str = Field(max_length=512)
     role: str = Field(max_length=256)
     agent_system: AgentSystem = AgentSystem.MOCK
-    provider: Provider = Provider.ANTHROPIC
+    provider: str = Field(default="anthropic", max_length=64)
     model: str = Field(default="", max_length=128)
     api_key: str | None = Field(default=None, repr=False)
     base_url: str | None = None
@@ -28,7 +28,7 @@ class AgentUpdateRequest(BaseModel):
     avatar: str | None = None
     role: str | None = None
     agent_system: AgentSystem | None = None
-    provider: Provider | None = None
+    provider: str | None = None
     model: str | None = None
     api_key: str | None = Field(default=None, repr=False)
     base_url: str | None = None

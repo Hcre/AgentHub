@@ -1,30 +1,24 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { user } from '../../data/mock'
-import { convKey, useChatStore } from '../../stores/chatStore'
+import { useChatStore } from '../../stores/chatStore'
 import { useUIStore } from '../../stores/uiStore'
 import { sessionsApi } from '../../api/sessions'
 import { useWebSocket } from '../../hooks/useWebSocket'
 import { Composer } from './Composer'
-import { ConversationTabs } from './ConversationTabs'
 import { MessageBubble } from './MessageBubble'
 import { TypingIndicator } from './TypingIndicator'
 import type { Agent } from '../../types'
 
 export function ChatView({ agent }: { agent: Agent }) {
   const activeConversationId = useUIStore((s) => s.activeConversationId)
-  const openConversation = useUIStore((s) => s.openConversation)
-  const conversations = useChatStore((s) => s.conversations)
   const messages = useChatStore((s) => s.messages)
   const typing = useChatStore((s) => s.typing)
   const send = useChatStore((s) => s.send)
-  const addConversation = useChatStore((s) => s.addConversation)
   const sessionIds = useChatStore((s) => s.sessionIds)
   const setSessionId = useChatStore((s) => s.setSessionId)
-  const [historyOpen, setHistoryOpen] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  const convs = conversations[agent.id] ?? []
-  const key = activeConversationId ? convKey(agent.id, activeConversationId) : null
+  const key = activeConversationId ? `${agent.id}|${activeConversationId}` : null
   const list = key ? (messages[key] ?? []) : []
   const isTyping = key ? (typing[key] ?? false) : false
   const sessionId = key ? (sessionIds[key] ?? null) : null
@@ -52,11 +46,6 @@ export function ChatView({ agent }: { agent: Agent }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [list.length, isTyping])
 
-  const onNew = () => {
-    const id = addConversation(agent.id)
-    openConversation(agent.id, id)
-  }
-
   const onSend = (text: string) => {
     if (!activeConversationId) return
     // 优先走真实 WS；未连接（mock agent / 后端不可用）则降级假回复
@@ -65,15 +54,6 @@ export function ChatView({ agent }: { agent: Agent }) {
 
   return (
     <div className="flex h-full flex-col">
-      <ConversationTabs
-        convs={convs}
-        activeId={activeConversationId}
-        open={historyOpen}
-        onPick={(id) => openConversation(agent.id, id)}
-        onToggle={() => setHistoryOpen((v) => !v)}
-        onNew={onNew}
-      />
-
       <div className="flex-1 overflow-y-auto px-4 py-5">
         <div className="ah-msgs mx-auto flex max-w-3xl flex-col gap-5">
           {list.map((m) => (

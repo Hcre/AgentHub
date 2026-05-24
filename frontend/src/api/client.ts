@@ -1,6 +1,6 @@
 // 轻量 fetch 封装：统一 base URL 与错误处理。
 
-const BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+const BASE = import.meta.env.VITE_API_BASE_URL || "";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -25,4 +25,4 @@ export const api = {
 };
 
 export const WS_BASE =
-  import.meta.env.VITE_WS_BASE_URL ?? "ws://localhost:8000";
+  import.meta.env.VITE_WS_BASE_URL || "";
