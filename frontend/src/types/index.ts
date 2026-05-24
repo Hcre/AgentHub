@@ -63,6 +63,8 @@ export interface ChatMessage {
   from: 'agent' | 'user'
   time: string
   text: string
+  /** 流式增量渲染中（done 后置 false / 移除哨兵） */
+  streaming?: boolean
   attachment?: Attachment
   actions?: string[]
 }
@@ -274,3 +276,50 @@ export type IconName =
   | 'chevronLeft'
   | 'chevronRight'
   | 'sliders'
+
+// ── 后端 API DTO（与 backend schema 对齐，字段为 snake_case）──
+
+/** 对应 backend `AgentOut`（schemas/agent.py）。注意与 UI 的 `Agent` 区分。 */
+export interface ApiAgent {
+  id: string
+  name: string
+  avatar: string
+  role: string
+  agent_system: string
+  provider: string
+  model: string
+  status: string
+  skills: string[]
+  capability_tags: string[]
+  is_system: boolean
+  created_at: string
+}
+
+/** 对应 backend `SessionOut`（schemas/session.py）。 */
+export interface Session {
+  id: string
+  type: string
+  title: string
+  group_id: string | null
+  agent_id: string | null
+  created_at: string
+}
+
+/** 对应 backend `StreamEventType`（domain/llm/protocol.py）。 */
+export type StreamEventType =
+  | 'text'
+  | 'thinking'
+  | 'tool_call'
+  | 'tool_result'
+  | 'request_approval'
+  | 'task_plan'
+  | 'error'
+  | 'done'
+
+/** 对应 backend `StreamEvent`（WS 服务端→客户端逐事件推送）。 */
+export interface StreamEvent {
+  type: StreamEventType
+  seq: number
+  content?: string | null
+  metadata?: Record<string, unknown>
+}

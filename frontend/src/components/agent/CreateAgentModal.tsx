@@ -1,11 +1,20 @@
 import { useState } from 'react'
-import { providers } from '../../data/extra'
+import { PROVIDER_BASE_URL, providers } from '../../data/extra'
 import { useAgentStore } from '../../stores/agentStore'
 import { useUIStore } from '../../stores/uiStore'
 import { Button, Dialog, DialogContent, Icon, Input, Textarea } from '../ui'
 
 const SELECT_CLS =
   'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring'
+
+/** 运行时选项。openai_api 未实现（后端落 mock），暂不暴露。 */
+const RUNTIMES: { id: string; label: string }[] = [
+  { id: 'anthropic_api', label: 'Anthropic API · 直连（首选）' },
+  { id: 'claude_code', label: 'Claude Code · CLI 代理（接入第三方）' },
+  { id: 'mock', label: 'Mock · 演示假数据' },
+]
+
+const DEFAULT_PROVIDER = providers[0]?.id ?? 'anthropic'
 
 function Label({ children }: { children: string }) {
   return <span className="text-[12px] font-medium text-muted-foreground">{children}</span>
@@ -16,41 +25,61 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
   const openConversation = useUIStore((s) => s.openConversation)
   const [name, setName] = useState('')
   const [role, setRole] = useState('')
-  const [providerId, setProviderId] = useState(providers[0]?.id ?? 'anthropic')
+  const [agentSystem, setAgentSystem] = useState('anthropic_api')
+  const [providerId, setProviderId] = useState(DEFAULT_PROVIDER)
   const [model, setModel] = useState(providers[0]?.models[0] ?? '')
+  const [baseUrl, setBaseUrl] = useState(PROVIDER_BASE_URL[DEFAULT_PROVIDER] ?? '')
   const [apiKey, setApiKey] = useState('')
   const [skills, setSkills] = useState('')
   const [systemPrompt, setSystemPrompt] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const provider = providers.find((p) => p.id === providerId) ?? providers[0]
+  const showBaseUrl = agentSystem === 'claude_code'
 
   const reset = () => {
     setName('')
     setRole('')
-    setProviderId(providers[0]?.id ?? 'anthropic')
+    setAgentSystem('anthropic_api')
+    setProviderId(DEFAULT_PROVIDER)
     setModel(providers[0]?.models[0] ?? '')
+    setBaseUrl(PROVIDER_BASE_URL[DEFAULT_PROVIDER] ?? '')
     setApiKey('')
     setSkills('')
     setSystemPrompt('')
   }
 
-  const submit = () => {
-    if (!name.trim() || !role.trim()) return
-    const id = createAgent({
-      name: name.trim(),
-      role: role.trim(),
-      provider: providerId,
-      model,
-      apiKey,
-      skills: skills
-        .split(/[,，\s]+/)
-        .map((s) => s.trim())
-        .filter(Boolean),
-      systemPrompt,
-    })
-    reset()
-    onClose()
-    openConversation(id, 'c1')
+  const onProviderChange = (id: string) => {
+    setProviderId(id)
+    const p = providers.find((x) => x.id === id)
+    setModel(p?.models[0] ?? '')
+    setBaseUrl(PROVIDER_BASE_URL[id] ?? '')
+  }
+
+  const submit = async () => {
+    if (!name.trim() || !role.trim() || submitting) return
+    setSubmitting(true)
+    try {
+      const id = await createAgent({
+        name: name.trim(),
+        role: role.trim(),
+        agentSystem,
+        provider: providerId,
+        model,
+        baseUrl: showBaseUrl ? baseUrl.trim() : undefined,
+        apiKey,
+        skills: skills
+          .split(/[,，\s]+/)
+          .map((s) => s.trim())
+          .filter(Boolean),
+        systemPrompt,
+      })
+      reset()
+      onClose()
+      openConversation(id, 'c1')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -84,17 +113,28 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
             </label>
           </div>
 
+          <label className="flex flex-col gap-1">
+            <Label>运行时</Label>
+            <select
+              className={SELECT_CLS}
+              value={agentSystem}
+              onChange={(e) => setAgentSystem(e.target.value)}
+            >
+              {RUNTIMES.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1">
               <Label>Provider</Label>
               <select
                 className={SELECT_CLS}
                 value={providerId}
-                onChange={(e) => {
-                  setProviderId(e.target.value)
-                  const p = providers.find((x) => x.id === e.target.value)
-                  setModel(p?.models[0] ?? '')
-                }}
+                onChange={(e) => onProviderChange(e.target.value)}
               >
                 {providers.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -118,6 +158,17 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
               </select>
             </label>
           </div>
+
+          {showBaseUrl && (
+            <label className="flex flex-col gap-1">
+              <Label>Base URL（须为 Anthropic 兼容端点）</Label>
+              <Input
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                placeholder="https://api.deepseek.com/anthropic"
+              />
+            </label>
+          )}
 
           <label className="flex flex-col gap-1">
             <Label>API Key</Label>
@@ -157,7 +208,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
             variant="brand"
             size="sm"
             onClick={submit}
-            disabled={!name.trim() || !role.trim()}
+            disabled={!name.trim() || !role.trim() || submitting}
           >
             创建
           </Button>

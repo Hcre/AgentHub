@@ -17,9 +17,23 @@ export const providers: Provider[] = [
     label: 'Anthropic',
     models: ['claude-sonnet-4-5', 'claude-opus-4-5', 'claude-haiku-4-5'],
   },
+  {
+    id: 'deepseek',
+    label: 'DeepSeek',
+    models: ['deepseek-chat', 'deepseek-reasoner'],
+  },
   { id: 'openai', label: 'OpenAI', models: ['gpt-4o', 'gpt-4o-mini', 'o3'] },
   { id: 'azure', label: 'Azure', models: ['gpt-4o-azure', 'gpt-4o-mini-azure'] },
 ]
+
+/**
+ * provider → claude_code 经 proxy 透传的目标端点预设（须为 Anthropic 兼容）。
+ * proxy 纯透传只换 auth header，不转协议，故仅支持 Anthropic 兼容端点。
+ */
+export const PROVIDER_BASE_URL: Record<string, string> = {
+  anthropic: 'https://api.anthropic.com',
+  deepseek: 'https://api.deepseek.com/anthropic',
+}
 
 export const activity: Activity[] = [
   {
