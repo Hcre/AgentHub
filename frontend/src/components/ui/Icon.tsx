@@ -32,6 +32,7 @@ import {
   Send,
   Settings,
   ShieldCheck,
+  SlidersHorizontal,
   Smile,
   Sparkles,
   Sun,
@@ -80,6 +81,7 @@ const MAP: Record<IconName, LucideIcon> = {
   pin: Pin,
   chevronLeft: ChevronLeft,
   chevronRight: ChevronRight,
+  sliders: SlidersHorizontal,
 }
 
 export interface IconProps {

@@ -107,6 +107,37 @@
   --wash-3: 150 14% 49% / 0.11;
 }
 
+/* ── 柔暗（介于浅色与深色，低对比暖灰） ── */
+.dim {
+  --background: 30 10% 18%;
+  --background-2: 30 10% 22%;
+  --foreground: 36 24% 90%;
+  --muted: 30 8% 24%;
+  --muted-foreground: 36 10% 66%;
+  --popover: 30 10% 20%;
+  --popover-foreground: 36 24% 90%;
+  --card: 30 9% 22%;
+  --card-foreground: 36 24% 90%;
+  --border: 30 8% 30%;
+  --input: 30 8% 30%;
+  --primary: 36 24% 90%;
+  --primary-foreground: 30 10% 18%;
+  --secondary: 30 8% 26%;
+  --secondary-foreground: 36 24% 90%;
+  --accent: 30 8% 28%;
+  --accent-foreground: 36 24% 90%;
+  --destructive: 14 60% 46%;
+  --destructive-foreground: 36 30% 92%;
+  --ring: 17 60% 58%;
+  --glass: 30 10% 22%;
+  --glass-alpha: 0.7;
+  --glass-strong-alpha: 0.86;
+  --glass-soft-alpha: 0.5;
+  --wash-1: 17 56% 53% / 0.2;
+  --wash-2: 36 60% 60% / 0.15;
+  --wash-3: 150 14% 49% / 0.12;
+}
+
 html,
 body {
   height: 100%;
@@ -188,4 +219,31 @@ body {
 }
 .typing-dot:nth-child(3) {
   animation-delay: 0.3s;
+}
+
+/* ── 标题字体（Tweaks 可调，默认 Source Serif 4） ── */
+h1,
+h2,
+h3 {
+  font-family: var(--ah-head-font, inherit);
+  letter-spacing: -0.015em;
+}
+
+/* ── 密度（紧凑：收紧面板头部与列表间距） ── */
+[data-density='compact'] .glass-panel > header {
+  padding-top: 0.45rem;
+  padding-bottom: 0.45rem;
+}
+[data-density='compact'] .ah-msgs {
+  gap: 0.85rem;
+}
+
+/* ── 交互打磨：颜色/变换平滑过渡 ── */
+button,
+a {
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
 }

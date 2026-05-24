@@ -1,12 +1,18 @@
 import { create } from 'zustand'
 
-export type Theme = 'light' | 'dark'
+export type Theme = 'light' | 'dim' | 'dark'
+export type AccentId = 'coral' | 'blue' | 'sage' | 'plum'
+export type Density = 'comfort' | 'compact'
+export type HeadingFont = 'Geist' | 'Source Serif 4' | 'Instrument Serif' | 'IBM Plex Sans'
 
 /** 中心区路由段：聊天 / 收件箱 / 任务 / 日历 / 群组 / 助手详情 */
 export type Section = 'chat' | 'inbox' | 'tasks' | 'calendar' | 'group' | 'agent-detail'
 
 interface UIState {
   theme: Theme
+  accent: AccentId
+  density: Density
+  headingFont: HeadingFont
   sidebarCollapsed: boolean
   rightCollapsed: boolean
   section: Section
@@ -17,6 +23,10 @@ interface UIState {
   activeGroupId: string | null
 
   toggleTheme: () => void
+  setTheme: (theme: Theme) => void
+  setAccent: (accent: AccentId) => void
+  setDensity: (density: Density) => void
+  setHeadingFont: (font: HeadingFont) => void
   toggleSidebar: () => void
   toggleRight: () => void
   setSection: (section: Section) => void
@@ -35,6 +45,9 @@ interface UIState {
  */
 export const useUIStore = create<UIState>((set) => ({
   theme: 'light',
+  accent: 'coral',
+  density: 'comfort',
+  headingFont: 'Source Serif 4',
   sidebarCollapsed: false,
   rightCollapsed: false,
   section: 'chat',
@@ -43,7 +56,11 @@ export const useUIStore = create<UIState>((set) => ({
   activeConversationId: 'c2',
   activeGroupId: 'design',
 
-  toggleTheme: () => set((s) => ({ theme: s.theme === 'light' ? 'dark' : 'light' })),
+  toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
+  setTheme: (theme) => set({ theme }),
+  setAccent: (accent) => set({ accent }),
+  setDensity: (density) => set({ density }),
+  setHeadingFont: (headingFont) => set({ headingFont }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   toggleRight: () => set((s) => ({ rightCollapsed: !s.rightCollapsed })),
   setSection: (section) => set({ section }),
