@@ -21,4 +21,6 @@ export const agentsApi = {
   get: (id: string) => api.get<ApiAgent>(`/api/agents/${id}`),
   create: (input: CreateAgentInput) => api.post<ApiAgent>("/api/agents", input),
   remove: (id: string) => api.del<void>(`/api/agents/${id}`),
+  /** 连通性检查：获取 Agent 配置确认可用 */
+  ping: (id: string) => api.get<ApiAgent>(`/api/agents/${id}`),
 };

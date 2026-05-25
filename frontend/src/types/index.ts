@@ -276,6 +276,8 @@ export type IconName =
   | 'chevronLeft'
   | 'chevronRight'
   | 'sliders'
+  | 'pencil'
+  | 'trash2'
 
 // ── 后端 API DTO（与 backend schema 对齐，字段为 snake_case）──
 
@@ -292,6 +294,32 @@ export interface ApiAgent {
   skills: string[]
   capability_tags: string[]
   is_system: boolean
+  created_at: string
+}
+
+/** 对应 backend `GroupMemberOut`。 */
+export interface ApiGroupMember {
+  id: string
+  name: string
+  role: string
+}
+
+/** 对应 backend 协调者摘要（GroupOut.coordinator）。 */
+export interface ApiGroupCoordinator {
+  id: string
+  name: string
+  role: string
+  agent_system: string
+  is_system: boolean
+}
+
+/** 对应 backend `GroupOut`（schemas/group.py）。注意与 UI 的 `Group` 区分。 */
+export interface ApiGroup {
+  id: string
+  name: string
+  description: string
+  coordinator: ApiGroupCoordinator
+  members: ApiGroupMember[]
   created_at: string
 }
 

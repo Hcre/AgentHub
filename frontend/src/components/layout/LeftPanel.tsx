@@ -1,11 +1,14 @@
-import { useState } from 'react'
+import { type MouseEvent, useState } from 'react'
 import { cn } from '../../lib/cn'
-import { channels, nav, org, user } from '../../data/mock'
+import { nav, org, user } from '../../data/mock'
 import { useAgentStore } from '../../stores/agentStore'
 import { useChatStore } from '../../stores/chatStore'
+import { useGroupStore } from '../../stores/groupStore'
 import { useUIStore, type Section } from '../../stores/uiStore'
 import { CreateAgentModal } from '../agent/CreateAgentModal'
-import { Avatar, Button, Icon, Kbd } from '../ui'
+import { CreateGroupModal } from '../group/CreateGroupModal'
+import { Avatar, Button, ContextMenu, Icon, Kbd } from '../ui'
+import type { ContextMenuItem } from '../ui'
 import type { IconName } from '../../types'
 
 function NavRow({
@@ -16,6 +19,7 @@ function NavRow({
   dotted,
   badge,
   onClick,
+  onContextMenu,
 }: {
   icon?: IconName
   label: string
@@ -24,10 +28,12 @@ function NavRow({
   dotted?: boolean
   badge?: boolean
   onClick: () => void
+  onContextMenu?: (e: MouseEvent) => void
 }) {
   return (
     <button
       onClick={onClick}
+      onContextMenu={onContextMenu}
       data-active={active ? 'true' : undefined}
       className={cn(
         'group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
@@ -76,7 +82,7 @@ function SectionHeader({
         <button
           onClick={onAdd}
           title={addTitle}
-          className="grid h-4 w-4 place-items-center rounded opacity-0 transition-opacity hover:bg-accent group-hover:opacity-100"
+          className="grid h-4 w-4 place-items-center rounded opacity-40 transition-all hover:opacity-100 hover:bg-accent"
         >
           <Icon name="plus" className="h-3 w-3" />
         </button>
@@ -97,11 +103,17 @@ export function LeftPanel() {
     toggleSidebar,
   } = useUIStore()
   const agents = useAgentStore((s) => s.agents)
+  const groups = useGroupStore((s) => s.groups)
   const conversations = useChatStore((s) => s.conversations)
+  const addConversation = useChatStore((s) => s.addConversation)
   const [openCh, setOpenCh] = useState(true)
   const [openAI, setOpenAI] = useState(true)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ editor: true })
+  const renameGroup = useGroupStore((s) => s.renameGroup)
+  const deleteGroup = useGroupStore((s) => s.deleteGroup)
   const [createOpen, setCreateOpen] = useState(false)
+  const [groupCreateOpen, setGroupCreateOpen] = useState(false)
+  const [menu, setMenu] = useState<{ groupId: string; x: number; y: number } | null>(null)
 
   return (
     <aside className="glass-panel flex h-full w-full flex-col overflow-hidden rounded-2xl border shadow-sm">
@@ -145,17 +157,26 @@ export function LeftPanel() {
           ))}
         </div>
 
-        <SectionHeader label="频道" collapsed={!openCh} onToggle={() => setOpenCh((v) => !v)} />
+        <SectionHeader
+          label="群组"
+          collapsed={!openCh}
+          onToggle={() => setOpenCh((v) => !v)}
+          onAdd={() => setGroupCreateOpen(true)}
+          addTitle="创建群组"
+        />
         {openCh && (
           <div className="space-y-px">
-            {channels.map((c) => (
+            {groups.map((g) => (
               <NavRow
-                key={c.id}
-                label={c.name}
+                key={g.id}
+                label={g.name}
                 dotted
-                badge={c.unread}
-                active={section === 'group' && activeGroupId === c.id}
-                onClick={() => openGroup(c.id)}
+                active={section === 'group' && activeGroupId === g.id}
+                onClick={() => openGroup(g.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  setMenu({ groupId: g.id, x: e.clientX, y: e.clientY })
+                }}
               />
             ))}
           </div>
@@ -200,6 +221,17 @@ export function LeftPanel() {
                       online={a.online}
                     />
                     <span className="flex-1 truncate text-left">{a.name}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const id = addConversation(a.id)
+                        openConversation(a.id, id)
+                      }}
+                      title="新建对话"
+                      className="grid h-5 w-5 place-items-center rounded text-muted-foreground opacity-0 transition-all hover:bg-accent hover:text-foreground group-hover/agent:opacity-100"
+                    >
+                      <Icon name="plus" className="h-3 w-3" />
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
@@ -270,6 +302,36 @@ export function LeftPanel() {
       </footer>
 
       <CreateAgentModal open={createOpen} onClose={() => setCreateOpen(false)} />
+      <CreateGroupModal open={groupCreateOpen} onClose={() => setGroupCreateOpen(false)} />
+      {menu && (
+        <ContextMenu
+          x={menu.x} y={menu.y}
+          onClose={() => setMenu(null)}
+          items={
+            [
+              {
+                icon: 'pencil',
+                label: '重命名',
+                onClick: () => {
+                  const name = window.prompt('新名称', groups.find((g) => g.id === menu.groupId)?.name ?? '')
+                  if (name && name.trim()) renameGroup(menu.groupId, name.trim())
+                },
+              },
+              {
+                icon: 'trash2',
+                label: '删除群组',
+                danger: true,
+                onClick: () => {
+                  if (window.confirm('确定删除该群组？')) {
+                    deleteGroup(menu.groupId)
+                    if (activeGroupId === menu.groupId) setSection('inbox')
+                  }
+                },
+              },
+            ] satisfies ContextMenuItem[]
+          }
+        />
+      )}
     </aside>
   )
 }

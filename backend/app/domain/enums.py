@@ -6,10 +6,10 @@ from enum import StrEnum
 class AgentSystem(StrEnum):
     """适配模式：决定走 API 管道还是 CLI 运行时。"""
 
-    CLAUDE_CODE = "claude_code"        # CLI 运行时（自带 Harness）
-    ANTHROPIC_API = "anthropic_api"    # Anthropic Messages API
-    OPENAI_API = "openai_api"          # OpenAI-compatible API (DeepSeek/Groq/vLLM)
-    MOCK = "mock"                      # 本地假数据
+    CLAUDE_CODE = "claude_code"  # CLI 运行时（自带 Harness）
+    ANTHROPIC_API = "anthropic_api"  # Anthropic Messages API
+    OPENAI_API = "openai_api"  # OpenAI-compatible API (DeepSeek/Groq/vLLM)
+    MOCK = "mock"  # 本地假数据
 
 
 class Provider(StrEnum):
@@ -17,6 +17,8 @@ class Provider(StrEnum):
     OPENAI = "openai"
     DEEPSEEK = "deepseek"
     AZURE = "azure"
+    MINIMAX = "minimax"
+    MIMO = "mimo"
     SYSTEM = "system"  # 协调者使用
 
 

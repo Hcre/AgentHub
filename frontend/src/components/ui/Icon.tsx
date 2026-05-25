@@ -22,6 +22,7 @@ import {
   MessageSquare,
   Moon,
   MoreHorizontal,
+  Pencil,
   Network,
   PanelLeft,
   PanelRight,
@@ -36,6 +37,7 @@ import {
   Smile,
   Sparkles,
   Sun,
+  Trash2,
   X,
   Zap,
   type LucideIcon,
@@ -82,6 +84,8 @@ const MAP: Record<IconName, LucideIcon> = {
   chevronLeft: ChevronLeft,
   chevronRight: ChevronRight,
   sliders: SlidersHorizontal,
+  pencil: Pencil,
+  trash2: Trash2,
 }
 
 export interface IconProps {

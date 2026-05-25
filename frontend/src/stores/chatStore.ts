@@ -1,10 +1,4 @@
 import { create } from 'zustand'
-import {
-  conversations as mockConversations,
-  messages as mockMessages,
-  outputs as mockOutputs,
-  stage as mockStage,
-} from '../data/mock'
 import { nowStamp, uid } from '../lib/id'
 import type {
   ChatMessage,
@@ -30,16 +24,6 @@ const REPLIES = [
 
 const NEXT_STAGE: Record<StageStatus, StageStatus> = { todo: 'doing', doing: 'done', done: 'todo' }
 
-function seedMessages(): Record<string, ChatMessage[]> {
-  const out: Record<string, ChatMessage[]> = {}
-  for (const [agentId, byConv] of Object.entries(mockMessages)) {
-    for (const [convId, list] of Object.entries(byConv)) {
-      out[convKey(agentId, convId)] = list
-    }
-  }
-  return out
-}
-
 interface ChatState {
   messages: Record<string, ChatMessage[]>
   conversations: Record<string, Conversation[]>
@@ -64,11 +48,11 @@ interface ChatState {
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
-  messages: seedMessages(),
-  conversations: { ...mockConversations },
+  messages: {},
+  conversations: {},
   typing: {},
-  stages: { [convKey('editor', 'c2')]: mockStage },
-  outputs: { [convKey('editor', 'c2')]: mockOutputs },
+  stages: {},
+  outputs: {},
   sessionIds: {},
   connected: false,
 

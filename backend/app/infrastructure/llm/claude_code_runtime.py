@@ -48,8 +48,7 @@ class ClaudeCodeRuntime(AgentRuntime):
     ) -> None:
         self._model = model
         self._proxy_url = (
-            f"{proxy_base.rstrip('/')}/agents/{agent_id}"
-            if proxy_base and agent_id else ""
+            f"{proxy_base.rstrip('/')}/proxy/agents/{agent_id}" if proxy_base and agent_id else ""
         )
         self._permission_mode = permission_mode
         self._max_turns = max_turns
@@ -63,9 +62,9 @@ class ClaudeCodeRuntime(AgentRuntime):
         session_key = str(request.session_id)
 
         async for event in self._run_cli(prompt, request, session_key, resume=True):
-            if (
-                event.type == StreamEventType.ERROR
-                and "No conversation found" in (event.content or "")
+            if "No conversation found" in (event.content or "") or (
+                event.type == StreamEventType.DONE
+                and "No conversation found" in str(event.metadata)
             ):
                 logger.info("Session %s 不存在，新建 CLI 会话", session_key)
                 async for fallback_event in self._run_cli(
@@ -81,7 +80,7 @@ class ClaudeCodeRuntime(AgentRuntime):
             self._process.terminate()
             try:
                 await asyncio.wait_for(self._process.wait(), timeout=5)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 self._process.kill()
             self._process = None
 
@@ -119,7 +118,7 @@ class ClaudeCodeRuntime(AgentRuntime):
                 for evt in events:
                     yield evt
                     seq = evt.seq + 1
-        except asyncio.TimeoutError:
+        except TimeoutError:
             yield StreamEvent(
                 type=StreamEventType.ERROR,
                 seq=seq,
@@ -142,16 +141,17 @@ class ClaudeCodeRuntime(AgentRuntime):
 
         self._process = None
 
-    def _build_cmd(
-        self, request: AgentRequest, session_key: str, *, resume: bool
-    ) -> list[str]:
+    def _build_cmd(self, request: AgentRequest, session_key: str, *, resume: bool) -> list[str]:
         cmd = [
             "claude",
-            "--output-format", "stream-json",
+            "--output-format",
+            "stream-json",
             "--verbose",
             "--print",
-            "--permission-mode", self._permission_mode,
-            "--max-turns", str(self._max_turns),
+            "--permission-mode",
+            self._permission_mode,
+            "--max-turns",
+            str(self._max_turns),
         ]
         if resume:
             cmd.extend(["--resume", session_key])
@@ -183,18 +183,16 @@ class ClaudeCodeRuntime(AgentRuntime):
                 return msg.get("content", "")
         return ""
 
-    async def _read_lines_with_timeout(
-        self, stdout: asyncio.StreamReader
-    ) -> AsyncIterator[str]:
+    async def _read_lines_with_timeout(self, stdout: asyncio.StreamReader) -> AsyncIterator[str]:
         """逐行读取 stdout，带总超时。"""
         deadline = asyncio.get_event_loop().time() + self._timeout
         while True:
             remaining = deadline - asyncio.get_event_loop().time()
             if remaining <= 0:
-                raise asyncio.TimeoutError
+                raise TimeoutError
             try:
                 line = await asyncio.wait_for(stdout.readline(), timeout=remaining)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 raise
             if not line:
                 break
@@ -229,32 +227,38 @@ class ClaudeCodeRuntime(AgentRuntime):
             for block in message.get("content", []):
                 block_type = block.get("type")
                 if block_type == "text":
-                    events.append(StreamEvent(
-                        type=StreamEventType.TEXT,
-                        seq=seq,
-                        content=block.get("text", ""),
-                    ))
+                    events.append(
+                        StreamEvent(
+                            type=StreamEventType.TEXT,
+                            seq=seq,
+                            content=block.get("text", ""),
+                        )
+                    )
                     seq += 1
                 elif block_type == "tool_use":
-                    events.append(StreamEvent(
-                        type=StreamEventType.TOOL_CALL,
-                        seq=seq,
-                        tool_call=ToolCall(
-                            call_id=block.get("id", ""),
-                            name=block.get("name", ""),
-                            arguments=block.get("input", {}),
-                        ),
-                    ))
+                    events.append(
+                        StreamEvent(
+                            type=StreamEventType.TOOL_CALL,
+                            seq=seq,
+                            tool_call=ToolCall(
+                                call_id=block.get("id", ""),
+                                name=block.get("name", ""),
+                                arguments=block.get("input", {}),
+                            ),
+                        )
+                    )
                     seq += 1
 
             usage = message.get("usage", {})
             if usage:
-                events.append(StreamEvent(
-                    type=StreamEventType.TEXT,
-                    seq=seq,
-                    content="",
-                    metadata={"token_usage": usage},
-                ))
+                events.append(
+                    StreamEvent(
+                        type=StreamEventType.TEXT,
+                        seq=seq,
+                        content="",
+                        metadata={"token_usage": usage},
+                    )
+                )
                 seq += 1
 
         elif event_type == "user":
@@ -262,16 +266,18 @@ class ClaudeCodeRuntime(AgentRuntime):
             for block in data.get("message", {}).get("content", []):
                 if block.get("type") == "tool_result":
                     is_error = block.get("is_error", False)
-                    events.append(StreamEvent(
-                        type=StreamEventType.TOOL_RESULT,
-                        seq=seq,
-                        tool_result=ToolResult(
-                            call_id=block.get("tool_use_id", ""),
-                            success=not is_error,
-                            content=block.get("content") if not is_error else None,
-                            error=block.get("content") if is_error else None,
-                        ),
-                    ))
+                    events.append(
+                        StreamEvent(
+                            type=StreamEventType.TOOL_RESULT,
+                            seq=seq,
+                            tool_result=ToolResult(
+                                call_id=block.get("tool_use_id", ""),
+                                success=not is_error,
+                                content=block.get("content") if not is_error else None,
+                                error=block.get("content") if is_error else None,
+                            ),
+                        )
+                    )
                     seq += 1
 
         elif event_type == "result":
@@ -280,16 +286,22 @@ class ClaudeCodeRuntime(AgentRuntime):
                 "total_cost_usd": data.get("total_cost_usd", 0),
                 "duration_ms": data.get("duration_ms", 0),
                 "subtype": data.get("subtype", ""),
+                "is_error": data.get("is_error", False),
             }
             # 权限阻断信息
             denials = data.get("permission_denials", [])
             if denials:
                 metadata["permission_denials"] = denials
-                metadata["is_error"] = data.get("is_error", False)
-            events.append(StreamEvent(
-                type=StreamEventType.DONE,
-                seq=seq,
-                metadata=metadata,
-            ))
+            # 错误列表（如 "No conversation found"）
+            errors = data.get("errors", [])
+            if errors:
+                metadata["errors"] = errors
+            events.append(
+                StreamEvent(
+                    type=StreamEventType.DONE,
+                    seq=seq,
+                    metadata=metadata,
+                )
+            )
 
         return events

@@ -3,6 +3,7 @@ name: agenthub
 services:
   postgres:
     image: pgvector/pgvector:pg16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-agenthub}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agenthub_dev_pwd}
@@ -20,6 +21,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
@@ -32,6 +34,7 @@ services:
       retries: 5
 
   backend:
+    restart: unless-stopped
     build:
       context: ../backend
       dockerfile: Dockerfile
@@ -52,6 +55,7 @@ services:
              uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
   celery_worker:
+    restart: unless-stopped
     build:
       context: ../backend
       dockerfile: Dockerfile
@@ -69,6 +73,7 @@ services:
 
   # 新前端：v0.dev 静态原型（nginx 托管，纯 mock 数据，不连后端）
   frontend:
+    restart: unless-stopped
     build:
       context: ../frontend
       dockerfile: Dockerfile

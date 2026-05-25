@@ -1,8 +1,9 @@
 import { create } from 'zustand'
 import { agents } from '../data/mock'
 import { coordinator, groupMessages, groups } from '../data/groups'
+import { groupsApi, type CreateGroupInput } from '../api/groups'
 import { nowStamp, uid } from '../lib/id'
-import type { Group, GroupMessage } from '../types'
+import type { ApiGroup, Group, GroupMessage } from '../types'
 
 export interface SendGroupOptions {
   requiresApproval?: boolean
@@ -78,16 +79,98 @@ export function simulateGroupReply(group: Group, text: string): GroupMessage {
 // END MOCK SEAM
 // ════════════════════════════════════════════════════════════════════
 
+/** 后端 ApiGroup → UI Group。members 仅保留 agentId（协调者已含在后端 members 内）。 */
+function toUiGroup(g: ApiGroup): Group {
+  return {
+    id: g.id,
+    name: g.name,
+    description: g.description,
+    members: g.members.map((m) => m.id),
+  }
+}
+
 interface GroupState {
   groups: Group[]
   messagesByGroup: Record<string, GroupMessage[]>
 
+  /** 拉后端真实群组并入列表（按 id 去重）；失败保持 seed mock。 */
+  fetchGroups: () => Promise<void>
+  /** 创建群组：先同步后端取真实 UUID；后端不可用则本地降级 mock。返回新群 id。 */
+  createGroup: (input: CreateGroupInput) => Promise<string>
+  /** 重命名：乐观更新本地 → 调 API；失败回滚。 */
+  renameGroup: (id: string, name: string) => Promise<void>
+  /** 删除群组：乐观移除 → 调 API；失败拉回全量。 */
+  deleteGroup: (id: string) => Promise<void>
   sendGroup: (groupId: string, text: string, opts?: SendGroupOptions) => void
 }
 
 export const useGroupStore = create<GroupState>((set, get) => ({
   groups,
   messagesByGroup: { ...groupMessages },
+
+  fetchGroups: async () => {
+    try {
+      const list = await groupsApi.list()
+      set((s) => {
+        const existing = new Set(s.groups.map((g) => g.id))
+        const incoming = list.filter((g) => !existing.has(g.id)).map(toUiGroup)
+        return { groups: [...s.groups, ...incoming] }
+      })
+    } catch {
+      // 后端不可用 → 保持 seed mock
+    }
+  },
+
+  createGroup: async (input) => {
+    try {
+      const created = await groupsApi.create(input)
+      const group = toUiGroup(created)
+      set((s) => ({ groups: [...s.groups, group] }))
+      return group.id
+    } catch {
+      // 后端不可用 → 本地降级 mock，保证 UI 不卡
+      const id = uid('grp')
+      const group: Group = {
+        id,
+        name: input.name,
+        description: input.description ?? '',
+        members: input.member_ids ?? [],
+      }
+      set((s) => ({ groups: [...s.groups, group] }))
+      return id
+    }
+  },
+
+  renameGroup: async (id, name) => {
+    const prev = get().groups
+    set((s) => ({
+      groups: s.groups.map((g) => (g.id === id ? { ...g, name } : g)),
+    }))
+    try {
+      await groupsApi.rename(id, name)
+    } catch {
+      set({ groups: prev }) // 回滚
+    }
+  },
+
+  deleteGroup: async (id) => {
+    const prev = get().groups
+    set((s) => ({
+      groups: s.groups.filter((g) => g.id !== id),
+      messagesByGroup: { ...s.messagesByGroup, [id]: [] },
+    }))
+    try {
+      await groupsApi.remove(id)
+    } catch {
+      // 后端失败 → 拉全量以恢复准确状态
+      try {
+        const list = await groupsApi.list()
+        set({ groups: list.map(toUiGroup) })
+      } catch {
+        set({ groups: prev }) // 后端也挂了 → 回滚本地
+      }
+    }
+  },
 
   sendGroup: (groupId, text, opts) => {
     const userMsg: GroupMessage = {

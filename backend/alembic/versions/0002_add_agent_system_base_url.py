@@ -19,14 +19,22 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "agents",
-        sa.Column("agent_system", sa.String(32), server_default="mock", nullable=False),
-    )
-    op.add_column(
-        "agents",
-        sa.Column("base_url", sa.String(512), nullable=True),
-    )
+    # 0001 用 Base.metadata.create_all() 从模型建表，模型更新后列可能已存在，做幂等处理
+    from sqlalchemy import inspect
+
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    existing = {c["name"] for c in inspector.get_columns("agents")}
+    if "agent_system" not in existing:
+        op.add_column(
+            "agents",
+            sa.Column("agent_system", sa.String(32), server_default="mock", nullable=False),
+        )
+    if "base_url" not in existing:
+        op.add_column(
+            "agents",
+            sa.Column("base_url", sa.String(512), nullable=True),
+        )
 
 
 def downgrade() -> None:

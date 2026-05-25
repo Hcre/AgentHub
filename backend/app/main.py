@@ -18,6 +18,7 @@ from app.core.exceptions import (
     DomainError,
     NotFoundError,
     PermissionError,
+    ValidationError,
 )
 from app.core.logging import setup_logging
 from app.infrastructure.cache.redis_client import close_redis
@@ -65,6 +66,11 @@ async def _forbidden(_: Request, exc: PermissionError) -> JSONResponse:
 @app.exception_handler(DomainError)
 async def _domain_error(_: Request, exc: DomainError) -> JSONResponse:
     return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+
+@app.exception_handler(ValidationError)
+async def _validation_error(_: Request, exc: ValidationError) -> JSONResponse:
+    return JSONResponse(status_code=422, content={"detail": str(exc)})
 
 
 @app.exception_handler(AgentHubError)
