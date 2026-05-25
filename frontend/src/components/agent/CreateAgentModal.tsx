@@ -79,7 +79,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
   const [baseUrl, setBaseUrl] = useState('')
   const [apiKey, setApiKey] = useState('')
   // Step 3
-  const [status, setStatus] = useState<'creating' | 'success' | 'error'>('creating')
+  const [status, setStatus] = useState<'idle' | 'creating' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
 
   const isCustom = pickedIndex === TEMPLATES.length
@@ -99,7 +99,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
     setModel('')
     setBaseUrl('')
     setApiKey('')
-    setStatus('creating')
+    setStatus('idle')
     setErrorMsg('')
   }
 
@@ -121,7 +121,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
     // 模板套用 deepseek / claude_code / deepseek-chat 作为默认
     setAgentSystem('claude_code')
     setProviderId('deepseek')
-    setModel('deepseek-chat')
+    setModel(providers.find(p => p.id === 'deepseek')?.models[0] ?? '')
     setBaseUrl('')
     setApiKey('')
     setStep(2)
@@ -353,7 +353,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
                     <Input
                       value={model}
                       onChange={(e) => setModel(e.target.value)}
-                      placeholder="例如 deepseek-chat"
+                      placeholder={providers.find(p => p.id === providerId)?.models[0] || '输入模型名'}
                     />
                   </label>
 
