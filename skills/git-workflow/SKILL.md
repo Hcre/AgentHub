@@ -225,3 +225,5 @@ git merge main   # 将最新 main 合并到 feature
 3. **合并前必须走 B3 审查。** 不能跳过。
 4. **每次操作后验证。** merge 后跑 `git status`，push 后确认 remote 更新。
 5. **队友的 worklog 永远直接接受。** 不审查 worklogs/ 下的变更。
+6. **日志按天拆分。** 每天写新文件 `YYYY-MM-DD_<简短描述>.md`，不要追加到前一天日志里。
+7. **Push 后必须询问用户是否 PR 到 main。** 给出命令或链接。
