@@ -18,8 +18,6 @@ from app.application.services import ChatService
 from app.core.events import get_event_bus
 from app.core.exceptions import AgentHubError
 from app.domain.enums import DispatchMode
-from app.infrastructure.cache.memory_l1 import RedisL1Store
-from app.infrastructure.cache.redis_client import get_redis
 from app.infrastructure.db.base import session_factory
 from app.infrastructure.llm.factory import build_adapter
 from app.infrastructure.repositories import (
@@ -46,7 +44,7 @@ async def session_ws(websocket: WebSocket, session_id: UUID) -> None:
             await _handle_message(websocket, session_id, data)
     except WebSocketDisconnect:
         await ws_manager.disconnect(session_id, websocket)
-    except Exception:  # noqa: BLE001 - 顶层兜底，避免连接悬挂
+    except Exception:  # - 顶层兜底，避免连接悬挂
         logger.exception("WS 处理异常")
         await ws_manager.disconnect(session_id, websocket)
 
@@ -65,7 +63,6 @@ async def _handle_message(ws: WebSocket, session_id: UUID, data: dict) -> None:
             PostgresSessionRepository(db),
             PostgresMessageRepository(db),
             PostgresAgentRepository(db),
-            RedisL1Store(get_redis()),
             _adapter,
             get_event_bus(),
         )
@@ -76,7 +73,7 @@ async def _handle_message(ws: WebSocket, session_id: UUID, data: dict) -> None:
         except AgentHubError as exc:
             await db.rollback()
             await ws.send_json({"type": "error", "seq": -1, "content": str(exc)})
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             await db.rollback()
             logger.exception("流式执行失败")
             await ws.send_json({"type": "error", "seq": -1, "content": str(exc)})
