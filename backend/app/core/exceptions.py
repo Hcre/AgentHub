@@ -19,3 +19,7 @@ class PermissionError(AgentHubError):  # noqa: A001 - 领域语义优先
 
 class InvalidTransitionError(DomainError):
     """Task FSM 非法状态转换。"""
+
+
+class ValidationError(AgentHubError):
+    """输入校验失败（通过 schema 但违反业务规则，如成员 Agent 不存在），映射 422。"""

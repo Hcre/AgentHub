@@ -11,12 +11,14 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     DateTime,
     ForeignKey,
     Integer,
     String,
     Text,
+    UniqueConstraint,
     Uuid,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -134,3 +136,36 @@ class NotificationModel(Base):
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     action_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class GroupModel(Base):
+    __tablename__ = "groups"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    coordinator_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    coordinator_config: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
+
+
+class GroupMemberModel(Base):
+    __tablename__ = "group_members"
+    __table_args__ = (UniqueConstraint("group_id", "agent_id", name="uq_group_member"),)
+
+    # BigSerial（PG）；SQLite 测试退回 Integer 以支持自增主键
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
+    group_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("groups.id", ondelete="CASCADE"), index=True
+    )
+    agent_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("agents.id", ondelete="CASCADE"), index=True
+    )
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

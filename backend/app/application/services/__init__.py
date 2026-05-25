@@ -2,6 +2,7 @@
 
 from app.application.services.agent_service import AgentService
 from app.application.services.chat_service import ChatService
+from app.application.services.group_service import GroupService
 from app.application.services.session_service import SessionService
 
-__all__ = ["AgentService", "ChatService", "SessionService"]
+__all__ = ["AgentService", "ChatService", "GroupService", "SessionService"]

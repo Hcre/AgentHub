@@ -97,3 +97,29 @@ class MessageResponse:
             metadata=m.metadata,
             created_at=m.created_at,
         )
+
+
+@dataclass
+class GroupCoordinatorResponse:
+    id: UUID
+    name: str
+    role: str
+    agent_system: str
+    is_system: bool
+
+
+@dataclass
+class GroupMemberResponse:
+    id: UUID
+    name: str
+    role: str
+
+
+@dataclass
+class GroupResponse:
+    id: UUID
+    name: str
+    description: str
+    coordinator: GroupCoordinatorResponse
+    members: list[GroupMemberResponse]
+    created_at: datetime

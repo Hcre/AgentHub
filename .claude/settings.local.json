@@ -8,7 +8,24 @@
       "Bash(pg_isready)",
       "Bash(redis-cli ping:*)",
       "Bash(. /home/huishuohuademao/workspace/AgentHub/backend/.venv/bin/activate)",
-      "Bash(python -c \":*)"
+      "Bash(python -c \":*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git ls-tree *)",
+      "Bash(cp /home/huishuohuademao/workspace/AgentHub/frontend/src/api/agents.ts /home/huishuohuademao/workspace/AgentHub/.claude/worktrees/xbpd/frontend/src/api/agents.ts)",
+      "Bash(cp /home/huishuohuademao/workspace/AgentHub/frontend/src/api/client.ts /home/huishuohuademao/workspace/AgentHub/.claude/worktrees/xbpd/frontend/src/api/client.ts)",
+      "Bash(cp /home/huishuohuademao/workspace/AgentHub/frontend/src/api/sessions.ts /home/huishuohuademao/workspace/AgentHub/.claude/worktrees/xbpd/frontend/src/api/sessions.ts)",
+      "Bash(cp /home/huishuohuademao/workspace/AgentHub/frontend/src/hooks/useWebSocket.ts /home/huishuohuademao/workspace/AgentHub/.claude/worktrees/xbpd/frontend/src/hooks/useWebSocket.ts)",
+      "Bash(git -C /home/huishuohuademao/workspace/AgentHub reset -q HEAD -- frontend/src/api/agents.ts frontend/src/api/client.ts frontend/src/api/sessions.ts frontend/src/hooks/useWebSocket.ts)",
+      "Bash(node_modules/.bin/eslint src *)",
+      "Bash(echo \"=== eslint exit: $? ===\")",
+      "Bash(node_modules/.bin/tsc -b . --force)",
+      "Bash(git -C /home/huishuohuademao/workspace/AgentHub/.claude/worktrees/xbpd status --short -- frontend/src)",
+      "Bash(xargs -r kill)",
+      "Bash(npx eslint *)",
+      "Bash(echo \"ESLINT_EXIT=$?\")",
+      "Bash(/home/huishuohuademao/workspace/AgentHub/backend/.venv/bin/ruff check *)",
+      "Bash(echo \"RUFF_EXIT=$?\")"
     ]
   }
 }

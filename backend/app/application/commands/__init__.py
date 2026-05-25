@@ -47,6 +47,27 @@ class DeleteAgentCommand:
     agent_id: UUID
 
 
+# === Group Commands ===
+
+
+@dataclass
+class CreateGroupCommand:
+    name: str
+    description: str = ""
+    member_ids: list[UUID] = field(default_factory=list)
+
+
+@dataclass
+class RenameGroupCommand:
+    group_id: UUID
+    name: str
+
+
+@dataclass
+class DeleteGroupCommand:
+    group_id: UUID
+
+
 # === Session / Chat Commands ===
 
 

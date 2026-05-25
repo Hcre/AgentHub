@@ -13,7 +13,12 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.services import AgentService, ChatService, SessionService
+from app.application.services import (
+    AgentService,
+    ChatService,
+    GroupService,
+    SessionService,
+)
 from app.core.events import EventBus, get_event_bus
 from app.domain.llm.protocol import UnifiedAgent
 from app.infrastructure.cache.memory_l1 import L1MemoryStore, RedisL1Store
@@ -22,6 +27,7 @@ from app.infrastructure.db.base import get_session
 from app.infrastructure.llm.factory import build_adapter
 from app.infrastructure.repositories import (
     PostgresAgentRepository,
+    PostgresGroupRepository,
     PostgresMessageRepository,
     PostgresSessionRepository,
 )
@@ -52,6 +58,10 @@ def get_agent_repo(session: DbSession) -> PostgresAgentRepository:
     return PostgresAgentRepository(session)
 
 
+def get_group_repo(session: DbSession) -> PostgresGroupRepository:
+    return PostgresGroupRepository(session)
+
+
 def get_session_repo(session: DbSession) -> PostgresSessionRepository:
     return PostgresSessionRepository(session)
 
@@ -68,6 +78,14 @@ def get_agent_service(
     bus: Annotated[EventBus, Depends(get_bus)],
 ) -> AgentService:
     return AgentService(repo, bus)
+
+
+def get_group_service(
+    group_repo: Annotated[PostgresGroupRepository, Depends(get_group_repo)],
+    agent_repo: Annotated[PostgresAgentRepository, Depends(get_agent_repo)],
+    bus: Annotated[EventBus, Depends(get_bus)],
+) -> GroupService:
+    return GroupService(group_repo, agent_repo, bus)
 
 
 def get_session_service(
