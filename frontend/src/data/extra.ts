@@ -15,22 +15,22 @@ export const providers: Provider[] = [
   {
     id: 'anthropic',
     label: 'Anthropic',
-    models: ['claude-sonnet-4-5', 'claude-opus-4-5', 'claude-haiku-4-5'],
+    models: ['claude-sonnet-4-6', 'claude-opus-4-7', 'claude-haiku-4-5'],
   },
   {
     id: 'deepseek',
     label: 'DeepSeek',
-    models: ['deepseek-chat', 'deepseek-reasoner'],
+    models: ['deepseek-v4-pro[1m]', 'deepseek-chat', 'deepseek-reasoner'],
   },
   {
     id: 'minimax',
     label: 'MiniMax',
-    models: ['abab6.5s-chat', 'abab7-chat'],
+    models: ['MiniMax-M2.7', 'abab6.5s-chat', 'abab7-chat'],
   },
   {
     id: 'mimo',
     label: 'Xiaomi MiMo',
-    models: ['mimo-7b', 'mimo-14b'],
+    models: ['mimo-v2.5-pro', 'mimo-7b', 'mimo-14b'],
   },
   { id: 'openai', label: 'OpenAI', models: ['gpt-4o', 'gpt-4o-mini', 'o3'] },
   { id: 'azure', label: 'Azure', models: ['gpt-4o-azure', 'gpt-4o-mini-azure'] },

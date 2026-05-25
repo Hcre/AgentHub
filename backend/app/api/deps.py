@@ -16,8 +16,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.services import AgentService, ChatService, SessionService
 from app.core.events import EventBus, get_event_bus
 from app.domain.llm.protocol import UnifiedAgent
-from app.infrastructure.cache.memory_l1 import L1MemoryStore, RedisL1Store
-from app.infrastructure.cache.redis_client import get_redis
 from app.infrastructure.db.base import get_session
 from app.infrastructure.llm.factory import build_adapter
 from app.infrastructure.repositories import (
@@ -35,10 +33,6 @@ DbSession = Annotated[AsyncSession, Depends(get_session)]
 @lru_cache
 def get_llm_adapter() -> UnifiedAgent:
     return build_adapter()
-
-
-def get_l1_memory() -> L1MemoryStore:
-    return RedisL1Store(get_redis())
 
 
 def get_bus() -> EventBus:
@@ -88,7 +82,6 @@ def get_chat_service(
         session_repo,
         message_repo,
         agent_repo,
-        get_l1_memory(),
         get_llm_adapter(),
         bus,
     )
@@ -101,7 +94,6 @@ async def build_chat_service_for_ws() -> AsyncIterator[ChatService]:
             PostgresSessionRepository(session),
             PostgresMessageRepository(session),
             PostgresAgentRepository(session),
-            get_l1_memory(),
             get_llm_adapter(),
             get_event_bus(),
         )
