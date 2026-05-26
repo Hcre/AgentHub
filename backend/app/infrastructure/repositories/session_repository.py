@@ -6,7 +6,6 @@ from uuid import UUID
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql import false
 
 from app.domain.entities.session import Session
 from app.domain.enums import SessionType

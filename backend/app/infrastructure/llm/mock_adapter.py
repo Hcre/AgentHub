@@ -10,9 +10,9 @@ from collections.abc import AsyncIterator
 
 from app.domain.llm.protocol import (
     AgentRequest,
+    LLMAdapter,
     StreamEvent,
     StreamEventType,
-    LLMAdapter,
 )
 
 

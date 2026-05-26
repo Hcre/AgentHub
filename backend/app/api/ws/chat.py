@@ -46,7 +46,7 @@ async def session_ws(websocket: WebSocket, session_id: UUID) -> None:
             await _handle_message(websocket, session_id, data)
     except WebSocketDisconnect:
         await ws_manager.disconnect(session_id, websocket)
-    except Exception:  # noqa: BLE001 - 顶层兜底，避免连接悬挂
+    except Exception:  # - 顶层兜底，避免连接悬挂
         logger.exception("WS 处理异常")
         await ws_manager.disconnect(session_id, websocket)
 
@@ -76,7 +76,7 @@ async def _handle_message(ws: WebSocket, session_id: UUID, data: dict) -> None:
         except AgentHubError as exc:
             await db.rollback()
             await ws.send_json({"type": "error", "seq": -1, "content": str(exc)})
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             await db.rollback()
             logger.exception("流式执行失败")
             await ws.send_json({"type": "error", "seq": -1, "content": str(exc)})

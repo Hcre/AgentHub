@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -23,16 +22,20 @@ def _make_request(content: str = "hello") -> AgentRequest:
 class TestParseLineUserEvent:
     def test_tool_result_success(self) -> None:
         runtime = ClaudeCodeRuntime()
-        line = json.dumps({
-            "type": "user",
-            "message": {
-                "content": [{
-                    "type": "tool_result",
-                    "tool_use_id": "call_001",
-                    "content": "File created successfully.",
-                }],
-            },
-        })
+        line = json.dumps(
+            {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "call_001",
+                            "content": "File created successfully.",
+                        }
+                    ],
+                },
+            }
+        )
         events = runtime._parse_line(line, 0)
         assert len(events) == 1
         assert events[0].type == StreamEventType.TOOL_RESULT
@@ -42,17 +45,21 @@ class TestParseLineUserEvent:
 
     def test_tool_result_error(self) -> None:
         runtime = ClaudeCodeRuntime()
-        line = json.dumps({
-            "type": "user",
-            "message": {
-                "content": [{
-                    "type": "tool_result",
-                    "tool_use_id": "call_002",
-                    "content": "rm in '/tmp/x' was blocked.",
-                    "is_error": True,
-                }],
-            },
-        })
+        line = json.dumps(
+            {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "call_002",
+                            "content": "rm in '/tmp/x' was blocked.",
+                            "is_error": True,
+                        }
+                    ],
+                },
+            }
+        )
         events = runtime._parse_line(line, 0)
         assert len(events) == 1
         assert events[0].type == StreamEventType.TOOL_RESULT
@@ -64,15 +71,21 @@ class TestParseLineUserEvent:
 class TestParseLineResult:
     def test_result_with_permission_denials(self) -> None:
         runtime = ClaudeCodeRuntime()
-        line = json.dumps({
-            "type": "result",
-            "subtype": "error_max_turns",
-            "is_error": True,
-            "permission_denials": [
-                {"tool_name": "Bash", "tool_use_id": "call_x", "tool_input": {"command": "rm -rf /tmp/x"}},
-            ],
-            "total_cost_usd": 0.05,
-        })
+        line = json.dumps(
+            {
+                "type": "result",
+                "subtype": "error_max_turns",
+                "is_error": True,
+                "permission_denials": [
+                    {
+                        "tool_name": "Bash",
+                        "tool_use_id": "call_x",
+                        "tool_input": {"command": "rm -rf /tmp/x"},
+                    },
+                ],
+                "total_cost_usd": 0.05,
+            }
+        )
         events = runtime._parse_line(line, 0)
         assert len(events) == 1
         assert events[0].type == StreamEventType.DONE
@@ -129,7 +142,6 @@ class TestBuildCmd:
 
 class TestBuildEnv:
     def test_inherits_os_environ(self) -> None:
-        import os
         runtime = ClaudeCodeRuntime()
         env = runtime._build_env()
         assert "PATH" in env
@@ -147,7 +159,6 @@ class TestBuildEnv:
 
     def test_global_mode_preserves_shell_env(self) -> None:
         """全局模式不覆盖 ANTHROPIC_API_KEY/BASE_URL，继承 os.environ。"""
-        import os
         runtime = ClaudeCodeRuntime(model="claude-sonnet-4")
         env = runtime._build_env()
         assert env["ANTHROPIC_MODEL"] == "claude-sonnet-4"
@@ -158,13 +169,15 @@ class TestBuildEnv:
 class TestParseLineText:
     def test_assistant_text(self) -> None:
         runtime = ClaudeCodeRuntime()
-        line = json.dumps({
-            "type": "assistant",
-            "message": {
-                "content": [{"type": "text", "text": "hello world"}],
-                "usage": {},
-            },
-        })
+        line = json.dumps(
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [{"type": "text", "text": "hello world"}],
+                    "usage": {},
+                },
+            }
+        )
         events = runtime._parse_line(line, 0)
         assert len(events) == 1
         assert events[0].type == StreamEventType.TEXT
@@ -172,18 +185,22 @@ class TestParseLineText:
 
     def test_assistant_tool_use(self) -> None:
         runtime = ClaudeCodeRuntime()
-        line = json.dumps({
-            "type": "assistant",
-            "message": {
-                "content": [{
-                    "type": "tool_use",
-                    "id": "call_123",
-                    "name": "read_file",
-                    "input": {"path": "/tmp/test.py"},
-                }],
-                "usage": {},
-            },
-        })
+        line = json.dumps(
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "call_123",
+                            "name": "read_file",
+                            "input": {"path": "/tmp/test.py"},
+                        }
+                    ],
+                    "usage": {},
+                },
+            }
+        )
         events = runtime._parse_line(line, 0)
         assert len(events) == 1
         assert events[0].type == StreamEventType.TOOL_CALL
@@ -192,12 +209,14 @@ class TestParseLineText:
 
     def test_result_done(self) -> None:
         runtime = ClaudeCodeRuntime()
-        line = json.dumps({
-            "type": "result",
-            "subtype": "success",
-            "duration_ms": 2000,
-            "total_cost_usd": 0.05,
-        })
+        line = json.dumps(
+            {
+                "type": "result",
+                "subtype": "success",
+                "duration_ms": 2000,
+                "total_cost_usd": 0.05,
+            }
+        )
         events = runtime._parse_line(line, 0)
         assert len(events) == 1
         assert events[0].type == StreamEventType.DONE

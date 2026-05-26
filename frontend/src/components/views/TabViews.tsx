@@ -5,8 +5,19 @@ import { Badge, Icon } from '../ui'
 import type { MemoryStatus } from '../../types'
 
 export function SkillsView() {
+  const setSection = useUIStore((s) => s.setSection)
   return (
     <div className="mx-auto max-w-2xl space-y-2 px-6 py-5">
+      <div className="flex items-center justify-between">
+        <span className="text-[12px] text-muted-foreground">已安装 {skills.length} 个技能</span>
+        <button
+          type="button"
+          onClick={() => setSection('skills-market')}
+          className="text-[12px] text-brand hover:underline"
+        >
+          浏览技能市场 →
+        </button>
+      </div>
       {skills.map((s) => (
         <div key={s.id} className="flex items-start gap-3 rounded-xl border bg-card p-4">
           <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-md border bg-muted/30 text-brand">
