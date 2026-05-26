@@ -13,7 +13,7 @@ class NotFoundError(AgentHubError):
     """资源不存在，映射 404。"""
 
 
-class PermissionError(AgentHubError):  # noqa: A001 - 领域语义优先
+class PermissionError(AgentHubError):  # - 领域语义优先
     """权限不足，映射 403。"""
 
 

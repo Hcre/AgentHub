@@ -7,6 +7,7 @@ API 模式（未实现）：由适配器自行管理消息上下文。
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from collections.abc import AsyncIterator
 
@@ -36,6 +37,26 @@ from app.domain.repositories import (
 from app.infrastructure.llm.factory import build_adapter_for_agent
 
 logger = logging.getLogger(__name__)
+
+SKILLS_DIR = "/skills"
+
+
+def _load_skill_content(skill_names: list[str]) -> str:
+    """读取 skill 文件内容，拼接为 system prompt 片段。"""
+    if not skill_names or not os.path.isdir(SKILLS_DIR):
+        return ""
+    parts: list[str] = []
+    for name in skill_names:
+        path = os.path.join(SKILLS_DIR, name, "SKILL.md")
+        if os.path.isfile(path):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    content = f.read().strip()
+                    if content:
+                        parts.append(f"## Skill: {name}\n\n{content}")
+            except OSError:
+                logger.warning("无法读取 skill 文件: %s", path)
+    return "\n\n---\n\n".join(parts) if parts else ""
 
 
 class ChatService:
@@ -87,11 +108,17 @@ class ChatService:
         adapter = build_adapter_for_agent(agent)
 
         # 4. 构造请求（CLI 模式由 --resume 管理历史，API 模式由适配器管理）
+        # 注入 skill 内容到 system prompt
+        skill_content = _load_skill_content(agent.skills or [])
+        system_prompt = agent.system_prompt or ""
+        if skill_content:
+            system_prompt = f"{system_prompt}\n\n{skill_content}".strip()
+
         request = AgentRequest(
             request_id=str(uuid.uuid4()),
             session_id=cmd.session_id,
             messages=[{"role": "user", "content": cmd.content}],
-            system_prompt=agent.system_prompt,
+            system_prompt=system_prompt,
             max_tokens=settings_max_tokens(),
         )
 

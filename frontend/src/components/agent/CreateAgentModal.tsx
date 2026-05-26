@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { providers } from '../../data/extra'
 import { useAgentStore } from '../../stores/agentStore'
 import { useChatStore } from '../../stores/chatStore'
@@ -19,40 +19,49 @@ const RUNTIMES = [
 interface Template {
   name: string
   systemPrompt: string
+  skills: string[]
 }
 
 const TEMPLATES: Template[] = [
   {
     name: '技术负责人',
     systemPrompt: '拆任务、排顺序、盯风险，协调工程师、评审和测试交付结果。',
+    skills: [],
   },
   {
     name: '工程师',
     systemPrompt: '接需求、写代码、上线。修 bug 比写代码还熟。',
+    skills: [],
   },
   {
     name: '代码评审',
     systemPrompt: '审 diff、提风险、走查测试、把合并前最后一道关。',
+    skills: [],
   },
   {
     name: '测试',
     systemPrompt: '复现问题、跑验收、做回归，把用户路径测到真的能用。',
+    skills: [],
   },
   {
     name: '产品经理',
     systemPrompt: '定方向、拆需求、写 PRD、推进交付。',
+    skills: [],
   },
   {
     name: '文案',
     systemPrompt: '写公众号、邮件、品牌稿。卖点和故事都能写。',
+    skills: [],
   },
   {
     name: '编辑',
     systemPrompt: '调语气、改结构、控篇幅，把稿子打磨到能发。',
+    skills: [],
   },
   {
     name: '外联文案',
     systemPrompt: '陌拜信、跟进序列、销售话术都他写。盯回复率反复优化。',
+    skills: [],
   },
 ]
 
@@ -60,11 +69,15 @@ function Label({ children }: { children: string }) {
   return <span className="text-[12px] font-medium text-muted-foreground">{children}</span>
 }
 
+/** 跳转技能市场时暂存草稿，回来后恢复 */
+let wizardDraft: { name: string; prompt: string; skills: string[] } | null = null
+
 export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const createAgent = useAgentStore((s) => s.createAgent)
   const removeAgent = useAgentStore((s) => s.removeAgent)
   const addConversation = useChatStore((s) => s.addConversation)
   const openConversation = useUIStore((s) => s.openConversation)
+  const setSection = useUIStore((s) => s.setSection)
 
   // Wizard state
   const [step, setStep] = useState(1)
@@ -72,6 +85,9 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
   const [pickedIndex, setPickedIndex] = useState<number | null>(null)
   const [customName, setCustomName] = useState('')
   const [customPrompt, setCustomPrompt] = useState('')
+  const [customSkills, setCustomSkills] = useState<string[]>([])
+  const [skillList, setSkillList] = useState<{name:string}[]>([])
+  const [skillLoading, setSkillLoading] = useState(false)
   // Step 2
   const [agentSystem, setAgentSystem] = useState('claude_code')
   const [providerId, setProviderId] = useState('deepseek')
@@ -86,6 +102,31 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
   const selectedTemplate = pickedIndex !== null && pickedIndex < TEMPLATES.length ? TEMPLATES[pickedIndex] : null
   const agentName = isCustom ? customName : (selectedTemplate?.name ?? '')
   const agentSystemPrompt = isCustom ? customPrompt : (selectedTemplate?.systemPrompt ?? '')
+  const selectedSkills = isCustom ? customSkills : (selectedTemplate?.skills ?? [])
+
+  // 自定义时加载 skill 列表 + 恢复草稿
+  useEffect(() => {
+    if (!isCustom) return
+    setSkillLoading(true)
+    fetch('/api/skills/library?_=' + Date.now())
+      .then((r) => r.json())
+      .then(setSkillList)
+      .catch(() => setSkillList([]))
+      .finally(() => setSkillLoading(false))
+    // 恢复跳转市场前的草稿
+    if (wizardDraft) {
+      setCustomName(wizardDraft.name)
+      setCustomPrompt(wizardDraft.prompt)
+      setCustomSkills(wizardDraft.skills)
+      wizardDraft = null
+    }
+  }, [isCustom])
+
+  const toggleSkill = (name: string) => {
+    setCustomSkills((prev) =>
+      prev.includes(name) ? prev.filter((s) => s !== name) : [...prev, name],
+    )
+  }
 
   const showProviderSection = agentSystem === 'claude_code'
 
@@ -94,6 +135,8 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
     setPickedIndex(null)
     setCustomName('')
     setCustomPrompt('')
+    setCustomSkills([])
+    setSkillList([])
     setAgentSystem('claude_code')
     setProviderId('deepseek')
     setModel('')
@@ -145,7 +188,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
         model: showProviderSection ? model.trim() : '',
         baseUrl: showProviderSection ? baseUrl.trim() || undefined : undefined,
         apiKey,
-        skills: [],
+        skills: selectedSkills,
         systemPrompt: agentSystemPrompt,
       })
 
@@ -266,7 +309,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
               </div>
 
               {isCustom && (
-                <div className="flex flex-col gap-3 rounded-lg border p-3">
+                <div className="flex flex-col gap-3">
                   <Input
                     value={customName}
                     onChange={(e) => setCustomName(e.target.value)}
@@ -279,6 +322,48 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
                     placeholder="描述这个队友的职责与边界（system prompt）…"
                     className="min-h-[60px]"
                   />
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between">
+                      <Label>Skill</Label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          wizardDraft = {
+                            name: customName,
+                            prompt: customPrompt,
+                            skills: customSkills,
+                          }
+                          onClose()
+                          setTimeout(() => setSection('skills-market'), 0)
+                        }}
+                        className="text-[11px] text-brand hover:underline"
+                      >
+                        浏览技能市场 →
+                      </button>
+                    </div>
+                    {skillLoading ? (
+                      <span className="text-[12px] text-muted-foreground">加载中…</span>
+                    ) : skillList.length === 0 ? (
+                      <span className="text-[12px] text-muted-foreground">暂无可用 Skill</span>
+                    ) : (
+                      <div className="flex flex-col gap-1 rounded-md border p-2">
+                        {skillList.map((s) => (
+                          <label
+                            key={s.name}
+                            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-[13px] hover:bg-accent"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={customSkills.includes(s.name)}
+                              onChange={() => toggleSkill(s.name)}
+                              className="h-3.5 w-3.5 accent-brand"
+                            />
+                            <span>{s.name.replace('.md', '')}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -454,6 +539,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
           </div>
         )}
       </DialogContent>
+
     </Dialog>
   )
 }

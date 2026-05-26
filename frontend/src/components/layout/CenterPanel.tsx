@@ -10,6 +10,7 @@ import { ChatView } from '../chat/ChatView'
 import { GroupChatView } from '../group/GroupChatView'
 import { InboxView } from '../inbox/InboxView'
 import { TasksTabView } from '../tasks/TasksTabView'
+import { SkillMarketplacePage } from '../skills/SkillMarketplacePage'
 import { MemoryView, SettingsView, SkillsView } from '../views/TabViews'
 import { Avatar, Badge, Button, Icon } from '../ui'
 import type { Agent } from '../../types'
@@ -55,6 +56,7 @@ export function CenterPanel() {
 
   if (section === 'group') return <GroupChatView />
   if (section === 'agent-detail') return <AgentDetailPage />
+  if (section === 'skills-market') return <SkillMarketplacePage />
   if (section === 'tasks')
     return (
       <Panel>
