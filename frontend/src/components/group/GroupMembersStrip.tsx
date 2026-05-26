@@ -1,18 +1,19 @@
 import { Avatar } from '../ui'
 import { lookupActor } from './actors'
+import type { Group } from '../../types'
 
 export function GroupMembersStrip({
-  memberIds,
+  group,
   onPick,
 }: {
-  memberIds: string[]
+  group: Group
   onPick: (id: string) => void
 }) {
   return (
     <div className="flex items-center gap-2">
       <div className="flex -space-x-1.5">
-        {memberIds.map((id) => {
-          const a = lookupActor(id)
+        {group.members.map((id) => {
+          const a = lookupActor(id, group)
           return (
             <button
               key={id}
@@ -26,7 +27,7 @@ export function GroupMembersStrip({
         })}
       </div>
       <span className="ml-1 font-mono text-[10.5px] text-muted-foreground">
-        {memberIds.length} 个成员
+        {group.members.length} 个成员
       </span>
     </div>
   )

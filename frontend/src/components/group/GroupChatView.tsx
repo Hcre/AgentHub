@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '../../lib/cn'
+import { groupsApi } from '../../api/groups'
+import { useGroupWebSocket } from '../../hooks/useGroupWebSocket'
 import { useGroupStore } from '../../stores/groupStore'
 import { useTaskStore } from '../../stores/taskStore'
 import { useUIStore } from '../../stores/uiStore'
@@ -21,13 +23,45 @@ export function GroupChatView() {
   const theme = useUIStore((s) => s.theme)
   const toggleTheme = useUIStore((s) => s.toggleTheme)
   const viewAgent = useUIStore((s) => s.viewAgent)
-  const { groups, messagesByGroup, sendGroup } = useGroupStore()
+  const groups = useGroupStore((s) => s.groups)
+  const messagesByGroup = useGroupStore((s) => s.messagesByGroup)
+  const sendGroup = useGroupStore((s) => s.sendGroup)
+  const sessionIdsByGroup = useGroupStore((s) => s.sessionIdsByGroup)
+  const setGroupSession = useGroupStore((s) => s.setGroupSession)
+  const loadGroupHistory = useGroupStore((s) => s.loadGroupHistory)
   const tasks = useTaskStore((s) => s.tasks)
   const [tab, setTab] = useState('chat')
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const group = groups.find((g) => g.id === activeGroupId)
   const msgs = activeGroupId ? (messagesByGroup[activeGroupId] ?? []) : []
+  const sessionId = activeGroupId ? (sessionIdsByGroup[activeGroupId] ?? null) : null
+
+  // 1. 切换群聊 → 找回或创建对应 session
+  useEffect(() => {
+    if (!activeGroupId || sessionId) return
+    let cancelled = false
+    groupsApi
+      .findOrCreateSession(activeGroupId)
+      .then((s) => {
+        if (!cancelled) setGroupSession(activeGroupId, s.id)
+      })
+      .catch(() => {
+        // 后端不可用 → 保留 UI 骨架，sendGroup 仅本地回显
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [activeGroupId, sessionId, setGroupSession])
+
+  // 2. session 就绪 → 拉一次历史
+  useEffect(() => {
+    if (!activeGroupId || !sessionId) return
+    void loadGroupHistory(activeGroupId)
+  }, [activeGroupId, sessionId, loadGroupHistory])
+
+  // 3. 挂载 WS
+  useGroupWebSocket(activeGroupId ?? null, sessionId)
 
   useEffect(() => {
     if (tab === 'chat' && scrollRef.current) {
@@ -61,7 +95,7 @@ export function GroupChatView() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <GroupMembersStrip memberIds={group.members} onPick={viewAgent} />
+          <GroupMembersStrip group={group} onPick={viewAgent} />
           <div className="h-5 w-px bg-border" />
           <Button variant="ghost" size="iconSm" onClick={toggleTheme} title="切换主题">
             <Icon name={theme === 'light' ? 'moon' : 'sun'} className="h-3.5 w-3.5" />
@@ -101,7 +135,7 @@ export function GroupChatView() {
           )}
           <div ref={scrollRef} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5">
             {msgs.map((m) => (
-              <GroupMessageItem key={m.id} msg={m} />
+              <GroupMessageItem key={m.id} msg={m} group={group} />
             ))}
           </div>
           <GroupComposer group={group} onSend={(text, opts) => sendGroup(group.id, text, opts)} />
@@ -136,7 +170,7 @@ export function GroupChatView() {
               </div>
             ) : (
               channelTasks.map((t, i) => {
-                const a = t.assignee ? lookupActor(t.assignee) : undefined
+                const a = t.assignee ? lookupActor(t.assignee, group) : undefined
                 return (
                   <div
                     key={t.id}

@@ -103,17 +103,13 @@ export interface Group {
   name: string
   description: string
   members: string[] // agentId[]
+  /** 协调者 Agent id（后端 is_system=true，不在 agentStore.agents 列表）。 */
+  coordinatorId?: string
+  /** 协调者展示名，来自 ApiGroup.coordinator.name（actors.ts 用）。 */
+  coordinatorName?: string
+  /** 协调者角色描述。 */
+  coordinatorRole?: string
   pinnedTask?: string
-}
-
-/** 协调者：编排群组工作的特殊 agent。 */
-export interface Coordinator {
-  id: 'coordinator'
-  name: string
-  role: string
-  color: AgentColor
-  online: boolean
-  bio: string
 }
 
 /** 协调者分发方案中的单个子任务步骤。 */
@@ -132,7 +128,7 @@ export interface CoordinatorPlan {
 }
 
 /**
- * 群聊消息。`who` 取值：agentId | 'coordinator' | 'user'。
+ * 群聊消息。`who` 取值：agentId（含协调者 UUID）| 'user' | 'unknown'。
  * `kind === 'plan'` 时带结构化分发方案 `plan`。
  */
 export interface GroupMessage {
@@ -144,6 +140,10 @@ export interface GroupMessage {
   kind?: 'plan'
   plan?: CoordinatorPlan
   requiresApproval?: boolean
+  /** 流式增量渲染中（done 后置 false / 移除哨兵） */
+  streaming?: boolean
+  /** 用户消息的 @mention 名单（解析自正文，发送时透传给后端）。 */
+  mentions?: string[]
 }
 
 // ── 次要视图（Phase 5） ──
