@@ -15,15 +15,20 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.application.commands import SendMessageCommand
 from app.application.services import ChatService
+from app.application.services.context_builder import ContextBuilder
+from app.application.services.discussion_orchestrator import DiscussionOrchestrator
+from app.application.services.selector import Selector
 from app.core.events import get_event_bus
 from app.core.exceptions import AgentHubError
 from app.domain.enums import DispatchMode
 from app.infrastructure.cache.memory_l1 import RedisL1Store
 from app.infrastructure.cache.redis_client import get_redis
+from app.infrastructure.cache.watermark_store import RedisWatermarkStore
 from app.infrastructure.db.base import session_factory
 from app.infrastructure.llm.factory import build_adapter
 from app.infrastructure.repositories import (
     PostgresAgentRepository,
+    PostgresGroupRepository,
     PostgresMessageRepository,
     PostgresSessionRepository,
 )
@@ -46,7 +51,7 @@ async def session_ws(websocket: WebSocket, session_id: UUID) -> None:
             await _handle_message(websocket, session_id, data)
     except WebSocketDisconnect:
         await ws_manager.disconnect(session_id, websocket)
-    except Exception:  # noqa: BLE001 - 顶层兜底，避免连接悬挂
+    except Exception:
         logger.exception("WS 处理异常")
         await ws_manager.disconnect(session_id, websocket)
 
@@ -61,13 +66,34 @@ async def _handle_message(ws: WebSocket, session_id: UUID, data: dict) -> None:
         dispatch_mode=DispatchMode(data.get("dispatch_mode", "auto")),
     )
     async with session_factory() as db:
+        msg_repo = PostgresMessageRepository(db)
+        agent_repo = PostgresAgentRepository(db)
+        group_repo = PostgresGroupRepository(db)
+        redis = get_redis()
+        l1 = RedisL1Store(redis)
+        wm = RedisWatermarkStore(redis)
+        ctx = ContextBuilder(msg_repo, agent_repo, l1, wm)
+        bus = get_event_bus()
+        discussion = DiscussionOrchestrator(
+            message_repo=msg_repo,
+            agent_repo=agent_repo,
+            l1_memory=l1,
+            watermarks=wm,
+            context_builder=ctx,
+            selector=Selector(),
+            event_bus=bus,
+        )
         chat = ChatService(
             PostgresSessionRepository(db),
-            PostgresMessageRepository(db),
-            PostgresAgentRepository(db),
-            RedisL1Store(get_redis()),
+            msg_repo,
+            agent_repo,
+            group_repo,
+            l1,
+            wm,
+            ctx,
+            discussion,
             _adapter,
-            get_event_bus(),
+            bus,
         )
         try:
             async for event in chat.send_and_stream(cmd):
@@ -76,7 +102,7 @@ async def _handle_message(ws: WebSocket, session_id: UUID, data: dict) -> None:
         except AgentHubError as exc:
             await db.rollback()
             await ws.send_json({"type": "error", "seq": -1, "content": str(exc)})
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             await db.rollback()
             logger.exception("流式执行失败")
             await ws.send_json({"type": "error", "seq": -1, "content": str(exc)})
