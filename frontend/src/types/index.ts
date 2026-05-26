@@ -350,4 +350,6 @@ export interface StreamEvent {
   seq: number
   content?: string | null
   metadata?: Record<string, unknown>
+  /** 群聊场景下标识发言人；私聊为 null。前端按此分色气泡 / 路由到 messagesByGroup。 */
+  sender_agent_id?: string | null
 }

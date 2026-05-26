@@ -44,12 +44,24 @@
 - `@某成员` → 该成员一句 ack
 - 无 @ → 协调者兜底 ack
 
-### 接真实后端的步骤
+### 接真实后端的步骤（2026-05-26 群聊 V1 + 讨论模式后端落地后）
+
+> 后端 V1 @ 路由 + Selector 讨论循环已实现（commit feature/chat/group-chat-impl）。
+> WS 协议与私聊统一为 `/ws/sessions/{session_id}`；StreamEvent 现含 `sender_agent_id` 字段。
 
 1. **发送**：`sendGroup` 里 append 用户消息后，把 `setTimeout(simulateGroupReply...)` 那段删掉，
-   改为 `POST /api/groups/{groupId}/messages`（body: `{ text, requiresApproval }`）。
-2. **接收**：开一条 WS（`/ws/groups/{groupId}` 或全局 `/ws`），收到推送的消息就 append 到
-   `messagesByGroup[groupId]`。协调者的分发方案、成员回复都由后端按真实编排推来。
+   改为通过 WS 推送 `{type:"message", content, mentions:[...]}` 到 `/ws/sessions/{group_session_id}`。
+   注意 mentions 字段是 `string[]`（Agent name 列表），后端 `_resolve_mentions` 会解析。
+2. **接收**：StreamEvent 推到 `messagesByGroup[groupId]`。**按 `sender_agent_id` 区分发言人**：
+   - `sender_agent_id == null` → 用户消息（一般不会从 WS 推回，本地 append 即可）
+   - `sender_agent_id != null` → 按该 agentId 路由到 `who` 字段，渲染对应 Agent 气泡/颜色
+3. **流式聚合**：同一 `sender_agent_id` 的连续 TEXT 事件应聚合成同一条 message（按 seq 升序累加 content）。
+   接近私聊 `chatStore.applyStreamEvent` 的逻辑，但 key 从 convKey 改为 `(groupId, sender_agent_id, latestSeqStart)`。
+4. **死群兜底**：用户无 @ 且群组 `dispatch_mode != DISCUSSION` → 后端静默，无回复。
+   前端不要 spinner 等回复，按发送即送达处理。
+5. **讨论模式**：群组配置 `dispatch_mode=discussion` 时，无 @ 也会进入 Selector 回合循环。
+   多个 Agent 会被依次唤起（串行），每位发言完一条独立 message。前端不需要特殊处理，
+   按 `sender_agent_id` 自然渲染即可。
 3. **类型已就位**：后端返回的消息只要符合 `GroupMessage`（`src/types/index.ts`）即可直接渲染，
    `kind:'plan'` + `CoordinatorPlan` 结构对应协调者拆解结果。
 4. **审批**：`requiresApproval` 的消息目前只打标记。真实流程应：发起 → 进「收件箱·审批」(Phase 5 `inbox`)
