@@ -51,7 +51,6 @@ def _load_skill_content(skill_names: list[str]) -> str:
         return ""
     parts: list[str] = []
     for name in skill_names:
-        # skill 目录结构: /skills/{name}/SKILL.md
         path = os.path.join(SKILLS_DIR, name, "SKILL.md")
         if os.path.isfile(path):
             try:
@@ -78,7 +77,7 @@ class ChatService:
         self._messages = message_repo
         self._agents = agent_repo
         self._l1 = l1_memory
-        self._llm = llm  # 全局默认，per-agent 覆盖时优先
+        self._llm = llm
         self._bus = event_bus
 
     async def send_and_stream(self, cmd: SendMessageCommand) -> AsyncIterator[StreamEvent]:
@@ -153,7 +152,7 @@ class ChatService:
                     buffer.append(event.content)
                 last_event = event
                 yield event
-        except Exception as exc:  # - 边界统一兜底
+        except Exception as exc:
             logger.exception("流式执行失败")
             assistant_msg.status = MessageStatus.FAILED
             await self._bus.publish(
@@ -182,7 +181,7 @@ class ChatService:
                 },
             )
 
-        # 7. 完成：落库 + 写 L1
+        # 7. 完成：落库
         full = "".join(buffer)
         assistant_msg.content = full
         assistant_msg.status = MessageStatus.COMPLETED
@@ -196,7 +195,6 @@ class ChatService:
     def _resolve_target_agent(session) -> uuid.UUID:  # type: ignore[no-untyped-def]
         if session.type == SessionType.PRIVATE and session.agent_id:
             return session.agent_id
-        # 群聊路由（@指定 / @协调者 / 自动检测）在 M3 实现
         raise DomainError("MVP 仅支持私聊单 Agent；群聊路由待 M3")
 
 

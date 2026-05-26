@@ -18,8 +18,6 @@ from app.application.services import ChatService
 from app.core.events import get_event_bus
 from app.core.exceptions import AgentHubError
 from app.domain.enums import DispatchMode
-from app.infrastructure.cache.memory_l1 import RedisL1Store
-from app.infrastructure.cache.redis_client import get_redis
 from app.infrastructure.db.base import session_factory
 from app.infrastructure.llm.factory import build_adapter
 from app.infrastructure.repositories import (
@@ -65,7 +63,6 @@ async def _handle_message(ws: WebSocket, session_id: UUID, data: dict) -> None:
             PostgresSessionRepository(db),
             PostgresMessageRepository(db),
             PostgresAgentRepository(db),
-            RedisL1Store(get_redis()),
             _adapter,
             get_event_bus(),
         )
