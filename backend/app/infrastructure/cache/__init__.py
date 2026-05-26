@@ -6,5 +6,18 @@ from app.infrastructure.cache.memory_l1 import (
     RedisL1Store,
 )
 from app.infrastructure.cache.redis_client import get_redis
+from app.infrastructure.cache.watermark_store import (
+    InMemoryWatermarkStore,
+    RedisWatermarkStore,
+    WatermarkStore,
+)
 
-__all__ = ["InMemoryL1Store", "L1MemoryStore", "RedisL1Store", "get_redis"]
+__all__ = [
+    "InMemoryL1Store",
+    "InMemoryWatermarkStore",
+    "L1MemoryStore",
+    "RedisL1Store",
+    "RedisWatermarkStore",
+    "WatermarkStore",
+    "get_redis",
+]

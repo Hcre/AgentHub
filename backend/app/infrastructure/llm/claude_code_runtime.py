@@ -59,7 +59,7 @@ class ClaudeCodeRuntime(AgentRuntime):
         """先 resume，找不到 session 时 fallback 新建。"""
         logger.info("Claude CLI request_id=%s session=%s", request.request_id, request.session_id)
         prompt = self._extract_prompt(request)
-        session_key = str(request.session_id)
+        session_key = self._compute_session_key(request)
 
         async for event in self._run_cli(prompt, request, session_key, resume=True):
             if "No conversation found" in (event.content or "") or (
@@ -182,6 +182,19 @@ class ClaudeCodeRuntime(AgentRuntime):
             if msg.get("role") == "user":
                 return msg.get("content", "")
         return ""
+
+    @staticmethod
+    def _compute_session_key(request: AgentRequest) -> str:
+        """CLI session key 计算。
+
+        私聊：session_id（单 Agent 占用整个 session）
+        群聊：{session_id}:{agent_id}（每 Agent 独立 sqlite，避免互相覆盖）
+
+        见 docs/design/group-chat_群聊功能设计方案.md §4.1。
+        """
+        if request.is_group_chat and request.agent_id is not None:
+            return f"{request.session_id}:{request.agent_id}"
+        return str(request.session_id)
 
     async def _read_lines_with_timeout(self, stdout: asyncio.StreamReader) -> AsyncIterator[str]:
         """逐行读取 stdout，带总超时。"""
