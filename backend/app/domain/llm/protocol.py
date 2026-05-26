@@ -29,6 +29,10 @@ class AgentRequest(BaseModel):
     available_tools: list[str] = []
     max_tokens: int = 16000
     temperature: float = 0.7
+    # 群聊上下文（私聊场景留空，CLI session key 等据此分流）
+    agent_id: UUID | None = None       # 本次调用的目标 Agent（群聊必填）
+    group_id: UUID | None = None       # 所在群组（群聊必填）
+    is_group_chat: bool = False        # 群聊标识；True 时 CLI key = {session_id}:{agent_id}
 
 
 class StreamEventType(StrEnum):
@@ -64,6 +68,8 @@ class StreamEvent(BaseModel):
     tool_result: ToolResult | None = None
     task_plan: dict | None = None
     metadata: dict[str, Any] = {}      # token_usage / model / latency_ms
+    # 群聊场景下标识发言人，前端按此给气泡分色（私聊为 None）
+    sender_agent_id: UUID | None = None
 
 
 class LLMAdapter(ABC):

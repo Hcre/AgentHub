@@ -87,5 +87,11 @@ class NotificationCategory(StrEnum):
 
 
 class DispatchMode(StrEnum):
+    # 用户级/命令级（SendMessageCommand 兼容值）
     AUTO = "auto"
     DIRECT = "direct"
+    # 群组级（Group.dispatch_mode，影响 ChatService 群聊分流）
+    AT_ROUTING = "at_routing"          # V1：@ 路由 + 死群静默
+    DISCUSSION = "discussion"          # M3：Selector 回合循环
+    ROLEPLAY = "roleplay"              # 预留：角色扮演（非本期）
+    FREE_BROADCAST = "free_broadcast"  # 预留：自治广播（非本期）
