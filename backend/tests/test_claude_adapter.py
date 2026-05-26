@@ -14,7 +14,6 @@ from app.infrastructure.llm.claude_adapter import (
     _build_tool_definitions,
 )
 
-
 # ======================================================================
 # _build_system_prompt 测试
 # ======================================================================
@@ -92,7 +91,7 @@ class TestClaudeAdapterStream:
     @pytest.mark.asyncio
     async def test_text_events(self) -> None:
         """验证纯文本流式响应产出 TEXT + DONE。"""
-        from unittest.mock import AsyncMock, MagicMock, patch
+        from unittest.mock import AsyncMock, patch
 
         from app.infrastructure.llm.claude_adapter import ClaudeAdapter
 
@@ -154,7 +153,7 @@ class TestClaudeAdapterStream:
     @pytest.mark.asyncio
     async def test_error_yields_error_event(self) -> None:
         """非重试异常 → ERROR 事件。"""
-        from unittest.mock import AsyncMock, patch
+        from unittest.mock import patch
 
         from app.infrastructure.llm.claude_adapter import ClaudeAdapter
 

@@ -13,17 +13,17 @@ os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("LLM_ADAPTER_MODE", "mock")
 os.environ.setdefault("ENV", "test")
 
-from collections.abc import AsyncIterator  # noqa: E402
+from collections.abc import AsyncIterator
 
-import pytest_asyncio  # noqa: E402
-from sqlalchemy.ext.asyncio import (  # noqa: E402
+import pytest_asyncio
+from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
 
-import app.infrastructure.db.models  # noqa: E402,F401
-from app.infrastructure.db.base import Base  # noqa: E402
+import app.infrastructure.db.models  # noqa: F401
+from app.infrastructure.db.base import Base
 
 
 @pytest_asyncio.fixture

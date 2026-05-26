@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -129,7 +128,6 @@ class TestBuildCmd:
 
 class TestBuildEnv:
     def test_inherits_os_environ(self) -> None:
-        import os
         runtime = ClaudeCodeRuntime()
         env = runtime._build_env()
         assert "PATH" in env
@@ -147,7 +145,6 @@ class TestBuildEnv:
 
     def test_global_mode_preserves_shell_env(self) -> None:
         """全局模式不覆盖 ANTHROPIC_API_KEY/BASE_URL，继承 os.environ。"""
-        import os
         runtime = ClaudeCodeRuntime(model="claude-sonnet-4")
         env = runtime._build_env()
         assert env["ANTHROPIC_MODEL"] == "claude-sonnet-4"
