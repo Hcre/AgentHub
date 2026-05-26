@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 import anthropic
+from openai import AsyncOpenAI
 
 from app.core.config import settings
 from app.domain.entities.agent import Agent
@@ -34,10 +35,15 @@ class SelectorDecision:
     next_agent_id: UUID | None
     done: bool
     reason: str = ""  # 调试/可观测
+    mention_queue: tuple[UUID, ...] = ()  # 剩余待处理的 @mention
 
     @classmethod
-    def pick(cls, agent_id: UUID, reason: str = "") -> SelectorDecision:
-        return cls(next_agent_id=agent_id, done=False, reason=reason)
+    def pick(
+        cls, agent_id: UUID, reason: str = "", mention_queue: tuple[UUID, ...] = ()
+    ) -> SelectorDecision:
+        return cls(
+            next_agent_id=agent_id, done=False, reason=reason, mention_queue=mention_queue
+        )
 
     @classmethod
     def finish(cls, reason: str = "") -> SelectorDecision:
@@ -45,6 +51,8 @@ class SelectorDecision:
 
 
 _MENTION_PATTERN = re.compile(r"@([A-Za-z0-9_一-龥\-]+)")
+_CODE_BLOCK_PATTERN = re.compile(r"```[\s\S]*?```")
+_PER_MESSAGE_CHAR_LIMIT = 300
 
 
 class Selector:
@@ -55,11 +63,12 @@ class Selector:
 
     def __init__(
         self,
-        client: anthropic.AsyncAnthropic | None = None,
+        client: anthropic.AsyncAnthropic | AsyncOpenAI | None = None,
         model: str | None = None,
     ) -> None:
         self._client = client
         self._model = model or settings.selector_model
+        self._provider = settings.selector_provider
 
     async def pick(
         self,
@@ -111,24 +120,35 @@ class Selector:
     def _resolve_mention(
         last: Message, members: list[Agent]
     ) -> SelectorDecision | None:
+        member_by_name = {a.name: a for a in members}
+        collected: list[UUID] = []
+
         # 用户消息的 mentions 字段优先
         if last.mentions:
             for name in last.mentions:
-                hit = next((a for a in members if a.name == name), None)
+                hit = member_by_name.get(name)
                 if hit is not None:
-                    return SelectorDecision.pick(
-                        hit.id, reason=f"@mention field={name}"
-                    )
+                    collected.append(hit.id)
+
         # Agent 自治 @：扫文本
         content = last.content or ""
         for match in _MENTION_PATTERN.finditer(content):
             name = match.group(1)
-            hit = next((a for a in members if a.name == name), None)
-            if hit is not None and hit.id != last.sender_agent_id:
-                return SelectorDecision.pick(
-                    hit.id, reason=f"@inline={name}"
-                )
-        return None
+            hit = member_by_name.get(name)
+            if (
+                hit is not None
+                and hit.id != last.sender_agent_id
+                and hit.id not in collected
+            ):
+                collected.append(hit.id)
+
+        if not collected:
+            return None
+
+        first, *rest = collected
+        return SelectorDecision.pick(
+            first, reason=f"@mention={first}", mention_queue=tuple(rest)
+        )
 
     # --- Layer 2 ---
 
@@ -164,20 +184,132 @@ class Selector:
         name_by_id: dict[UUID, str],
         already_spoken: set[UUID],
     ) -> SelectorDecision:
-        try:
-            client = self._client or anthropic.AsyncAnthropic()
-        except Exception as exc:
-            logger.warning("Anthropic 客户端初始化失败，降级 DONE: %s", exc)
-            return SelectorDecision.finish("anthropic init failed")
-
         candidates = [a for a in members if a.id not in already_spoken]
         if not candidates:
             return SelectorDecision.finish("all spoken in this round")
 
+        if self._provider == "anthropic":
+            return await self._llm_decide_anthropic(
+                candidates=candidates, history=history, name_by_id=name_by_id
+            )
+        # deepseek, openai — both use OpenAI-compatible API
+        return await self._llm_decide_openai(
+            candidates=candidates, history=history, name_by_id=name_by_id
+        )
+
+    @staticmethod
+    def _build_prompts(
+        *,
+        candidates: list[Agent],
+        history: list[Message],
+        name_by_id: dict[UUID, str],
+    ) -> tuple[str, str]:
+        system = (
+            "你是多 Agent 群聊的发言调度器。基于群聊记录判断下一位最应该发言的成员，"
+            "或宣告讨论已收敛。\n\n"
+            "判断规则：\n"
+            "1. 如果讨论已自然结束、无新信息可贡献 → decision=done\n"
+            "2. 如果某成员的能力与当前话题强相关 → decision=next, agent_name=该成员\n"
+            "3. 如果讨论在重复已有观点 → decision=done\n"
+            "4. 不选已发言成员（除非有强烈理由）\n"
+            "5. 必须通过 select_next_speaker 工具返回决策"
+        )
+
+        cand_lines = [
+            f"- {a.name}（角色：{a.role or '未指定'}；能力：{', '.join(a.capability_tags) or '通用'}）"
+            for a in candidates
+        ]
+        cand_block = "\n".join(cand_lines)
+
+        hist_lines: list[str] = []
+        for msg in history[-15:]:
+            speaker = (
+                name_by_id.get(msg.sender_agent_id, "未知 Agent")
+                if msg.sender_agent_id
+                else "用户"
+            )
+            content = msg.content or ""
+            # Layer 1: compress code blocks
+            content = _CODE_BLOCK_PATTERN.sub("[代码片段已省略]", content)
+            # Layer 2: per-message char limit
+            if len(content) > _PER_MESSAGE_CHAR_LIMIT:
+                content = content[:_PER_MESSAGE_CHAR_LIMIT] + "..."
+            hist_lines.append(f"{speaker}: {content}")
+
+        prefix = "候选成员：\n" + cand_block + "\n\n群聊记录（按时间顺序）：\n---\n"
+        suffix = "\n---\n\n请通过 select_next_speaker 工具返回决策。"
+
+        # Layer 3: total prompt length guard — trim oldest, keep ≥1
+        max_chars = settings.selector_max_prompt_chars
+        overhead = len(system) + len(prefix) + len(suffix)
+        budget = max(100, max_chars - overhead)
+        trimmed = list(hist_lines)
+        while trimmed:
+            body = "\n".join(trimmed)
+            if len(body) <= budget:
+                break
+            if len(trimmed) == 1:
+                trimmed[0] = trimmed[0][: budget - 3] + "..."
+                break
+            trimmed.pop(0)
+
+        prompt = prefix + "\n".join(trimmed) + suffix
+        return system, prompt
+
+    @staticmethod
+    def _parse_llm_response(
+        resp: anthropic.types.Message, candidates: list[Agent]
+    ) -> SelectorDecision:
+        tool_use = next(
+            (b for b in resp.content if getattr(b, "type", None) == "tool_use"),
+            None,
+        )
+        if tool_use is None:
+            logger.warning("Selector LLM 未返回 tool_use，降级 DONE")
+            return SelectorDecision.finish("no tool_use")
+
+        payload = tool_use.input or {}
+        decision = payload.get("decision")
+        reason = payload.get("reason", "")
+
+        if decision == "done":
+            return SelectorDecision.finish(f"llm done: {reason}")
+        if decision == "next":
+            agent_name = payload.get("agent_name")
+            hit = next((a for a in candidates if a.name == agent_name), None)
+            if hit is None:
+                logger.warning(
+                    "Selector LLM 选了不存在的候选: %s，降级 DONE", agent_name
+                )
+                return SelectorDecision.finish(f"unknown candidate: {agent_name}")
+            return SelectorDecision.pick(hit.id, reason=f"llm pick: {reason}")
+
+        logger.warning("Selector LLM 返回非法 decision=%s，降级 DONE", decision)
+        return SelectorDecision.finish(f"invalid decision: {decision}")
+
+    # --- Layer 3 helpers: provider dispatch ---
+
+    async def _llm_decide_anthropic(
+        self,
+        *,
+        candidates: list[Agent],
+        history: list[Message],
+        name_by_id: dict[UUID, str],
+    ) -> SelectorDecision:
+        try:
+            client: anthropic.AsyncAnthropic = (
+                self._client
+                if isinstance(self._client, anthropic.AsyncAnthropic)
+                else anthropic.AsyncAnthropic()
+            )
+        except Exception as exc:
+            logger.warning("Anthropic 客户端初始化失败，降级 DONE: %s", exc)
+            return SelectorDecision.finish("anthropic init failed")
+
         system, prompt = self._build_prompts(
             candidates=candidates, history=history, name_by_id=name_by_id
         )
-        tools = [
+        tools: list[dict[str, object]] = [
             {
                 "name": "select_next_speaker",
                 "description": "选定下一位发言人或宣告讨论收敛",
@@ -210,66 +342,105 @@ class Selector:
                 tool_choice={"type": "tool", "name": "select_next_speaker"},
             )
         except Exception as exc:
-            logger.warning("Selector LLM 调用失败，降级 DONE: %s", exc)
+            logger.warning("Selector Anthropic 调用失败，降级 DONE: %s", exc)
             return SelectorDecision.finish(f"llm error: {exc.__class__.__name__}")
 
         return self._parse_llm_response(resp, candidates)
 
-    @staticmethod
-    def _build_prompts(
+    async def _llm_decide_openai(
+        self,
         *,
         candidates: list[Agent],
         history: list[Message],
         name_by_id: dict[UUID, str],
-    ) -> tuple[str, str]:
-        system = (
-            "你是多 Agent 群聊的发言调度器。基于群聊记录判断下一位最应该发言的成员，"
-            "或宣告讨论已收敛。\n\n"
-            "判断规则：\n"
-            "1. 如果讨论已自然结束、无新信息可贡献 → decision=done\n"
-            "2. 如果某成员的能力与当前话题强相关 → decision=next, agent_name=该成员\n"
-            "3. 如果讨论在重复已有观点 → decision=done\n"
-            "4. 不选已发言成员（除非有强烈理由）\n"
-            "5. 必须通过 select_next_speaker 工具返回决策"
+    ) -> SelectorDecision:
+        try:
+            if self._client is not None and isinstance(self._client, AsyncOpenAI):
+                client = self._client
+            elif self._provider == "deepseek":
+                client = AsyncOpenAI(
+                    base_url="https://api.deepseek.com/v1",
+                    api_key=settings.deepseek_api_key,
+                )
+            else:
+                client = AsyncOpenAI(api_key=settings.openai_api_key)
+        except Exception as exc:
+            logger.warning("OpenAI 客户端初始化失败，降级 DONE: %s", exc)
+            return SelectorDecision.finish("openai init failed")
+
+        system, prompt = self._build_prompts(
+            candidates=candidates, history=history, name_by_id=name_by_id
         )
 
-        cand_lines = [
-            f"- {a.name}（角色：{a.role or '未指定'}；能力：{', '.join(a.capability_tags) or '通用'}）"
-            for a in candidates
+        tools: list[dict[str, object]] = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "select_next_speaker",
+                    "description": "选定下一位发言人或宣告讨论收敛",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "decision": {
+                                "type": "string",
+                                "enum": ["next", "done"],
+                                "description": "next 表示选人；done 表示讨论已收敛",
+                            },
+                            "agent_name": {
+                                "type": "string",
+                                "description": "decision=next 时填，必须是候选人之一的 name",
+                            },
+                            "reason": {"type": "string"},
+                        },
+                        "required": ["decision"],
+                    },
+                },
+            }
         ]
-        hist_lines: list[str] = []
-        for msg in history[-15:]:
-            speaker = (
-                name_by_id.get(msg.sender_agent_id, "未知 Agent")
-                if msg.sender_agent_id
-                else "用户"
-            )
-            hist_lines.append(f"{speaker}: {msg.content}")
 
-        prompt = (
-            "候选成员：\n"
-            + "\n".join(cand_lines)
-            + "\n\n群聊记录（按时间顺序）：\n---\n"
-            + "\n".join(hist_lines)
-            + "\n---\n\n请通过 select_next_speaker 工具返回决策。"
-        )
-        return system, prompt
+        try:
+            resp = await client.chat.completions.create(
+                model=self._model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt},
+                ],
+                tools=tools,
+                tool_choice={
+                    "type": "function",
+                    "function": {"name": "select_next_speaker"},
+                },
+                max_tokens=512,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Selector %s 调用失败，降级 DONE: %s", self._provider, exc
+            )
+            return SelectorDecision.finish(f"llm error: {exc.__class__.__name__}")
+
+        return self._parse_openai_response(resp, candidates)
 
     @staticmethod
-    def _parse_llm_response(
-        resp: anthropic.types.Message, candidates: list[Agent]
+    def _parse_openai_response(
+        resp: object, candidates: list[Agent]
     ) -> SelectorDecision:
-        tool_use = next(
-            (b for b in resp.content if getattr(b, "type", None) == "tool_use"),
-            None,
-        )
-        if tool_use is None:
-            logger.warning("Selector LLM 未返回 tool_use，降级 DONE")
-            return SelectorDecision.finish("no tool_use")
+        import json as _json
 
-        payload = tool_use.input or {}
+        choice = resp.choices[0]  # type: ignore[union-attr]
+        msg = choice.message
+        if not msg.tool_calls:
+            logger.warning("Selector OpenAI 未返回 tool_calls，降级 DONE")
+            return SelectorDecision.finish("no tool_calls")
+
+        tc = msg.tool_calls[0]
+        try:
+            payload = _json.loads(tc.function.arguments)
+        except (_json.JSONDecodeError, AttributeError) as exc:
+            logger.warning("Selector OpenAI tool_calls 参数解析失败: %s", exc)
+            return SelectorDecision.finish("tool_calls parse error")
+
         decision = payload.get("decision")
-        reason = payload.get("reason", "")
+        reason: str = payload.get("reason", "")
 
         if decision == "done":
             return SelectorDecision.finish(f"llm done: {reason}")

@@ -74,6 +74,7 @@ class DiscussionOrchestrator:
         """运行讨论循环，逐 StreamEvent yield。"""
         max_round = settings.max_discussion_rounds
         already_spoken: set[UUID] = set()
+        pending_mentions: list[UUID] = []
         last_msg_for_history: Message = trigger
 
         for round_no in range(max_round):
@@ -86,18 +87,43 @@ class DiscussionOrchestrator:
             # 2. 取最近 history（含本轮已发言）
             history = await self._fetch_history(session, since=trigger)
 
-            # 3. Selector 决策
-            decision = await self._sel.pick(
-                members=members,
-                history=history,
-                already_spoken=already_spoken,
-            )
+            # 3. Selector 决策（pending_mentions 非空时优先出队）
+            decision: SelectorDecision | None = None
+            while pending_mentions:
+                next_id = pending_mentions.pop(0)
+                if next_id in already_spoken:
+                    continue
+                hit = await self._agents.get_by_id(next_id)
+                if hit is None:
+                    continue
+                decision = SelectorDecision.pick(
+                    next_id,
+                    reason="@mention queue",
+                    mention_queue=tuple(pending_mentions),
+                )
+                break
+
+            if decision is None:
+                decision = await self._sel.pick(
+                    members=members,
+                    history=history,
+                    already_spoken=already_spoken,
+                )
+
+            # 合并 Selector 返回的新 mention_queue 到 pending
+            if decision.mention_queue:
+                # 去重：已在 pending 或已发言的不重复入队
+                for mid in decision.mention_queue:
+                    if mid not in pending_mentions and mid not in already_spoken:
+                        pending_mentions.append(mid)
+
             logger.info(
-                "讨论 round=%d session=%s decision=%s reason=%s",
+                "讨论 round=%d session=%s decision=%s reason=%s pending=%d",
                 round_no,
                 session.id,
                 decision.next_agent_id or "DONE",
                 decision.reason,
+                len(pending_mentions),
             )
             if decision.done or decision.next_agent_id is None:
                 return

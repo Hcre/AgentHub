@@ -46,7 +46,10 @@ class Settings(BaseSettings):
 
     # --- 讨论模式 ---
     max_discussion_rounds: int = 3            # DiscussionOrchestrator 硬上限
-    selector_model: str = "claude-haiku-4-5-20251001"  # Selector 廉价模型
+    selector_model: str = "deepseek-chat"     # Selector 廉价模型（默认 DeepSeek V4 Flash）
+    selector_provider: Literal["anthropic", "deepseek", "openai"] = "deepseek"
+    deepseek_api_key: str = ""                # DeepSeek API Key
+    selector_max_prompt_chars: int = 4000     # Selector prompt 总字符上限
 
     # --- CORS ---
     cors_origins: str = "http://localhost:5173"
