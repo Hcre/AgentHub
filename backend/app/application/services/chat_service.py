@@ -1,9 +1,7 @@
-"""ChatService（L3）：MVP 核心 —— 发送消息 + 流式输出 + L1 记忆。
+"""ChatService（L3）：MVP 核心 —— 发送消息 + 流式输出。
 
-数据流（架构文档 S11/S12/S22）：
-  持久化用户消息 → 写入 L1 滑动窗口 → 构造带记忆的 AgentRequest
-  → 适配器流式产出 StreamEvent（逐事件 yield 给 WS）
-  → 完成时落库 assistant 消息 + 写入 L1。
+CLI 模式：CLI 通过 --resume 管理自己的对话历史，AgentHub 不维护 L1。
+API 模式（未实现）：由适配器自行管理消息上下文。
 """
 
 from __future__ import annotations
@@ -27,7 +25,6 @@ from app.domain.events import (
 )
 from app.domain.llm.protocol import (
     AgentRequest,
-    MemoryContext,
     StreamEvent,
     StreamEventType,
     UnifiedAgent,
@@ -37,7 +34,6 @@ from app.domain.repositories import (
     MessageRepository,
     SessionRepository,
 )
-from app.infrastructure.cache.memory_l1 import L1MemoryStore
 from app.infrastructure.llm.factory import build_adapter_for_agent
 
 logger = logging.getLogger(__name__)
@@ -69,19 +65,17 @@ class ChatService:
         session_repo: SessionRepository,
         message_repo: MessageRepository,
         agent_repo: AgentRepository,
-        l1_memory: L1MemoryStore,
         llm: UnifiedAgent,
         event_bus: EventBus,
     ) -> None:
         self._sessions = session_repo
         self._messages = message_repo
         self._agents = agent_repo
-        self._l1 = l1_memory
         self._llm = llm
         self._bus = event_bus
 
     async def send_and_stream(self, cmd: SendMessageCommand) -> AsyncIterator[StreamEvent]:
-        """发送用户消息并流式返回 Agent 响应。供 WS 处理器消费后推送前端。"""
+        """发送用户消息并流式返回 Agent 响应。"""
         session = await self._sessions.get_by_id(cmd.session_id)
         if session is None:
             raise NotFoundError(f"会话不存在: {cmd.session_id}")
@@ -95,7 +89,6 @@ class ChatService:
             reply_to=cmd.reply_to,
         )
         await self._messages.save(user_msg)
-        await self._l1.append(cmd.session_id, {"role": "user", "content": cmd.content})
         await self._bus.publish(
             MessageSent(
                 session_id=cmd.session_id,
@@ -114,9 +107,7 @@ class ChatService:
             raise NotFoundError(f"Agent 不存在: {agent_id}")
         adapter = build_adapter_for_agent(agent)
 
-        # 4. 构造带 L1 记忆的请求
-        window = await self._l1.get_window(cmd.session_id)
-
+        # 4. 构造请求（CLI 模式由 --resume 管理历史，API 模式由适配器管理）
         # 注入 skill 内容到 system prompt
         skill_content = _load_skill_content(agent.skills or [])
         system_prompt = agent.system_prompt or ""
@@ -126,9 +117,8 @@ class ChatService:
         request = AgentRequest(
             request_id=str(uuid.uuid4()),
             session_id=cmd.session_id,
-            messages=window,
-            system_prompt=system_prompt or None,
-            memory=MemoryContext(l1_working=window),
+            messages=[{"role": "user", "content": cmd.content}],
+            system_prompt=system_prompt,
             max_tokens=settings_max_tokens(),
         )
 
@@ -186,7 +176,6 @@ class ChatService:
         assistant_msg.content = full
         assistant_msg.status = MessageStatus.COMPLETED
         await self._messages.save(assistant_msg)
-        await self._l1.append(cmd.session_id, {"role": "assistant", "content": full})
         await self._bus.publish(
             StreamingCompleted(session_id=cmd.session_id, message_id=assistant_msg.id)
         )
