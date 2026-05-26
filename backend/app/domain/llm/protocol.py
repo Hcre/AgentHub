@@ -32,7 +32,7 @@ class AgentRequest(BaseModel):
     # 群聊上下文（私聊场景留空，CLI session key 等据此分流）
     agent_id: UUID | None = None       # 本次调用的目标 Agent（群聊必填）
     group_id: UUID | None = None       # 所在群组（群聊必填）
-    is_group_chat: bool = False        # 群聊标识；True 时 CLI key = {session_id}:{agent_id}
+    is_group_chat: bool = False        # 群聊标识；True 时 CLI key = uuid5(session_id:agent_id)
 
 
 class StreamEventType(StrEnum):

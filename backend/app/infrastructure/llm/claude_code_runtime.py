@@ -6,7 +6,8 @@
 会话持久化策略（利用 CLI 自带 session 机制，不自己拼历史）：
 - 先尝试 --resume <session_id> 恢复对话
 - CLI 返回 "No conversation found" 时 fallback --session-id 新建
-- session_id 直接复用 AgentHub 的 session UUID
+- 私聊：session_key = session_id（UUID）
+- 群聊：session_key = uuid5(session_id:agent_id)（确定性映射，CLI 只接受合法 UUID）
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import asyncio
 import json
 import logging
 import os
+import uuid
 from collections.abc import AsyncIterator
 
 from app.domain.llm.protocol import (
@@ -56,7 +58,11 @@ class ClaudeCodeRuntime(AgentRuntime):
         self._process: asyncio.subprocess.Process | None = None
 
     async def stream(self, request: AgentRequest) -> AsyncIterator[StreamEvent]:
-        """先 resume，找不到 session 时 fallback 新建。"""
+        """先 resume，找不到 session 时 fallback 新建。
+
+        群聊 session key 通过 uuid5 确定性映射为合法 UUID，
+        --resume / --session-id 均接受合法 UUID，无需特殊处理。
+        """
         logger.info("Claude CLI request_id=%s session=%s", request.request_id, request.session_id)
         prompt = self._extract_prompt(request)
         session_key = self._compute_session_key(request)
@@ -188,12 +194,11 @@ class ClaudeCodeRuntime(AgentRuntime):
         """CLI session key 计算。
 
         私聊：session_id（单 Agent 占用整个 session）
-        群聊：{session_id}:{agent_id}（每 Agent 独立 sqlite，避免互相覆盖）
-
-        见 docs/design/group-chat_群聊功能设计方案.md §4.1。
+        群聊：uuid5(session_id:agent_id)，确定性映射为合法 UUID
+              （CLI --session-id / --resume 均要求合法 UUID，见 §4.1）
         """
         if request.is_group_chat and request.agent_id is not None:
-            return f"{request.session_id}:{request.agent_id}"
+            return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{request.session_id}:{request.agent_id}"))
         return str(request.session_id)
 
     async def _read_lines_with_timeout(self, stdout: asyncio.StreamReader) -> AsyncIterator[str]:
