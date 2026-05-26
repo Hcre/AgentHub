@@ -79,6 +79,24 @@ class PostgresMessageRepository(MessageRepository):
         rows = (await self._s.execute(stmt)).scalars().all()
         return [_to_domain(m) for m in reversed(rows)]  # 返回正序
 
+    async def list_after(
+        self, session_id: UUID, after_message_id: UUID, *, limit: int = 100
+    ) -> list[Message]:
+        anchor = await self._s.get(MessageModel, after_message_id)
+        if anchor is None:
+            return []
+        stmt = (
+            select(MessageModel)
+            .where(
+                MessageModel.session_id == session_id,
+                MessageModel.created_at > anchor.created_at,
+            )
+            .order_by(MessageModel.created_at.asc())
+            .limit(limit)
+        )
+        rows = (await self._s.execute(stmt)).scalars().all()
+        return [_to_domain(m) for m in rows]
+
     async def set_pinned(self, message_id: UUID, pinned: bool) -> None:
         m = await self._s.get(MessageModel, message_id)
         if m is not None:
