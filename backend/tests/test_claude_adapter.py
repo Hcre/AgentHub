@@ -116,7 +116,9 @@ class TestClaudeAdapterStream:
         types = [e.type for e in collected]
         assert StreamEventType.TEXT in types
         assert types[-1] == StreamEventType.DONE
-        text_content = "".join(e.content for e in collected if e.type == StreamEventType.TEXT and e.content)
+        text_content = "".join(
+            e.content for e in collected if e.type == StreamEventType.TEXT and e.content
+        )
         assert text_content == "Hello world"
 
     @pytest.mark.asyncio
@@ -159,9 +161,7 @@ class TestClaudeAdapterStream:
 
         adapter = ClaudeAdapter(api_key="sk-test", model="test-model")
 
-        with patch.object(
-            adapter._client.messages, "stream", side_effect=ValueError("bad input")
-        ):
+        with patch.object(adapter._client.messages, "stream", side_effect=ValueError("bad input")):
             req = AgentRequest(
                 request_id="test",
                 session_id="00000000-0000-0000-0000-000000000001",
@@ -197,7 +197,7 @@ class TestClaudeAdapterStream:
             )
             collected = [e async for e in adapter.stream(req)]
 
-        done = [e for e in collected if e.type == StreamEventType.DONE][0]
+        done = next(e for e in collected if e.type == StreamEventType.DONE)
         assert done.metadata["token_usage"] == {"input_tokens": 10, "output_tokens": 5}
         assert done.metadata["model"] == "test-model"
 
@@ -228,27 +228,33 @@ def _make_mock_text_events(
     events.append(msg_start)
 
     # content_block_start (text)
-    events.append(_mock_obj(
-        type="content_block_start",
-        content_block=_mock_obj(type="text"),
-    ))
+    events.append(
+        _mock_obj(
+            type="content_block_start",
+            content_block=_mock_obj(type="text"),
+        )
+    )
 
     # text deltas
     for t in texts:
-        events.append(_mock_obj(
-            type="content_block_delta",
-            delta=_mock_obj(type="text_delta", text=t),
-        ))
+        events.append(
+            _mock_obj(
+                type="content_block_delta",
+                delta=_mock_obj(type="text_delta", text=t),
+            )
+        )
 
     # content_block_stop
     events.append(_mock_obj(type="content_block_stop"))
 
     # message_delta
-    events.append(_mock_obj(
-        type="message_delta",
-        usage=_mock_obj(output_tokens=output_tokens),
-        delta=_mock_obj(stop_reason="end_turn"),
-    ))
+    events.append(
+        _mock_obj(
+            type="message_delta",
+            usage=_mock_obj(output_tokens=output_tokens),
+            delta=_mock_obj(stop_reason="end_turn"),
+        )
+    )
 
     return events
 
@@ -258,32 +264,40 @@ def _make_mock_tool_events(tool_name: str, tool_input_json: str) -> list:
     events = []
 
     # message_start
-    events.append(_mock_obj(
-        type="message_start",
-        message=_mock_obj(usage=_mock_obj(input_tokens=15)),
-    ))
+    events.append(
+        _mock_obj(
+            type="message_start",
+            message=_mock_obj(usage=_mock_obj(input_tokens=15)),
+        )
+    )
 
     # content_block_start (tool_use)
-    events.append(_mock_obj(
-        type="content_block_start",
-        content_block=_mock_obj(type="tool_use", name=tool_name, id="call_123"),
-    ))
+    events.append(
+        _mock_obj(
+            type="content_block_start",
+            content_block=_mock_obj(type="tool_use", name=tool_name, id="call_123"),
+        )
+    )
 
     # input_json_delta
-    events.append(_mock_obj(
-        type="content_block_delta",
-        delta=_mock_obj(type="input_json_delta", partial_json=tool_input_json),
-    ))
+    events.append(
+        _mock_obj(
+            type="content_block_delta",
+            delta=_mock_obj(type="input_json_delta", partial_json=tool_input_json),
+        )
+    )
 
     # content_block_stop
     events.append(_mock_obj(type="content_block_stop"))
 
     # message_delta
-    events.append(_mock_obj(
-        type="message_delta",
-        usage=_mock_obj(output_tokens=10),
-        delta=_mock_obj(stop_reason="tool_use"),
-    ))
+    events.append(
+        _mock_obj(
+            type="message_delta",
+            usage=_mock_obj(output_tokens=10),
+            delta=_mock_obj(stop_reason="tool_use"),
+        )
+    )
 
     return events
 

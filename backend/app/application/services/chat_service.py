@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from collections.abc import AsyncIterator
 
@@ -46,6 +47,26 @@ from app.infrastructure.llm.factory import build_adapter_for_agent
 
 logger = logging.getLogger(__name__)
 
+SKILLS_DIR = "/skills"
+
+
+def _load_skill_content(skill_names: list[str]) -> str:
+    """读取 skill 文件内容，拼接为 system prompt 片段。"""
+    if not skill_names or not os.path.isdir(SKILLS_DIR):
+        return ""
+    parts: list[str] = []
+    for name in skill_names:
+        path = os.path.join(SKILLS_DIR, name, "SKILL.md")
+        if os.path.isfile(path):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    content = f.read().strip()
+                    if content:
+                        parts.append(f"## Skill: {name}\n\n{content}")
+            except OSError:
+                logger.warning("无法读取 skill 文件: %s", path)
+    return "\n\n---\n\n".join(parts) if parts else ""
+
 
 class ChatService:
     def __init__(
@@ -72,10 +93,8 @@ class ChatService:
         self._llm = llm  # 全局默认，per-agent 覆盖时优先
         self._bus = event_bus
 
-    async def send_and_stream(
-        self, cmd: SendMessageCommand
-    ) -> AsyncIterator[StreamEvent]:
-        """发送用户消息并流式返回 Agent 响应。供 WS 处理器消费后推送前端。"""
+    async def send_and_stream(self, cmd: SendMessageCommand) -> AsyncIterator[StreamEvent]:
+        """发送用户消息并流式返回 Agent 响应。"""
         session = await self._sessions.get_by_id(cmd.session_id)
         if session is None:
             raise NotFoundError(f"会话不存在: {cmd.session_id}")

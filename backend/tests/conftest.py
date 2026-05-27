@@ -6,9 +6,7 @@ import base64
 import os
 
 # 必须在导入 app.* 之前设置环境变量（settings 启动即读取并缓存）
-os.environ.setdefault(
-    "SECRET_KEY", base64.b64encode(b"0" * 32).decode("ascii")
-)
+os.environ.setdefault("SECRET_KEY", base64.b64encode(b"0" * 32).decode("ascii"))
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("LLM_ADAPTER_MODE", "mock")
 os.environ.setdefault("ENV", "test")

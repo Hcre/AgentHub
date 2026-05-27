@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import { nowStamp, uid } from '../lib/id'
 import type {
   ChatMessage,
@@ -47,7 +48,9 @@ interface ChatState {
   toggleStage: (agentId: string, conversationId: string, taskId: string) => void
 }
 
-export const useChatStore = create<ChatState>((set, get) => ({
+export const useChatStore = create<ChatState>()(
+  persist(
+    (set, get) => ({
   messages: {},
   conversations: {},
   typing: {},
@@ -162,4 +165,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     }))
   },
-}))
+}),
+    {
+      name: 'agenthub-chat',
+      partialize: (state) => ({
+        messages: state.messages,
+        conversations: state.conversations,
+        sessionIds: state.sessionIds,
+      }),
+    },
+  ),
+)

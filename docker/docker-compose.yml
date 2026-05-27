@@ -38,6 +38,8 @@ services:
     build:
       context: ../backend
       dockerfile: Dockerfile
+    volumes:
+      - ../.agenthub/skills:/skills
     env_file:
       - ../.env
     environment:
@@ -77,8 +79,11 @@ services:
     build:
       context: ../frontend
       dockerfile: Dockerfile
+    depends_on:
+      backend:
+        condition: service_started
     ports:
-      - "5173:80"
+      - "5174:80"
 
 volumes:
   pg_data:
