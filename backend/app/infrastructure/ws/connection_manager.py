@@ -37,7 +37,7 @@ class ConnectionManager:
         for ws in list(self._rooms.get(session_id, set())):
             try:
                 await ws.send_json(payload)
-            except Exception:  # noqa: BLE001 - 连接异常即清理
+            except Exception:  # - 连接异常即清理
                 dead.append(ws)
         for ws in dead:
             await self.disconnect(session_id, ws)

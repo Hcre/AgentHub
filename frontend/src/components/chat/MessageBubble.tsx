@@ -35,12 +35,12 @@ export function MessageBubble({
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeHighlight]}
               components={{
-                pre: ({ children }) => (
+                pre: ({ children }: any) => (
                   <pre className="overflow-x-auto rounded-lg border bg-muted/40 p-3 text-[12px]">
                     {children}
                   </pre>
                 ),
-                code: ({ className, children, ...props }) => {
+                code: ({ className, children, ...props }: any) => {
                   const isInline = !className
                   return isInline ? (
                     <code className="rounded bg-muted/60 px-1 py-0.5 text-[12px] font-mono" {...props}>
@@ -52,7 +52,7 @@ export function MessageBubble({
                     </code>
                   )
                 },
-                a: ({ href, children }) => (
+                a: ({ href, children }: any) => (
                   <a href={href} target="_blank" rel="noopener" className="text-brand underline">
                     {children}
                   </a>

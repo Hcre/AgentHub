@@ -1,9 +1,9 @@
 import { Avatar, Badge, Button, Icon } from '../ui'
 import { lookupActor } from './actors'
-import type { CoordinatorPlan as Plan } from '../../types'
+import type { CoordinatorPlan as Plan, Group } from '../../types'
 
 /** 协调者的结构化分发方案卡。 */
-export function CoordinatorPlan({ plan }: { plan: Plan }) {
+export function CoordinatorPlan({ plan, group }: { plan: Plan; group?: Group }) {
   return (
     <div className="mt-2 overflow-hidden rounded-xl border bg-card">
       <header className="flex items-center gap-2 border-b border-border/70 bg-brand/5 px-4 py-2.5">
@@ -21,7 +21,7 @@ export function CoordinatorPlan({ plan }: { plan: Plan }) {
       </div>
       <ol className="divide-y border-t">
         {plan.steps.map((s) => {
-          const a = lookupActor(s.who)
+          const a = lookupActor(s.who, group)
           return (
             <li
               key={s.id}

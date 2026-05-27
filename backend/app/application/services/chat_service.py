@@ -1,45 +1,71 @@
-"""ChatService（L3）：MVP 核心 —— 发送消息 + 流式输出 + L1 记忆。
+"""ChatService（L3）：私聊 + 群聊统一入口。
 
-数据流（架构文档 S11/S12/S22）：
-  持久化用户消息 → 写入 L1 滑动窗口 → 构造带记忆的 AgentRequest
-  → 适配器流式产出 StreamEvent（逐事件 yield 给 WS）
-  → 完成时落库 assistant 消息 + 写入 L1。
+数据流（架构文档 S11/S12/S22 + group-chat 设计文档 §3）：
+  持久化用户消息 → 写 L1 滑动窗口 → 路由目标 Agent(s)
+  → 对每个 Agent: ContextBuilder.build_for_agent → 适配器流式
+  → 完成时落库 + 推进 watermark + 重写 L1
+
+群聊路由：
+  - 用户 @ Agent → V1 串行执行（list[Agent]）
+  - 群组 dispatch_mode == DISCUSSION 且无 @ → 进入讨论循环（Phase 6 接入）
+  - 其余 → 死群静默（仅广播用户消息）
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from collections.abc import AsyncIterator
 
 from app.application.commands import SendMessageCommand
-from app.core.config import settings
+from app.application.services.context_builder import ContextBuilder
+from app.application.services.discussion_orchestrator import DiscussionOrchestrator
 from app.core.events import EventBus
-from app.core.exceptions import DomainError, NotFoundError
+from app.core.exceptions import NotFoundError
+from app.domain.entities.agent import Agent
+from app.domain.entities.group import Group
 from app.domain.entities.message import Message
-from app.domain.enums import MessageRole, MessageStatus, SessionType
+from app.domain.entities.session import Session
+from app.domain.enums import DispatchMode, MessageRole, MessageStatus, SessionType
 from app.domain.events import (
     MessageSent,
     StreamingCompleted,
     StreamingFailed,
     StreamingStarted,
 )
-from app.domain.llm.protocol import (
-    AgentRequest,
-    MemoryContext,
-    StreamEvent,
-    StreamEventType,
-    UnifiedAgent,
-)
+from app.domain.llm.protocol import StreamEvent, StreamEventType, UnifiedAgent
 from app.domain.repositories import (
     AgentRepository,
+    GroupRepository,
     MessageRepository,
     SessionRepository,
 )
 from app.infrastructure.cache.memory_l1 import L1MemoryStore
+from app.infrastructure.cache.watermark_store import WatermarkStore
 from app.infrastructure.llm.factory import build_adapter_for_agent
 
 logger = logging.getLogger(__name__)
+
+SKILLS_DIR = "/skills"
+
+
+def _load_skill_content(skill_names: list[str]) -> str:
+    """读取 skill 文件内容，拼接为 system prompt 片段。"""
+    if not skill_names or not os.path.isdir(SKILLS_DIR):
+        return ""
+    parts: list[str] = []
+    for name in skill_names:
+        path = os.path.join(SKILLS_DIR, name, "SKILL.md")
+        if os.path.isfile(path):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    content = f.read().strip()
+                    if content:
+                        parts.append(f"## Skill: {name}\n\n{content}")
+            except OSError:
+                logger.warning("无法读取 skill 文件: %s", path)
+    return "\n\n---\n\n".join(parts) if parts else ""
 
 
 class ChatService:
@@ -48,99 +74,167 @@ class ChatService:
         session_repo: SessionRepository,
         message_repo: MessageRepository,
         agent_repo: AgentRepository,
+        group_repo: GroupRepository,
         l1_memory: L1MemoryStore,
+        watermarks: WatermarkStore,
+        context_builder: ContextBuilder,
+        discussion: DiscussionOrchestrator,
         llm: UnifiedAgent,
         event_bus: EventBus,
     ) -> None:
         self._sessions = session_repo
         self._messages = message_repo
         self._agents = agent_repo
+        self._groups = group_repo
         self._l1 = l1_memory
+        self._wm = watermarks
+        self._ctx = context_builder
+        self._discussion = discussion
         self._llm = llm  # 全局默认，per-agent 覆盖时优先
         self._bus = event_bus
 
-    async def send_and_stream(
-        self, cmd: SendMessageCommand
-    ) -> AsyncIterator[StreamEvent]:
-        """发送用户消息并流式返回 Agent 响应。供 WS 处理器消费后推送前端。"""
+    async def send_and_stream(self, cmd: SendMessageCommand) -> AsyncIterator[StreamEvent]:
+        """发送用户消息并流式返回 Agent 响应。"""
         session = await self._sessions.get_by_id(cmd.session_id)
         if session is None:
             raise NotFoundError(f"会话不存在: {cmd.session_id}")
 
-        # 1. 持久化用户消息
-        user_msg = Message(
-            session_id=cmd.session_id,
-            role=MessageRole.USER,
-            content=cmd.content,
-            mentions=cmd.mentions,
-            reply_to=cmd.reply_to,
-        )
-        await self._messages.save(user_msg)
-        await self._l1.append(
-            cmd.session_id, {"role": "user", "content": cmd.content}
-        )
-        await self._bus.publish(
-            MessageSent(
-                session_id=cmd.session_id,
-                message_id=user_msg.id,
-                role="user",
-                content_type="text",
-            )
-        )
+        # 1. 持久化用户消息 + L1 + 广播
+        user_msg = await self._persist_user_message(session, cmd)
 
-        # 2. 解析目标 Agent（MVP：私聊固定 session.agent_id）
-        agent_id = self._resolve_target_agent(session)
+        # 2. 分流：私聊 / 群聊
+        if session.type == SessionType.PRIVATE:
+            async for evt in self._handle_private(session, user_msg):
+                yield evt
+            return
 
-        # 3. 按 Agent 构造适配器（per-agent 路由）
-        agent = await self._agents.get_by_id(agent_id)
+        # 群聊：必须能查到 Group
+        if session.group_id is None:
+            logger.warning("群聊 session 无 group_id: %s", session.id)
+            return
+        group = await self._groups.get_by_id(session.group_id)
+        if group is None:
+            logger.warning("群组不存在: %s", session.group_id)
+            return
+
+        async for evt in self._handle_group(session, group, user_msg):
+            yield evt
+
+    # --- 私聊路径（向后兼容） ---
+
+    async def _handle_private(
+        self, session: Session, trigger: Message
+    ) -> AsyncIterator[StreamEvent]:
+        if session.agent_id is None:
+            raise NotFoundError(f"私聊会话缺少 agent_id: {session.id}")
+        agent = await self._agents.get_by_id(session.agent_id)
         if agent is None:
-            raise NotFoundError(f"Agent 不存在: {agent_id}")
-        adapter = build_adapter_for_agent(agent)
+            raise NotFoundError(f"Agent 不存在: {session.agent_id}")
+        async for evt in self._stream_one_agent(
+            session=session, group=None, target=agent, trigger=trigger
+        ):
+            yield evt
 
-        # 4. 构造带 L1 记忆的请求
-        window = await self._l1.get_window(cmd.session_id)
-        request = AgentRequest(
-            request_id=str(uuid.uuid4()),
-            session_id=cmd.session_id,
-            messages=window,
-            system_prompt=agent.system_prompt,
-            memory=MemoryContext(l1_working=window),
-            max_tokens=settings_max_tokens(),
+    # --- 群聊路径 ---
+
+    async def _handle_group(
+        self, session: Session, group: Group, trigger: Message
+    ) -> AsyncIterator[StreamEvent]:
+        # 解析 @ 提及
+        targets = await self._resolve_mentions(trigger.mentions, group)
+
+        if targets:
+            # V1 串行：逐个 Agent 处理
+            for target in targets:
+                async for evt in self._stream_one_agent(
+                    session=session, group=group, target=target, trigger=trigger
+                ):
+                    yield evt
+            return
+
+        # 无 @：根据群组模式决定
+        mode = group.dispatch_mode
+        if mode == DispatchMode.DISCUSSION:
+            async for evt in self._discussion.run_discussion(
+                session=session, group=group, trigger=trigger
+            ):
+                yield evt
+            return
+
+        # AT_ROUTING / 其他：死群静默（设计决策见实施计划 §六）
+        logger.debug("群组 %s 无 @ 提及，静默处理", group.id)
+
+    async def _resolve_mentions(
+        self, mention_names: list[str], group: Group
+    ) -> list[Agent]:
+        """按 @name 解析为 Agent 实体（跳过不存在 / 不在群成员的）。"""
+        if not mention_names:
+            return []
+        valid_ids = {*group.member_ids, group.coordinator_id}
+        resolved: list[Agent] = []
+        seen: set[uuid.UUID] = set()
+        for name in mention_names:
+            agent = await self._agents.get_by_name(name)
+            if agent is None:
+                logger.debug("@%s 解析失败：Agent 不存在", name)
+                continue
+            if agent.id not in valid_ids:
+                logger.debug("@%s 解析失败：Agent 不在群成员", name)
+                continue
+            if agent.id in seen:
+                continue
+            resolved.append(agent)
+            seen.add(agent.id)
+        return resolved
+
+    # --- 公共：单 Agent 流式执行 + 落库 + 推 watermark ---
+
+    async def _stream_one_agent(
+        self,
+        *,
+        session: Session,
+        group: Group | None,
+        target: Agent,
+        trigger: Message,
+    ) -> AsyncIterator[StreamEvent]:
+        request = await self._ctx.build_for_agent(
+            session=session, group=group, target_agent=target, trigger=trigger
         )
+        adapter = build_adapter_for_agent(target)
 
-        # 5. 流式执行
         assistant_msg = Message(
-            session_id=cmd.session_id,
+            session_id=session.id,
             role=MessageRole.ASSISTANT,
             content="",
-            sender_agent_id=agent_id,
+            sender_agent_id=target.id,
             status=MessageStatus.STREAMING,
         )
         await self._bus.publish(
-            StreamingStarted(session_id=cmd.session_id, message_id=assistant_msg.id)
+            StreamingStarted(session_id=session.id, message_id=assistant_msg.id)
         )
 
         buffer: list[str] = []
         last_event: StreamEvent | None = None
         try:
-            async for event in adapter.stream(request):
+            async for raw_event in adapter.stream(request):
+                event = self._tag_sender(raw_event, target.id)
                 if event.type == StreamEventType.TEXT and event.content:
                     buffer.append(event.content)
                 last_event = event
                 yield event
-        except Exception as exc:  # noqa: BLE001 - 边界统一兜底
-            logger.exception("流式执行失败")
+        except Exception as exc:
+            logger.exception("流式执行失败 agent=%s", target.id)
             assistant_msg.status = MessageStatus.FAILED
             await self._bus.publish(
                 StreamingFailed(
-                    session_id=cmd.session_id,
+                    session_id=session.id,
                     message_id=assistant_msg.id,
                     error=str(exc),
                 )
             )
             raise
 
-        # 6. 权限阻断检测
+        # 权限阻断
         if (
             last_event
             and last_event.type == StreamEventType.DONE
@@ -152,32 +246,56 @@ class ChatService:
                 content="以下操作被安全策略阻断",
                 metadata={
                     "message_id": str(assistant_msg.id),
-                    "session_id": str(cmd.session_id),
+                    "session_id": str(session.id),
                     "denied_ops": last_event.metadata["permission_denials"],
                 },
+                sender_agent_id=target.id,
             )
 
-        # 7. 完成：落库 + 写 L1
+        # 落库 + 推进 watermark + L1
         full = "".join(buffer)
         assistant_msg.content = full
         assistant_msg.status = MessageStatus.COMPLETED
         await self._messages.save(assistant_msg)
         await self._l1.append(
-            cmd.session_id, {"role": "assistant", "content": full}
+            session.id, {"role": "assistant", "content": full}
         )
+        if group is not None:
+            await self._wm.set(group.id, target.id, assistant_msg.id)
         await self._bus.publish(
             StreamingCompleted(
-                session_id=cmd.session_id, message_id=assistant_msg.id
+                session_id=session.id, message_id=assistant_msg.id
             )
         )
 
+    # --- 工具 ---
+
+    async def _persist_user_message(
+        self, session: Session, cmd: SendMessageCommand
+    ) -> Message:
+        msg = Message(
+            session_id=session.id,
+            role=MessageRole.USER,
+            content=cmd.content,
+            mentions=cmd.mentions,
+            reply_to=cmd.reply_to,
+        )
+        await self._messages.save(msg)
+        await self._l1.append(
+            session.id, {"role": "user", "content": cmd.content}
+        )
+        await self._bus.publish(
+            MessageSent(
+                session_id=session.id,
+                message_id=msg.id,
+                role="user",
+                content_type="text",
+            )
+        )
+        return msg
+
     @staticmethod
-    def _resolve_target_agent(session) -> uuid.UUID:  # type: ignore[no-untyped-def]
-        if session.type == SessionType.PRIVATE and session.agent_id:
-            return session.agent_id
-        # 群聊路由（@指定 / @协调者 / 自动检测）在 M3 实现
-        raise DomainError("MVP 仅支持私聊单 Agent；群聊路由待 M3")
-
-
-def settings_max_tokens() -> int:
-    return settings.max_tokens
+    def _tag_sender(event: StreamEvent, sender_id: uuid.UUID) -> StreamEvent:
+        if event.sender_agent_id is None:
+            return event.model_copy(update={"sender_agent_id": sender_id})
+        return event

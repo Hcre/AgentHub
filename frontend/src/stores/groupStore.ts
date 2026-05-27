@@ -1,112 +1,90 @@
 import { create } from 'zustand'
-import { agents } from '../data/mock'
-import { coordinator, groupMessages, groups } from '../data/groups'
 import { groupsApi, type CreateGroupInput } from '../api/groups'
+import { sessionsApi, type MessageOut } from '../api/sessions'
 import { nowStamp, uid } from '../lib/id'
-import type { ApiGroup, Group, GroupMessage } from '../types'
+import type { ApiGroup, Group, GroupMessage, StreamEvent } from '../types'
 
 export interface SendGroupOptions {
   requiresApproval?: boolean
 }
 
-// ════════════════════════════════════════════════════════════════════
-// MOCK SEAM — 假群聊的全部"智能"都在这里。
-// 真实接入时：删掉 simulateGroupReply，sendGroup 改为 POST /api/groups/{id}/messages
-// （或 WS 发送），协调者/成员的回复由后端推送，前端只负责把推来的 GroupMessage
-//  append 到 messagesByGroup。详见 src/components/group/HANDOFF.md。
-// ════════════════════════════════════════════════════════════════════
+/** 流式哨兵 id 前缀；按 sender 区分多人独立聚合。 */
+const streamingKey = (groupId: string, senderId: string) =>
+  `__streaming__${groupId}:${senderId}`
 
 /** 解析 @mention，返回被点名的名字列表（去掉 @）。 */
 function parseMentions(text: string): string[] {
   return (text.match(/@(\S+)/g) ?? []).map((m) => m.slice(1))
 }
 
-/**
- * 假协调者/成员回复。根据 @mention 决定谁回：
- * - @协调者 → 返回一份结构化分发方案（kind: 'plan'）
- * - @某成员 → 该成员 ack
- * - 无 @     → 协调者兜底 ack
- * 真实后端会用 LLM 编排替换这段；签名 (group, text) → GroupMessage 保持稳定即可平滑替换。
- */
-export function simulateGroupReply(group: Group, text: string): GroupMessage {
-  const mentioned = parseMentions(text)
-
-  if (mentioned.includes(coordinator.name) || mentioned.includes('协调者')) {
-    const members = group.members
-    return {
-      id: uid('gr'),
-      from: 'agent',
-      who: 'coordinator',
-      time: nowStamp(),
-      kind: 'plan',
-      plan: {
-        summary: '我把它拆成几个子任务并分给合适的成员，下面是分发方案（mock 数据）。',
-        steps: members.map((who, i) => ({
-          id: `s${i + 1}`,
-          who,
-          label: `${agents.find((a) => a.id === who)?.name ?? who} 负责的子任务 ${i + 1}`,
-          eta: 20 + i * 5,
-          depends: i === 0 ? [] : [`s${i}`],
-        })),
-        watchouts: ['这是占位方案，真实拆解由协调者 LLM 生成。'],
-      },
-    }
-  }
-
-  const targetName = mentioned[0]
-  const target = targetName
-    ? agents.find((a) => a.name === targetName && group.members.includes(a.id))
-    : undefined
-  if (target) {
-    return {
-      id: uid('gr'),
-      from: 'agent',
-      who: target.id,
-      time: nowStamp(),
-      text: `收到，我走一下，有结果同步到频道。`,
-    }
-  }
-
-  return {
-    id: uid('gr'),
-    from: 'agent',
-    who: 'coordinator',
-    time: nowStamp(),
-    text: '收到。我看一下上下文，20 秒后给一份拆分方案。',
-  }
-}
-// ════════════════════════════════════════════════════════════════════
-// END MOCK SEAM
-// ════════════════════════════════════════════════════════════════════
-
-/** 后端 ApiGroup → UI Group。members 仅保留 agentId（协调者已含在后端 members 内）。 */
+/** 后端 ApiGroup → UI Group。 */
 function toUiGroup(g: ApiGroup): Group {
   return {
     id: g.id,
     name: g.name,
     description: g.description,
     members: g.members.map((m) => m.id),
+    coordinatorId: g.coordinator.id,
+    coordinatorName: g.coordinator.name,
+    coordinatorRole: g.coordinator.role,
+  }
+}
+
+/** 后端 MessageOut → UI GroupMessage。 */
+function toUiMessage(m: MessageOut): GroupMessage {
+  const isUser = m.role === 'user'
+  return {
+    id: m.id,
+    from: isUser ? 'user' : 'agent',
+    who: isUser ? 'user' : (m.sender_agent_id ?? 'unknown'),
+    time: m.created_at ? formatTime(m.created_at) : nowStamp(),
+    text: m.content,
+    mentions: m.mentions,
+  }
+}
+
+function formatTime(iso: string): string {
+  try {
+    const d = new Date(iso)
+    return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  } catch {
+    return nowStamp()
   }
 }
 
 interface GroupState {
   groups: Group[]
   messagesByGroup: Record<string, GroupMessage[]>
+  /** groupId → 后端 Session id。 */
+  sessionIdsByGroup: Record<string, string>
+  /** 当前活跃群聊 WS 实例（sendGroup 取用；切群时整体替换）。 */
+  ws: WebSocket | null
+  /** WS 是否已建立连接。 */
+  connected: boolean
 
-  /** 拉后端真实群组并入列表（按 id 去重）；失败保持 seed mock。 */
+  // CRUD
   fetchGroups: () => Promise<void>
-  /** 创建群组：先同步后端取真实 UUID；后端不可用则本地降级 mock。返回新群 id。 */
   createGroup: (input: CreateGroupInput) => Promise<string>
-  /** 重命名：乐观更新本地 → 调 API；失败回滚。 */
   renameGroup: (id: string, name: string) => Promise<void>
-  /** 删除群组：乐观移除 → 调 API；失败拉回全量。 */
   deleteGroup: (id: string) => Promise<void>
+
+  // Session / 流式
+  setGroupSession: (groupId: string, sessionId: string) => void
+  loadGroupHistory: (groupId: string) => Promise<void>
+  applyGroupStreamEvent: (groupId: string, event: StreamEvent) => void
+  setWs: (ws: WebSocket | null) => void
+  setConnected: (v: boolean) => void
+
+  // 发送
   sendGroup: (groupId: string, text: string, opts?: SendGroupOptions) => void
 }
 
 export const useGroupStore = create<GroupState>((set, get) => ({
-  groups,
-  messagesByGroup: { ...groupMessages },
+  groups: [],
+  messagesByGroup: {},
+  sessionIdsByGroup: {},
+  ws: null,
+  connected: false,
 
   fetchGroups: async () => {
     try {
@@ -117,7 +95,7 @@ export const useGroupStore = create<GroupState>((set, get) => ({
         return { groups: [...s.groups, ...incoming] }
       })
     } catch {
-      // 后端不可用 → 保持 seed mock
+      // 后端不可用 → 空列表（UI 由组件层兜底引导创建群组）
     }
   },
 
@@ -128,7 +106,6 @@ export const useGroupStore = create<GroupState>((set, get) => ({
       set((s) => ({ groups: [...s.groups, group] }))
       return group.id
     } catch {
-      // 后端不可用 → 本地降级 mock，保证 UI 不卡
       const id = uid('grp')
       const group: Group = {
         id,
@@ -149,7 +126,7 @@ export const useGroupStore = create<GroupState>((set, get) => ({
     try {
       await groupsApi.rename(id, name)
     } catch {
-      set({ groups: prev }) // 回滚
+      set({ groups: prev })
     }
   },
 
@@ -162,23 +139,99 @@ export const useGroupStore = create<GroupState>((set, get) => ({
     try {
       await groupsApi.remove(id)
     } catch {
-      // 后端失败 → 拉全量以恢复准确状态
       try {
         const list = await groupsApi.list()
         set({ groups: list.map(toUiGroup) })
       } catch {
-        set({ groups: prev }) // 后端也挂了 → 回滚本地
+        set({ groups: prev })
       }
     }
   },
 
+  setGroupSession: (groupId, sessionId) =>
+    set((s) => ({
+      sessionIdsByGroup: { ...s.sessionIdsByGroup, [groupId]: sessionId },
+    })),
+
+  loadGroupHistory: async (groupId) => {
+    const sid = get().sessionIdsByGroup[groupId]
+    if (!sid) return
+    try {
+      const raw = await sessionsApi.messages(sid)
+      const msgs = raw.map(toUiMessage)
+      set((s) => ({
+        messagesByGroup: { ...s.messagesByGroup, [groupId]: msgs },
+      }))
+    } catch {
+      // 拉取失败 → 保留现有缓存
+    }
+  },
+
+  applyGroupStreamEvent: (groupId, event) => {
+    set((s) => {
+      const list = s.messagesByGroup[groupId] ?? []
+      const senderId = event.sender_agent_id ?? 'unknown'
+      const sentinelId = streamingKey(groupId, senderId)
+
+      if (event.type === 'text') {
+        const chunk = event.content ?? ''
+        if (!chunk) return {}
+        const idx = list.findIndex((m) => m.id === sentinelId)
+        if (idx >= 0) {
+          const cur = list[idx]!
+          const next = [...list]
+          next[idx] = { ...cur, text: (cur.text ?? '') + chunk }
+          return { messagesByGroup: { ...s.messagesByGroup, [groupId]: next } }
+        }
+        const seeded: GroupMessage = {
+          id: sentinelId,
+          from: 'agent',
+          who: senderId,
+          time: nowStamp(),
+          text: chunk,
+          streaming: true,
+        }
+        return {
+          messagesByGroup: { ...s.messagesByGroup, [groupId]: [...list, seeded] },
+        }
+      }
+
+      if (event.type === 'done') {
+        const next = list.map((m) =>
+          m.id === sentinelId ? { ...m, id: uid('gm'), streaming: false } : m,
+        )
+        return { messagesByGroup: { ...s.messagesByGroup, [groupId]: next } }
+      }
+
+      if (event.type === 'error') {
+        const errMsg: GroupMessage = {
+          id: uid('ge'),
+          from: 'agent',
+          who: senderId,
+          time: nowStamp(),
+          text: `⚠️ ${event.content ?? '执行出错'}`,
+        }
+        const next = list.filter((m) => m.id !== sentinelId).concat(errMsg)
+        return { messagesByGroup: { ...s.messagesByGroup, [groupId]: next } }
+      }
+
+      // thinking / tool_* / request_approval / task_plan：MVP 不渲染
+      return {}
+    })
+  },
+
+  setWs: (ws) => set({ ws }),
+  setConnected: (v) => set({ connected: v }),
+
   sendGroup: (groupId, text, opts) => {
+    const mentions = parseMentions(text)
     const userMsg: GroupMessage = {
       id: uid('gu'),
       from: 'user',
       who: 'user',
       time: nowStamp(),
       text,
+      mentions,
       requiresApproval: opts?.requiresApproval,
     }
     set((s) => ({
@@ -188,16 +241,17 @@ export const useGroupStore = create<GroupState>((set, get) => ({
       },
     }))
 
-    const group = get().groups.find((g) => g.id === groupId)
-    if (!group) return
-    window.setTimeout(() => {
-      const reply = simulateGroupReply(group, text)
-      set((s) => ({
-        messagesByGroup: {
-          ...s.messagesByGroup,
-          [groupId]: [...(s.messagesByGroup[groupId] ?? []), reply],
-        },
-      }))
-    }, 1200)
+    const ws = get().ws
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(
+        JSON.stringify({
+          type: 'message',
+          content: text,
+          mentions,
+          dispatch_mode: 'auto',
+        }),
+      )
+    }
+    // WS 未连接 → 仅本地回显，等待用户重试或后端恢复
   },
 }))

@@ -23,6 +23,17 @@ class MessageRepository(ABC):
         ...
 
     @abstractmethod
+    async def list_after(
+        self, session_id: UUID, after_message_id: UUID, *, limit: int = 100
+    ) -> list[Message]:
+        """拉取 after_message_id 之后的消息（正序，含尾部）。
+
+        群聊增量注入用（docs/design/group-chat_群聊功能设计方案.md §3.4）。
+        若 after_message_id 不存在，返回空列表（调用方应回退到首次接触路径）。
+        """
+        ...
+
+    @abstractmethod
     async def set_pinned(self, message_id: UUID, pinned: bool) -> None: ...
 
     @abstractmethod

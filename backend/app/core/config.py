@@ -40,6 +40,17 @@ class Settings(BaseSettings):
     claude_cli_timeout: int = 300
     proxy_base_url: str = "http://127.0.0.1:8000"
 
+    # --- 群聊增量注入 ---
+    max_delta_messages: int = 50              # ContextBuilder delta 上限，超过截断
+    watermark_ttl_seconds: int = 604800       # Watermark Redis TTL (7天)
+
+    # --- 讨论模式 ---
+    max_discussion_rounds: int = 3            # DiscussionOrchestrator 硬上限
+    selector_model: str = "deepseek-chat"     # Selector 廉价模型（默认 DeepSeek V4 Flash）
+    selector_provider: Literal["anthropic", "deepseek", "openai"] = "deepseek"
+    deepseek_api_key: str = ""                # DeepSeek API Key
+    selector_max_prompt_chars: int = 4000     # Selector prompt 总字符上限
+
     # --- CORS ---
     cors_origins: str = "http://localhost:5173"
 

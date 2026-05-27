@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from app.core.exceptions import DomainError
+from app.domain.enums import DispatchMode
 
 
 def _now() -> datetime:
@@ -19,7 +20,11 @@ def _now() -> datetime:
 
 @dataclass
 class Group:
-    """群组聚合根。coordinator_config 为按群模型/参数覆盖（M3 用），创建时不暴露。"""
+    """群组聚合根。coordinator_config 为按群模型/参数覆盖（M3 用），创建时不暴露。
+
+    群级 dispatch_mode 暂存 coordinator_config['dispatch_mode']（默认 AT_ROUTING），
+    避免本期新增 DB column；后续 M4 提取为独立字段。
+    """
 
     name: str
     coordinator_id: UUID
@@ -36,3 +41,17 @@ class Group:
     def validate(self) -> None:
         if not self.name or not self.name.strip():
             raise DomainError("Group name 不能为空")
+
+    @property
+    def dispatch_mode(self) -> DispatchMode:
+        raw = self.coordinator_config.get("dispatch_mode")
+        if raw is None:
+            return DispatchMode.DISCUSSION
+        try:
+            return DispatchMode(raw)
+        except ValueError:
+            return DispatchMode.AT_ROUTING
+
+    def set_dispatch_mode(self, mode: DispatchMode) -> None:
+        self.coordinator_config["dispatch_mode"] = mode.value
+        self.updated_at = _now()

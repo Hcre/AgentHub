@@ -22,10 +22,10 @@ from anthropic import (
 
 from app.domain.llm.protocol import (
     AgentRequest,
+    LLMAdapter,
     StreamEvent,
     StreamEventType,
     ToolCall,
-    LLMAdapter,
 )
 
 logger = logging.getLogger(__name__)
@@ -79,7 +79,7 @@ class ClaudeAdapter(LLMAdapter):
                 content=f"LLM 调用失败（已重试 {_MAX_RETRIES} 次）：{exc}",
             )
             return
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             yield StreamEvent(
                 type=StreamEventType.ERROR,
                 seq=seq,
@@ -104,9 +104,7 @@ class ClaudeAdapter(LLMAdapter):
     # 内部：带重试的流式调用
     # ------------------------------------------------------------------
 
-    async def _stream_with_retry(
-        self, kwargs: dict[str, Any]
-    ) -> AsyncIterator[dict[str, Any]]:
+    async def _stream_with_retry(self, kwargs: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
         """带指数退避的流式调用，yield 原始事件 dict。"""
         for attempt in range(_MAX_RETRIES + 1):
             try:
@@ -124,9 +122,7 @@ class ClaudeAdapter(LLMAdapter):
                 )
                 await asyncio.sleep(delay)
 
-    async def _do_stream(
-        self, kwargs: dict[str, Any]
-    ) -> AsyncIterator[dict[str, Any]]:
+    async def _do_stream(self, kwargs: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
         """单次 Anthropic API 流式调用，解析所有事件类型。"""
         # 收集状态
         current_block_type: str | None = None
