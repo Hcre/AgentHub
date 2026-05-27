@@ -46,7 +46,7 @@ class Group:
     def dispatch_mode(self) -> DispatchMode:
         raw = self.coordinator_config.get("dispatch_mode")
         if raw is None:
-            return DispatchMode.AT_ROUTING
+            return DispatchMode.DISCUSSION
         try:
             return DispatchMode(raw)
         except ValueError:

@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import asyncio as _asyncio
 import logging
 from collections.abc import AsyncIterator
 from uuid import UUID
@@ -63,6 +64,7 @@ class DiscussionOrchestrator:
         self._ctx = context_builder
         self._sel = selector
         self._bus = event_bus
+        self._flush_lock = _asyncio.Lock()  # 多 Agent 并发写 DB 的串行锁
 
     async def run_discussion(
         self,
@@ -117,6 +119,17 @@ class DiscussionOrchestrator:
                     if mid not in pending_mentions and mid not in already_spoken:
                         pending_mentions.append(mid)
 
+            # 用户消息首轮不能落空：Selector 判 DONE 时随机选一人兜底
+            if round_no == 0 and decision.done and decision.picks == ():
+                import random as _random
+                fallback = _random.choice(members)
+                logger.info(
+                    "讨论 round=0 Selector=DONE，随机兜底 agent=%s", fallback.name
+                )
+                decision = SelectorDecision.pick(
+                    fallback.id, reason="fallback: selector done, random pick"
+                )
+
             logger.info(
                 "讨论 round=%d session=%s decision=%s reason=%s pending=%d",
                 round_no,
@@ -125,10 +138,63 @@ class DiscussionOrchestrator:
                 decision.reason,
                 len(pending_mentions),
             )
+            # 4. 分支：多选（picks）vs 单选
+            if decision.picks:
+                # 同回合多人并行
+                pick_ids = list(dict.fromkeys(decision.picks))  # 去重保序
+                pick_targets: list[Agent] = []
+                for pid in pick_ids:
+                    t = await self._agents.get_by_id(pid)
+                    if t is not None:
+                        pick_targets.append(t)
+                    else:
+                        logger.warning("讨论 multi-pick 目标 %s 不存在，跳过", pid)
+
+                if not pick_targets:
+                    return
+
+                logger.info(
+                    "讨论 round=%d multi-pick=%d agents=%s",
+                    round_no,
+                    len(pick_targets),
+                    [t.name for t in pick_targets],
+                )
+
+                # 并行流式：用 asyncio.Queue 合并多路 StreamEvent
+                queue: _asyncio.Queue[StreamEvent | None] = _asyncio.Queue()
+
+                async def _stream_into_q(agent: Agent) -> None:
+                    try:
+                        async for evt in self._stream_one(
+                            session=session, group=group, target=agent,
+                            trigger=last_msg_for_history,
+                        ):
+                            await queue.put(evt)
+                    except Exception:
+                        logger.exception("multi-pick 流式失败 agent=%s", agent.id)
+                    finally:
+                        await queue.put(None)  # sentinel
+
+                tasks = [
+                    _asyncio.create_task(_stream_into_q(a)) for a in pick_targets
+                ]
+                finished = 0
+                while finished < len(tasks):
+                    evt = await queue.get()
+                    if evt is None:
+                        finished += 1
+                        continue
+                    yield evt
+                await _asyncio.gather(*tasks, return_exceptions=True)
+
+                for t in pick_targets:
+                    already_spoken.add(t.id)
+                return  # multi-pick 消耗完整回合，不继续循环
+
             if decision.done or decision.next_agent_id is None:
                 return
 
-            # 4. 取目标 Agent
+            # 5. 取目标 Agent（单人）
             target = await self._agents.get_by_id(decision.next_agent_id)
             if target is None:
                 logger.warning(
@@ -136,7 +202,7 @@ class DiscussionOrchestrator:
                 )
                 continue
 
-            # 5. 单 Agent 流式
+            # 6. 单 Agent 流式
             async for evt in self._stream_one(
                 session=session,
                 group=group,
@@ -145,7 +211,7 @@ class DiscussionOrchestrator:
             ):
                 yield evt
 
-            # 6. 标记已发言
+            # 7. 标记已发言
             already_spoken.add(target.id)
 
         logger.info(
@@ -223,9 +289,10 @@ class DiscussionOrchestrator:
         full = "".join(buffer)
         assistant_msg.content = full
         assistant_msg.status = MessageStatus.COMPLETED
-        await self._messages.save(assistant_msg)
-        await self._l1.append(session.id, {"role": "assistant", "content": full})
-        await self._wm.set(group.id, target.id, assistant_msg.id)
+        async with self._flush_lock:  # 多 Agent 并发时串行落库
+            await self._messages.save(assistant_msg)
+            await self._l1.append(session.id, {"role": "assistant", "content": full})
+            await self._wm.set(group.id, target.id, assistant_msg.id)
         await self._bus.publish(
             StreamingCompleted(session_id=session.id, message_id=assistant_msg.id)
         )
@@ -233,7 +300,8 @@ class DiscussionOrchestrator:
     # --- helpers ---
 
     async def _load_members(self, group: Group) -> list[Agent]:
-        ids = list({*group.member_ids, group.coordinator_id})
+        """加载群成员（不含协调者）。协调者负责任务分解，不参与自由讨论。"""
+        ids = list(group.member_ids)  # member_ids 不含协调者
         members: list[Agent] = []
         for aid in ids:
             a = await self._agents.get_by_id(aid)

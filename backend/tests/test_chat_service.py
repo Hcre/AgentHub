@@ -182,7 +182,7 @@ async def test_group_no_mention_silent(db_session) -> None:  # type: ignore[no-u
     from app.domain.entities.agent import Agent
     from app.domain.entities.group import Group
     from app.domain.entities.session import Session
-    from app.domain.enums import SessionType
+    from app.domain.enums import DispatchMode, SessionType
 
     agent_repo = PostgresAgentRepository(db_session)
     coord = Agent(name="协调者", avatar="C", role="c", is_system=True)
@@ -191,6 +191,7 @@ async def test_group_no_mention_silent(db_session) -> None:  # type: ignore[no-u
         await agent_repo.save(ag)
 
     group = Group(name="g3", coordinator_id=coord.id, member_ids=[a.id])
+    group.set_dispatch_mode(DispatchMode.AT_ROUTING)  # 显式降级
     await PostgresGroupRepository(db_session).save(group)
     session = Session(type=SessionType.GROUP, group_id=group.id, title="g")
     await PostgresSessionRepository(db_session).save(session)
@@ -201,7 +202,6 @@ async def test_group_no_mention_silent(db_session) -> None:  # type: ignore[no-u
             SendMessageCommand(session_id=session.id, content="大家好")
         )
     ]
-    # 不应有任何流式事件（仅用户消息广播，但用户消息不走 stream yield）
     assert events == []
     assert await wm.get(group.id, a.id) is None
 
