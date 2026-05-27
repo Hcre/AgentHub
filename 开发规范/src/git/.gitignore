@@ -1,0 +1,37 @@
+# === 依赖目录 ===
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+vendor/
+
+# === 环境变量（含密钥，严禁提交） ===
+.env
+.env.local
+.env.*.local
+
+# === IDE 配置 ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === 构建产物 ===
+dist/
+build/
+*.egg-info/
+*.log
+
+# === 测试/覆盖率 ===
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# === 系统文件 ===
+.DS_Store
+Thumbs.db
+desktop.ini

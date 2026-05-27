@@ -1,0 +1,35 @@
+# 04-API 设计规范 §二「落地」的可运行示例
+# 用法: npm i -g @stoplight/spectral-cli && spectral lint openapi.yaml
+# 在 FastAPI 项目中可先导出 schema: python -c "import json,main; print(json.dumps(main.app.openapi()))" > openapi.json
+
+extends: ["spectral:oas"]
+
+rules:
+  # 红线1：URL 用 kebab-case，禁大写/下划线
+  path-kebab-case:
+    description: 路径段必须 kebab-case
+    given: "$.paths[*]~"
+    severity: error
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[a-z0-9-/{}]+$"
+
+  # 红线1：URL 内禁出现动词（用 HTTP 方法表达动作）
+  no-verb-in-path:
+    description: 路径禁含 get/create/update/delete 等动词
+    given: "$.paths[*]~"
+    severity: error
+    then:
+      function: pattern
+      functionOptions:
+        notMatch: "(get|create|update|delete|list)"
+
+  # 红线5：每个操作须声明安全方案（公开接口显式标 security: []）
+  operation-security-defined:
+    description: 操作必须声明认证要求
+    given: "$.paths[*][get,post,put,patch,delete]"
+    severity: warn
+    then:
+      field: security
+      function: truthy

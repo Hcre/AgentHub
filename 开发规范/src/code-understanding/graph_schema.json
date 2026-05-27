@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "代码知识图谱 Schema",
+  "description": "对应规范 §1.2 节点类型 + §1.3 边类型。用于初始化 KuzuDB / Neo4j 图数据库。",
+  "version": "1.0.0",
+
+  "node_types": {
+    "FUNCTION": {
+      "properties": ["name", "module", "line", "signature", "docstring", "language"],
+      "index_on": ["name", "module"],
+      "description": "函数/方法节点"
+    },
+    "CLASS": {
+      "properties": ["name", "module", "line", "base_classes", "methods_count", "language"],
+      "index_on": ["name", "module"],
+      "description": "类/接口节点"
+    },
+    "MODULE": {
+      "properties": ["name", "path", "language", "lines_of_code", "dependencies_count"],
+      "index_on": ["name", "language"],
+      "description": "模块/包/文件节点"
+    },
+    "API": {
+      "properties": ["method", "path", "handler", "module", "auth_required"],
+      "index_on": ["method", "path"],
+      "description": "HTTP/RPC 端点节点"
+    },
+    "CONFIG": {
+      "properties": ["key", "value_type", "default", "module", "sensitive"],
+      "index_on": ["key"],
+      "description": "配置项/环境变量节点"
+    },
+    "SCHEMA": {
+      "properties": ["name", "database", "columns", "module"],
+      "index_on": ["name"],
+      "description": "数据库表/数据结构节点"
+    }
+  },
+
+  "edge_types": {
+    "CALLS": {
+      "direction": "A → B",
+      "description": "A 调用 B",
+      "source_types": ["FUNCTION"],
+      "target_types": ["FUNCTION"]
+    },
+    "IMPORTS": {
+      "direction": "A → B",
+      "description": "A 导入 B",
+      "source_types": ["MODULE"],
+      "target_types": ["MODULE", "CLASS", "FUNCTION"]
+    },
+    "EXTENDS": {
+      "direction": "A → B",
+      "description": "A 继承 B",
+      "source_types": ["CLASS"],
+      "target_types": ["CLASS"]
+    },
+    "IMPLEMENTS": {
+      "direction": "A → B",
+      "description": "A 实现接口 B",
+      "source_types": ["CLASS"],
+      "target_types": ["CLASS"]
+    },
+    "CONTAINS": {
+      "direction": "A → B",
+      "description": "A 包含 B",
+      "source_types": ["MODULE"],
+      "target_types": ["MODULE", "CLASS", "FUNCTION"]
+    },
+    "DEFINES": {
+      "direction": "A → B",
+      "description": "A 定义/声明 B",
+      "source_types": ["MODULE"],
+      "target_types": ["FUNCTION", "CLASS", "CONFIG", "SCHEMA"]
+    },
+    "ROUTES": {
+      "direction": "A → B",
+      "description": "A 路由到 B",
+      "source_types": ["API"],
+      "target_types": ["FUNCTION", "CLASS"]
+    },
+    "CONFIGURES": {
+      "direction": "A → B",
+      "description": "A 配置/引用 B",
+      "source_types": ["MODULE", "FUNCTION"],
+      "target_types": ["CONFIG"]
+    },
+    "DATAFLOW": {
+      "direction": "A → B",
+      "description": "数据从 A 流向 B",
+      "source_types": ["FUNCTION"],
+      "target_types": ["FUNCTION", "SCHEMA"]
+    },
+    "CONTROLFLOW": {
+      "direction": "A → B",
+      "description": "控制流从 A 到 B",
+      "source_types": ["FUNCTION"],
+      "target_types": ["FUNCTION"]
+    },
+    "REFERENCES": {
+      "direction": "A → B",
+      "description": "A 引用 B",
+      "source_types": ["MODULE", "FUNCTION"],
+      "target_types": ["FUNCTION", "CLASS", "MODULE"]
+    },
+    "DEPENDS_ON": {
+      "direction": "A → B",
+      "description": "A 运行时依赖 B",
+      "source_types": ["MODULE", "FUNCTION"],
+      "target_types": ["MODULE", "CONFIG", "API"]
+    }
+  }
+}

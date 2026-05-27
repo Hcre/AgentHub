@@ -1,0 +1,16 @@
+# 02-代码编写规范 §二「落地」的可运行示例
+# 等价于 pyproject.toml 的 [tool.ruff] 段（ruff.toml 不需要 [tool.ruff] 前缀）
+# 用法: pip install ruff && ruff check src/coding/
+
+line-length = 100
+
+[lint]
+# T20=print/pprint  S=安全(bandit)  E722=裸except  T100=调试断点(pdb)  N=命名  PLR0915=函数过长
+select = ["E", "F", "N", "T20", "T100", "S", "PLR0915"]
+
+[lint.pylint]
+max-statements = 50   # 函数语句数警告阈值，按项目可调
+
+[lint.per-file-ignores]
+# 示例反面教材文件故意违规，仅供阅读，不纳入检查
+"naming_bad.py" = ["N", "E", "F"]
