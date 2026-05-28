@@ -1,69 +1,62 @@
 # AgentHub 开发规范
 
-> 版本: v1.0 | 2026-05-26
-> 来源: `spec/rules/` 三大红线 + `CLAUDE.md` + `spec/architecture_架构定义.md` + `frontend/HANDOFF.md` + 项目协作流程
-
-本文件夹是 AgentHub 项目通用开发规范的**统一入口**，适用于所有开发者（人类 & AI Agent）。`spec/rules/` 中的原始红线文件仍为权威来源，本文件夹是其结构化整理。
+> 版本: v3.0 | 2026-05-28
+> AgentHub 项目通用开发规范的**统一入口**，适用于所有开发者（人类 & AI Agent）。
 
 ---
 
-## 快速索引
+## 入口
 
-| 文档 | 关键词 | 何时读 |
-|------|--------|--------|
-| [01-architecture_架构规范](01-architecture_架构规范.md) | 分层、依赖倒置、模块边界 | 开始写后端逻辑前 |
-| [02-code_代码规范](02-code_代码规范.md) | Python/TS 红线 | 写任何代码前 |
-| [03-process_流程规范](03-process_流程规范.md) | 分支、提交、PR、Review | 领任务 / 提 MR 前 |
-| [04-testing_测试规范](04-testing_测试规范.md) | 测试金字塔、覆盖目标、Mock | 写测试前 |
-| [05-git_协作规范](05-git_协作规范.md) | 分支管理、同步、合并 | 开始工作 / 合并前 |
-| [06-boundaries_边界矩阵](06-boundaries_边界矩阵.md) | Always/AskFirst/Never | 写权限逻辑前 |
-| [07-tech-stack_技术栈](07-tech-stack_技术栈.md) | 选型、版本、约束 | 新人入职 / 选型决策 |
+| 你是 | 读哪个 |
+|------|--------|
+| 👤 人类（项目协作者） | [README-规范导航.md](README-规范导航.md) — 快速索引 + 红线速查 |
+| 🤖 AI Agent | [CLAUDE-规范导航.md](CLAUDE-规范导航.md) — 任务→规范定位 + 红线总表 + 去重映射 |
 
 ---
 
-## 红线速查
+## 规范全集
 
-以下 3 条违反任一条 = 方案打回 / CR 不通过 / 流程违规：
+### 主规范（细化 ai-workflow 各步骤）
 
-### 架构红线（6 条）
-1. **AR-01**: 5 层洋葱 `L5->L4->L3->L2<-L1`，L2 不能 import 任何上层
-2. **AR-02**: 新 Agent 系统只加 Adapter，禁止改 `domain/`
-3. **AR-03**: Harness 不含 LLM 调用
-4. **AR-04**: Agent 间不直接通信（仅 Blackboard + Coordinator）
-5. **AR-05**: Task 状态变更必须走 FSM + 事件溯源
-6. **AR-06**: Agent system 与 model 解耦
+| # | 文件 | 关键词 | 红线 |
+|---|------|--------|------|
+| 01 | [架构设计规范](01-architecture_架构设计规范.md) | 5 层洋葱 / 依赖倒置 / Adapter / FSM | AR-01 ~ AR-06 |
+| 02 | [代码编写规范](02-coding_代码编写规范.md) | Python/TS 红线 / 命名 / 错误 / 安全 | CR-01 ~ CR-12 |
+| 03 | [Git 协作规范](03-git_Git协作规范.md) | 分支 / 提交 / PR / 合并 | PR-02/03/06/07 摘要 |
+| 04 | [API 设计规范](04-api_API设计规范.md) | REST + WS / 错误响应 / Pydantic | AP-01 ~ AP-07 |
+| 05 | [测试规范](05-testing_测试规范.md) | 金字塔 / Mock 边界 / Adapter+FSM 必测 | T-01 ~ T-06 |
+| 06 | [文档规范](06-documentation_文档规范.md) | 命名 / explore / ADR / worklog | D-01 ~ D-12 |
+| 08 | [代码理解与图谱规范](08-code-understanding_代码理解与图谱规范.md) | 双图谱：CodeGraph + Understand-Anything | — |
 
-### 代码红线（12 条）
-1. **CR-01**: 禁裸 `print()` -> `logging`
-2. **CR-02**: 禁裸 SQL 拼接 -> 参数化
-3. **CR-03**: 数据库变更必须走 Alembic Migration
-4. **CR-04**: API 端点必须有异常处理
-5. **CR-05**: API 输入必须 Pydantic v2 校验
-6. **CR-06**: 外部 API 调用必须有超时+重试+熔断
-7. **CR-07**: TS strict mode 零错误，禁 `any`
-8. **CR-08**: React render 中禁异步函数
-9. **CR-09**: 组件超过 200 行建议拆分
-10. **CR-10**: 禁硬编码密钥/Token -> 环境变量
-11. **CR-11**: 禁遗留调试代码（print/console.log/注释代码块）
-12. **CR-12**: 禁同步阻塞在 async 上下文
+### AgentHub 特有附录
 
-### 流程红线（9 条）
-1. **PR-01**: 接口先行，变更需 2 人 Review
-2. **PR-02**: 分支 `feature/<domain>/<desc>`
-3. **PR-03**: Conventional Commits
-4. **PR-04**: Agent 写文件必经审批
-5. **PR-05**: 每里程碑结束全员集成测试
-6. **PR-06**: PR 至少 1 人 Review
-7. **PR-07**: 提交前跑验证（ruff/pytest/tsc/eslint）
-8. **PR-08**: 修改代码后更新 roadmap
-9. **PR-09**: SPEC 和代码同步
+| 文件 | 用途 |
+|------|------|
+| [99-boundaries_边界矩阵.md](99-boundaries_边界矩阵.md) | Agent 操作权限矩阵：Always / Ask First / Never |
+| [99-process-rules_流程红线全集.md](99-process-rules_流程红线全集.md) | 完整 PR-01 ~ PR-09，03 Git 摘要的扩展 |
+
+### 协作流程方法论
+
+[ai-workflow_AI协作开发流程/](ai-workflow_AI协作开发流程/) 共 7 篇：
+
+```
+01-角色分工与文件体系  →  02-第零步_调研  →  03-第一步_编写计划
+                                                      ↓
+                                                04-第二步_迭代开发
+                                                      ↓
+                                                05-完整流程与核心原则（PR-01~09 在此）
+                                                      ↓
+                                                06-第三步_收束节点（四阶段闸门）
+                                                      ↓
+                                                07-汇报（四档汇报体系）
+```
 
 ---
 
-## 项目约定
+## 改规范时
 
-- **分支**: `feature/<domain>/<desc>`，禁止直接 push main
-- **提交**: Conventional Commits（`feat:`/`fix:`/`refactor:`/`docs:`/`test:`/`chore:`）
-- **验证**: 每次 commit 前 `verify.bat` 或手动跑 ruff/tsc/eslint
-- **日志**: 每次工作后在 `worklogs/` 目录写日志，更新 `STATUS.md`
-- **文档**: 命名规范 `{English}_{中文}.md`，pre-push hook 自动检查
+1. 改 `NN-*.md` → 同步 `docs/specs/NN-*.md` 规格（若有对应）
+2. 红线增删 → 同步 `CLAUDE-规范导航.md` §2 + `README-规范导航.md` 红线速查
+3. 改 §二落地配置 → 同步实际配置（`backend/pyproject.toml` / `.pre-commit-config.yaml` / `frontend/eslint.config.js`）
+4. 改文档命名/分支命名/worklog 路径 → 同步对应 `scripts/check_*.py`
+5. 同 PR 内写 worklog + 更 STATUS.md（pre-push 自动校）
