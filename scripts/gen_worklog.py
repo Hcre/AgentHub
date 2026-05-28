@@ -27,7 +27,7 @@ TEMPLATE = """# 工作日志：{title}
 - [ ]
 
 ## 给下一位的交接
-> 写之前先查看 docs/task_assignment_v3.md，明确下游任务分配和等待对象。
+> 写之前先查看 docs/plan/task-assignment_任务分配.md，明确下游任务分配和等待对象。
 >
 """
 
@@ -60,7 +60,7 @@ def main() -> int:
     )
 
     repo_root = Path(__file__).resolve().parent.parent
-    user_dir = repo_root / ".agenthub" / "worklogs" / who
+    user_dir = repo_root / "worklogs" / who
     user_dir.mkdir(parents=True, exist_ok=True)
 
     filename = f"{today}_{desc}.md"

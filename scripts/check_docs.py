@@ -108,7 +108,7 @@ if archive_dir.is_dir():
             error(f"docs/archive/{f.name}: missing DEPRECATED_ prefix")
 
 # 4. worklogs/
-worklogs_dir = ROOT / ".agenthub" / "worklogs"
+worklogs_dir = ROOT / "worklogs"
 if worklogs_dir.is_dir():
     for f in worklogs_dir.iterdir():
         if f.is_dir():
@@ -119,7 +119,7 @@ if worklogs_dir.is_dir():
                     continue
                 if not WORKLOG_PATTERN.match(sub.name):
                     error(
-                        f".agenthub/worklogs/{f.name}/{sub.name}: "
+                        f"worklogs/{f.name}/{sub.name}: "
                         f"worklog must start with YYYY-MM-DD_"
                     )
         else:
@@ -129,7 +129,7 @@ if worklogs_dir.is_dir():
                 continue
             if not WORKLOG_PATTERN.match(f.name):
                 error(
-                    f".agenthub/worklogs/{f.name}: "
+                    f"worklogs/{f.name}: "
                     f"worklog must start with YYYY-MM-DD_ (or move to docs/explore/)"
                 )
 

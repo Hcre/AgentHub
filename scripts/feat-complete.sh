@@ -21,7 +21,7 @@ echo ""
 
 # 3. Update roadmap
 echo "-- 3/7 update roadmap --"
-echo "Check spec/roadmap_开发路线图.md"
+echo "Check docs/plan/开发清单_roadmap.md"
 echo "Mark completed tasks with ✅, add completion date and notes."
 read -r -p "Updated? (y/n): " ok
 [ "$ok" = "n" ] && { echo "Update roadmap first."; exit 1; }
@@ -37,13 +37,13 @@ python scripts/gen_worklog.py "$who" "$task" 2>/dev/null || {
 }
 
 echo ""
-echo "Edit file in .agenthub/worklogs/$who"
+echo "Edit file in worklogs/$who"
 read -r -p "Press enter..."
 
 # 5. Update STATUS
 echo ""
 echo "-- 5/7 update STATUS.md --"
-echo "Update your row in .agenthub/worklogs/STATUS.md:"
+echo "Update your row in worklogs/STATUS.md:"
 echo "  - 'Working on' -> next task"
 echo "  - 'Done this week' -> add this feature"
 echo "  - Update 'Last updated' date"

@@ -13,8 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-WORKLOG_DIR = REPO_ROOT / ".agenthub" / "worklogs"
-STATUS_FILE = WORKLOG_DIR / "STATUS.md"
+WORKLOG_DIR = REPO_ROOT / "worklogs"
+STATUS_FILE = REPO_ROOT / "STATUS.md"
 
 
 def get_today_str() -> str:
@@ -66,20 +66,20 @@ def has_commits_to_push() -> bool:
 
 
 def check_worklog_in_push(person_dir: str, pushed_files: list[str]) -> bool:
-    prefix = f".agenthub/worklogs/{person_dir}/"
+    prefix = f"worklogs/{person_dir}/"
     for f in pushed_files:
         if f.startswith(prefix):
             print(f"[OK] Worklog in this push: {f}")
             return True
     today = get_today_str()
     print(f"[FAIL] No worklog update in {person_dir}/ included in this push")
-    print(f"  Expected: .agenthub/worklogs/{person_dir}/{today}_<desc>.md")
+    print(f"  Expected: worklogs/{person_dir}/{today}_<desc>.md")
     return False
 
 
 def check_any_worklog_in_push(pushed_files: list[str]) -> bool:
     for f in pushed_files:
-        if ".agenthub/worklogs/" in f and "/20" in f:
+        if f.startswith("worklogs/") and "/20" in f:
             print(f"[OK] Worklog in this push: {f}")
             return True
     today = get_today_str()
