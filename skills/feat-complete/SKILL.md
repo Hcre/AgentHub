@@ -43,7 +43,7 @@ python scripts/check_branch.py
 
 ### 3. 更新 roadmap
 
-如果完成了 `spec/roadmap_开发路线图.md` 中的任务：
+如果完成了 `docs/plan/开发清单_roadmap.md` 中的任务：
 
 - 任务完成并验证通过 → 标记 `✅`
 - 追加完成日期和备注：
@@ -67,7 +67,7 @@ python scripts/gen_worklog.py 黎 fix-websocket-reconnect
 
 ### 5. 更新 STATUS.md
 
-- 修改 `.agenthub/worklogs/STATUS.md` 中你的那一行
+- 修改根 `STATUS.md` 中你的那一行
 - 更新"最后更新"日期为今天
 - 更新"正在做"为你下一个任务
 - 更新"这周完成了"加上本次完成的功能

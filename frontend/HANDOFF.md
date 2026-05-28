@@ -98,7 +98,7 @@ frontend/
 
 ## 七、延伸阅读
 
-- 每个 Phase 的细节与交接：`.agenthub/worklogs/袁/2026-05-23_Phase*.md`
+- 每个 Phase 的细节与交接：`worklogs/袁/2026-05-23_Phase*.md`
 - 群聊专项：`src/components/group/HANDOFF.md`
 - 需求权威：`docs/PRD_AgentHub_v4_统一方案.md`；API：`docs/adapter_interface_spec.md`
 - 原型参考（只读）：`frontend/prototype/`

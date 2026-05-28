@@ -14,7 +14,7 @@
 
 - **决策**: 摘除 Celery，用 `asyncio.gather` 替代任务编排；数据库从 12 表精简为 6 表
 - **原因**: MVP 阶段无需分布式任务队列，单进程异步足够；12 表过度设计，6 表覆盖核心场景
-- **影响文件**: `spec/architecture_架构定义.md`、`spec/data-model_数据模型.md`、`spec/boundaries_边界矩阵.md`、`spec/roadmap_开发路线图.md`
+- **影响文件**: `docs/specs/01-architecture_架构定义.md`、`docs/specs/03-data-model_数据模型.md`、`conventions/99-boundaries_边界矩阵.md`、`docs/plan/开发清单_roadmap.md`
 - **参考**: PRD v4 统一方案
 
 ## 2026-05-23 — CLI-first 双轨架构确立
@@ -39,7 +39,7 @@
 
 - **决策**: 建立 worklog + STATUS.md + Skills + pre-commit 自动检查的协作流程
 - **原因**: 多人协作需要明确的交接机制和质量门禁
-- **影响文件**: `.agenthub/worklogs/`、`skills/`、`scripts/check_worklog.py`、`CLAUDE.md`
+- **影响文件**: `worklogs/`、`skills/`、`scripts/check_worklog.py`、`CLAUDE.md`
 
 ## 2026-05-21 — 项目脚手架初始化
 

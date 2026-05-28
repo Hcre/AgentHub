@@ -227,9 +227,9 @@
 
 ## 八、实施期间的协同
 
-- 每完成一个 Phase，在 `.agenthub/worklogs/STATUS.md` 更新进度
+- 每完成一个 Phase，在 `worklogs/STATUS.md` 更新进度
 - 实施完成后：
-  - 更新 `spec/roadmap_开发路线图.md` M3 章节，标注「3.2 / 3.4-3.7 推迟」
+  - 更新 `docs/plan/开发清单_roadmap.md` M3 章节，标注「3.2 / 3.4-3.7 推迟」
   - `group-chat-discussion-mode_*.md` 文档头部标签从 M3 改为「V1 同期实施，M3 协调者部分推迟」
   - 关闭 V1 设计文档审查表中 M1 / C2 / H3 三项
 
@@ -240,5 +240,5 @@
 | `group-chat_群聊功能设计方案.md` | V1 @ 路由 + 增量注入（§3.4） |
 | `group-chat-discussion-mode_群聊讨论模式设计方案.md` | Selector 选人 / 防循环 / Bypass / 模式预留 |
 | `group-chat-boundary-and-dependencies.md` | 模块边界与接口契约 |
-| `spec/roadmap_开发路线图.md` | 原始 M3 任务清单 |
-| `spec/architecture_架构定义.md` | 五层架构 + 上下文三层体系 |
+| `docs/plan/开发清单_roadmap.md` | 原始 M3 任务清单 |
+| `docs/specs/01-architecture_架构定义.md` | 五层架构 + 上下文三层体系 |

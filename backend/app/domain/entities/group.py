@@ -1,4 +1,4 @@
-"""Group 聚合根（spec/data-model §2.4-2.5）。
+"""Group 聚合根（docs/specs/03-data-model_数据模型.md §2.4-2.5）。
 
 群组拥有一个自动创建的协调者 Agent（coordinator_id）与一组人选成员
 （member_ids，不含协调者）。名称格式校验在 L4（Pydantic），此处只保证非空。

@@ -2,7 +2,7 @@
 
 IM 聊天式多 Agent 协作平台。用户通过类飞书聊天界面与 AI Agent 对话，支持单聊、群聊（@mentions 多 Agent）、任务自动分解与并行调度。
 
-> 脚手架基于 `docs/PRD_AgentHub.md` 与 `docs/架构设计_分层与数据流.md` 生成。
+> 脚手架基于 `docs/plan/背景_PRD_AgentHub_统一方案.md` 与 `docs/specs/01b-architecture-design_分层与数据流.md` 生成。
 
 ## 架构
 
@@ -81,15 +81,25 @@ npm run dev
 agenthub/
 ├── README.md           # ← 你正在读的文件（人类入口）
 ├── CLAUDE.md           # AI/Agent 入口
-├── docs/               # 人类阅读 — 当前权威文档
-│   ├── explore/        #   技术探索过程 + ADR + 演进日志
-│   └── archive/        #   历史版本文档归档
-├── spec/               # Agent 参考 — 结构化规格
-│   ├── rules/          #   三大红线
-│   └── domains/        #   按域拆分
-├── .agenthub/          # AI 协作基础设施
-│   └── worklogs/       #   个人工作日志 + STATUS.md
-├── skills/             # 可复用 AI 技能
+├── STATUS.md           # 进度仪表盘数据源
+├── dashboard.html      # 可视化进度面板
+├── conventions/        # 规范 01-08 + ai-workflow + 99-* 附录
+├── docs/               # 文档资产
+│   ├── plan/           #   PRD / 路线图 / 任务分配 / 设计
+│   ├── specs/          #   功能规格（含 domains/）
+│   ├── templates/      #   ★模板权威（给新项目复制用）
+│   ├── reports/        #   汇报产出 + HTML 渲染产物
+│   ├── research/       #   调研
+│   ├── explore/        #   技术探索 + EVOLUTION 演进日志
+│   └── archive/        #   历史版本文档归档（DEPRECATED_ 前缀）
+├── worklogs/           # 工作日志（按人分子目录）+ decisions/ ADR
+│   ├── 董/ 黎/ 袁/
+│   └── decisions/      #   ADR（架构决策记录）
+├── meta/FILE_GRAPH.md  # 文件归类权威
+├── .agenthub/          # 运行时配置 + 项目专有 Skill
+│   ├── config.json
+│   └── skills/         #   小红书相关 skill
+├── skills/             # 通用 Claude Code Skills
 ├── frontend/           # L5 React + TypeScript
 ├── backend/            # L1-L4 FastAPI
 │   └── app/
@@ -100,18 +110,20 @@ agenthub/
 │       ├── core/           # 配置 / 安全 / 事件总线
 │       └── schemas/        # Pydantic 请求/响应
 ├── docker/             # Docker Compose + Nginx
-└── scripts/            # 自动化脚本（含 check_docs.py）
+└── scripts/            # 自动化脚本（含 check_docs.py / check_worklog.py）
 ```
 
 ### 文档约定
 
 | 目录 | 读者 | 命名规则 | 示例 |
 |------|------|----------|------|
-| `docs/` | 人类 | `{English}_{中文}.md` | `PRD_AgentHub_统一方案.md` |
-| `docs/explore/` | 人类 | `EXP-NN_` / `ADR-NN-` / `作者-` | `EXP-01_架构模式对比矩阵.md` |
+| `docs/` 根 | 人类 | `{English}_{中文}.md` | `DEPLOYMENT-GUIDE_部署测试指南.md` |
+| `docs/specs/` | Agent | `NN-<name>_<中文>.md` | `03-data-model_数据模型.md` |
+| `docs/plan/` | Agent + 人 | 同上 | `开发清单_roadmap.md` |
+| `docs/explore/` | 人类 | `EXP-NN_` / 个人子目录 | `EXP-01_架构模式对比矩阵.md` |
 | `docs/archive/` | 溯源 | `DEPRECATED_{原名}.md` | `DEPRECATED_PRD_v3.md` |
-| `spec/` | Agent | `{english}_{中文}.md` | `data-model_数据模型.md` |
-| `worklogs/` | 队友 | `YYYY-MM-DD_{描述}.md` | `2026-05-23_修复一致性.md` |
+| `worklogs/{你的名字}/` | 队友 | `YYYY-MM-DD_{描述}.md` | `2026-05-28_修复一致性.md` |
+| `worklogs/decisions/` | Agent | `NNNN-<slug>.md` | `0001-cli-first-pivot.md` |
 
 > 所有文档提交前自动检查命名规范（`check_docs.py` pre-push hook）。
 
@@ -126,8 +138,8 @@ cd frontend && npm run test   # 前端单测
 
 设计文档位于 `docs/`：
 
-- 产品需求：`docs/PRD_AgentHub_统一方案.md`
-- 架构设计：`docs/architecture-design_架构设计_分层与数据流.md`
-- 适配器接口契约：`docs/adapter-interface_适配器接口规范.md`
+- 产品需求：`docs/plan/背景_PRD_AgentHub_统一方案.md`
+- 架构设计：`docs/specs/01b-architecture-design_分层与数据流.md`
+- 适配器接口契约：`docs/specs/04c-adapter-interface_适配器接口规范.md`
 - 技术探索索引：`docs/explore/README.md`
 - 项目演进日志：`docs/explore/EVOLUTION.md`

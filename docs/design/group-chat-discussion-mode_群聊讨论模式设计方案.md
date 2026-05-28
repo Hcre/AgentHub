@@ -323,4 +323,4 @@ SELECTOR_PROMPTS = {
 | `docs/explore/group-chat-discussion-mode-options.md` | 三问题方案对比（本抉择的输入） |
 | `docs/explore/group-chat-discussion-mode-research.md` | 业界调研（AutoGen/CrewAI/Slack/OpenClaw） |
 | `docs/explore/group-chat-boundary-and-dependencies.md` | 模块边界与接口契约 |
-| `spec/domains/domain2-orchestration_域2-Agent编排.md` | M3 编排任务清单 |
+| `docs/specs/domains/domain2-orchestration_域2-Agent编排.md` | M3 编排任务清单 |

@@ -387,5 +387,5 @@ async def resolve(self, mentions, content, group):
 |------|------|
 | `docs/explore/group-chat-boundary-and-dependencies.md` | 群聊依赖分析与模块边界 |
 | `docs/design/group-creation_群组创建功能设计方案.md` | 群组创建（前置功能，已实现） |
-| `spec/architecture_架构定义.md` | 五层架构 |
-| `spec/commands_命令接口.md` | Session 创建与消息发送 API |
+| `docs/specs/01-architecture_架构定义.md` | 五层架构 |
+| `docs/specs/04-commands_命令接口.md` | Session 创建与消息发送 API |

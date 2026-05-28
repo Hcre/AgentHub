@@ -14,7 +14,7 @@
 
 ## 二、API 设计
 
-与 `spec/commands_命令接口.md` 对齐，路径统一为 `/api/groups`。
+与 `docs/specs/04-commands_命令接口.md` 对齐，路径统一为 `/api/groups`。
 
 ### 2.1 创建群组
 
@@ -94,7 +94,7 @@ GET /api/agents?search=keyword&page=1&limit=20
 
 ## 三、数据模型
 
-完全沿用 `spec/data-model_数据模型.md` 定义：
+完全沿用 `docs/specs/03-data-model_数据模型.md` 定义：
 
 ### groups
 
@@ -110,13 +110,13 @@ CREATE TABLE groups (
 );
 ```
 
-**相对 spec（spec/data-model §2.4）的差异**：
+**相对 spec（docs/specs/03-data-model §2.4）的差异**：
 
 | 差异 | 说明 |
 |------|------|
 | `name` 加 `UNIQUE` | spec 为 `name TEXT NOT NULL`（无唯一约束）。本方案名称全局唯一（§2.4、§4.3 step1）依赖此约束，故显式加 `UNIQUE`。 |
 | 新增 `coordinator_id` | spec 无此列。显式 FK 指向协调者 Agent，比仅靠 `coordinator_config` 更明确表达「哪个 Agent 是协调者」。 |
-| 保留 `coordinator_config` | 列保留以对齐 spec，但**创建 API 不接收、不返回**；协调者运行时缺省读全局配置（`/api/settings.coordinator`，spec/commands §2.0）。M3 编排需要按群覆盖模型时直接启用，无需再加 migration。 |
+| 保留 `coordinator_config` | 列保留以对齐 spec，但**创建 API 不接收、不返回**；协调者运行时缺省读全局配置（`/api/settings.coordinator`，docs/specs/04-commands §2.0）。M3 编排需要按群覆盖模型时直接启用，无需再加 migration。 |
 
 ### group_members
 
@@ -360,9 +360,9 @@ import { CreateGroupModal } from '../group/CreateGroupModal'
 
 | 文档 | 相关内容 |
 |------|---------|
-| `spec/architecture_架构定义.md` §2.2 | 群组与协调者定义 |
-| `spec/data-model_数据模型.md` §2.4-2.5 | groups/group_members DDL |
-| `spec/commands_命令接口.md` §2.2 | Group API 规范 |
-| `spec/boundaries_边界矩阵.md` §二 | 群组管理权限 + 20 人上限 |
-| `spec/rules/arch-rules_架构红线.md` | 架构约束（五层洋葱，依赖方向） |
+| `docs/specs/01-architecture_架构定义.md` §2.2 | 群组与协调者定义 |
+| `docs/specs/03-data-model_数据模型.md` §2.4-2.5 | groups/group_members DDL |
+| `docs/specs/04-commands_命令接口.md` §2.2 | Group API 规范 |
+| `conventions/99-boundaries_边界矩阵.md` §二 | 群组管理权限 + 20 人上限 |
+| `conventions/arch-rules_架构红线.md` | 架构约束（五层洋葱，依赖方向） |
 | `frontend/src/components/group/HANDOFF.md` | 前端 mock seam 说明 |

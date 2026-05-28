@@ -1,6 +1,6 @@
 ---
 name: doc-sync
-description: 文档同步与治理 — 个人探索归档、团队决策落地、旧版本文档归档、文档索引一致性检查。任何涉及 docs/ spec/ explore/ archive/ 的变更都应触发此 skill。
+description: 文档同步与治理 — 个人探索归档、团队决策落地、旧版本文档归档、文档索引一致性检查。任何涉及 docs/ explore/ archive/ worklogs/decisions/ 的变更都应触发此 skill。
 ---
 
 # doc-sync: 文档同步与治理
@@ -19,11 +19,16 @@ description: 文档同步与治理 — 个人探索归档、团队决策落地�
 
 | 目录 | 职责 | 读者 | 命名规则 |
 |------|------|------|----------|
-| `docs/` 根 | 当前权威文档（PRD、架构、接口契约） | 人类 | `{English}_{中文}.md` |
-| `docs/explore/` | 技术探索过程 + ADR + 演进日志 | 人类 | 见下文分类 |
+| `docs/` 根 | 当前权威 + 部署等运维文档 | 人类 | `{English}_{中文}.md` |
+| `docs/plan/` | PRD / 路线图 / 任务分配 / 设计 | 人类 + Agent | `{name}_{中文}.md` |
+| `docs/specs/` | 结构化规格（架构 / 数据 / API / 测试 / 域） | Agent | `NN-{name}_{中文}.md` |
+| `docs/explore/` | 技术探索过程 + EVOLUTION 演进日志（ADR 已搬走） | 人类 | 见下文分类 |
 | `docs/archive/` | 过期/被取代的版本文档 | 溯源 | `DEPRECATED_{原名}.md` |
-| `spec/` | 结构化规格（数据模型、API、红线） | Agent | `{english}_{中文}.md` |
-| `.agenthub/worklogs/` | 个人每日工作日志 | 队友 | `YYYY-MM-DD_{描述}.md` |
+| `docs/research/` | 调研笔记 | 人类 | `{name}_{中文}.md` |
+| `docs/templates/` | 模板权威（给新项目复制用） | 复制起步 | `{类型}模板.md` |
+| `worklogs/{董,黎,袁}/` | 个人每日工作日志 | 队友 | `YYYY-MM-DD_{描述}.md` |
+| `worklogs/decisions/` | ADR（架构决策记录）| Agent | `NNNN-{slug}.md` |
+| `conventions/` | 规范正文（01-08 + ai-workflow + 99-* 附录） | 全员 | 已固定 |
 
 ## 执行流程
 
@@ -45,7 +50,7 @@ description: 文档同步与治理 — 个人探索归档、团队决策落地�
 
 ```
 探索结论是否影响项目文档？
-├─ 否 → 只写 worklog（.agenthub/worklogs/{你}/YYYY-MM-DD_{描述}.md）
+├─ 否 → 只写 worklog（worklogs/{你}/YYYY-MM-DD_{描述}.md）
 └─ 是 → 写 worklog + 归档到 docs/explore/
 ```
 
@@ -81,12 +86,12 @@ mv 踩坑记录.md docs/explore/dong-claude-code-adapter-pitfalls.md
 
 ```
 这个决策影响了什么？
-├─ 架构方向 → 写/更新 ADR → 追加 EVOLUTION.md
-├─ 产品需求 → 更新 docs/PRD_AgentHub_统一方案.md
-├─ 架构设计 → 更新 docs/architecture-design_*.md
-├─ 接口契约 → 更新 docs/adapter-interface_*.md 或 spec/commands_*.md
-├─ 数据模型 → 更新 spec/data-model_数据模型.md
-├─ 开发计划 → 更新 spec/roadmap_开发路线图.md
+├─ 架构方向 → 写 ADR → worklogs/decisions/NNNN-{slug}.md → 追加 EVOLUTION.md
+├─ 产品需求 → 更新 docs/plan/背景_PRD_AgentHub_统一方案.md
+├─ 架构设计 → 更新 docs/specs/01-architecture_架构定义.md 或 01b-architecture-design_*.md
+├─ 接口契约 → 更新 docs/specs/04c-adapter-interface_*.md 或 04-commands_*.md
+├─ 数据模型 → 更新 docs/specs/03-data-model_数据模型.md（+ Alembic migration）
+├─ 开发计划 → 更新 docs/plan/开发清单_roadmap.md
 └─ 探索结论被正式采纳 → 个人笔记升级为 EXP-NN
 ```
 
@@ -110,7 +115,7 @@ mv 踩坑记录.md docs/explore/dong-claude-code-adapter-pitfalls.md
 - **备选方案**: 考虑过但没选的方案及原因
 ```
 
-命名：`ADR-{NN}-{英文简述}.md`，放入 `docs/explore/`
+命名：`NNNN-{英文简述}.md`（4 位数字编号），放入 `worklogs/decisions/`（旧位置 `docs/explore/ADR-*` 已弃用）
 
 #### B4. 归档旧版本
 
@@ -144,9 +149,9 @@ mv 踩坑记录.md docs/explore/dong-claude-code-adapter-pitfalls.md
 #### C1. 枚举文件
 
 ```bash
-ls docs/ && ls docs/explore/ && ls docs/archive/
-ls spec/ && ls spec/domains/ && ls spec/rules/
-ls .agenthub/worklogs/ && for d in .agenthub/worklogs/*/; do ls "$d"; done
+ls docs/ && ls docs/explore/ && ls docs/archive/ && ls docs/plan/ && ls docs/specs/ && ls docs/research/ && ls docs/templates/
+ls docs/specs/domains/ && ls conventions/
+ls worklogs/ && ls worklogs/decisions/ && for d in worklogs/{董,黎,袁}/; do ls "$d"; done
 ```
 
 #### C2. 逐目录检查
@@ -217,13 +222,14 @@ done
 
 | 所在目录 | 格式 | 正确示例 | 错误示例 |
 |----------|------|----------|----------|
-| `docs/` | `{English}_{中文}.md` | `PRD_AgentHub_统一方案.md` | `PRD_v4.md`、`最终版PRD.md` |
+| `docs/` 根 | `{English}_{中文}.md` | `DEPLOYMENT-GUIDE_部署测试指南.md` | `PRD_v4.md`、`最终版PRD.md` |
+| `docs/plan/` | `{name}_{中文}.md` | `开发清单_roadmap.md`、`背景_PRD_AgentHub_统一方案.md` | `计划.md` |
+| `docs/specs/` | `NN-{name}_{中文}.md` | `03-data-model_数据模型.md`、`04c-adapter-interface_适配器接口规范.md` | `数据模型.md` |
 | `docs/explore/` | `EXP-{NN}_{中文}.md` | `EXP-01_架构模式对比矩阵.md` | `01_架构.md` |
-| `docs/explore/` | `ADR-{NN}-{en-slug}.md` | `ADR-01-cli-first-pivot.md` | `ADR_v1.md` |
-| `docs/explore/` | `{作者}-{en-topic}.md` | `dong-sendmessage-flow-analysis.md` | `cc-haha.md` |
+| `docs/explore/{黎,董,袁}/` | `{en-topic}.md` | `黎/group-chat-boundary-and-dependencies.md` | `cc-haha.md` |
 | `docs/archive/` | `DEPRECATED_{原名}.md` | `DEPRECATED_PRD_v3.md` | `old_PRD.md` |
-| `spec/` | `{english}_{中文}.md` | `data-model_数据模型.md` | `数据模型.md` |
-| `worklogs/` | `YYYY-MM-DD_{描述}.md` | `2026-05-23_修复一致性.md` | `修复一致性.md` |
+| `worklogs/{你}/` | `YYYY-MM-DD_{描述}.md` | `2026-05-28_修复一致性.md` | `修复一致性.md` |
+| `worklogs/decisions/` | `NNNN-{en-slug}.md`（ADR）| `0001-cli-first-pivot.md` | `ADR-01.md` |
 
 ## 自检清单
 

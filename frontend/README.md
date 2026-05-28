@@ -24,7 +24,7 @@ npm run dev      # http://localhost:5173
 
 - **接手必读：[`HANDOFF.md`](./HANDOFF.md)** — 结构、各 store→API 接入点、运行、mock 边界、待办
 - 群聊专项：[`src/components/group/HANDOFF.md`](./src/components/group/HANDOFF.md)
-- 各阶段日志：`../.agenthub/worklogs/袁/`
+- 各阶段日志：`../worklogs/袁/`
 
 ## 部署
 

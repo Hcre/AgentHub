@@ -126,13 +126,13 @@ agenthub/
 │   ├── infrastructure/# L1: PG Repos, Redis, asyncio.gather, FileSystem
 │   └── schemas/       # Pydantic v2
 ├── docker/
-├── spec/              # SPEC 文档
+├── docs/specs/        # SPEC 文档
 └── skill/             # Claude Code Skills
 ```
 
 ### 3.4 数据模型
 
-见 [`data-model_数据模型.md`](data-model_数据模型.md)。核心 6 张表：agents / groups / group_members / sessions / messages / tasks（v4 精简，status 字段替代 task_events）。
+见 [`03-data-model_数据模型.md`](03-data-model_数据模型.md)。核心 6 张表：agents / groups / group_members / sessions / messages / tasks（v4 精简，status 字段替代 task_events）。
 
 ### 3.5 任务状态机
 

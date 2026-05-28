@@ -13,7 +13,7 @@ description: Review code changes against AgentHub rules. Use before PR submissio
 
 ## 检查维度
 
-### 1. 架构红线 (spec/rules/arch-rules_架构红线.md)
+### 1. 架构红线 (conventions/01-architecture_架构设计规范.md §一)
 
 | 编号 | 检查项 | 方法 |
 |------|--------|------|
@@ -24,7 +24,7 @@ description: Review code changes against AgentHub rules. Use before PR submissio
 | AR-05 | Task Engine 事件溯源 | 不直接修改 status，走 task_events |
 | AR-06 | Agent 系统与模型解耦 | 无硬编码 system→model 映射 |
 
-### 2. 代码红线 (spec/rules/code-rules_代码红线.md)
+### 2. 代码红线 (conventions/02-coding_代码编写规范.md §一)
 
 **Python:**
 - [ ] CR-01: 无 `print()`
@@ -44,7 +44,7 @@ description: Review code changes against AgentHub rules. Use before PR submissio
 - [ ] CR-10: 无硬编码密钥
 - [ ] CR-11: 无 `print()`/`console.log()` 生产路径
 
-### 3. 流程红线 (spec/rules/process-rules_流程红线.md)
+### 3. 流程红线 (conventions/99-process-rules_流程红线全集.md)
 
 - [ ] PR-02: 分支命名符合 `feature/<domain>/<desc>`
 - [ ] PR-03: Commit message 符合 Conventional Commits

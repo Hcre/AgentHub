@@ -63,7 +63,7 @@ npm test -- --coverage
 
 ## PR-08：修改代码后更新项目进度
 
-每次完成一个任务的代码实现后，必须同步更新 `spec/roadmap_开发路线图.md` 中对应该任务的验收状态：
+每次完成一个任务的代码实现后，必须同步更新 `docs/plan/开发清单_roadmap.md` 中对应该任务的验收状态：
 
 - 任务完成并验证通过 → 标记 `✅`
 - 在任务下方追加一行 `> 完成: YYYY-MM-DD, 备注: <关键决策/遗留问题>`
@@ -71,7 +71,7 @@ npm test -- --coverage
 
 ## PR-09：SPEC 和代码同步
 
-- 任何架构变更 → 先更新 `spec/architecture_架构定义.md`
-- 任何数据模型变更 → 先更新 `spec/data-model_数据模型.md` + 生成 Alembic migration
-- 任何 API 变更 → 先更新 `spec/commands_命令接口.md`
-- M1-M5 每个里程碑结束 → 更新 `spec/AgentHub_SPEC_项目主规格.md` 中的状态
+- 任何架构变更 → 先更新 `docs/specs/01-architecture_架构定义.md`
+- 任何数据模型变更 → 先更新 `docs/specs/03-data-model_数据模型.md` + 生成 Alembic migration
+- 任何 API 变更 → 先更新 `docs/specs/04-commands_命令接口.md`
+- M1-M5 每个里程碑结束 → 更新 `docs/specs/00-overview_项目主规格.md` 中的状态

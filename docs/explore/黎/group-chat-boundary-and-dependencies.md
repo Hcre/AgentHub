@@ -403,6 +403,6 @@ ChatService.send_group_message()
 |------|------|
 | `docs/design/group-creation_群组创建功能设计方案.md` | 群组创建功能完整设计 |
 | `docs/adapter-cli-flow_全场景流程分析.md` §四/§五 | 群聊任务模式 + 讨论模式流程 |
-| `spec/domains/domain2-orchestration_域2-Agent编排.md` | M3 编排任务清单 |
-| `docs/PRD_AgentHub_统一方案.md` | 当前权威 PRD |
-| `spec/architecture_架构定义.md` | 五层架构定义 |
+| `docs/specs/domains/domain2-orchestration_域2-Agent编排.md` | M3 编排任务清单 |
+| `docs/plan/背景_PRD_AgentHub_统一方案.md` | 当前权威 PRD |
+| `docs/specs/01-architecture_架构定义.md` | 五层架构定义 |

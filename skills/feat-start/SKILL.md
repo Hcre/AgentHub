@@ -22,8 +22,8 @@ description: Start a new feature — read spec, create branch, update STATUS, ge
 git pull origin main
 ```
 
-读 `spec/roadmap_开发路线图.md` 确认当前进度。
-读 `spec/rules/` 确认红线。
+读 `docs/plan/开发清单_roadmap.md` 确认当前进度。
+读 `conventions/CLAUDE-规范导航.md` 红线总表（AR/CR/PR/AP/T/D）确认红线。
 
 ### 2. 读相关 SPEC
 
@@ -31,10 +31,10 @@ git pull origin main
 
 | 任务 | 必读文档 |
 |------|---------|
-| 后端开发 | `docs/架构设计_分层与数据流.md` + `spec/data-model_数据模型.md` |
-| API 开发 | `spec/commands_命令接口.md` + `spec/boundaries_边界矩阵.md` |
-| 前端开发 | `docs/PRD_AgentHub.md` + `spec/commands_命令接口.md` |
-| Agent 集成 | `docs/adapter_interface_spec.md` + `spec/architecture_架构定义.md` |
+| 后端开发 | `docs/specs/01b-architecture-design_分层与数据流.md` + `docs/specs/03-data-model_数据模型.md` |
+| API 开发 | `docs/specs/04-commands_命令接口.md` + `conventions/99-boundaries_边界矩阵.md` |
+| 前端开发 | `docs/plan/背景_PRD_AgentHub_统一方案.md` + `docs/specs/04-commands_命令接口.md` |
+| Agent 集成 | `docs/specs/04c-adapter-interface_适配器接口规范.md` + `docs/specs/01-architecture_架构定义.md` |
 
 ### 3. 创建分支
 
@@ -62,7 +62,7 @@ python scripts/gen_worklog.py 黎 add-websocket-heartbeat
 
 ### 6. 开发
 
-遵循 `.agenthub/CLAUDE.md` 中的行为准则和 `spec/rules/` 红线。
+遵循 `CLAUDE.md` 中的行为准则和 `conventions/CLAUDE-规范导航.md` 红线总表（AR/CR/PR/AP/T/D 全集）。
 
 ---
 
