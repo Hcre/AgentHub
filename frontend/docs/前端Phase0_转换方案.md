@@ -1,6 +1,6 @@
 # 前端 Phase 0 — 转换方案
 
-> 版本: v1.0 | 日期: 2026-05-23 | 基于 `前端实施计划_v1.md` Phase 0 展开
+> 版本: v1.0 | 日期: 2026-05-23 | 基于 `前端实施计划.md` Phase 0 展开
 > 目标: 在 `frontend/` 重建 Vite + React 18 + TypeScript + Tailwind + Zustand 工程，现有 v0 原型移至 `prototype/` 作为 UX 参考
 
 ---
@@ -223,7 +223,7 @@ mv nginx.conf prototype/
 
 # 截图、设计文档
 mv screenshots/ prototype/
-mv docs/ prototype/docs/     # 前端实施计划_v1.md 仍保留在 docs/
+mv docs/ prototype/docs/     # 前端实施计划.md 仍保留在 docs/
 
 # 其他设计资产
 mv uploads/ prototype/
@@ -257,7 +257,7 @@ frontend/
 │   └── components/
 ├── public/
 ├── docs/                  # ← 保留，前端实施计划仍在
-│   └── 前端实施计划_v1.md
+│   └── 前端实施计划.md
 └── 前端Phase0_转换方案.md  # ← 本文档
 ```
 
@@ -325,7 +325,7 @@ try_files $uri $uri/ /index.html;
 
 ## 五、目录结构参考
 
-新 `src/` 的推荐初始结构（按 `前端实施计划_v1.md` §1.1-1.4）：
+新 `src/` 的推荐初始结构（按 `前端实施计划.md` §1.1-1.4）：
 
 ```
 src/

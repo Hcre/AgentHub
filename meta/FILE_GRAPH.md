@@ -44,7 +44,7 @@ AgentHub/                                # 仓库根：仅放顶层入口文件�
 │   │   ├── 背景_PRD_AgentHub_统一方案.md  #     为什么做、设计决策（PRD 权威）
 │   │   ├── 开发清单_roadmap.md            #     功能点列表（迁自 spec/roadmap）
 │   │   ├── task-assignment_任务分配.md   #     分工
-│   │   ├── 前端实施计划_v1.md            #     前端阶段计划
+│   │   ├── 前端实施计划.md            #     前端阶段计划
 │   │   └── design/                       #     复杂功能设计文档
 │   │       └── group-chat_*.md           #     群聊设计方案（迁自 docs/design/）
 │   ├── specs/                            #   功能规格（迁自 spec/）

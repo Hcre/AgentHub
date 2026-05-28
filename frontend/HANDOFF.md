@@ -86,7 +86,7 @@ frontend/
 
 ## 六、已知简化 / 待优化（接手前先看）
 
-- **`frontend/docs/` 被 .gitignore 排除** —— `前端实施计划_v1.md`、`前端Phase0_转换方案.md` 不在 git 里。要共享给团队需把 `.gitignore` 里的 `docs/` 行去掉再提交，或移到仓库根 `docs/`。
+- **`frontend/docs/` 被 .gitignore 排除** —— `前端实施计划.md`、`前端Phase0_转换方案.md` 不在 git 里。要共享给团队需把 `.gitignore` 里的 `docs/` 行去掉再提交，或移到仓库根 `docs/`。
 - Tweaks 设置不持久化（刷新回默认）——如需：uiStore 包 `zustand/middleware` 的 `persist`。
 - 新建 agent 不出现在任务负责人下拉 / 群组成员（这俩仍读 `data/mock` 的种子 agents，未走 agentStore）。
 - 群聊：派发按钮、@mention 多选/补全、消息持久化未做（group/HANDOFF.md 有清单）。

@@ -45,7 +45,7 @@ AgentHub/
 |------|--------|
 | `meta/FILE_GRAPH.md` | 新增/移动文件前（决策树） |
 | `conventions/CLAUDE-规范导航.md` | 任务 → 规范定位 + 红线总表（AR/CR/PR/AP/T/D）|
-| `conventions/0X-*.md` | 写代码/接口/测试前对应查 |
+| conventions/0X-*.md | 写代码/接口/测试前对应查（01 架构 / 02 代码 / 03 Git / 04 API / 05 测试 / 06 文档 / 08 图谱） |
 | `conventions/99-boundaries_边界矩阵.md` | 写 Agent 权限/审批前 |
 | `conventions/99-process-rules_流程红线全集.md` | PR-01~09 全集 |
 | `conventions/ai-workflow_AI协作开发流程/` | 流程方法论（调研→计划→开发→收束→汇报） |
@@ -58,11 +58,11 @@ AgentHub/
 | `docs/specs/04c-adapter-interface_适配器接口规范.md` | 接入新 Agent 系统前 |
 | `docs/specs/05-testing-strategy_测试策略.md` | 写测试前（含 E2E 5 条 Core User Stories）|
 | `docs/specs/02-assumptions_假设清单.md` | 理解隐含假设前提 |
-| `docs/specs/domains/domain{1,2,3}-*.md` | 深入某个域时读对应文件 |
+| docs/specs/domains/ | 深入某个域时读对应文件（domain1-chat / domain2-orchestration / domain3-toolchain） |
 | `docs/plan/开发清单_roadmap.md` | 领任务前，看当前进度 |
 | `docs/plan/背景_PRD_AgentHub_统一方案.md` | 当前权威 PRD |
 | `docs/plan/task-assignment_任务分配.md` | 分工 |
-| `docs/explore/` | 技术探索文档 → `README.md` 索引 + `EVOLUTION.md` 演进日志 |
+| docs/explore/ | 技术探索文档 → `docs/explore/README.md` 索引 + `docs/explore/EVOLUTION.md` 演进日志 |
 | `docs/archive/` | 历史版本归档 |
 | `worklogs/decisions/0001-cli-first-pivot.md` | 双轨架构决策记录 |
 
