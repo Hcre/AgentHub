@@ -6,7 +6,7 @@ export type Density = 'comfort' | 'compact'
 export type HeadingFont = 'Geist' | 'Source Serif 4' | 'Instrument Serif' | 'IBM Plex Sans'
 
 /** 中心区路由段：聊天 / 收件箱 / 任务 / 日历 / 群组 / 助手详情 */
-export type Section = 'chat' | 'inbox' | 'tasks' | 'calendar' | 'group' | 'agent-detail' | 'skills-market'
+export type Section = 'chat' | 'inbox' | 'tasks' | 'calendar' | 'group' | 'agent-detail' | 'skills-market' | 'api-keys'
 
 interface UIState {
   theme: Theme

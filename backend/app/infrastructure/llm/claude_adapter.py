@@ -39,8 +39,11 @@ _RETRYABLE = (RateLimitError, APIStatusError)
 class ClaudeAdapter(LLMAdapter):
     """Anthropic Messages API 适配器（anthropic_api 模式）。"""
 
-    def __init__(self, api_key: str, model: str) -> None:
-        self._client = AsyncAnthropic(api_key=api_key)
+    def __init__(self, api_key: str, model: str, base_url: str | None = None) -> None:
+        kwargs: dict[str, Any] = {"api_key": api_key}
+        if base_url:
+            kwargs["base_url"] = base_url
+        self._client = AsyncAnthropic(**kwargs)
         self._model = model
 
     # ------------------------------------------------------------------
