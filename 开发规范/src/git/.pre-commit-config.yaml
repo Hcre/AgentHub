@@ -1,0 +1,32 @@
+# pre-commit hook 配置示例（对应 02 §二 + 03 §二）
+# 安装: pip install pre-commit && pre-commit install && pre-commit install --hook-type commit-msg
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+        args: ['--maxkb=10000']
+
+  # 02 红线 1/4/5：print / 裸 except / 调试断点等 —— ruff 一把抓（取代 flake8+isort）
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.0
+    hooks:
+      - id: ruff            # lint
+      - id: ruff-format     # 格式化（取代 black）
+
+  # 02 红线 3：阻止密钥入库
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.0
+    hooks:
+      - id: gitleaks
+
+  # 03 红线 2：commit message 符合 Conventional Commits（配 commitlint.config.js）
+  - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
+    rev: v9.16.0
+    hooks:
+      - id: commitlint
+        stages: [commit-msg]
