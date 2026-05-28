@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>开发规范 · 项目仪表盘</title>
+<style>
+  :root {
+    /* Claude 官网风：暖米底 + 黏土强调色 */
+    --bg: #f5f4ee; --surface: #ffffff; --surface-2: #faf9f4;
+    --border: #e7e4da; --border-strong: #ddd9cc;
+    --ink: #1f1d1a; --ink-soft: #4a4640; --muted: #8a857b; --faint: #b3ada1;
+    --clay: #cc785c; --clay-deep: #b35f44; --clay-tint: #f6e9e2;
+    --green: #5b8a5a; --green-tint: #e7efe3;
+    --blue: #5a7da3; --blue-tint: #e6edf4;
+    --amber: #b8862f; --amber-tint: #f5ecd6;
+    --red: #c0573f; --red-tint: #f6e2dc;
+    --serif: 'Tiempos Text', 'Iowan Old Style', Georgia, 'Songti SC', 'STSong', serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', ui-sans-serif, sans-serif;
+    --shadow: 0 1px 2px rgba(40,33,26,.04), 0 4px 16px rgba(40,33,26,.05);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--sans); background: var(--bg); color: var(--ink);
+    line-height: 1.6; padding: 3rem 1.5rem 5rem; max-width: 980px; margin: 0 auto;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--clay-deep); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 2px; }
+  code { background: var(--surface-2); border: 1px solid var(--border); padding: .1rem .4rem;
+         border-radius: 5px; font-size: .85em; font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; }
+
+  /* ---- header ---- */
+  header { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem;
+           padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+  h1 { font-family: var(--serif); font-weight: 500; font-size: 1.85rem; letter-spacing: -.01em; color: var(--ink); }
+  h1 .dot { color: var(--clay); }
+  .nav { margin-top: .5rem; font-size: .86rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: .2rem .7rem; }
+  .controls { display: flex; align-items: center; gap: 1rem; }
+  .stamp { font-size: .76rem; color: var(--faint); text-align: right; line-height: 1.45; }
+  .stamp b { color: var(--muted); font-weight: 600; }
+  .stamp .stale { color: var(--amber); font-weight: 600; }
+  .btn {
+    background: var(--surface); border: 1px solid var(--border-strong); color: var(--ink-soft);
+    border-radius: 8px; padding: .5rem .9rem; cursor: pointer; font-size: .82rem; font-family: var(--sans);
+    display: inline-flex; align-items: center; gap: .45rem; transition: border-color .15s, color .15s, background .15s;
+  }
+  .btn:hover { border-color: var(--clay); color: var(--clay-deep); background: var(--clay-tint); }
+  .btn.spin svg { animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---- summary ---- */
+  .summary { margin-top: 2rem; background: var(--surface); border: 1px solid var(--border);
+             border-radius: 16px; padding: 1.75rem 1.9rem; box-shadow: var(--shadow); }
+  .summary-top { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: .5rem; }
+  .summary-top h2 { font-family: var(--serif); font-weight: 500; font-size: 1.15rem; color: var(--ink-soft); }
+  .pct { font-family: var(--serif); font-size: 3rem; font-weight: 500; line-height: 1; color: var(--clay); letter-spacing: -.02em; }
+  .pct small { font-size: 1rem; color: var(--muted); font-family: var(--sans); margin-left: .5rem; }
+  .track { height: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; overflow: hidden; margin: 1.25rem 0 .25rem; }
+  .fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--clay), var(--clay-deep)); border-radius: 999px; transition: width .7s cubic-bezier(.4,0,.2,1); }
+  .sub { color: var(--muted); font-size: .88rem; }
+  .chips { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: 1.4rem; }
+  .chip { border: 1px solid var(--border-strong); border-radius: 999px; padding: .38rem .85rem; font-size: .82rem;
+          cursor: pointer; color: var(--ink-soft); background: var(--surface); user-select: none;
+          transition: all .15s; display: inline-flex; align-items: center; }
+  .chip:hover { border-color: var(--muted); }
+  .chip.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .chip.active .n { color: #fff; }
+  .chip .dot { width: 7px; height: 7px; border-radius: 50%; margin-right: .5rem; }
+  .chip .n { font-weight: 700; color: var(--ink); margin-right: .32rem; }
+  .d-done { background: var(--green); } .d-active { background: var(--blue); }
+  .d-pending { background: var(--faint); } .d-blocked { background: var(--red); }
+
+  /* ---- cards ---- */
+  .cards { margin-top: 1.5rem; display: grid; gap: .8rem; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+          padding: 1rem 1.15rem; border-left: 3px solid var(--border-strong);
+          transition: transform .14s ease, box-shadow .14s ease, border-color .14s; }
+  .card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .card.s-done { border-left-color: var(--green); }
+  .card.s-active { border-left-color: var(--blue); }
+  .card.s-pending { border-left-color: var(--faint); }
+  .card.s-blocked { border-left-color: var(--red); }
+  .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: .6rem; }
+  .card-title { font-weight: 600; font-size: .98rem; color: var(--ink); }
+  .badge { padding: .18rem .6rem; border-radius: 999px; font-size: .7rem; font-weight: 600; white-space: nowrap; flex: 0 0 auto; }
+  .badge-done { background: var(--green-tint); color: var(--green); }
+  .badge-active { background: var(--blue-tint); color: var(--blue); }
+  .badge-pending { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+  .badge-blocked { background: var(--red-tint); color: var(--red); }
+  .card-meta { color: var(--muted); font-size: .79rem; margin-top: .55rem; display: flex; gap: .7rem; flex-wrap: wrap; }
+
+  /* ---- sections ---- */
+  .section { margin-top: 2.5rem; }
+  .section h2 { font-family: var(--serif); font-weight: 500; font-size: 1.25rem; margin-bottom: .9rem;
+                display: flex; align-items: center; gap: .5rem; }
+  .section h2.blocked { color: var(--red); } .section h2.debt { color: var(--amber); }
+  .section h2 .count { font-family: var(--sans); font-size: .78rem; color: var(--muted); font-weight: 500; }
+  .row { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+         padding: .8rem 1.1rem; margin-bottom: .6rem; font-size: .9rem; color: var(--ink-soft); }
+  .row.blocked { border-left: 3px solid var(--red); }
+  .row.debt { border-left: 3px solid var(--amber); }
+
+  /* ---- gate table ---- */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
+  table { width: 100%; border-collapse: collapse; font-size: .82rem; min-width: 580px; }
+  th, td { padding: .65rem .9rem; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; color: var(--ink-soft); }
+  th { color: var(--muted); font-weight: 600; background: var(--surface-2); }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--surface-2); }
+
+  .empty { color: var(--muted); text-align: center; padding: 2.75rem 1.25rem;
+           border: 1px dashed var(--border-strong); border-radius: 12px; background: var(--surface); }
+  .empty.error { border-color: var(--red); color: var(--ink-soft); }
+  .empty.error b { color: var(--red); }
+  footer { text-align: center; color: var(--faint); font-size: .78rem; margin-top: 4rem;
+           padding-top: 1.5rem; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>开发规范<span class="dot"> · </span>项目仪表盘</h1>
+    <nav class="nav">
+      <a href="README.md">README</a>·
+      <a href="plan/开发清单.md">开发清单</a>·
+      <a href="meta/FILE_GRAPH.md">文件图谱</a>·
+      <a href="STATUS.md">STATUS.md</a>·
+      <a href="CLAUDE.md">CLAUDE.md</a>
+    </nav>
+  </div>
+  <div class="controls">
+    <div class="stamp" id="stamp">—</div>
+    <button class="btn" id="refresh" title="立即刷新">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
+      刷新
+    </button>
+  </div>
+</header>
+
+<main>
+  <section class="summary">
+    <div class="summary-top">
+      <h2>总体进度</h2>
+      <span class="pct"><span id="pct">0</span>%<small id="count">— / —</small></span>
+    </div>
+    <div class="track"><div class="fill" id="fill"></div></div>
+    <p class="sub" id="summary-sub">正在加载 STATUS.md …</p>
+    <div class="chips" id="chips"></div>
+  </section>
+
+  <section class="cards" id="cards"></section>
+
+  <section class="section" id="blocked-section" hidden>
+    <h2 class="blocked">🚫 阻塞项 <span class="count" id="blocked-count"></span></h2>
+    <div id="blocked-list"></div>
+  </section>
+
+  <section class="section" id="debt-section" hidden>
+    <h2 class="debt">⚠️ 技术债 <span class="count" id="debt-count"></span></h2>
+    <div id="debt-list"></div>
+  </section>
+
+  <section class="section" id="gate-section" hidden>
+    <h2>🚦 收束节点历史 <span class="count" id="gate-count"></span></h2>
+    <div class="table-wrap"><table id="gate-table"></table></div>
+  </section>
+</main>
+
+<footer>数据源 <code>STATUS.md</code> · 每 60 秒原地刷新（保留筛选与滚动位置） · AI 协作开发流程驱动</footer>
+
+<script>
+"use strict";
+const REFRESH_MS = 60000;
+const state = { filter: "all", countdown: REFRESH_MS / 1000, loaded: false, stale: false, lastData: null };
+
+const STATUS = {
+  done:    { label: "已完成", test: s => /✅|已完成/.test(s) },
+  active:  { label: "进行中", test: s => /🔄|进行中/.test(s) },
+  blocked: { label: "阻塞",   test: s => /🚫|阻塞/.test(s) },
+  pending: { label: "待开始", test: () => true },
+};
+const ORDER = ["done", "active", "blocked", "pending"];
+const classify = s => ORDER.find(k => STATUS[k].test(s)) || "pending";
+const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+// --- STATUS.md 解析 ---
+function parse(md) {
+  const lines = md.split(/\r?\n/);
+  const out = { features: [], blocked: [], debt: [], gates: [], updated: "" };
+  let section = "";
+  for (const raw of lines) {
+    const line = raw.trim();
+    const dm = line.match(/^>\s*(?:最后)?更新[:：]\s*(.+)$/);
+    if (dm) out.updated = dm[1].trim();
+    if (line.startsWith("## ")) {
+      const h = line.slice(3);
+      section = h.includes("进度") ? "features"
+        : h.includes("阻塞") ? "blocked"
+        : h.includes("技术债") ? "debt"
+        : h.includes("收束") ? "gates"
+        : "other";
+      continue;
+    }
+    const isTableRow = line.startsWith("|") && !/^\|[\s|:-]+\|?$/.test(line);
+    if (isTableRow) {
+      const cols = line.split("|").slice(1, -1).map(c => c.trim());
+      if (section === "features" && cols[0] && cols[0] !== "功能点") {
+        out.features.push({ name: cols[0], bdd: cols[1] || "-", status: cols[2] || "", date: cols[3] || "-" });
+      } else if (section === "gates" && cols[0] && cols[0] !== "节点" && !/尚无/.test(cols[0])) {
+        out.gates.push(cols);
+      }
+    }
+    if (line.startsWith("- ")) {
+      const item = line.slice(2).trim();
+      if (item && item !== "（无）") {
+        if (section === "blocked") out.blocked.push(item);
+        if (section === "debt") out.debt.push(item);
+      }
+    }
+  }
+  return out;
+}
+
+// STATUS.md 写 specs/xx.md，实际位于 docs/specs/
+function bddLink(bdd) {
+  if (!bdd || bdd === "-") return "—";
+  if (/^specs\//.test(bdd)) return `<a href="docs/${bdd}">${esc(bdd)}</a>`;
+  if (/^docs\//.test(bdd)) return `<a href="${bdd}">${esc(bdd)}</a>`;
+  return esc(bdd);
+}
+
+function renderSummary(data, counts, total, done) {
+  const pct = total ? Math.round(done / total * 100) : 0;
+  document.getElementById("pct").textContent = pct;
+  document.getElementById("fill").style.width = pct + "%";
+  document.getElementById("count").textContent = `${done} / ${total}`;
+  document.getElementById("summary-sub").textContent =
+    total ? `${total} 个功能点，${done} 个已完成${counts.active ? `，${counts.active} 进行中` : ""}${counts.blocked ? `，${counts.blocked} 阻塞` : ""}。`
+          : "未解析到功能点。";
+
+  const defs = [
+    ["all", "全部", total, ""],
+    ["done", "已完成", counts.done, "d-done"],
+    ["active", "进行中", counts.active, "d-active"],
+    ["pending", "待开始", counts.pending, "d-pending"],
+    ["blocked", "阻塞", counts.blocked, "d-blocked"],
+  ];
+  const chips = document.getElementById("chips");
+  chips.innerHTML = defs.map(([k, lbl, n, dot]) =>
+    `<button class="chip ${state.filter === k ? "active" : ""}" data-k="${k}">
+       ${dot ? `<span class="dot ${dot}"></span>` : ""}<span class="n">${n}</span>${lbl}
+     </button>`).join("");
+  chips.querySelectorAll(".chip").forEach(c =>
+    c.onclick = () => { state.filter = c.dataset.k; render(data); });
+}
+
+function renderCards(data) {
+  const shown = data.features.filter(f => state.filter === "all" || classify(f.status) === state.filter);
+  const el = document.getElementById("cards");
+  if (!shown.length) { el.innerHTML = `<div class="empty">该筛选下暂无功能点</div>`; return; }
+  el.innerHTML = shown.map(f => {
+    const k = classify(f.status);
+    const txt = f.status.replace(/^[✅🔄⏳🚫]\s*/, "").trim() || STATUS[k].label;
+    const date = f.date && f.date !== "-" ? `<span>📅 ${esc(f.date)}</span>` : "";
+    return `<article class="card s-${k}">
+      <div class="card-head">
+        <span class="card-title">${esc(f.name)}</span>
+        <span class="badge badge-${k}">${esc(txt)}</span>
+      </div>
+      <div class="card-meta"><span>BDD: ${bddLink(f.bdd)}</span>${date}</div>
+    </article>`;
+  }).join("");
+}
+
+function renderList(name, items, cls) {
+  const sec = document.getElementById(name + "-section");
+  sec.hidden = !items.length;
+  if (!items.length) return;
+  document.getElementById(name + "-count").textContent = `(${items.length})`;
+  document.getElementById(name + "-list").innerHTML =
+    items.map(x => `<div class="row ${cls}">${esc(x)}</div>`).join("");
+}
+
+function renderGates(gates) {
+  const sec = document.getElementById("gate-section");
+  sec.hidden = !gates.length;
+  if (!gates.length) return;
+  document.getElementById("gate-count").textContent = `(${gates.length})`;
+  const head = ["节点", "日期", "范围", "整理", "测试", "AI审计", "人审计", "验证", "遗留"];
+  document.getElementById("gate-table").innerHTML =
+    `<thead><tr>${head.map(h => `<th>${h}</th>`).join("")}</tr></thead>` +
+    `<tbody>${gates.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody>`;
+}
+
+function render(data) {
+  state.lastData = data;
+  const counts = { done: 0, active: 0, pending: 0, blocked: 0 };
+  data.features.forEach(f => counts[classify(f.status)]++);
+  renderSummary(data, counts, data.features.length, counts.done);
+  renderCards(data);
+  renderList("blocked", data.blocked, "blocked");
+  renderList("debt", data.debt, "debt");
+  renderGates(data.gates);
+  state.loaded = true;
+}
+
+function setStamp() {
+  const u = state.lastData?.updated;
+  const tail = state.stale ? `<span class="stale">⚠ 刷新失败，显示上次数据</span>` : `${state.countdown}s 后刷新`;
+  document.getElementById("stamp").innerHTML = (u ? `<b>更新</b> ${esc(u)}<br>` : "") + tail;
+}
+
+async function load() {
+  const btn = document.getElementById("refresh");
+  btn.classList.add("spin");
+  try {
+    const res = await fetch("STATUS.md", { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    render(parse(await res.text()));
+    state.stale = false;
+  } catch (e) {
+    // 关键修复：只有首次加载失败才清空页面；
+    // 后续刷新失败保留上次数据，仅在时间戳处提示，避免内容“消失”。
+    if (!state.loaded) {
+      document.getElementById("cards").innerHTML =
+        `<div class="empty error"><b>⚠️ 无法加载 STATUS.md</b><br><br>
+         本页需通过 HTTP 服务访问，不能用 <code>file://</code> 直接打开。<br>
+         双击 <code>scripts/打开仪表盘.bat</code>，或运行 <code>python scripts/start_server.py</code>。<br>
+         <small>(${esc(e.message)})</small></div>`;
+    } else {
+      state.stale = true;
+    }
+  } finally {
+    state.countdown = REFRESH_MS / 1000;
+    setStamp();
+    btn.classList.remove("spin");
+  }
+}
+
+setInterval(() => {
+  state.countdown--;
+  if (state.countdown <= 0) load();
+  else setStamp();
+}, 1000);
+
+document.getElementById("refresh").onclick = load;
+load();
+</script>
+</body>
+</html>
