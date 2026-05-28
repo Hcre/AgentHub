@@ -43,3 +43,13 @@ docker/data/
 
 # === Git worktrees ===
 .worktrees/
+
+# === Runtime / personal artifacts ===
+scraps/
+screenshots/
+uploads/
+
+# === AI session caches ===
+.deepseek/
+.reasonix/
+.claude/
