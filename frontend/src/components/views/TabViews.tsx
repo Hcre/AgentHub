@@ -71,12 +71,20 @@ export function MemoryView() {
 
 export function SettingsView() {
   const activeAgentId = useUIStore((s) => s.activeAgentId)
+  const setSection = useUIStore((s) => s.setSection)
   const profiles = useAgentStore((s) => s.profiles)
   const cfg = activeAgentId ? profiles[activeAgentId]?.config : undefined
   if (!cfg) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
         无配置
+        <button
+          type="button"
+          onClick={() => setSection('api-keys')}
+          className="text-[13px] text-brand hover:underline"
+        >
+          API 密钥管理 →
+        </button>
       </div>
     )
   }
@@ -89,7 +97,7 @@ export function SettingsView() {
     ['Temperature', cfg.temperature],
   ]
   return (
-    <div className="mx-auto max-w-md px-6 py-5">
+    <div className="mx-auto max-w-md space-y-3 px-6 py-5">
       <div className="rounded-xl border bg-card p-4">
         {rows.map(([label, value]) => (
           <div
@@ -101,6 +109,13 @@ export function SettingsView() {
           </div>
         ))}
       </div>
+      <button
+        type="button"
+        onClick={() => setSection('api-keys')}
+        className="text-[13px] text-brand hover:underline"
+      >
+        API 密钥管理 →
+      </button>
     </div>
   )
 }

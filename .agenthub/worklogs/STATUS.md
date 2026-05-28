@@ -1,11 +1,11 @@
 # 当前状态
 
-> 最后更新: 2026-05-26
+> 最后更新: 2026-05-28
 > 规则：**每次 push 或开始/结束一个任务时，更新你自己的那一行。**
 
 | 我 | 正在做 | 阻塞？ | 这周完成了 |
 |----|--------|--------|-----------|
-| 黎 | 前端 Agent 创建 3 步向导 + CLI 代理联调 bug 修复 + Docker 部署验证 | 无 | ClaudeAdapter 完整重写 ✅ + 文档治理 ✅ + Agent 创建向导 ✅ + CLI 代理联调 ✅ + nginx 反向代理 ✅ |
+| 黎 | Pi Agent 接入 + API Key Manager + Docker 部署验证 | 无 | ClaudeAdapter 完整重写 ✅ + 文档治理 ✅ + Agent 创建向导 ✅ + CLI 代理联调 ✅ + nginx 反向代理 ✅ + Pi Agent 接入 ✅ + API Key Manager ✅ + DeepSeek 代理 ✅ |
 | 董 | 域2: CLI 多模型代理实现（cc-haha 分析 + 代理方案设计 + 代码实现） | 待端到端验证（需要真实 API Key） | ADR-01 ✅ + v4 PRD ✅ + adapter-cli-flow-analysis v1.3 ✅ + CLI 多模型代理方案设计 ✅ + proxy handler/router 实现 ✅ + ClaudeCodeRuntime 适配代理模式 ✅ |
 | 袁 | §7.1/7.2 API 联调收尾确认（WS 主路径已通，send() 保留为降级兜底）✅ | 无 | 前端全 Phase ✅ + 视觉打磨 ✅ + 交接文档 ✅ + §7.1/7.2 API 联调收尾 ✅ |
 

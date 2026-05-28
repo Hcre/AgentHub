@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { cn } from '../../lib/cn'
 
 export interface DialogProps {
@@ -9,14 +10,15 @@ export interface DialogProps {
 
 export function Dialog({ open, onOpenChange, children }: DialogProps) {
   if (!open) return null
-  return (
+  return createPortal(
     <div className="animate-[var(--animate-fade-in)] fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={() => onOpenChange(false)}
       />
       <div className="animate-[var(--animate-slide-in)] relative z-10">{children}</div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

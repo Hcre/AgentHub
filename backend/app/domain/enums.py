@@ -7,6 +7,7 @@ class AgentSystem(StrEnum):
     """适配模式：决定走 API 管道还是 CLI 运行时。"""
 
     CLAUDE_CODE = "claude_code"  # CLI 运行时（自带 Harness）
+    PI_AGENT = "pi_agent"  # Pi Agent CLI 运行时（自带 Harness，多 Provider）
     ANTHROPIC_API = "anthropic_api"  # Anthropic Messages API
     OPENAI_API = "openai_api"  # OpenAI-compatible API (DeepSeek/Groq/vLLM)
     MOCK = "mock"  # 本地假数据
@@ -91,7 +92,7 @@ class DispatchMode(StrEnum):
     AUTO = "auto"
     DIRECT = "direct"
     # 群组级（Group.dispatch_mode，影响 ChatService 群聊分流）
-    AT_ROUTING = "at_routing"          # V1：@ 路由 + 死群静默
-    DISCUSSION = "discussion"          # M3：Selector 回合循环
-    ROLEPLAY = "roleplay"              # 预留：角色扮演（非本期）
+    AT_ROUTING = "at_routing"  # V1：@ 路由 + 死群静默
+    DISCUSSION = "discussion"  # M3：Selector 回合循环
+    ROLEPLAY = "roleplay"  # 预留：角色扮演（非本期）
     FREE_BROADCAST = "free_broadcast"  # 预留：自治广播（非本期）
