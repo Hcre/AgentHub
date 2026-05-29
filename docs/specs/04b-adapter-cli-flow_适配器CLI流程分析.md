@@ -1,6 +1,7 @@
 # Adapter → CLI 全场景流程分析
 
-> 版本：v1.4 | 日期：2026-05-23 | 基于 ADR-01 + v4 统一方案
+> 版本：v1.5 | 日期：2026-05-26 | 基于 ADR-01 + v4 统一方案
+> v1.5: 重写 §五 群聊讨论模式 —— Selector 串行轮转 + 增量注入（替代旧的并行广播全员）；同步 §十 决策表
 > v1.4: 新增 §九 CLI 多模型代理场景（鉴权适配 + 透明转发 + 错误处理）
 > v1.3: §8 Session 生命周期补充完整前端↔后端↔CLI 交互流程 / §6 权限补充完整检测→通知→重试流程
 
@@ -243,243 +244,387 @@ execute_subtask(task, agent, group_context)
 
 ---
 
-## 五、场景四：群聊自由讨论（非任务意图）
+## 五、场景四：群聊讨论模式（Selector 轮转 + 增量注入）
 
-**触发**：用户在群组 "全栈开发组" 发送 "我想做一个博客，你们有什么想法？"（讨论意图，非任务指令，无 @mention）
+> v1.5 重写。旧版（v1.0–v1.4 §五）描述的是「并行 asyncio.gather 广播全员」模式，已被 `docs/design/group-chat-discussion-mode_群聊讨论模式设计方案.md` 取代。当前实现为 **Selector 程序驱动的串行轮转 + watermark 增量注入**。
 
-### 5.1 意图分类
+**触发**：用户在 `dispatch_mode=DISCUSSION` 的群组中发送 "我想做一个博客，你们有什么想法？"（无 @mention）
 
-消息到达后，ChatService 首先判定处理路径：
+### 5.1 ChatService 路径分流
 
 ```
-用户消息: "我想做一个博客，你们有什么想法？"
+ChatService.send_and_stream(cmd)
 │
-├─ 有 @mention？ → 否 → 不走 direct 路由
+├─ 1. 持久化 user message (PG) + 写 L1 + WS 广播
 │
-├─ 意图分类（轻量规则 + LLM 兜底）：
+├─ 2. 取 session：session.type == GROUP？
+│      └─ 否 → 私聊路径 (§二/三)
+│
+├─ 3. 取 group：group_repo.get_by_id(session.group_id)
+│
+├─ 4. 解析 @mention（trigger.mentions）
+│      ├─ 非空 → V1 串行执行被 @ 的 Agent（逐个 _stream_one_agent）
+│      └─ 空 → 看 group.dispatch_mode
+│
+├─ 5. dispatch_mode 路由
+│      ├─ DISCUSSION → DiscussionOrchestrator.run_discussion
+│      ├─ AT_ROUTING + 无 @ → 死群静默（仅广播用户消息）
+│      └─ （M3）TASK → Coordinator 分解（见 §四）
+│
+└─ 6. 流式产出 StreamEvent → WS 推送 → 前端按 sender_agent_id 分色渲染
+```
+
+> 注意：当前 `SendMessageCommand.dispatch_mode` 字段被接收但 ChatService 不读取，路由完全由 `group.dispatch_mode` 决定。前端的 dispatch_mode 选择需要先持久化到群组配置（`coordinator_config['dispatch_mode']`）。
+
+### 5.2 DiscussionOrchestrator：回合循环
+
+讨论模式不再并行广播。改为**轮转 + Selector 程序驱动**的回合循环：
+
+```
+DiscussionOrchestrator.run_discussion(session, group, trigger):
+│
+│  pending_mentions: list[UUID] = []       # @ 接力队列
+│  already_spoken: set[UUID] = set()       # 本次讨论已发言（Layer 3 用）
+│
+│  for round_no in range(settings.max_discussion_rounds):   # 默认 3 轮
+│      members = load_members(group)                        # coordinator + member_ids
+│      history = MessageRepo.list_by_session(session, limit=L1_WINDOW)
+│
+│      # 决策：pending_mentions 优先于 Selector
+│      if pending_mentions:
+│          next_id = pending_mentions.pop(0)
+│          if next_id in already_spoken: continue           # 跳过已发言
+│          decision = SelectorDecision.pick(next_id, reason="@mention queue", ...)
+│      else:
+│          decision = await Selector.pick(members, history, already_spoken)
+│
+│      # 合并 Selector 返回的新 mention_queue
+│      for mid in decision.mention_queue:
+│          if mid not in pending_mentions and mid not in already_spoken:
+│              pending_mentions.append(mid)
+│
+│      if decision.done or decision.next_agent_id is None:
+│          return                                            # 自然收敛
+│
+│      target = AgentRepo.get_by_id(decision.next_agent_id)
+│      yield from _stream_one(session, group, target, trigger)
+│      already_spoken.add(target.id)
+│
+│  # 触顶 MAX_ROUND，自然结束
+```
+
+**防循环三件套**：
+1. **Selector DONE**（主力）—— LLM 判断讨论已收敛
+2. **MAX_ROUND 硬上限**（默认 3，`settings.max_discussion_rounds`）
+3. **人在环中断** —— 用户发新消息时 WS 进入新一次 `send_and_stream`，前一个生成器自然终止
+
+### 5.3 Selector：三层路由（程序驱动，零~一次 LLM）
+
+`Selector.pick(members, history, already_spoken)` 按优先级三层决策：
+
+```
+Layer 1 — @mention 直达（零 LLM）
+│
+│  扫描 history[-1]（即上一轮发言）
+│    1. 用户消息：直接读 last.mentions 字段
+│    2. Agent 自治 @：用正则 r"@([A-Za-z0-9_一-龥\-]+)" 扫文本，
+│       排除 sender 自己（不能 @ 自己触发自己）
+│  多个 @ → 第一个直达，其余进 mention_queue（接力队列）
+│
+│  返回：SelectorDecision(next=first, reason="@mention=...", mention_queue=(rest,))
+│
+Layer 2 — capability_tags 关键词匹配（零 LLM）
+│
+│  对每个 candidate（排除 last.sender_agent_id）：
+│    hit_count = sum(1 for tag in agent.capability_tags
+│                       if tag.lower() in last.content.lower())
+│  best = argmax(hit_count) where hit_count > 0
+│
+│  返回：SelectorDecision(next=best, reason="capability hit=N")
+│
+Layer 3 — LLM 评估（廉价模型一次调用，强制 tool_use JSON）
+│
+│  candidates = [a for a in members if a.id not in already_spoken]
+│  若全部已发言 → finish("all spoken in this round")
+│
+│  Provider 路由（settings.selector_provider）：
+│    - deepseek (默认) → DeepSeek V4 Flash, OpenAI 兼容 API
+│    - anthropic       → Haiku
+│    - openai          → GPT
+│
+│  Tool schema：
+│    select_next_speaker(
+│      decision: "next" | "done",
+│      agent_name?: str,        # decision=next 时必填，须是候选人之一
+│      reason?: str
+│    )
+│
+│  Prompt 优化（防止 history 过长撑爆上下文）：
+│    Layer A: ```代码块``` → "[代码片段已省略]"
+│    Layer B: 单条 > 300 字符 → 截断 "..."
+│    Layer C: 总长 > settings.selector_max_prompt_chars (默认 4000)
+│             → 从最旧开始丢弃，保留 ≥1 条
+│
+│  失败降级（key 缺失/网络异常/响应非法）→ finish，不阻塞用户
+```
+
+### 5.4 @mention 接力：用户 @ 多人 与 Agent 自治 @
+
+```
+情况 A：用户 @多人（dispatch_mode=DISCUSSION）
+─────────────────────────────────────────────
+用户: "@AgentA @AgentB 你们看看这个方案"
+↓ trigger.mentions = ["AgentA", "AgentB"]
+
+ChatService._handle_group:
+  targets = _resolve_mentions(["AgentA", "AgentB"], group)
+  ↓ [A, B] 非空 → V1 串行：逐个 _stream_one_agent（不走 Selector）
+
+注：当前实现里，「用户 @ 多人 + DISCUSSION 模式」走的是
+ChatService 的简单串行路径，不走 DiscussionOrchestrator。
+mention_queue 机制主要服务于 Agent 自治 @ 接力链路。
+
+
+情况 B：用户无 @，Agent 自治 @ 接力
+─────────────────────────────────────────────
+用户: "我想做一个博客"
+↓ trigger.mentions = []
+
+ChatService → DiscussionOrchestrator.run_discussion
+
+round 0:
+  Selector.pick → Layer 3 LLM 选 FrontendAgent
+  FrontendAgent 回复末尾写: "@BackendAgent 需要后端配合"
+  watermark.set(group, Frontend, msg_id)
+
+round 1:
+  Selector.pick:
+    Layer 1 扫 history[-1].content 命中 @BackendAgent
+    （sender=Frontend 自己排除掉，BackendAgent 通过）
+    → SelectorDecision(next=Backend, reason="@mention=...")
+  _stream_one(BackendAgent)
+
+round 2:
+  ... 直到 Selector DONE 或触顶 MAX_ROUND
+```
+
+### 5.5 ContextBuilder：watermark 增量注入
+
+群聊每个 Agent 维护独立 **watermark**（Redis: `wm:{group_id}:{agent_id}` → message_id，TTL 7 天）。
+
+```
+ContextBuilder.build_for_agent(session, group, target_agent, trigger):
+│
+├─ delta = _compute_delta(session_id, group_id, agent_id):
 │   │
-│   ├─ 任务关键词: "做"、"创建"、"实现"、"帮我"
-│   │   → task_intent → Coordinator 分解
+│   │  wm = WatermarkStore.get(group, target_agent)
 │   │
-│   ├─ 讨论关键词: "想法"、"建议"、"你们觉得"、"怎么看"
-│   │   → discussion_intent → broadcast 讨论模式
+│   ├─ wm is None（首次接触）
+│   │     seed = MessageRepo.list_by_session(session, limit=L1_WINDOW=20)
+│   │     return _maybe_truncate(seed)
 │   │
-│   └─ 兜底: 非明确任务 → discussion_intent
-│
-└─ 结果: discussion_intent → 群聊讨论模式
-```
-
-### 5.2 讨论模式核心机制：并行通知 + 独立决策
-
-与任务模式不同，讨论模式中**没有 Coordinator 参与**。每个 Agent 独立接收上下文、独立判断是否回应。
-
-```
-ChatService.send_and_stream()
-│
-├─ 1. 持久化 user message + L1 + broadcast WS（所有在线成员立即可见）
-│
-├─ 2. 判定 intent = discussion
-│
-├─ 3. 为群组内每个 Agent 并行构建 AgentRequest + 调用 CLI
+│   ├─ wm 命中
+│   │     注：_extract_delta_from_l1 当前永远返回 None
+│   │     （L1 缓存只存 role/content 字典，无 message_id 无法做 delta）
+│   │     ↓
+│   │     delta = MessageRepo.list_after(session, wm, limit=MAX_DELTA+1)
+│   │     ↓
+│   │     若 delta 为空 → wm 在 PG 不存在（被删除或失效）
+│   │       → fallback 到种子历史（warning 日志）
+│   │     若 delta 非空 → _maybe_truncate（默认 MAX_DELTA=50）
 │   │
-│   │   for agent in group.members:          ← 并行，asyncio.gather
-│   │       req = ContextBuilder.build_for_discussion(agent, group, user_msg)
-│   │       tasks.append(agent_runtime.stream(req))
-│   │
-│   │   results = await asyncio.gather(*tasks, return_exceptions=True)
-│   │
-│   └─ 关键：Agent 之间在**同一轮内互相看不到对方的回复**
-│      因为并行执行，peer_context 只包含「本轮之前」的历史消息
+│   └─ _maybe_truncate：超长则取最近 N + 记录 truncated_count
 │
-├─ 4. 收集每个 Agent 的响应
+├─ members_block = format_members(load_members(group), target_agent)
+│      （列出其他成员名 + 角色，不含 target 自己）
 │
-└─ 5. 逐个保存 + L1 + broadcast WS
-```
-
-### 5.3 每个 Agent 收到的上下文
-
-以 Agent "FrontendAgent" 为例：
-
-```
-ContextBuilder.build_for_discussion(frontend_agent, group, user_msg)
+├─ persona = target_agent.system_prompt or f"你是 {target_agent.name}。"
 │
-├─ system_prompt:                       ← 身份走 --system-prompt
-│   """
-│   你是 FrontendAgent，前端开发专家。
-│   当前在「全栈开发组」群聊中。
+├─ delta_block = format_delta(delta.messages, agent_name_by_id)
+│      格式：
+│      ┌── 自上次发言后的新群聊消息（按时间顺序）：
+│      │ ---
+│      │ FrontendAgent: 建议用 React + Tailwind...
+│      │ BackendAgent: 推荐 FastAPI...
+│      │ 用户 (@FrontendAgent): 状态管理用什么？
+│      │ ---
+│      └──
 │
-│   群组成员：
-│   - BackendAgent: 后端开发专家，擅长 [python, fastapi]
-│   - ReviewerAgent: 代码审查专家，擅长 [code_review, testing]
-│   - Coordinator: 任务协调者，负责任务分解与分配
+├─ truncated_hint = "[省略了更早的 N 条群聊消息]" if truncated > 0
 │
-│   行为规则：
-│   - 用户在群聊中提问时，基于你的专长给出建议
-│   - 如果你没有相关建议，可以不回复
-│   - 不要替其他 Agent 回答他们领域的问题
-│   """
+├─ system_prompt = "\n\n".join([
+│      persona,
+│      GROUP_CHAT_CONTRACT,        # 主动 @ 接力 / 简洁优先 / 角色聚焦
+│      members_block,
+│      truncated_hint + delta_block,
+│   ])
 │
-├─ peer_context: None（第一轮没有其他人的回复）
-│   后续轮次会包含上一轮其他 Agent 的回复（见 §5.6）
-│
-├─ messages: L1 window（含当前用户消息）
-│
-└─ capability_prompt: 工具描述（M3 启用，注入 prompt 文本）
+└─ AgentRequest(
+     messages=[{role: "user", content: trigger.content}],   ← 仅 trigger 单条
+     system_prompt=system_prompt,
+     memory=MemoryContext(l1_working=window),
+     agent_id=target_agent.id,
+     group_id=group.id,
+     is_group_chat=True,
+   )
+
+流式完成（_stream_one 末尾）→ WatermarkStore.set(group, target, assistant_msg.id)
 ```
 
-**CLI 调用方式**：每个 Agent 走自己的 CLI session（--resume 恢复历史连续性）。
+**关键差异**（vs 旧版 peer_context 设计）：
+
+| 维度 | 旧版（v1.4 §5.6） | 新版（v1.5） |
+|------|-------------------|--------------|
+| 上下文容器 | peer_context（拼到 prompt 文本） | system_prompt 的 delta_block |
+| 历史范围 | 上一轮所有 Agent 的回复 | 自该 Agent 上次发言后的全量增量 |
+| 状态存储 | 无（每轮临时拼） | Redis watermark（按 group×agent） |
+| 缓存友好 | 否 | 是（system_prompt 前缀稳定，cache 命中率高） |
+| messages 内容 | L1 window 全量 | 仅 trigger.content 单条 |
+
+### 5.6 ClaudeCodeRuntime：群聊 session key
 
 ```
-ClaudeCodeRuntime.stream(request):
-  ├─ session_key = f"{group_session_id}:{agent_id}"  ← 群聊中每个 Agent 独立 CLI session
-  │
-  ├─ prompt = user_message  (+ peer_context if exists)
-  │
-  └─ cmd = ["claude", "--resume", session_key,
-             "--output-format", "stream-json",
-             "--system-prompt", system_prompt,
-             "--max-turns", max_turns]
-  └─ stdin.write(prompt)
+_compute_session_key(request):
+  if request.is_group_chat and request.agent_id is not None:
+      return f"{session_id}:{agent_id}"     # 每 Agent 独立 sqlite
+  return str(session_id)                     # 私聊单 Agent 占用整个 session
 ```
 
-### 5.4 Agent 响应的三种情况
-
-| 情况 | Agent 行为 | Adapter 产出 | ChatService 处理 |
-|------|-----------|-------------|-----------------|
-| **有建议** | 生成文本回复 | TEXT × N → DONE | 落库 + L1 + broadcast WS |
-| **无建议** | CLI 输出 "暂无建议" 或空回复 | TEXT("暂无") → DONE | 落库（可折叠展示） |
-| **超时未响应** | 60s 无输出 | asyncio.wait_for 超时 | 不落库，仅日志 |
-
-### 5.5 并发执行与前端渲染
+每个 Agent 拥有自己的 CLI session 目录：
 
 ```
-时间线：
-  t=0    用户消息广播到群聊（所有人可见）
-  t=0    asyncio.gather 并行启动 3 个 Agent CLI
-  │
-  ├─ t=2s   FrontendAgent 开始流式输出:
-  │         "建议用 React + Tailwind，响应式设计，组件库推荐 shadcn/ui..."
-  │         → WS push: {agent: "FrontendAgent", text: "建议用 React..."}
-  │
-  ├─ t=3s   BackendAgent 开始流式输出:
-  │         "后端推荐 FastAPI + PostgreSQL，需要用户认证、文章 CRUD、评论系统..."
-  │         → WS push: {agent: "BackendAgent", text: "后端推荐 FastAPI..."}
-  │
-  └─ t=60s  ReviewerAgent 超时无响应 → 跳过
+session abc-123 (DISCUSSION 群聊)
+├─ ~/.claude/sessions/abc-123:frontend-uuid/   FrontendAgent 视角
+├─ ~/.claude/sessions/abc-123:backend-uuid/    BackendAgent 视角
+└─ ~/.claude/sessions/abc-123:reviewer-uuid/   ReviewerAgent 视角
 
-前端 ChatView 渲染：
-┌─────────────────────────────────────────┐
-│ 用户: 我想做一个博客，你们有什么想法？     │
-│                                         │
-│ ┌─ FrontendAgent ─────────────────────┐ │
-│ │ 建议用 React + Tailwind，响应式设计， │ │
-│ │ 组件库推荐 shadcn/ui...              │ │
-│ └──────────────────────────────────────┘ │
-│                                         │
-│ ┌─ BackendAgent ──────────────────────┐ │
-│ │ 后端推荐 FastAPI + PostgreSQL...     │ │
-│ └──────────────────────────────────────┘ │
-└─────────────────────────────────────────┘
+每次 _stream_one(AgentX):
+  cmd = ["claude", "--print",
+         "--resume", f"{session_id}:{agent_id}",   # 首次失败 → fallback --session-id
+         "--system-prompt", <persona + CONTRACT + members + delta>,
+         "--output-format", "stream-json", "--verbose",
+         "--permission-mode", "acceptEdits",
+         "--max-turns", "10"]
+  stdin: trigger.content
 ```
 
-### 5.6 多轮讨论：peer_context 的累积
+CLI sqlite 中只保留该 Agent 自己的 turns（自身的 prompt + 自己说过的话）。**别人发言通过 system_prompt 的 delta_block 整段注入**，不混入 messages。
 
-用户继续追问：
-
-```
-第二轮：用户 → "前端用什么状态管理比较好？"
-
-ContextBuilder.build_for_discussion(backend_agent, group, user_msg_2):
-│
-├─ identity_prompt: 同上
-│
-├─ peer_context: """                    ← 本轮新增：上一轮的 Agent 回复
-│     ## 上一轮群聊讨论
-│     **FrontendAgent**: 建议用 React + Tailwind，组件库推荐 shadcn/ui
-│     **BackendAgent**: 后端推荐 FastAPI + PostgreSQL，需要用户认证
-│     """
-│
-└─ messages: L1 window（含两轮对话）
-```
-
-**关键**：peer_context 让每个 Agent 在第二轮能看到第一轮其他人说了什么，从而给出更有针对性的回复。
+### 5.7 完整时间线：3 个 Agent 讨论
 
 ```
-BackendAgent 第二轮收到的完整 prompt:
-"""
-## 你的身份
-你是 BackendAgent，后端开发专家。
-...
+群组成员: [FrontendAgent, BackendAgent, ReviewerAgent]
+dispatch_mode = DISCUSSION
+MAX_ROUND = 3
 
-## 上一轮群聊讨论
-**FrontendAgent**: 建议用 React + Tailwind，组件库推荐 shadcn/ui
-**BackendAgent**: 后端推荐 FastAPI + PostgreSQL，需要用户认证
+t=0  user → "我想做一个博客"
+       ChatService: 落库 + L1 + WS 广播
+       → group.dispatch_mode == DISCUSSION + 无 @ → DiscussionOrchestrator
 
-用户：前端用什么状态管理比较好？
-"""
+──────────── round 0 ────────────
+t=0  Selector.pick:
+       Layer 1: 无 @ → skip
+       Layer 2: "博客" 无明显能力匹配 → skip
+       Layer 3: LLM (DeepSeek V4 Flash) → tool_use: {decision:"next", agent_name:"FrontendAgent"}
+     → next = FrontendAgent
+
+t=1  _stream_one(FrontendAgent):
+       ContextBuilder: wm=None → 种子 [user_msg]
+       system_prompt = persona + CONTRACT + members + delta(user_msg)
+       CLI --resume abc-123:Frontend-uuid（首次→fallback --session-id）
+       stream → "建议 React + Tailwind，后端要给 API。@BackendAgent 你来设计"
+       WS 推送（sender_agent_id=Frontend-uuid，前端用蓝色气泡）
+       watermark.set(group, Frontend, msg_F.id)
+
+──────────── round 1 ────────────
+t=4  Selector.pick:
+       Layer 1: history[-1] 是 Frontend 消息，扫到 @BackendAgent
+       → next = BackendAgent
+
+t=5  _stream_one(BackendAgent):
+       ContextBuilder: wm=None (Backend 首次)
+       system_prompt 包含 delta=[user_msg, Frontend 的回复]
+       stream → "FastAPI + PostgreSQL，要不要审一下？@ReviewerAgent"
+       watermark.set(group, Backend, msg_B.id)
+
+──────────── round 2 ────────────
+t=9  Selector.pick:
+       Layer 1: 上一条含 @ReviewerAgent → next = Reviewer
+
+t=10 _stream_one(ReviewerAgent):
+       ContextBuilder: wm=None (Reviewer 首次)
+       system_prompt 包含 delta=[user_msg, Frontend, Backend]
+       stream → "整体合理。前端考虑 SSR，后端注意鉴权"
+       watermark.set(group, Reviewer, msg_R.id)
+
+──────────── round 3 == MAX_ROUND ────────────
+t=13 触顶硬上限，循环退出（日志 INFO "讨论达到 max_round=3"）
+
+前端 ChatView：
+  user → Frontend 气泡 → Backend 气泡 → Reviewer 气泡
+
+──────────── 用户追问 ────────────
+t=20 user → "前端用什么状态管理？"
+       新一次 send_and_stream，前面的 generator 已结束
+
+       round 0: Selector → Layer 3 LLM → FrontendAgent
+       ContextBuilder:
+         wm = msg_F.id（上次 Frontend 发言的 id）
+         delta = list_after(session, msg_F.id)
+               = [Backend, Reviewer, 用户新消息]   ← 增量！
+       system_prompt 注入这 3 条 delta（前缀 persona+CONTRACT+members 命中 prompt cache）
 ```
 
-BackendAgent 看到前一轮 FrontendAgent 提到 shadcn/ui 后，可能回应：
-"前端用 shadcn/ui 的话，状态管理推荐 Zustand，轻量且和 React 配合好..."
+### 5.8 Agent 响应的三种情况
 
-### 5.7 LoopGuard：防止 Agent 互相聊死
+| 情况 | Selector 行为 | Adapter 产出 | ChatService 处理 |
+|------|--------------|-------------|-----------------|
+| **有发言** | next=Agent | TEXT × N → DONE | 落库 + L1 + WS + 推 watermark |
+| **Selector LLM 判 done** | finish("llm done: …") | 不调用 Adapter | 循环退出 |
+| **触顶 MAX_ROUND** | 不再调用 | 不调用 Adapter | INFO 日志后返回 |
+| **Adapter 抛异常** | n/a | StreamingFailed 事件 | raise 给上层 ChatService（WS rollback + 推 error） |
+| **CLI 权限被阻断** | n/a | DONE w/ permission_denials | 额外 emit REQUEST_APPROVAL（同私聊 §六） |
 
-```
-场景：Agent 之间的回复可能触发连锁反应
+### 5.9 失败降级速查
 
-FrontendAgent: "建议用 React + Tailwind"
-  → BackendAgent: "React 不错，需要我提供什么 API？"
-    → FrontendAgent: "需要用户登录和文章 CRUD 的接口文档"
-      → BackendAgent: "好的，我先设计 API 端点..."
-        → FrontendAgent: "接口文档收到，字段设计有什么建议？"
-          → ... 无限循环
-```
+| 场景 | 行为 |
+|------|------|
+| Selector LLM API Key 缺失（client 初始化失败） | finish("init failed")，不阻塞用户 |
+| Selector LLM 调用异常（网络/限流） | finish(reason="llm error: {ExceptionClass}") |
+| LLM 返回不带 tool_use / tool_calls | finish("no tool_use" / "no tool_calls") |
+| LLM 选了不存在的候选名 | finish("unknown candidate: {name}") + warning |
+| LLM 返回非法 decision 值 | finish("invalid decision: {raw}") |
+| watermark 在 PG 不存在（消息被删） | fallback 种子历史 + warning |
+| pending_mentions 中 agent 不存在 | continue 出队，下一位 |
+| pending_mentions 中 agent 已发言 | continue 出队，下一位 |
+| 群组成员为空 | finish("members empty") |
+| history 为空 | finish("history empty") |
 
-LoopGuard 机制：
+### 5.10 Adapter 关键差异：讨论 vs 任务
 
-```python
-class LoopGuard:
-    def __init__(self, max_consecutive_agent_messages: int = 5):
-        self.max_consecutive = max_consecutive
+| 维度 | 讨论模式（当前实现） | 任务模式（M3 Coordinator，规划） |
+|------|---------------------|----------------------|
+| 入口 | dispatch_mode=DISCUSSION + 无 @ | dispatch_mode=AT_ROUTING + 任务关键词 |
+| 调度方式 | Selector 串行轮转（每轮选 1） | Coordinator 分解 + 并发 dispatch |
+| Agent 是否必须回复 | 否（Selector DONE 即停） | 是（被分配任务必须执行） |
+| 上下文注入 | system_prompt + watermark delta | task_brief + peer_context |
+| Coordinator 参与 | 不参与（仅当 member 出现时才被 Selector 选中） | 主导分解、有向 dispatch |
+| 防循环 | MAX_ROUND=3 + Selector DONE | 任务依赖 DAG + cycle detect |
+| 超时处理 | 单 Agent 异常 → 循环 raise | 任务标 FAILED → 重试/升级 |
+| 前端渲染 | 按 sender_agent_id 分色的消息流 | 任务卡片 + 流式输出 |
 
-    def should_auto_respond(self, recent_messages: list[Message]) -> bool:
-        """检查是否应该自动触发 Agent 回复。"""
-        consecutive = 0
-        for msg in reversed(recent_messages):
-            if msg.role == "assistant" and msg.sender_type == "agent":
-                consecutive += 1
-            else:
-                break  # 遇到 user 消息 → 重置计数
+### 5.11 与旧版（peer_context 并行广播）的对比
 
-        return consecutive < self.max_consecutive
-        # >= 5 条连续 Agent 消息 → 停止自动回复，等待用户介入
-```
+旧版（v1.0–v1.4）的「并行 asyncio.gather 通知全员」存在三个问题，促成了 v1.5 重构：
 
-**生效流程**：
+1. **LLM 成本失控**：每条用户消息触发 N 个 Agent 并发（N=群规模），即使大多数 Agent 无关
+2. **回复噪声大**：所有 Agent 同时回应，互相看不到对方观点，输出冗余
+3. **顺序不可控**：网络抖动决定先后，无法体现「主答 + 补充」的协作语义
 
-```
-消息序列：                      LoopGuard.check()
-  user: "你们有什么想法"         → count=0 ✓ 触发讨论
-  FrontendAgent: "建议..."       → count=1 ✓ 仍可自动回复
-  BackendAgent: "推荐..."        → count=2 ✓ 仍可自动回复
-  FrontendAgent: "补充..."       → count=3 ✓ 仍可自动回复
-  BackendAgent: "再补充..."      → count=4 ✓ 仍可自动回复
-  ReviewerAgent: "建议..."       → count=5 ✗ 停止自动回复
-  ── 系统注入 ──
-  [系统]: "讨论活跃，如需继续请发送消息"
-```
-
-### 5.8 Adapter 关键差异：讨论 vs 任务
-
-| 维度 | 讨论模式 | 任务模式（Coordinator） |
-|------|---------|----------------------|
-| 入口 | 意图分类 → discussion | 意图分类 → task |
-| 是否触发 Coordinator | 否 | 是 |
-| Agent 调用方式 | 并行 `asyncio.gather` 通知全体 | 先分解 → 再有向 dispatch |
-| Agent 是否必须回复 | 否（可选沉默） | 是（分配的任务必须执行） |
-| peer_context | 上一轮全体 Agent 回复 | 仅相关 Agent 的上下文 |
-| 超时处理 | 静默跳过 | 任务标记 FAILED，触发重试/升级 |
-| 前端渲染 | 消息气泡流 | 任务卡片 + 流式输出 |
+新版以 Selector 程序驱动**每轮选 1 个最合适的发言人**，配合 watermark 增量注入：
+- LLM 调用 ≤ MAX_ROUND（默认 3）次廉价模型 + 0~N 次目标 Agent
+- @ 接力机制让 Agent 显式发起协作，对话路径可观测
+- 缓存友好：system_prompt 前缀稳定，CLI prompt cache 命中率高
 
 ---
 
@@ -1088,16 +1233,19 @@ CLI 请求 (Anthropic 格式)
 | 私聊后续：`--resume` + 只传当前消息 | CLI 自己管历史，AgentHub 不传全量 messages |
 | 身份信息走 `--system-prompt` | CLI 原生支持，不污染 user prompt |
 | 其他上下文（peer/capability）注入 prompt 文本 | 非身份信息，拼入 stdin 传入 |
-| 群聊 Worker：`--resume` + 每轮注入 peer_context | 自身对话用 resume，别人消息每轮增量注入 |
+| 群聊 Agent：`--resume` + system_prompt 注入 watermark delta | 自身对话由 CLI session 管理，他人发言走 system_prompt（cache 友好） |
 | Coordinator：API 模式 `chat_structured` | 需要可靠的结构化 JSON 输出 |
-| 群聊讨论：并行通知全体 Agent | Agent 独立决策是否回复，互不阻塞 |
-| 讨论轮次：peer_context 只含本**轮之前**的消息 | 并行执行中 Agent 互相看不到同轮回复 |
+| **群聊讨论：Selector 串行轮转**（v1.5 取代旧并行广播） | LLM 成本可控、对话顺序可观测、协作语义清晰 |
+| **Selector 三层路由（@mention → capability → LLM）** | 程序优先于 LLM，多数轮次零 LLM 决策 |
+| **Selector LLM：DeepSeek V4 Flash 默认 + tool_use 强制 JSON** | 廉价 + 可靠结构化输出，prompt 长度有三层裁剪 |
+| **讨论防循环：MAX_ROUND(3) + Selector DONE + 用户新消息中断** | 三重保险防 Agent 互相聊死 |
+| **ContextBuilder：watermark 增量注入** | 每 Agent 跟踪「上次发言点」，仅注入 delta 而非全量 |
+| **群聊 messages 仅含 trigger 单条** | 历史通过 system_prompt 的 delta_block 注入，CLI session 自管自身 turn |
 | session_id 直接复用 AgentHub session UUID | 无需额外映射层，CLI 原生支持 UUID |
 | 超时保留 session / 崩溃删除 session | 超时可能是正常任务过大，崩溃=状态损坏不可恢复 |
 | WS 断开立即 kill，不保留进程 | --resume 已保证可恢复 |
-| LoopGuard：连续 5 条 Agent 消息停止触发 | 防止 Agent 互相聊死，等用户介入 |
-| 讨论超时 Agent 静默跳过 | 讨论非强制任务，沉默是合法行为 |
-| 群聊 session_id 格式：`{group_session}:{agent_id}` | 同一群聊中每个 Agent 独立 CLI session |
+| 讨论中 Agent 异常即终止循环 | 单 Agent 失败影响整体观感，宁可显式报错 |
+| 群聊 session_id 格式：`{group_session_id}:{agent_id}` | 同一群聊中每个 Agent 独立 CLI sqlite，互不覆盖 |
 | 权限：预设 acceptEdits + 检测 permission_denials | --print 模式无交互式提示，阻断后通知用户重试 |
 | **代理**：所有 CLI 流量走内置代理 | 鉴权不兼容（x-api-key vs Bearer），统一适配 |
 | **代理**：URL 路径编码 agent_id | 无需自定义 header，CLI 零改动 |
@@ -1117,3 +1265,6 @@ CLI 请求 (Anthropic 格式)
 | `DOC-17-context-injection-problem.md` | CLI 上下文注入问题分析 |
 | `CLI多模型代理方案.md` | CLI 多模型代理方案设计（含 ProxyHandler + 路由 + 鉴权适配） |
 | `cc-haha-multi-model-analysis.md` | cc-haha 多模型支持机制深度分析 |
+| `docs/design/group-chat_群聊功能设计方案.md` | 群聊总体设计（watermark + 增量注入） |
+| `docs/design/group-chat-discussion-mode_群聊讨论模式设计方案.md` | 讨论模式设计（Selector 三层路由 + 防循环） |
+| `docs/design/group-chat-implementation-plan_群聊实施计划.md` | 群聊分阶段实施计划 |

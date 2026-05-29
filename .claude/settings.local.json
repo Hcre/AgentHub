@@ -25,7 +25,17 @@
       "Bash(npx eslint *)",
       "Bash(echo \"ESLINT_EXIT=$?\")",
       "Bash(/home/huishuohuademao/workspace/AgentHub/backend/.venv/bin/ruff check *)",
-      "Bash(echo \"RUFF_EXIT=$?\")"
+      "Bash(echo \"RUFF_EXIT=$?\")",
+      "Bash(/home/huishuohuademao/workspace/AgentHub/backend/.venv/bin/python -m pytest tests/ -x -q --no-cov)",
+      "Bash(npx tsc *)",
+      "Bash(/home/huishuohuademao/workspace/AgentHub/frontend/node_modules/.bin/tsc -p /home/huishuohuademao/workspace/AgentHub/.claude/worktrees/group-chat-impl/frontend/tsconfig.app.json --noEmit)",
+      "Bash(ln -s /home/huishuohuademao/workspace/AgentHub/frontend/node_modules /home/huishuohuademao/workspace/AgentHub/.claude/worktrees/group-chat-impl/frontend/node_modules)",
+      "Bash(./node_modules/.bin/tsc -b --noEmit)",
+      "Bash(./node_modules/.bin/tsc -b)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(./node_modules/.bin/eslint src/stores/groupStore.ts src/hooks/useGroupWebSocket.ts src/components/group/ src/api/groups.ts src/api/sessions.ts src/types/index.ts)",
+      "Bash(python3 *)",
+      "Bash(python3.12 ../scripts/feasibility/phase1_smoke.py)"
     ]
   }
 }

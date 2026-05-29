@@ -12,12 +12,13 @@ docs/explore/
 ├── EVOLUTION.md           ← 项目决策演进日志
 ├── ADR-NN-*.md            ← 架构决策记录（团队级）
 ├── EXP-NN_*.md            ← 技术探索报告（团队级）
-├── 黎/                    ← 黎的个人探索
-├── 董/                    ← 董的个人探索
-│   ├── claude-code-haha-analysis.md
-│   ├── sendmessage-flow-analysis.md
-│   └── claude-code-adapter-pitfalls.md
-└── 袁/                    ← 袁的个人探索
+└── 董/                    ← 董的个人探索
+    ├── claude-code-haha-analysis.md
+    ├── sendmessage-flow-analysis.md
+    ├── claude-code-adapter-pitfalls.md
+    ├── cc-haha-multi-model-analysis.md
+    ├── 01-Agent-CRUD-补全设计.md
+    └── CLI多模型代理方案.md
 ```
 
 ## 分类
@@ -44,6 +45,12 @@ docs/explore/
 | EXP-10 | [结构化上下文设计](EXP-10_structured-context-design.md) | Agent 上下文结构设计 |
 | EXP-11 | [上下文注入问题](EXP-11_context-injection-problem.md) | 上下文注入方案分析 |
 
+## 进行中的探索
+
+| 文件 | 主题 | 状态 |
+|------|------|------|
+| [group-chat-boundary-and-dependencies](group-chat-boundary-and-dependencies.md) | 群聊模块边界、依赖分析与接口契约 | 讨论中 |
+
 ## 架构决策记录
 
 | 文件 | 决策摘要 |
@@ -58,12 +65,9 @@ docs/explore/
 | [claude-code-haha-analysis](董/claude-code-haha-analysis.md) | Claude Code 行为分析 |
 | [sendmessage-flow-analysis](董/sendmessage-flow-analysis.md) | SendMessage 流程分析 |
 | [claude-code-adapter-pitfalls](董/claude-code-adapter-pitfalls.md) | Claude Code 适配器踩坑记录 |
-
-### 黎/
-暂无个人探索文档。
-
-### 袁/
-暂无个人探索文档。
+| [cc-haha-multi-model-analysis](董/cc-haha-multi-model-analysis.md) | 多模型代理方案分析 |
+| [01-Agent-CRUD-补全设计](董/01-Agent-CRUD-补全设计.md) | Agent CRUD 补全设计 |
+| [CLI多模型代理方案](董/CLI多模型代理方案.md) | CLI 多模型代理方案 |
 
 ## 文档生命周期
 

@@ -33,6 +33,11 @@ class AgentRequest(BaseModel):
     agent_id: UUID | None = None       # 本次调用的目标 Agent（群聊必填）
     group_id: UUID | None = None       # 所在群组（群聊必填）
     is_group_chat: bool = False        # 群聊标识；True 时 CLI key = uuid5(session_id:agent_id)
+    # 群聊 delta 文本（自上次发言后的新消息渲染）。从 system_prompt 中独立出来，
+    # 是为了让 V1 长驻进程能复用 spawn-time 的稳定 sp（persona + 契约 + 成员），
+    # 把动态 delta 放到 user message 里逐轮注入。V0 路径会拼回 sp 保持兼容。
+    # 见 ADR-02 + ContextBuilder._build_group。
+    group_delta_text: str | None = None
 
 
 class StreamEventType(StrEnum):

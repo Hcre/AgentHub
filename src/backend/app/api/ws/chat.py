@@ -49,7 +49,8 @@ async def session_ws(websocket: WebSocket, session_id: UUID) -> None:
             if data.get("type") != "message":
                 continue
             await _handle_message(websocket, session_id, data)
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError):
+        # RuntimeError: receive_json 在已关闭 WS 上调用（客户端先关）
         await ws_manager.disconnect(session_id, websocket)
     except Exception:
         logger.exception("WS 处理异常")
@@ -99,10 +100,25 @@ async def _handle_message(ws: WebSocket, session_id: UUID, data: dict) -> None:
             async for event in chat.send_and_stream(cmd):
                 await ws.send_json(event.model_dump(mode="json"))
             await db.commit()
+        except WebSocketDisconnect:
+            # 客户端 mid-stream 关闭：刷新/切走/网络抖动 —— 不算服务端错误，回滚后让外层 while 退出
+            await db.rollback()
+            logger.info("WS 客户端中途断开，停止 stream session=%s", session_id)
+            raise
         except AgentHubError as exc:
             await db.rollback()
-            await ws.send_json({"type": "error", "seq": -1, "content": str(exc)})
+            await _safe_send_error(ws, str(exc))
         except Exception as exc:
             await db.rollback()
             logger.exception("流式执行失败")
-            await ws.send_json({"type": "error", "seq": -1, "content": str(exc)})
+            await _safe_send_error(ws, str(exc))
+
+
+async def _safe_send_error(ws: WebSocket, message: str) -> None:
+    """尽力把错误送回 WS；客户端已关时静默吞掉。"""
+    try:
+        await ws.send_json({"type": "error", "seq": -1, "content": message})
+    except (WebSocketDisconnect, RuntimeError):
+        # RuntimeError: "Cannot call send once a close message has been sent"
+        # WebSocketDisconnect: 客户端已关
+        pass
