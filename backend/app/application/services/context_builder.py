@@ -95,7 +95,10 @@ class ContextBuilder:
         members_block = format_members(members, target_agent)
 
         # 3. 拼 stable_prefix（cache 友好）
-        persona = target_agent.system_prompt or f"你是 {target_agent.name}。"
+        persona = target_agent.system_prompt or (
+            f"你是 {target_agent.name}，本群成员之一。"
+            f"你只代表你自己发言，不要替其他成员说话，不要模仿他人的口癖或说话风格。"
+        )
         agent_name_by_id = {m.id: m.name for m in members}
         delta_block = format_delta(delta.messages, agent_name_by_id)
         truncated_hint = (
@@ -210,7 +213,7 @@ class ContextBuilder:
     # --- 成员加载 ---
 
     async def _load_members(self, group: Group) -> list[Agent]:
-        ids = list({*group.member_ids, group.coordinator_id})
+        ids = [mid for mid in group.member_ids if mid != group.coordinator_id]
         members: list[Agent] = []
         for aid in ids:
             agent = await self._agents.get_by_id(aid)
