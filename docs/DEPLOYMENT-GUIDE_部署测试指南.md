@@ -1,6 +1,6 @@
 # AgentHub 部署与测试指南
 
-> 版本：v1.0 | 日期：2026-05-23 | 基于 M2 域2 联调经验
+> 版本：v1.1 | 日期：2026-05-24 | 更新：前端启动方式 + Docker 部署 + 缓存问题
 
 ---
 
@@ -58,6 +58,7 @@ cp backend/.env.example backend/.env
 #   DATABASE_URL=postgresql+asyncpg://agenthub:agenthub_dev_pwd@localhost:5432/agenthub
 #   REDIS_URL=redis://localhost:6379/0
 #   SECRET_KEY=<有效的 base64 32 字节密钥>
+#   PROXY_BASE_URL=http://127.0.0.1:8000/proxy  ← CLI 代理模式必填
 ```
 
 ### 3. 创建数据库
@@ -100,29 +101,59 @@ ALTER TABLE agents ADD COLUMN IF NOT EXISTS base_url VARCHAR(512);
 
 ## 三、启动服务
 
-### Terminal 1 — 后端
+### 本地开发启动
+
+#### Terminal 1 — 后端
 
 ```bash
 cd backend
 source .venv/bin/activate
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+alembic stamp head                          # 对齐 migration 版本
+uvicorn app.main:app --reload --port 8000
 ```
 
-### Terminal 2 — 前端
+#### Terminal 2 — 前端
 
 ```bash
 cd frontend
-npm run dev
+npm run build && npm run preview -- --port 4173
 ```
 
-### 验证启动
+⚠️ **不要用 `npm run dev`**：Vite 开发服务器有预构建缓存问题，切换分支/重装依赖后 CSS 可能缺失（表现为弹窗不居中、组件错位）。详情见 §七 Q8。
+
+#### 验证启动
 
 ```bash
 # 后端
 curl http://127.0.0.1:8000/api/agents
 
-# 前端
-curl http://127.0.0.1:5173
+# 前端（预览地址为 4173）
+curl http://127.0.0.1:4173
+```
+
+### Docker 部署
+
+```bash
+cd docker
+docker compose up -d --build
+```
+
+服务端口：
+
+| 服务 | 端口 | 说明 |
+|------|------|------|
+| 后端 API | 8000 | FastAPI + Uvicorn |
+| 前端 | 5173（映射到容器 80） | Nginx 托管生产构建 |
+| PostgreSQL | 5432 | pgvector/pg16 |
+| Redis | 6379 | Redis 7 |
+
+⚠️ **Docker 不支持 claude_code 运行时**：容器内无 Node.js + Claude CLI，只能用 `anthropic_api`（直连）或 `mock`（演示）。
+
+Docker 环境变量在项目根目录 `.env` 中（`docker-compose.yml` 引用 `../.env`），需确认以下字段：
+
+```bash
+# 根 .env 额外需要（Docker 用）：
+PROXY_BASE_URL=http://backend:8000/proxy   # 容器内用 service name
 ```
 
 ---
@@ -213,6 +244,30 @@ CLI session 被手动删除或过期。系统会自动 fallback 新建，不影�
 ### Q7: 前端 502 Bad Gateway
 
 后端未启动或端口不是 8000。前端 `.env` 的 `VITE_API_BASE_URL` 必须匹配后端端口。
+
+### Q8: 前端样式错乱（弹窗不居中、组件缺位）
+
+**原因：** Vite 开发服务器（`npm run dev`）使用 `node_modules/.vite` 预构建缓存。切换分支/重装依赖后，缓存中的 CSS 可能不包含新组件的 Tailwind 类名（如 `fixed`、`inset-0`）。
+
+**解决方案：**
+
+方案 A（推荐）—— 使用生产预览替代开发服务器：
+```bash
+npm run build && npm run preview -- --port 4173
+```
+
+方案 B —— 清除缓存后重启 dev：
+```bash
+rm -rf node_modules/.vite node_modules dist
+npm install
+npm run dev
+```
+
+**原理：** `npm run build` 全量扫描源码生成完整 CSS，无缓存。`npm run dev` 按需增量生成 + 缓存复用，缓存过期会导致新类名缺失。
+
+### Q9: Docker 和本地的前端显示不同
+
+Docker 走 `npm run build` 生产构建，本地 `npm run dev` 可能缓存过期。统一用 §三 的 `npm run build && npm run preview` 即可一致。
 
 ---
 

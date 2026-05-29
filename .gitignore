@@ -43,3 +43,4 @@ docker/data/
 
 # === Git worktrees ===
 .worktrees/
+.claude/worktrees/

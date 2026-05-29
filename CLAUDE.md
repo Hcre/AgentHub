@@ -4,7 +4,7 @@
 
 ## 项目定位
 
-IM 聊天式多 Agent 协作平台。5 层洋葱架构（L1 Infrastructure → L2 Domain → L3 Application → L4 API → L5 Presentation）。技术栈：FastAPI + React/TypeScript + PostgreSQL + Redis + Docker。LLM 接入：SDK/CLI 双轨（`LLMAdapter` + `AgentRuntime`），CLI 优先。
+IM 聊天式多 Agent 协作平台。5 层架构（L1 Infrastructure → L2 Domain → L3 Application → L4 API → L5 Presentation）。技术栈：FastAPI + React/TypeScript + PostgreSQL + Redis + Docker。LLM 接入：SDK/CLI 双轨（`LLMAdapter` + `AgentRuntime`），CLI 优先。
 
 依赖方向：`L5 → L4 → L3 → L2 ← L1`（L1 实现 L2 接口，依赖倒置）。
 
@@ -22,6 +22,7 @@ IM 聊天式多 Agent 协作平台。5 层洋葱架构（L1 Infrastructure → L
 | `docs/community-research_社区调研与架构对比分析.md` | 竞品调研与架构选型参考 |
 | `docs/explore/` | 技术探索文档 → [README.md](docs/explore/README.md) 索引 + [EVOLUTION.md](docs/explore/EVOLUTION.md) 演进日志 |
 | `docs/explore/ADR-01-cli-first-pivot.md` | 双轨架构决策记录 |
+| `docs/design/` | 功能设计方案（如群组创建等） |
 | `docs/archive/` | 历史版本文档归档 |
 | `spec/AgentHub_SPEC_项目主规格.md` | 首次接触，了解全貌 |
 | `spec/architecture_架构定义.md` | 做架构决策前 |
