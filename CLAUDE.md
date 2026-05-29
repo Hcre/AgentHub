@@ -91,6 +91,44 @@ IM 聊天式多 Agent 协作平台。5 层洋葱架构（L1 Infrastructure → L
 
 push 之前 worklog 检查自动运行，不通过会阻止 push。
 
+## 本地开发起步
+
+### 后端 `.env` 配置（每次新 worktree 必做）
+
+`backend/.env` 在 `.gitignore` 内，新 worktree 必须手动配。**不能直接拷 `.env.example`**：
+里面 `SECRET_KEY=CHANGE_ME_base64_32bytes` 是占位符，启动 base64 解码会炸；而且
+agent 凭据加密用的 SECRET_KEY 必须跟主仓根 `.env`（Docker compose 用的那份）一致，
+否则 PG 里已有 agent 的 api_key 解不开。
+
+```bash
+# 在新 worktree 的 backend/ 目录里
+cp ../.env.example .env  # 先拿到模板（worktree 内是 worktree 根；主仓 backend 是主仓根）
+
+# 然后用主仓根 .env 的 SECRET_KEY/JWT_SECRET 覆盖：
+#   MAIN=/home/huishuohuademao/workspace/AgentHub
+#   把 $MAIN/.env 里的两行 grep 出来贴进 backend/.env
+grep -E "^(SECRET_KEY|JWT_SECRET)=" $MAIN/.env
+# 再编辑 backend/.env，替换对应两行
+```
+
+### 启动
+
+```bash
+# Terminal 1 — 后端（worktree/backend）
+.venv/bin/alembic upgrade head
+.venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# Terminal 2 — 前端（worktree/frontend）
+npm install         # 切 worktree 后 node_modules 可能缺包
+npm run dev         # 或 build + preview 避免 vite dev 缓存问题
+```
+
+Phase 1 长驻 CLI（ADR-02）需 `backend/.env` 加：
+```
+CLAUDE_CODE_LONG_RUNNING=1
+LLM_ADAPTER_MODE=claude_cli
+```
+
 ## 协作流程
 
 ### 每次工作前
