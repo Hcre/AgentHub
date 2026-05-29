@@ -122,7 +122,7 @@ python scripts/start_server.py    # 起本地 HTTP（dashboard 需 HTTP，不能
 ```bash
 python scripts/gen_codegraph.py   # 重建图谱（改后端结构后跑）
 ```
-- 人看：浏览器开 `.understand-anything/graph.html`（分层依赖图，点节点看上下游）或 `CODE_MAP.md`
+- 人看：浏览器开 `.understand-anything/graph.html`（分层依赖图，点节点看上下游）或 `docs/CODE_MAP.md`；也可在 dashboard「图谱」Tab 内直接查看
 - AI 查：`.codegraph/graph.json`（节点/边/缺陷：跨层违规、循环依赖、死代码）
 
 ## 目录结构

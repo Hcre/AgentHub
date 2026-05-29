@@ -85,6 +85,7 @@ AgentHub/                                # 仓库根：仅放顶层入口文件 
 │   ├── research/                        #   调研文档
 │   ├── explore/                         #   技术探索 + EVOLUTION 演进日志（含个人子目录 黎/董/袁）
 │   ├── archive/                         #   历史快照（DEPRECATED_ 前缀）
+│   ├── CODE_MAP.md                      #   【代码地图】后端模块全景（Mermaid）+ 入口表（gen_codegraph.py 生成，入 git）
 │   └── DEPLOYMENT-GUIDE_部署测试指南.md   #   运维向
 │
 ├── worklogs/                           # 【工作日志】★按人分子目录
@@ -103,7 +104,6 @@ AgentHub/                                # 仓库根：仅放顶层入口文件 
 ├── meta/                               # 【元信息】描述仓库自身
 │   └── FILE_GRAPH.md                    #   本文件
 │
-├── CODE_MAP.md                         # 【代码地图】后端模块全景（Mermaid）+ 入口表（gen_codegraph.py 生成，入 git）
 ├── .codegraph/                         # 【代码图谱·AI 侧】graph_schema.json 入 git；graph.json gitignored
 ├── .understand-anything/               # 【代码图谱·人侧】graph.html 交互可视化（gitignored，可重建）
 │
