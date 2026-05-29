@@ -8,7 +8,7 @@ set fail=0
 
 REM 后端: ruff lint
 echo ► 后端 ruff lint...
-cd /d "%~dp0..\backend"
+cd /d "%~dp0..\src\backend"
 ruff check app/ --config pyproject.toml
 if %errorlevel% neq 0 (
     echo ❌ ruff 失败
@@ -21,7 +21,7 @@ cd /d "%~dp0.."
 REM 后端: ruff format
 echo.
 echo ► 后端 ruff format...
-cd /d "%~dp0..\backend"
+cd /d "%~dp0..\src\backend"
 ruff format --check app/ --config pyproject.toml
 if %errorlevel% neq 0 (
     echo ❌ ruff format 失败
@@ -34,7 +34,7 @@ cd /d "%~dp0.."
 REM 后端: mypy
 echo.
 echo ► 后端 mypy...
-cd /d "%~dp0..\backend"
+cd /d "%~dp0..\src\backend"
 mypy app/
 if %errorlevel% neq 0 (
     echo ❌ mypy 失败
@@ -47,7 +47,7 @@ cd /d "%~dp0.."
 REM 前端: tsc typecheck
 echo.
 echo ► 前端 TypeScript...
-cd /d "%~dp0..\frontend"
+cd /d "%~dp0..\src\frontend"
 call npx tsc --noEmit
 if %errorlevel% neq 0 (
     echo ❌ tsc 失败
@@ -60,7 +60,7 @@ cd /d "%~dp0.."
 REM 前端: eslint
 echo.
 echo ► 前端 eslint...
-cd /d "%~dp0..\frontend"
+cd /d "%~dp0..\src\frontend"
 call npx eslint src/ --config .eslintrc.json
 if %errorlevel% neq 0 (
     echo ❌ eslint 失败

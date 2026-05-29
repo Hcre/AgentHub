@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentHub · 产品需求文档</title>
+<style>
+  :root{
+    --bg:#F0EEE6; --bg-soft:#F5F3EC; --panel:#FBFAF6; --panel-2:#F6F3EA;
+    --line:#E2DDD0; --line-soft:#EAE6DA; --txt:#28261F; --txt-dim:#6A6457;
+    --txt-faint:#9A9385; --brand:#C9613C; --brand-2:#D97757; --accent:#7A8CA3;
+    --gold:#B68A3E; --good:#5C8A56; --warn:#C08A2E; --bad:#C0533F;
+    --radius:16px; --shadow:0 18px 40px -24px rgba(80,60,40,.35);
+    --mono:'SFMono-Regular',ui-monospace,'Cascadia Code','Consolas',monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;font-size:15px}
+  body{
+    font-family:var(--sans);background:radial-gradient(1100px 700px at 82% -8%,#F7E9DF 0%,transparent 55%),radial-gradient(900px 650px at -8% 8%,#EEEADD 0%,transparent 50%),var(--bg);
+    color:var(--txt);line-height:1.7;-webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--brand);color:#fff}
+  .shell{display:flex;min-height:100vh}
+  .side{
+    position:fixed;top:0;left:0;bottom:0;width:248px;
+    background:linear-gradient(180deg,#F6F3EA,#F2EFE5);border-right:1px solid var(--line);
+    padding:26px 16px 30px;overflow-y:auto;z-index:50;
+  }
+  .side::-webkit-scrollbar{width:6px}
+  .side::-webkit-scrollbar-thumb{background:#DCD6C8;border-radius:8px}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px;padding:0 6px}
+  .brand .mark{
+    width:36px;height:36px;border-radius:10px;flex:0 0 auto;
+    background:linear-gradient(135deg,var(--brand),var(--brand-2));
+    display:grid;place-items:center;font-weight:800;color:#fff;font-size:16px;
+    box-shadow:0 8px 20px -8px var(--brand);
+  }
+  .brand b{font-size:15px;letter-spacing:.3px;display:block;line-height:1.25;color:var(--txt)}
+  .brand span{font-size:10.5px;color:var(--txt-faint);letter-spacing:1.5px}
+  .side .meta{font-size:10.5px;color:var(--txt-faint);padding:0 6px;margin:12px 0 16px;border-top:1px solid var(--line);padding-top:12px}
+  nav a{
+    display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;
+    color:var(--txt-dim);text-decoration:none;font-size:12.5px;transition:.18s;margin-bottom:2px;
+  }
+  nav a .n{font-family:var(--mono);font-size:10px;color:var(--txt-faint);width:18px;text-align:center}
+  nav a:hover{background:#EBE6D8;color:var(--txt)}
+  nav a.active{background:linear-gradient(90deg,rgba(201,97,60,.14),transparent);color:#2a2620;box-shadow:inset 2px 0 0 var(--brand)}
+  nav a.active .n{color:var(--brand)}
+  nav .grp{font-size:9.5px;letter-spacing:2px;color:var(--txt-faint);text-transform:uppercase;margin:16px 0 6px 10px}
+  .main{margin-left:248px;flex:1;padding:40px 48px 60px;max-width:1160px}
+
+  .sec-head{margin-bottom:28px}
+  .sec-head .tag{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;color:var(--brand);margin-bottom:4px}
+  .sec-head h2{font-size:26px;font-weight:800;letter-spacing:-.5px;margin:4px 0 10px}
+  .sec-head p{font-size:14px;color:var(--txt-dim);max-width:720px}
+  h2{font-size:24px;font-weight:800;margin:40px 0 14px;letter-spacing:-.3px}
+  h3{font-size:18px;font-weight:700;margin:28px 0 12px;display:flex;align-items:center;gap:10px}
+  h3 .dot{width:7px;height:7px;border-radius:50%;background:var(--brand);flex:0 0 auto}
+  h4{font-size:15px;font-weight:700;margin:18px 0 8px;color:var(--txt)}
+  p{font-size:13.5px;color:var(--txt-dim);margin-bottom:10px;line-height:1.75}
+  .mono{font-family:var(--mono)}
+
+  .card{border:1px solid var(--line);border-radius:13px;padding:18px 20px;background:var(--panel);box-shadow:var(--shadow)}
+  .card.hl{border-left:3px solid var(--brand)}
+  .card h4{font-size:14px;margin:0 0 8px}
+  .card p{font-size:12.5px}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr 1fr}
+  .g4{grid-template-columns:1fr 1fr 1fr 1fr}
+
+  .chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chip{font-size:11px;padding:3px 10px;border-radius:5px;background:#EDE8DD;color:var(--txt-dim);font-family:var(--mono);border:1px solid var(--line)}
+  .chip.b{background:rgba(201,97,60,.12);color:var(--brand);border-color:rgba(201,97,60,.25)}
+  .chip.t{background:rgba(90,80,180,.08);color:#6350a0;border-color:rgba(90,80,180,.15)}
+  .b-pill{font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:4px;display:inline-block}
+  .b-pill.ok{background:#E1F0DD;color:var(--good)}
+  .b-pill.mid{background:#F3E9D0;color:var(--warn)}
+  .b-pill.no{background:#F2DDD8;color:var(--bad)}
+  .pill{font-size:11px;padding:2px 8px;border-radius:12px;background:#EDE8DD;color:var(--txt-dim);border:1px solid var(--line);display:inline-block;margin:2px}
+
+  .tbl-wrap{overflow-x:auto;border-radius:11px;border:1px solid var(--line);background:var(--panel)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead{background:var(--bg-soft)}th{padding:10px 14px;text-align:left;font-weight:700;font-size:12px;color:var(--txt-dim);border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:9px 14px;border-bottom:1px solid var(--line-soft);color:var(--txt-dim)}
+  tr:last-child td{border-bottom:none}
+  td.num{font-family:var(--mono);text-align:right;white-space:nowrap}
+
+  .diagram{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:20px 24px;font-family:var(--mono);font-size:12px;line-height:1.5;overflow-x:auto;white-space:pre;box-shadow:var(--shadow)}
+  .diagram .hl{color:var(--brand);font-weight:700}
+  .diagram .cm{color:var(--txt-faint)}
+
+  .note{padding:14px 16px;border-radius:11px;display:flex;gap:10px;align-items:flex-start;font-size:13px;margin:16px 0;border:1px solid}
+  .note .ico{font-size:18px;flex:0 0 auto;margin-top:1px}
+  .note.info{border-color:rgba(122,140,163,.3);background:rgba(122,140,163,.08)}
+  .note.warn{border-color:rgba(192,138,46,.3);background:rgba(192,138,46,.08)}
+  .note.good{border-color:rgba(92,138,86,.25);background:rgba(92,138,86,.08)}
+
+  .features{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .features .f{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+  .features .f .icon{font-size:22px;flex:0 0 auto}
+  .features .f h5{font-size:13px;font-weight:700;margin:0 0 3px}
+  .features .f p{font-size:11.5px;margin:0;color:var(--txt-faint)}
+
+  .story-card{border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:var(--panel);box-shadow:var(--shadow)}
+  .story-card .head{display:flex;gap:10px;margin-bottom:8px}
+  .story-card .head .num{font-family:var(--mono);font-size:12px;color:var(--brand);font-weight:700;white-space:nowrap}
+  .story-card .head h4{font-size:14px;margin:0}
+  .story-card .bd{font-size:12.5px;color:var(--txt-dim);line-height:1.7}
+  .story-card .bd code{background:#EDE8DD;padding:1px 5px;border-radius:3px;font-family:var(--mono);font-size:11.5px}
+
+  .step-row{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+  .step{font-size:11.5px;padding:5px 12px;border-radius:7px;background:var(--panel);border:1px solid var(--line);color:var(--txt-dim);display:flex;align-items:center;gap:6px}
+  .step .dot{width:6px;height:6px;border-radius:50%;flex:0 0 auto}
+  .step .dot.g{background:var(--good)}
+  .step .dot.o{background:var(--warn)}
+  .step .dot.r{background:var(--bad)}
+  .step .dot.b{background:var(--brand)}
+
+  .verdict{border:2px solid var(--brand);border-radius:14px;padding:22px 26px;background:linear-gradient(135deg,var(--panel),#FDF8F4);box-shadow:var(--shadow)}
+  .verdict .lbl{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--brand);font-weight:700;margin-bottom:8px}
+  .verdict h4{font-size:17px;font-weight:800;margin:0 0 12px}
+  .verdict p{font-size:13px}
+  .verdict .row{display:flex;gap:20px;margin-top:14px;flex-wrap:wrap}
+  .verdict .m{text-align:center;padding:10px 18px;background:var(--bg-soft);border-radius:9px;flex:1;min-width:100px}
+  .verdict .m b{font-size:22px;color:var(--brand);display:block;font-family:var(--mono)}
+
+  .vision{display:grid;grid-template-columns:repeat(3,1fr);gap:0;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+  .v-step{padding:22px 20px;position:relative;border-right:1px solid var(--line)}
+  .v-step:last-child{border-right:none}
+  .v-step .when{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;color:var(--brand);text-transform:uppercase}
+  .v-step h4{font-size:16px;font-weight:800;margin:8px 0 10px}
+  .v-step .goal{font-size:12px;color:var(--txt-dim);margin-bottom:10px}
+
+  .src{font-size:10.5px;color:var(--txt-faint);font-family:var(--mono);margin-top:12px;display:flex;flex-wrap:wrap;gap:4px 14px}
+  .divider{height:1px;background:var(--line);margin:40px 0}
+  footer{border-top:1px solid var(--line);padding:24px 0 10px;margin-top:40px;color:var(--txt-faint);font-size:11.5px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  footer code{font-family:var(--mono);color:var(--brand)}
+  .toTop{position:fixed;right:24px;bottom:24px;width:42px;height:42px;border-radius:11px;background:var(--panel);border:1px solid var(--line);color:var(--txt);display:grid;place-items:center;cursor:pointer;opacity:0;transition:.25s;z-index:60;font-size:16px;box-shadow:var(--shadow)}
+  .toTop.show{opacity:1}
+  .toTop:hover{border-color:var(--brand);color:var(--brand)}
+  @media(max-width:900px){
+    .side{display:none}.main{margin-left:0;padding:24px 20px}
+    .g2,.g3,.g4{grid-template-columns:1fr}.features{grid-template-columns:1fr}
+    .vision{grid-template-columns:1fr}.v-step{border-right:none;border-bottom:1px solid var(--line)}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">
+      <div class="mark">A</div>
+      <div><b>AgentHub</b><span>产品需求文档</span></div>
+    </div>
+    <div class="meta">v1.0 · 2026-05-21 · <code>Draft</code></div>
+    <nav>
+      <div class="grp">概述</div>
+      <a href="#intro" class="active"><span class="n">01</span>产品概述</a>
+      <a href="#personas"><span class="n">02</span>用户画像</a>
+      <a href="#stories"><span class="n">03</span>用户故事</a>
+      <div class="grp">功能</div>
+      <a href="#agents"><span class="n">04</span>Agent 管理</a>
+      <a href="#groups"><span class="n">05</span>群组功能</a>
+      <a href="#chat"><span class="n">06</span>私聊</a>
+      <a href="#tasks"><span class="n">07</span>任务管理</a>
+      <a href="#inbox"><span class="n">08</span>收件箱</a>
+      <div class="grp">规划</div>
+      <a href="#nonfunc"><span class="n">09</span>非功能需求</a>
+      <a href="#ui"><span class="n">10</span>UI 布局</a>
+      <a href="#data"><span class="n">11</span>数据模型</a>
+      <a href="#api"><span class="n">12</span>API 概要</a>
+      <a href="#milestones"><span class="n">13</span>里程碑</a>
+      <a href="#risks"><span class="n">14</span>风险评估</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <section id="intro">
+      <div class="sec-head">
+        <div class="tag">§1 概述</div>
+        <h2>产品概述</h2>
+        <p><strong>IM 聊天式多 Agent 协作平台</strong> — 用户通过类飞书聊天界面与 AI Agent 对话，支持单聊、群聊（@mentions 多 Agent 协作）、任务自动分解与并行调度。</p>
+      </div>
+      <div class="grid g4" style="margin-bottom:18px">
+        <div class="card hl"><h4>💬 类 IM 交互</h4><p>用最自然的聊天方式调度 AI Agent，无需学习命令行或 API</p></div>
+        <div class="card hl"><h4>🤝 多 Agent 协作</h4><p>群组内协调者自动分解任务、分配 Agent、合并结果</p></div>
+        <div class="card hl"><h4>🎨 富媒体产物</h4><p>代码 Diff、网页预览、文件附件直接在聊天流中预览和操作</p></div>
+        <div class="card hl"><h4>📋 任务管理</h4><p>同一套数据支持 IM 视角和看板视角，子任务从属于父任务</p></div>
+      </div>
+      <div class="note info"><span class="ico">ℹ</span><div><b>本期 Non-Goals：</b>移动端原生 App（P3）、自研 Agent 引擎、完整 CI/CD 流水线、语音/视频通话均不作为 MVP 范围</div></div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="personas">
+      <div class="sec-head">
+        <div class="tag">§2 用户画像</div>
+        <h2>User Personas</h2>
+      </div>
+      <div class="grid g2">
+        <div class="card hl"><h4>👨‍💻 主要：小飞 — 独立全栈开发者</h4><p>日常用 Claude Code 写后端、Codex 写前端。厌倦在两个终端间反复复制上下文。希望在一个界面上像用微信一样：新建群聊，拉入"前端 Agent"和"后端 Agent"，说一句需求，两个 Agent 各自产出、自动协调。</p></div>
+        <div class="card"><h4>🧑‍💼 次要：阿豆 — 非技术产品经理</h4><p>不会写代码但有清晰的产品想法。希望像和设计师沟通一样和 AI Agent 对话，Agent 直接生成可预览的网页，在聊天流中看到效果、提出修改意见，不打开任何代码编辑器。</p></div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="stories">
+      <div class="sec-head">
+        <div class="tag">§3 核心需求</div>
+        <h2>Core User Stories（BDD 格式）</h2>
+      </div>
+      <div class="grid" style="gap:16px">
+        <div class="story-card">
+          <div class="head"><span class="num">Story 1</span><h4>单聊模式完成任务</h4></div>
+          <div class="bd">与单个 Agent 进行 1v1 对话并下达编码任务，快速获得代码产出并在聊天流中预览结果。<br>
+          <code>Given</code> 用户创建与 "Claude Code" Agent 私聊 <code>→ When</code> 发送"用 React 写一个计数器组件" <code>→ Then</code> Agent 返回代码块 + 网页预览卡片</div>
+        </div>
+        <div class="story-card">
+          <div class="head"><span class="num">Story 2</span><h4>群聊模式多 Agent 协作</h4></div>
+          <div class="bd">在群聊中 @协调者 或直接发送任务，由协调者自动拆解并分配，前后端代码在一个对话中协同产出。<br>
+          <code>Given</code> 群聊拉入 FrontendAgent + BackendAgent <code>→ When</code> 发送"帮我做一个博客系统" <code>→ Then</code> 协调者拆解为子任务 → 并行分派 → 产物依次展示</div>
+        </div>
+        <div class="story-card">
+          <div class="head"><span class="num">Story 3</span><h4>产物内联预览与迭代</h4></div>
+          <div class="bd">在聊天流中直接预览 Agent 产出物，无需切换工具完成"需求→预览→修改→确认"闭环。<br>
+          <code>Given</code> Agent 返回 HTML/CSS/JS <code>→ Then</code> 聊天流中渲染网页预览卡片（内联 iframe）<br>
+          <code>Given</code> 代码修改以 Diff 格式呈现 <code>→ Then</code> 渲染 Diff 视图（绿/红标注增删行）</div>
+        </div>
+        <div class="story-card">
+          <div class="head"><span class="num">Story 4</span><h4>对话上下文管理与 Agent 切换</h4></div>
+          <div class="bd">在不同 Agent 之间通过 Harness 自动传递关键上下文，用户无需重复解释项目背景。</div>
+        </div>
+        <div class="story-card">
+          <div class="head"><span class="num">Story 5</span><h4>创建自定义 Agent</h4></div>
+          <div class="bd">通过表单或对话创建自定义 Agent（System Prompt + 模型配置 + 工具集），为特定场景定制 Agent 行为。</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="agents">
+      <div class="sec-head">
+        <div class="tag">§4 功能需求 · A</div>
+        <h2>Agent 管理</h2>
+      </div>
+      <h3><span class="dot"></span>Agent 创建 — 必要字段</h3>
+      <div class="tbl-wrap">
+        <table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>name</td><td>string</td><td>是</td><td>Agent 唯一名称，如 "FrontendAgent"</td></tr>
+          <tr><td>avatar</td><td>string(url)</td><td>是</td><td>Agent 头像 URL</td></tr>
+          <tr><td>role</td><td>string</td><td>是</td><td>Agent 角色描述，如"前端开发专家"</td></tr>
+          <tr><td>provider</td><td>enum</td><td>是</td><td>LLM 提供商：anthropic / openai / azure</td></tr>
+          <tr><td>model</td><td>string</td><td>是</td><td>模型名称，如 claude-sonnet-4-20250514</td></tr>
+          <tr><td>api_key</td><td>string</td><td>是</td><td>对应 provider 的 API Key（加密存储）</td></tr>
+          <tr><td>skills</td><td>string[]</td><td>否</td><td>初始技能列表</td></tr>
+          <tr><td>system_prompt</td><td>string</td><td>否</td><td>使用默认模板则不填</td></tr>
+        </tbody></table>
+      </div>
+
+      <h3><span class="dot"></span>Agent 权限控制</h3>
+      <div class="tbl-wrap">
+        <table><thead><tr><th>操作</th><th>默认权限</th><th>审批要求</th></tr></thead>
+        <tbody>
+          <tr><td>读取文件</td><td>自动</td><td>无需审批</td></tr>
+          <tr><td>创建/编辑文件</td><td>自动</td><td>无需审批</td></tr>
+          <tr><td>删除文件</td><td>需审批</td><td>用户在收件箱中确认</td></tr>
+          <tr><td>Git push</td><td>需审批</td><td>收件箱确认 + Diff 预览</td></tr>
+          <tr><td>Docker 部署</td><td>需审批</td><td>收件箱确认 + 部署预览</td></tr>
+          <tr><td>访问外部网络</td><td>需审批</td><td>每次请求确认</td></tr>
+        </tbody></table>
+      </div>
+
+      <h3><span class="dot"></span>Agent 详情页 Tab</h3>
+      <div class="features">
+        <div class="f"><div class="icon">📋</div><div><h5>概览</h5><p>基本信息：名称、头像、角色、状态、负载、所属群组</p></div></div>
+        <div class="f"><div class="icon">🏷️</div><div><h5>能力</h5><p>capability_tags 标签列表，支持添加/删除</p></div></div>
+        <div class="f"><div class="icon">🧠</div><div><h5>记忆</h5><p>L1-L4 记忆查看/筛选/编辑</p></div></div>
+        <div class="f"><div class="icon">📌</div><div><h5>任务</h5><p>分配给此 Agent 的任务列表（进行中/已完成）</p></div></div>
+        <div class="f"><div class="icon">📈</div><div><h5>活动</h5><p>Agent 的活动日志时间线</p></div></div>
+        <div class="f"><div class="icon">⚙️</div><div><h5>设置</h5><p>模型、API Key、system_prompt、max_tokens、并发数等</p></div></div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="groups">
+      <div class="sec-head">
+        <div class="tag">§4 功能需求 · B</div>
+        <h2>群组功能（= 频道）</h2>
+      </div>
+      <div class="note info"><span class="ico">💡</span><div>群组 = 频道，Agent 可以同时存在于多个群组中。创建群组时自动生成一个<b>协调者</b>（Coordinator = AI + Harness），群组成员列表可见，不可移除。</div></div>
+
+      <h3><span class="dot"></span>协调者工作机制</h3>
+      <div class="diagram">
+用户/成员发送消息到群组
+  │
+  ▼
+协调者程序接收消息
+  │
+  ├─ 用户 @协调者 或 消息包含任务意图（自动检测）
+  │    │
+  │    ▼
+  │   协调者 AI 进行任务分解
+  │    │  → 分析需求 → 生成子任务列表 → 匹配 Agent 能力
+  │    │  → 返回结构化 JSON（子任务 + 被分配的 Agent）
+  │    │
+  │    ▼
+  │   Harness 校验 → 编译 DAG → 分发执行
+  │    │
+  │    ▼
+  │   Agent 并行/串行执行 → 结果合并 → 回复到群聊
+  │
+  └─ 非任务（普通聊天消息 / @指定 Agent）
+     → 不触发任务分解，仅作为对话上下文保留
+      </div>
+
+      <h3><span class="dot"></span>消息路由规则</h3>
+      <div class="tbl-wrap">
+        <table><thead><tr><th>操作</th><th>行为</th></tr></thead>
+        <tbody>
+          <tr><td>直接发送（不 @任何人）</td><td>全体可见；系统自动检测是否有任务意图</td></tr>
+          <tr><td>@协调者 消息内容</td><td>显式触发协调者进行任务分解</td></tr>
+          <tr><td>@AgentName 消息内容</td><td>仅被 @ 的 Agent 处理，协调者不介入</td></tr>
+          <tr><td>@All 消息内容</td><td>群组内所有 Agent 响应（不含协调者）</td></tr>
+        </tbody></table>
+      </div>
+
+      <h3><span class="dot"></span>上下文三层体系</h3>
+      <div class="tbl-wrap">
+        <table><thead><tr><th>层级</th><th>范围</th><th>存储</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td><b>热上下文</b></td><td>最近 15-20 条消息</td><td>Redis（实时）</td><td>直接注入 LLM prompt</td></tr>
+          <tr><td><b>长期上下文</b></td><td>被 pin 的消息 + 摘要</td><td>PostgreSQL</td><td>跨会话持久化</td></tr>
+          <tr><td><b>历史预览</b></td><td>更早的对话摘要占位</td><td>本地文件系统</td><td>用户可展开查看</td></tr>
+        </tbody></table>
+      </div>
+
+      <h3><span class="dot"></span>产物内联类型</h3>
+      <div class="features">
+        <div class="f"><div class="icon">📝</div><div><h5>代码 Diff</h5><p>内联 Monaco Diff Editor，展开/折叠、批注、接受/拒绝</p></div></div>
+        <div class="f"><div class="icon">🌐</div><div><h5>网页预览</h5><p>内嵌 iframe 卡片，点击展开全屏预览</p></div></div>
+        <div class="f"><div class="icon">📎</div><div><h5>文件附件</h5><p>文件卡片（文件名/大小/类型），下载或预览</p></div></div>
+        <div class="f"><div class="icon">📄</div><div><h5>文档渲染</h5><p>Markdown/PDF 预览卡片，点击全屏浏览</p></div></div>
+        <div class="f"><div class="icon">🚀</div><div><h5>部署状态</h5><p>状态卡片（构建中/成功/失败），查看日志、访问 URL</p></div></div>
+        <div class="f"><div class="icon">📋</div><div><h5>任务计划</h5><p>结构化子任务列表卡片，查看详情、修改分配</p></div></div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="tasks">
+      <div class="sec-head">
+        <div class="tag">§4 功能需求 · C</div>
+        <h2>任务管理</h2>
+      </div>
+      <div class="note info"><span class="ico">💡</span><div>聊天中派发的任务 = 任务界面的任务，<b>同一套数据</b>。</div></div>
+
+      <h3><span class="dot"></span>任务模型</h3>
+      <div class="diagram">
+父任务 (Task)
+  ├── 子任务 1 (SubTask) → 负责人: FrontendAgent → <span class="hl">completed</span>
+  ├── 子任务 2 (SubTask) → 负责人: BackendAgent  → <span class="hl">running</span>
+  └── 子任务 3 (SubTask) → 负责人: ReviewerAgent → pending (依赖 1,2)
+      </div>
+
+      <h3><span class="dot"></span>任务属性</h3>
+      <div class="tbl-wrap">
+        <table><thead><tr><th>属性</th><th>类型</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>id</td><td>UUID</td><td>任务唯一标识</td></tr>
+          <tr><td>title</td><td>string</td><td>任务标题</td></tr>
+          <tr><td>status</td><td>enum</td><td>pending / queued / running / completed / failed / cancelled</td></tr>
+          <tr><td>priority</td><td>enum</td><td>critical / high / medium / low</td></tr>
+          <tr><td>assignee</td><td>UUID</td><td>负责人/负责群组 ID</td></tr>
+          <tr><td>parent_task_id</td><td>UUID?</td><td>父任务 ID</td></tr>
+          <tr><td>subtasks</td><td>UUID[]</td><td>子任务 ID 列表</td></tr>
+          <tr><td>source</td><td>enum</td><td>chat（聊天派发）/ manual（手动创建）</td></tr>
+        </tbody></table>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="inbox">
+      <div class="sec-head">
+        <div class="tag">§4 功能需求 · D</div>
+        <h2>收件箱 & 审批流</h2>
+      </div>
+      <div class="grid g3">
+        <div class="card"><h4>📬 全部</h4><p>所有通知的时间线汇总</p></div>
+        <div class="card"><h4>✅ 审批</h4><p>Agent 操作审批请求（删除/部署/Git push/外网访问）</p></div>
+        <div class="card"><h4>📅 日历</h4><p>任务截止日期月/周/日视图，过期标红</p></div>
+      </div>
+      <h3><span class="dot"></span>审批流程</h3>
+      <div class="diagram">
+Agent 请求审批（如删除文件）
+  │
+  ▼
+收件箱 → 审批 Tab 出现待处理项
+  │
+  ├─ 用户点击 <span class="hl">APPROVE</span> → Agent 继续执行
+  └─ 用户点击 <span class="hl">REJECT</span>  → 任务取消 / Agent 寻找替代方案
+      </div>
+      <div class="step-row">
+        <span class="step"><span class="dot g"></span>审批项展示</span>
+        <span class="step">发起者</span>
+        <span class="step">操作描述</span>
+        <span class="step">影响范围</span>
+        <span class="step">Diff 预览</span>
+        <span class="step">APPROVE / REJECT 按钮</span>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="nonfunc">
+      <div class="sec-head">
+        <div class="tag">§5 非功能需求</div>
+        <h2>质量属性</h2>
+      </div>
+      <div class="grid g2">
+        <div class="card hl">
+          <h4>⚡ 性能指标</h4>
+          <div class="tbl-wrap" style="border:none;box-shadow:none">
+            <table><tbody>
+              <tr><td>消息发送到显示延迟</td><td class="num"><span class="b-pill ok">&lt; 500ms</span></td></tr>
+              <tr><td>WebSocket 重连时间</td><td class="num"><span class="b-pill ok">&lt; 3s</span></td></tr>
+              <tr><td>流式输出首 token 延迟</td><td class="num"><span class="b-pill ok">&lt; 2s</span></td></tr>
+              <tr><td>任务列表加载（100 条）</td><td class="num"><span class="b-pill ok">&lt; 1s</span></td></tr>
+              <tr><td>并发会话支持</td><td class="num"><span class="b-pill mid">≥ 20</span></td></tr>
+            </tbody></table>
+          </div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:12px"><h4>🔒 安全</h4><p>API Key AES-256-GCM 加密 · TLS 1.3 · 路径遍历防护 · JWT 鉴权 · 操作日志保留 30 天</p></div>
+          <div class="card"><h4>🎨 可用性</h4><p>暗色/亮色主题 · 中英文切换（P2） · Chrome/Firefox/Edge 最新两版本 · 移动端响应式（P3）</p></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="ui">
+      <div class="sec-head">
+        <div class="tag">§6</div>
+        <h2>UI 布局草案</h2>
+      </div>
+      <div class="diagram">
+┌─────────┬──────────────────────────────┬─────────────┐
+│  左侧    │        中间                   │   右侧       │
+│ 导航栏   │       聊天区域                │  详情面板    │
+│         │                              │ (可收起)    │
+│ ┌─────┐ │ ┌──────────────────────────┐ │             │
+│ │会话  │ │ │ 群组名称 / Agent 名称    │ │ Agent 详情  │
+│ │列表  │ │ │ ─────────────────────── │ │ 任务详情    │
+│ │     │ │ │                        │ │ 产物预览    │
+│ │🔍   │ │ │ 消息 1                 │ │             │
+│ │📌   │ │ │ 消息 2 (含 Diff 卡片)   │ │             │
+│ │     │ │ │ 消息 3 (含预览卡片)     │ │             │
+│ │     │ │ │                        │ │             │
+│ │     │ │ ├────────────────────────┤ │             │
+│ │     │ │ │ 输入框                 │ │             │
+│ │ └─────┘ │ └──────────────────────────┘ │             │
+│ ├─────────┤                              ├─────────────┤
+│ │ Tab 切换│                              │             │
+│ │ □ Agent │                              │             │
+│ │ □ 任务  │                              │             │
+│ │ □ 收件箱│                              │             │
+│ └─────────┘                              └─────────────┘
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="data">
+      <div class="sec-head">
+        <div class="tag">§7</div>
+        <h2>数据模型</h2>
+      </div>
+      <div class="diagram">
+User ──┬── Session (会话) ──── Message (消息)
+       │       │                    │
+       │       ├── GroupSession     ├── text
+       │       └── PrivateSession   ├── diff
+       │                            ├── preview_card
+       ├── Agent ──── AgentConfig   ├── task_plan
+       │    ├── capability_tags[]   └── approval_request
+       │    ├── channels[]
+       │    ├── workspace
+       │    └── memory_config
+       │
+       ├── Group ──── Coordinator (1:1)
+       │    ├── members[]
+       │    └── sessions[]
+       │
+       └── Task ──── subtasks[] ──── task_events[]
+      </div>
+
+      <h3><span class="dot"></span>MVP 表清单（10 张表）</h3>
+      <div class="tbl-wrap">
+        <table><thead><tr><th>表</th><th>核心字段</th><th>存储引擎</th></tr></thead>
+        <tbody>
+          <tr><td>users</td><td>id, name, email, avatar</td><td>PostgreSQL</td></tr>
+          <tr><td>agents</td><td>id, name, avatar, role, provider, model, api_key_encrypted, status, settings</td><td>PostgreSQL</td></tr>
+          <tr><td>agent_capabilities</td><td>agent_id, tag</td><td>PostgreSQL</td></tr>
+          <tr><td>groups</td><td>id, name, description, coordinator_config</td><td>PostgreSQL</td></tr>
+          <tr><td>group_members</td><td>group_id, agent_id</td><td>PostgreSQL</td></tr>
+          <tr><td>sessions</td><td>id, type(group/private), title, created_at</td><td>PostgreSQL</td></tr>
+          <tr><td>messages</td><td>id, session_id, role, content, content_type, metadata</td><td>PostgreSQL</td></tr>
+          <tr><td>tasks</td><td>id, title, description, status, priority, assignee, due_date, parent_task_id</td><td>PostgreSQL</td></tr>
+          <tr><td>task_events</td><td>id, task_id, event_type, event_data, actor</td><td>PostgreSQL</td></tr>
+          <tr><td>notifications</td><td>id, user_id, type, title, content, is_read</td><td>PostgreSQL</td></tr>
+        </tbody></table>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="milestones">
+      <div class="sec-head">
+        <div class="tag">§8</div>
+        <h2>里程碑计划（共 20 天）</h2>
+      </div>
+      <div class="tbl-wrap">
+        <table><thead><tr><th>里程碑</th><th>日期</th><th>交付标准</th><th>成功闸门</th></tr></thead>
+        <tbody>
+          <tr><td><b>M1</b> 环境搭建 + 技术验证</td><td>5/20-22</td><td>API 环境就绪、适配器框架、脚手架</td><td>成功调用至少 1 个外部 Agent API</td></tr>
+          <tr><td><b>M2</b> 单聊 MVP</td><td>5/23-27</td><td>对话列表 + 1v1 聊天 + 流式输出 + 代码渲染</td><td>完成"需求→代码→预览"闭环</td></tr>
+          <tr><td><b>M3</b> 群聊 + 协调者</td><td>5/28-6/1</td><td>群聊 + @协调者 + 任务拆解 + DAG 编译 + 并行调度</td><td>任务拆解分发到 ≥ 2 个 Agent</td></tr>
+          <tr><td><b>M4</b> 产物预览 + 迭代</td><td>6/2-5</td><td>网页预览、Diff 视图、Pin、自建 Agent</td><td>预览/修改/确认闭环</td></tr>
+          <tr><td><b>M5</b> 文档 + 视频 + 打磨</td><td>6/6-9</td><td>PRD 终稿 + 架构文档 + Spec/Rules + Demo 视频</td><td>视频覆盖 5 个 Core User Stories</td></tr>
+          <tr><td><b>M6</b> 提交</td><td>6/10</td><td>代码整理、README 完善</td><td>全部材料通过提交渠道送达</td></tr>
+        </tbody></table>
+      </div>
+
+      <h3><span class="dot"></span>降级策略</h3>
+      <div class="tbl-wrap">
+        <table><thead><tr><th>阻塞场景</th><th>降级方案</th></tr></thead>
+        <tbody>
+          <tr><td>M2 API 接入阻塞</td><td>Mock Agent（预设响应）保证 UI 流程完整</td></tr>
+          <tr><td>M3 协调者分解不稳定</td><td>降级为手动 @Agent 模式</td></tr>
+          <tr><td>M4 内联预览阻塞</td><td>降级为"新窗口打开预览"</td></tr>
+          <tr><td>LLM Provider 不可用</td><td>切换到备选 Provider / Mock 模式</td></tr>
+        </tbody></table>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="risks">
+      <div class="sec-head">
+        <div class="tag">§9</div>
+        <h2>风险与边界条件</h2>
+      </div>
+      <h3><span class="dot"></span>已知风险</h3>
+      <div class="tbl-wrap">
+        <table><thead><tr><th>风险</th><th>影响</th><th>缓解措施</th></tr></thead>
+        <tbody>
+          <tr><td>多 Agent 并发上下文污染</td><td>任务结果不一致</td><td>全局-私有双层上下文 + 共享制品只读</td></tr>
+          <tr><td>LLM token 消耗不可控</td><td>成本爆炸</td><td>四道硬闸：步骤/Token/时长/工具调用上限</td></tr>
+          <tr><td>Agent 输出质量不稳定</td><td>子任务失败率高</td><td>Harness 重试 + 失败自动人工介入</td></tr>
+          <tr><td>WebSocket 不稳定</td><td>消息丢失</td><td>PostgreSQL 持久化兜底 + 重连恢复</td></tr>
+          <tr><td>API Key 泄露</td><td>安全事件</td><td>AES-256-GCM 加密 + 前端密码模式</td></tr>
+        </tbody></table>
+      </div>
+      <h3><span class="dot"></span>边界条件</h3>
+      <div class="step-row">
+        <span class="step">群组 Agent 上限：20 个</span>
+        <span class="step">热上下文：20 条</span>
+        <span class="step">Agent 并发：3 个</span>
+        <span class="step">子任务嵌套：1 层</span>
+        <span class="step">API Key 不可查看明文</span>
+        <span class="step">Agent name 全局唯一</span>
+      </div>
+    </section>
+
+    <footer>
+      <span>AgentHub PRD · v1.0 Draft</span>
+      <span>生成于 <code>2026-05-22</code></span>
+    </footer>
+
+    <button class="toTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" id="topBtn">↑</button>
+  </main>
+</div>
+<script>
+  const btn = document.getElementById('topBtn');
+  window.addEventListener('scroll',()=>{btn.classList.toggle('show',window.scrollY>300)});
+  document.querySelectorAll('nav a').forEach(a=>{
+    a.addEventListener('click',function(e){e.preventDefault();const id=this.getAttribute('href').slice(1);document.getElementById(id).scrollIntoView({behavior:'smooth'});document.querySelectorAll('nav a').forEach(x=>x.classList.remove('active'));this.classList.add('active')})
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentHub · 分层架构设计</title>
+<style>
+  :root{
+    --bg:#F0EEE6; --bg-soft:#F5F3EC; --panel:#FBFAF6; --panel-2:#F6F3EA;
+    --line:#E2DDD0; --line-soft:#EAE6DA; --txt:#28261F; --txt-dim:#6A6457;
+    --txt-faint:#9A9385; --brand:#C9613C; --brand-2:#D97757; --accent:#5C8A56;
+    --gold:#B68A3E; --good:#5C8A56; --warn:#C08A2E; --bad:#C0533F; --code-bg:#2D2B28;
+    --blue:#4F6F8F; --purple:#6350a0;
+    --radius:16px; --shadow:0 18px 40px -24px rgba(80,60,40,.35);
+    --mono:'SFMono-Regular',ui-monospace,'Cascadia Code','Consolas',monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;font-size:15px}
+  body{
+    font-family:var(--sans);
+    background:radial-gradient(1100px 700px at 82% -8%,#E8F0E3 0%,transparent 55%),radial-gradient(900px 650px at -8% 8%,#EEEADD 0%,transparent 50%),var(--bg);
+    color:var(--txt);line-height:1.7;-webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--brand);color:#fff}
+  .shell{display:flex;min-height:100vh}
+  .side{
+    position:fixed;top:0;left:0;bottom:0;width:248px;
+    background:linear-gradient(180deg,#F0EDE2,#EDEADE);border-right:1px solid var(--line);
+    padding:24px 14px 30px;overflow-y:auto;z-index:50;
+  }
+  .side::-webkit-scrollbar{width:6px}
+  .side::-webkit-scrollbar-thumb{background:#DCD6C8;border-radius:8px}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:5px;padding:0 6px}
+  .brand .mark{
+    width:34px;height:34px;border-radius:9px;flex:0 0 auto;
+    background:linear-gradient(135deg,var(--accent),#7AB87A);
+    display:grid;place-items:center;font-weight:800;color:#fff;font-size:15px;
+    box-shadow:0 8px 20px -8px var(--accent);
+  }
+  .brand b{font-size:14px;letter-spacing:.3px;display:block;line-height:1.25;color:var(--txt)}
+  .brand span{font-size:10px;color:var(--txt-faint);letter-spacing:1.5px}
+  .side .meta{font-size:10px;color:var(--txt-faint);padding:0 6px;margin:10px 0 12px;border-top:1px solid var(--line);padding-top:10px}
+  nav a{
+    display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:7px;
+    color:var(--txt-dim);text-decoration:none;font-size:12px;transition:.18s;margin-bottom:1px;
+  }
+  nav a .n{font-family:var(--mono);font-size:9.5px;color:var(--txt-faint);width:16px;text-align:center}
+  nav a:hover{background:#E5E0D2;color:var(--txt)}
+  nav a.active{background:linear-gradient(90deg,rgba(92,138,86,.12),transparent);color:#2a2620;box-shadow:inset 2px 0 0 var(--accent)}
+  nav a.active .n{color:var(--accent)}
+  nav .grp{font-size:9px;letter-spacing:2px;color:var(--txt-faint);text-transform:uppercase;margin:14px 0 5px 9px}
+  .main{margin-left:248px;flex:1;padding:36px 44px 60px;max-width:1120px}
+
+  .sec-head{margin-bottom:24px}
+  .sec-head .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:1.5px;color:var(--accent);margin-bottom:3px}
+  .sec-head h2{font-size:25px;font-weight:800;letter-spacing:-.5px;margin:3px 0 8px}
+  .sec-head p{font-size:13.5px;color:var(--txt-dim);max-width:720px}
+  h2{font-size:22px;font-weight:800;margin:36px 0 12px;letter-spacing:-.3px}
+  h2:first-child{margin-top:0}
+  h3{font-size:17px;font-weight:700;margin:26px 0 10px;display:flex;align-items:center;gap:10px}
+  h3 .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:0 0 auto}
+  h3.d-blue .dot{background:var(--blue)}
+  h3.d-purple .dot{background:var(--purple)}
+  h4{font-size:14px;font-weight:700;margin:16px 0 7px;color:var(--txt)}
+  p{font-size:13px;color:var(--txt-dim);margin-bottom:9px;line-height:1.75}
+
+  .card{border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:var(--panel);box-shadow:var(--shadow)}
+  .card.hl{border-left:3px solid var(--accent)}
+  .card h4{font-size:13.5px;margin:0 0 7px}
+  .card p{font-size:12px}
+  .grid{display:grid;gap:12px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr 1fr}
+  .g4{grid-template-columns:1fr 1fr 1fr 1fr}
+
+  .diagram{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px;font-family:var(--mono);font-size:11px;line-height:1.4;overflow-x:auto;white-space:pre;box-shadow:var(--shadow)}
+  .diagram .hl{color:var(--brand);font-weight:700}
+  .diagram .hl-b{color:var(--blue);font-weight:700}
+  .diagram .hl-g{color:var(--accent);font-weight:700}
+  .diagram .cm{color:var(--txt-faint)}
+  .diagram .box{color:var(--txt-dim)}
+
+  .tbl-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--line);background:var(--panel)}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  thead{background:var(--bg-soft)}th{padding:9px 12px;text-align:left;font-weight:700;font-size:11.5px;color:var(--txt-dim);border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:8px 12px;border-bottom:1px solid var(--line-soft);color:var(--txt-dim)}
+  tr:last-child td{border-bottom:none}
+  td.num{font-family:var(--mono);text-align:right;white-space:nowrap}
+
+  .b-pill{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;display:inline-block}
+  .b-pill.ok{background:#E1F0DD;color:var(--good)}
+  .b-pill.mid{background:#F3E9D0;color:var(--warn)}
+  .b-pill.no{background:#F2DDD8;color:var(--bad)}
+  .b-pill.b{background:rgba(79,111,143,.12);color:var(--blue)}
+  .b-pill.p{background:rgba(99,80,160,.1);color:var(--purple)}
+
+  .note{padding:13px 15px;border-radius:10px;display:flex;gap:10px;align-items:flex-start;font-size:12.5px;margin:14px 0;border:1px solid}
+  .note .ico{font-size:17px;flex:0 0 auto;margin-top:1px}
+  .note.info{border-color:rgba(79,111,143,.3);background:rgba(79,111,143,.08)}
+  .note.warn{border-color:rgba(192,138,46,.3);background:rgba(192,138,46,.08)}
+  .note.g{border-color:rgba(92,138,86,.25);background:rgba(92,138,86,.08)}
+
+  .chip-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+  .chip{font-size:10.5px;padding:3px 9px;border-radius:5px;background:#EDE8DD;color:var(--txt-dim);font-family:var(--mono);border:1px solid var(--line)}
+  .chip.l1{background:rgba(79,111,143,.08);color:var(--blue);border-color:rgba(79,111,143,.15)}
+  .chip.l2{background:rgba(99,80,160,.07);color:var(--purple);border-color:rgba(99,80,160,.12)}
+  .chip.l3{background:rgba(201,97,60,.08);color:var(--brand);border-color:rgba(201,97,60,.15)}
+  .chip.l4{background:rgba(92,138,86,.08);color:var(--accent);border-color:rgba(92,138,86,.15)}
+
+  .arch-layers{display:flex;flex-direction:column;gap:9px;margin:14px 0}
+  .layer{
+    border:1px solid var(--line);border-radius:10px;padding:14px 16px;
+    background:var(--panel);box-shadow:var(--shadow);position:relative;
+  }
+  .layer .tag{position:absolute;top:-8px;left:14px;font-family:var(--mono);font-size:10px;letter-spacing:1px;padding:1px 10px;border-radius:4px;font-weight:700}
+  .layer.l5{border-left:4px solid var(--brand)}
+  .layer.l5 .tag{background:var(--brand);color:#fff}
+  .layer.l4{border-left:4px solid var(--blue)}
+  .layer.l4 .tag{background:var(--blue);color:#fff}
+  .layer.l3{border-left:4px solid var(--gold)}
+  .layer.l3 .tag{background:var(--gold);color:#fff}
+  .layer.l2{border-left:4px solid var(--purple)}
+  .layer.l2 .tag{background:var(--purple);color:#fff}
+  .layer.l1{border-left:4px solid var(--accent)}
+  .layer.l1 .tag{background:var(--accent);color:#fff}
+  .layer .fn{font-family:var(--mono);font-size:11.5px;color:var(--txt)}
+  .layer .sub{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px}
+  .layer .sub span{font-size:11px;padding:2px 7px;border-radius:4px;background:var(--bg-soft);color:var(--txt-dim)}
+
+  .flow-row{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;align-items:center}
+  .flow-step{font-size:11px;padding:4px 10px;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--txt-dim)}
+  .flow-step .dot{width:5px;height:5px;border-radius:50%;display:inline-block;margin-right:4px}
+  .flow-step .dot.g{background:var(--good)}
+  .flow-step .dot.o{background:var(--warn)}
+  .flow-step .dot.r{background:var(--bad)}
+  .flow-step .dot.b{background:var(--blue)}
+  .flow-arrow{color:var(--txt-faint);font-size:14px;font-family:var(--mono)}
+
+  .verdict{border:2px solid var(--accent);border-radius:13px;padding:20px 24px;background:linear-gradient(135deg,var(--panel),#F5F3EE);box-shadow:var(--shadow)}
+  .verdict .lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:2px;color:var(--accent);font-weight:700;margin-bottom:6px}
+  .verdict h4{font-size:16px;font-weight:800;margin:0 0 10px}
+
+  .code-block{
+    background:var(--code-bg);color:#E8E4DB;border-radius:10px;padding:14px 16px;
+    font-family:var(--mono);font-size:11.5px;line-height:1.5;overflow-x:auto;white-space:pre;
+    box-shadow:var(--shadow);margin:10px 0;
+  }
+  .code-block .kw{color:#C9A87C}
+  .code-block .str{color:#9BBF8F}
+  .code-block .cm{color:#8A867A;font-style:italic}
+  .code-block .ty{color:#87B9D9}
+  .code-block .fn{color:#D9A987}
+  .code-block .num{color:#D9B384}
+
+  .src{font-size:10px;color:var(--txt-faint);font-family:var(--mono);margin-top:10px;display:flex;flex-wrap:wrap;gap:4px 12px}
+  .divider{height:1px;background:var(--line);margin:36px 0}
+  footer{border-top:1px solid var(--line);padding:22px 0 8px;margin-top:36px;color:var(--txt-faint);font-size:11px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+  footer code{font-family:var(--mono);color:var(--accent)}
+  .toTop{position:fixed;right:22px;bottom:22px;width:40px;height:40px;border-radius:10px;background:var(--panel);border:1px solid var(--line);color:var(--txt);display:grid;place-items:center;cursor:pointer;opacity:0;transition:.25s;z-index:60;font-size:15px;box-shadow:var(--shadow)}
+  .toTop.show{opacity:1}
+  .toTop:hover{border-color:var(--accent);color:var(--accent)}
+  @media(max-width:900px){.side{display:none}.main{margin-left:0;padding:22px 16px}.g2,.g3,.g4{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">
+      <div class="mark">A</div>
+      <div><b>AgentHub</b><span>架构设计文档</span></div>
+    </div>
+    <div class="meta">v1.0 · 2026-05-21 · <code>基于 PRD</code></div>
+    <nav>
+      <div class="grp">总览</div>
+      <a href="#overview" class="active"><span class="n">01</span>五层架构总览</a>
+      <div class="grp">领域模型</div>
+      <a href="#aggregates"><span class="n">02</span>聚合根</a>
+      <a href="#task-engine"><span class="n">03</span>Task Engine</a>
+      <div class="grp">层间通信</div>
+      <a href="#commands"><span class="n">04</span>Command 总线</a>
+      <a href="#events"><span class="n">05</span>Domain Events</a>
+      <div class="grp">数据流</div>
+      <a href="#s-agent"><span class="n">06</span>Agent CRUD</a>
+      <a href="#s-group"><span class="n">07</span>群组 & 聊天</a>
+      <a href="#s-stream"><span class="n">08</span>流式输出</a>
+      <a href="#s-coordinator"><span class="n">09</span>协调者 DAG</a>
+      <a href="#s-fsm"><span class="n">10</span>任务 FSM</a>
+      <a href="#s-worker"><span class="n">11</span>Worker 执行</a>
+      <a href="#s-inbox"><span class="n">12</span>收件箱</a>
+      <a href="#s-context"><span class="n">13</span>上下文注入</a>
+      <div class="grp">附录</div>
+      <a href="#bus"><span class="n">14</span>事件总线</a>
+      <a href="#impl"><span class="n">15</span>实现要点</a>
+      <a href="#arch-api"><span class="n">16</span>API 映射</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <section id="overview">
+      <div class="sec-head">
+        <div class="tag">§1 总览</div>
+        <h2>五层架构总览</h2>
+        <p>7 层洋葱模型精简为 5 层实现，后端 4 层 + 前端 1 层。依赖方向：<code>L5 → L4 → L3 → L2 ← L1</code>（L1 实现 L2 定义的抽象接口，依赖倒置）。</p>
+      </div>
+
+      <div class="arch-layers">
+        <div class="layer l5">
+          <div class="tag">L5 Presentation</div>
+          <div class="fn">React 18 + TypeScript Strict</div>
+          <div class="sub">
+            <span>ChatView</span><span>AgentPanel</span><span>TaskBoard</span>
+            <span>Inbox</span><span>Settings</span>
+            <span>Zustand Stores × 6</span><span>Hooks × 8</span>
+          </div>
+        </div>
+        <div class="layer l4">
+          <div class="tag">L4 API Gateway</div>
+          <div class="fn">FastAPI Routers + WebSocket Handlers</div>
+          <div class="sub">
+            <span>AgentRouter</span><span>GroupRouter</span><span>TaskRouter</span>
+            <span>SessionRouter</span><span>InboxRouter</span><span>WsHandler</span>
+            <span>Auth · CORS · RateLimit</span>
+          </div>
+        </div>
+        <div class="layer l3">
+          <div class="tag">L3 Application（用例编排）</div>
+          <div class="fn">Service 层 · Command 模式 · Event Bus</div>
+          <div class="sub">
+            <span>AgentService</span><span>GroupService</span><span>ChatService</span>
+            <span>TaskService</span><span>InboxService</span><span>CoordinatorService</span>
+          </div>
+        </div>
+        <div class="layer l2">
+          <div class="tag">L2 Domain（领域模型 + 核心规则）</div>
+          <div class="fn">实体 · Task Engine · 黑板上</div>
+          <div class="sub">
+            <span>Agent ⭐</span><span>Group ⭐</span><span>Session ⭐</span><span>Task ⭐</span>
+            <span>Message</span><span>Notification</span><span>FSM</span>
+            <span>Coordinator</span><span>Harness</span><span>Blackboard</span>
+          </div>
+        </div>
+        <div class="layer l1">
+          <div class="tag">L1 Infrastructure</div>
+          <div class="fn">PG / Redis / Celery / LLM Adapter</div>
+          <div class="sub">
+            <span>SQLAlchemy Repos</span><span>Redis Cache + Pub/Sub</span>
+            <span>Celery Workers</span><span>ClaudeAdapter</span>
+            <span>GPTAdapter</span><span>CodexAdapter</span>
+            <span>WS Bridge</span><span>FileSystem</span>
+          </div>
+        </div>
+      </div>
+
+      <h3><span class="dot"></span>层间交互原则</h3>
+      <div class="grid g4">
+        <div class="card"><h4>L5 ↔ L4</h4><p>Request DTO / WS Frame → Response DTO / WS Push</p></div>
+        <div class="card"><h4>L4 → L3</h4><p>Command Object → Domain Event / Result</p></div>
+        <div class="card"><h4>L3 → L2</h4><p>Domain Object → Domain Event（待持久化）</p></div>
+        <div class="card"><h4>L2 ↔ L1</h4><p>Repository Interface ↔ 具体实现（依赖倒置）</p></div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="aggregates">
+      <div class="sec-head">
+        <div class="tag">§2 领域模型</div>
+        <h2>聚合根</h2>
+      </div>
+      <div class="diagram">
+┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
+│  Agent   │  │  Group   │  │ Session  │  │  Task    │
+│  (聚合根) │  │  (聚合根) │  │  (聚合根) │  │  (聚合根) │
+└────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘
+     │              │              │              │
+     ├─ capabilities │ ├─ members    ├─ messages    ├─ subtasks
+     ├─ workspace   │ ├─ sessions   │ ├─ pinned     ├─ events
+     ├─ memory_cfg  │ └─ coordina-  │ └─ contexts   ├─ artifacts
+     └─ channels    │   tor (1:1)  │              └─ assignee
+                    └──────────────┘              └─ parent
+
+┌──────────┐  ┌──────────┐  ┌──────────┐
+│ Message  │  │Notification│ │Artifact  │
+│  (实体)   │  │  (实体)    │ │  (实体)   │
+└──────────┘  └──────────┘  └──────────┘
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="task-engine">
+      <div class="sec-head">
+        <div class="tag">§3 核心引擎</div>
+        <h2>Task Engine 三组件</h2>
+      </div>
+
+      <div class="grid g3">
+        <div class="card hl"><h4>🧠 Coordinator（LLM 驱动）</h4>
+          <p>任务分解 · 异常诊断 · Agent 推荐 · 审批建议</p>
+          <div class="chip-row"><span class="chip">LLM Prompt</span><span class="chip">结构化输出</span></div>
+        </div>
+        <div class="card"><h4>⚙️ Harness（纯 Python）</h4>
+          <p>FSM 流转 · Guard 校验 · DAG 编译 · 预算管控 · Worker 调度</p>
+          <div class="chip-row"><span class="chip">不含 LLM</span><span class="chip">可单元测试</span></div>
+        </div>
+        <div class="card"><h4>🗄️ Blackboard（PostgreSQL）</h4>
+          <p>tasks · task_events · task_artifacts · Agent Registry · Shared Artifacts</p>
+          <div class="chip-row"><span class="chip">持久化</span><span class="chip">事务性</span></div>
+        </div>
+      </div>
+
+      <h3><span class="dot"></span>Task Engine 内部流程</h3>
+      <div class="diagram">
+┌────────────────────────────────────────────────────────────┐
+│ Task Engine 执行循环                                        │
+│                                                            │
+│  ├─ 1. 收到子任务 → 校验依赖是否全部 resolved               │
+│  │       · 否 → 回 QUEUED，等待依赖完成                     │
+│  │       · 是 → transition(RUNNING)                         │
+│  │                                                         │
+│  ├─ 2. 构造 AgentContext（GlobalContext + PrivateContext）   │
+│  │                                                         │
+│  ├─ 3. 通过 UnifiedAdapter.send_message() 调用 Worker Agent │
+│  │       · 流式输出通过 Redis Pub/Sub → WS 推送到前端       │
+│  │       · TOOL_CALL 事件 → ToolScheduler 处理              │
+│  │                                                         │
+│  ├─ 4. 处理工具调用：ToolScheduler.receive(tool_call)       │
+│  │       → ToolRegistry.lookup(name)                        │
+│  │       → 权限检查                                         │
+│  │       → 如果是"危险操作" → request_approval              │
+│  │       → 否则执行 + 写入 task_artifacts                   │
+│  │                                                         │
+│  ├─ 5. 验证 gate: 任务是否达到 validation_gate?             │
+│  │       · 成功 → transition(COMPLETED)                     │
+│  │       · 失败 → transition(FAILED) → retry / escalate     │
+│  │                                                         │
+│  └─ 6. 写入 task_events + task_artifacts                    │
+│       发布 TaskStateChanged 事件 → WS 推送                  │
+└────────────────────────────────────────────────────────────┘
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="commands">
+      <div class="sec-head">
+        <div class="tag">§4 层间通信</div>
+        <h2>Command 总线</h2>
+      </div>
+      <p>所有跨层操作走 Command → Service → Domain Event 模式。L4 路由接收 HTTP 请求后构造 Command，传递给 L3 Service。</p>
+
+      <div class="code-block">
+<span class="cm"># === Agent Commands ===</span>
+<span class="ty">CreateAgentCommand</span>(name, avatar, role, provider, model, api_key, ...)
+<span class="ty">UpdateAgentCommand</span>(agent_id, name?, role?, ...)
+<span class="ty">DeleteAgentCommand</span>(agent_id)
+
+<span class="cm"># === Group Commands ===</span>
+<span class="ty">CreateGroupCommand</span>(name, description, member_ids)
+<span class="ty">AddMemberCommand</span>(group_id, agent_id)
+<span class="ty">RemoveMemberCommand</span>(group_id, agent_id)
+
+<span class="cm"># === Session / Chat Commands ===</span>
+<span class="ty">CreateSessionCommand</span>(type, group_id?, agent_id?, title)
+<span class="ty">SendMessageCommand</span>(session_id, content, mentions, dispatch_mode)
+<span class="ty">PinMessageCommand</span>(session_id, message_id)
+
+<span class="cm"># === Task Commands ===</span>
+<span class="ty">CreateTaskCommand</span>(title, description, assignee_id, priority, ...)
+<span class="ty">ListTasksCommand</span>(status, priority, assignee_id, sort_by, ...)
+<span class="ty">UpdateTaskCommand</span>(task_id, status?, priority?, ...)
+
+<span class="cm"># === Inbox / Approval Commands ===</span>
+<span class="ty">ListInboxCommand</span>(category, is_read, page)
+<span class="ty">HandleApprovalCommand</span>(task_id, decision, payload)
+      </div>
+
+      <h3><span class="dot"></span>发送消息时的 dispatch_mode</h3>
+      <div class="tbl-wrap">
+        <table><thead><tr><th>模式</th><th>值</th><th>行为</th></tr></thead>
+        <tbody>
+          <tr><td><b>自动</b></td><td><code>auto</code></td><td>@协调者 → 触发分解；@Agent → 直接路由；无@ → LLM 意图检测</td></tr>
+          <tr><td><b>直接</b></td><td><code>direct</code></td><td>直接发给目标 Agent（私聊固定使用）</td></tr>
+        </tbody></table>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="events">
+      <div class="sec-head">
+        <div class="tag">§5 领域事件</div>
+        <h2>Domain Events 目录</h2>
+      </div>
+
+      <div class="code-block">
+<span class="cm"># === Agent Events ===</span>
+<span class="ty">AgentCreated</span>(agent_id, name, provider, model, timestamp)
+<span class="ty">AgentUpdated</span>(agent_id, changed_fields, timestamp)
+<span class="ty">AgentDeleted</span>(agent_id, timestamp)
+
+<span class="cm"># === Group Events ===</span>
+<span class="ty">GroupCreated</span>(group_id, name, coordinator_id, timestamp)
+<span class="ty">MemberAdded</span>(group_id, agent_id, timestamp)
+<span class="ty">MemberRemoved</span>(group_id, agent_id, timestamp)
+
+<span class="cm"># === Chat / Task Events ===</span>
+<span class="ty">MessageSent</span>(session_id, message_id, content_type, timestamp)
+<span class="ty">TaskCreated</span>(task_id, parent_id, assignee, timestamp)
+<span class="ty">TaskStateChanged</span>(task_id, from_status, to_status, timestamp)
+<span class="ty">ApprovalRequested</span>(task_id, tool_name, arguments, timestamp)
+<span class="ty">ApprovalResolved</span>(task_id, decision, timestamp)
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="s-agent">
+      <div class="sec-head">
+        <div class="tag">§6 数据流</div>
+        <h2>Agent CRUD 数据流</h2>
+      </div>
+
+      <h3 class="d-blue"><span class="dot"></span>创建 Agent（S1）</h3>
+      <div class="diagram">
+<span class="cm">时序：</span>
+L5(前端)            L4(AgentRouter)     L3(AgentService)    L2(Agent)        L1(DB)
+  │                     │                    │                  │               │
+  │ POST /api/agents    │                    │                  │               │
+  │ {name,avatar,role,  │                    │                  │               │
+  │  provider,model,key}│                    │                  │               │
+  │────────────────────▶│                    │                  │               │
+  │                     │ CreateAgentCmd     │                  │               │
+  │                     │───────────────────▶│                  │               │
+  │                     │                    │ check_unique     │               │
+  │                     │                    │─────────────────▶│               │
+  │                     │                    │◀─────────────────│               │
+  │                     │                    │ encrypt_api_key  │               │
+  │                     │                    │ Agent(name,...)  │               │
+  │                     │                    │────────────────▶│               │
+  │                     │                    │ validate()       │               │
+  │                     │                    │◀────────────────│               │
+  │                     │                    │ save(agent)     │               │
+  │                     │                    │───────────────────────────────▶│
+  │                     │                    │◀───────────────────────────────│
+  │                     │ 201 {id,name...}  │                   │               │
+  │◀────────────────────│                    │ AgentCreated     │               │
+  │                     │                    │─────────────────────────────────▶│
+  │                     │                    │         EventBus Pub/Sub        │
+      </div>
+
+      <h3 class="d-purple"><span class="dot"></span>编辑 Agent（S2）</h3>
+      <div class="diagram">
+<span class="cm">关键流程：</span>
+L3 → L1: AgentRepository.get_by_id(id)     <span class="cm"># 加载聚合根</span>
+L3 → L2: agent.update(**changed_fields)    <span class="cm"># 领域逻辑</span>
+L3 → L1: AgentRepository.save(agent)       <span class="cm"># 持久化</span>
+L3 → EventBus: AgentUpdated                <span class="cm"># 发布事件</span>
+
+<span class="cm">如果修改 api_key → 重新加密（AES-256-GCM）</span>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="s-group">
+      <div class="sec-head">
+        <div class="tag">§7 数据流</div>
+        <h2>群组创建 & 聊天</h2>
+      </div>
+
+      <h3 class="d-blue"><span class="dot"></span>创建群组（S5）</h3>
+      <div class="diagram">
+<span class="cm">关键逻辑：</span>
+1. Group(name, description)             <span class="cm"># 创建群组实体</span>
+2. CoordinatorAgent(                    <span class="cm"># 自动生成协调者</span>
+     name="协调者-{group_id}",
+     role="system_coordinator",
+     provider=system,
+     is_system=True)
+3. save(group)                           <span class="cm"># 持久化群组</span>
+4. save(coordinator_agent)               <span class="cm"># 持久化协调者</span>
+5. add_members(initial_members)          <span class="cm"># 添加初始成员</span>
+6. GroupCreated + AgentCreated 发布      <span class="cm"># 事件通知</span>
+      </div>
+
+      <h3 class="d-purple"><span class="dot"></span>群聊发送消息（S8）</h3>
+      <div class="diagram">
+                     coordinator
+                     ┌─────────────────────────────────────┐
+                     │ 协调者接收消息                        │
+                     │ → 分析需求 + 可用 Agent 列表          │
+                     │ → LLM 结构化输出子任务 + 分配         │
+                     │ → Harness 校验 → 编译 DAG            │
+                     │ → 调度执行                           │
+                     └─────────────────────────────────────┘
+                                │
+         ┌──────────────────────┼──────────────────────┐
+         ▼                      ▼                      ▼
+   ┌────────────┐        ┌────────────┐        ┌────────────┐
+   │ Worker     │        │ Worker     │        │ Worker     │
+   │ Frontend   │        │ Backend    │        │ Reviewer   │
+   │ Agent      │        │ Agent      │        │ Agent      │
+   └─────┬──────┘        └─────┬──────┘        └─────┬──────┘
+         │                     │                      │
+         └─────────────────────┼──────────────────────┘
+                               ▼
+                     ┌──────────────────┐
+                     │ 结果合并 → 群聊回复│
+                     └──────────────────┘
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="s-stream">
+      <div class="sec-head">
+        <div class="tag">§8 数据流</div>
+        <h2>流式输出</h2>
+      </div>
+
+      <div class="diagram">
+L1(LLMAdapter)    L2(Worker)    Redis Pub/Sub    L4(WS Handler)    L5(前端)
+     │                │               │                │               │
+     │ stream()       │               │                │               │
+     │───────────────▶│               │                │               │
+     │ token:"我"     │               │                │               │
+     │───────────────▶│ StreamingToken │                │               │
+     │                │──────────────▶│                │               │
+     │                │               │ WS push:"我"   │               │
+     │                │               │───────────────▶│               │
+     │                │               │                │ setState("我")│
+     │                │               │                │──────────────▶│
+     │ token:"想要"   │               │                │               │
+     │───────────────▶│──────────────▶│───────────────▶│──────────────▶│
+     │ token:"创建"   │               │                │               │
+     │───────────────▶│──────────────▶│───────────────▶│──────────────▶│
+     │  ...           │    ...        │     ...        │     ...       │
+     │                │               │                │               │
+     │ (stream结束)   │               │                │               │
+     │                │StreamCompleted│                │               │
+     │                │──────────────▶│                │               │
+     │                │               │ message.done   │               │
+     │                │               │───────────────▶│──────────────▶│
+      </div>
+      <div class="note info"><span class="ico">💡</span><div>每个 token 通过 Redis Pub/Sub 广播到对应 session 的 WS Handler，前端逐 token 追加到 StreamingText 组件。</div></div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="s-coordinator">
+      <div class="sec-head">
+        <div class="tag">§9 数据流</div>
+        <h2>协调者分解与 DAG 执行</h2>
+      </div>
+
+      <h3 class="d-blue"><span class="dot"></span>DAG 编译</h3>
+      <div class="diagram">
+<span class="cm">Coordinator 输出的 JSON 决策：</span>
+{
+  "plan": {
+    "tasks": [
+      {"id": "t1", "title": "前端UI组件",  "assignee": "FrontendAgent", "dependencies": []},
+      {"id": "t2", "title": "后端API",     "assignee": "BackendAgent",  "dependencies": []},
+      {"id": "t3", "title": "集成测试",    "assignee": "ReviewerAgent",  "dependencies": ["t1", "t2"]}
+    ]
+  }
+}
+
+<span class="cm">Harness 校验规则：</span>
+✓ 检测循环依赖 → detect_cycle(plan) → 拒绝
+✓ 所有 assignee 在群组内 → 不在则警告
+✓ 依赖 ID 都存在 → 缺失则补充
+✓ 通过后 → 创建 Task 聚合根 + 子任务 + 入队
+      </div>
+
+      <h3 class="d-purple"><span class="dot"></span>依赖与并行</h3>
+      <div class="note g"><span class="ico">▶</span><div><b>无依赖 → 并行执行</b>：t1（前端）和 t2（后端）无依赖关系，同时分配 Worker 执行。<br>
+<b>有依赖 → 串行等待</b>：t3（集成测试）依赖 t1、t2 都完成后才进入 RUNNING 状态。</div></div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="s-fsm">
+      <div class="sec-head">
+        <div class="tag">§10 数据流</div>
+        <h2>任务 FSM（状态机）</h2>
+      </div>
+
+      <div class="diagram">
+                    ┌──────────┐
+                    │  PENDING │  任务已创建（手动创建或协调者生成）
+                    └────┬─────┘
+                         │ Harness 入队
+                         ▼
+                    ┌──────────┐
+                    │  QUEUED  │  等待 Worker 领取
+                    └────┬─────┘
+                         │ Worker 领取 + Guard 校验通过
+                         ▼
+                    ┌──────────┐
+              ┌─────│ RUNNING  │─────┐
+              │     └────┬─────┘     │
+              │          │           │
+              │     ┌────┼────┐      │
+              │     │    │    │      │
+              ▼     ▼    │    ▼      ▼
+         ┌──────────┐    │  ┌───────────────┐
+         │ COMPLETED│    │  │AWAITING_      │  人工介入请求
+         │  (终态)  │    │  │APPROVAL       │
+         └──────────┘    │  └───┬───┬───┬───┘
+                         │      │   │   │
+                         │  APPROVE│   │ REJECT
+                         │      │   │   │
+          ┌──────────┐   │      ▼   │   ▼
+          │  FAILED  │───┘  ┌──────────┐  ┌───────────┐
+          └────┬─────┘      │  RUNNING │  │ CANCELLED │
+               │            │ (恢复执行)│  │  (终态)   │
+               │ 重试       └──────────┘  └───────────┘
+               │ (retry_count &lt; 3)
+               ▼
+          ┌──────────┐
+          │  QUEUED  │  (重新入队，可能换 Worker)
+          └──────────┘
+      </div>
+      <div class="step-row" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
+        <span class="flow-step"><span class="dot g"></span>COMPLETED 终态</span>
+        <span class="flow-step"><span class="dot r"></span>FAILED → 重试(≤3) / 升级</span>
+        <span class="flow-step"><span class="dot o"></span>AWAITING_APPROVAL → HITL</span>
+        <span class="flow-step"><span class="dot r"></span>CANCELLED 终态</span>
+        <span class="flow-step"><span class="dot b"></span>PAUSED 手动暂停</span>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="s-worker">
+      <div class="sec-head">
+        <div class="tag">§11 数据流</div>
+        <h2>Worker 上下文注入</h2>
+      </div>
+
+      <div class="diagram">
+<span class="cm">Harness.build_agent_context(task) 构造的 System Prompt：</span>
+
+┌── System Prompt ──────────────────────────┐
+│                                            │
+│  ## 当前任务                               │
+│  创建登录页面UI组件，包含邮箱+密码+提交按钮  │
+│                                            │
+│  ## 用户需求背景                           │
+│  用户要求做一个完整的登录页面，包含前端和后端 │
+│                                            │
+│  ## 共享制品引用                           │
+│  · api_contract:v1 (read_artifact 可获取)  │
+│                                            │
+│  ## 输出规范                               │
+│  使用 React + Tailwind CSS                 │
+│                                            │
+│  ## 你的工作记忆                           │
+│  (Agent 私有上下文，跨步骤累积)              │
+│                                            │
+└────────────────────────────────────────────┘
+      </div>
+
+      <h3><span class="dot"></span>上下文三层体系</h3>
+      <div class="tbl-wrap">
+        <table><thead><tr><th>层级</th><th>内容</th><th>存储</th><th>Token 估算</th></tr></thead>
+        <tbody>
+          <tr><td><b>热上下文</b></td><td>最近 15-20 条消息全文</td><td>Redis</td><td>~2000-4000</td></tr>
+          <tr><td><b>长期上下文</b></td><td>Pin 消息 + 对话摘要</td><td>PostgreSQL</td><td>~500-1000</td></tr>
+          <tr><td><b>历史预览</b></td><td>更早对话的摘要占位</td><td>本地 JSON</td><td>0（不占用 LLM 上下文）</td></tr>
+        </tbody></table>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="s-inbox">
+      <div class="sec-head">
+        <div class="tag">§12 数据流</div>
+        <h2>收件箱通知</h2>
+      </div>
+
+      <div class="diagram">
+<span class="cm">通知触发流程：</span>
+
+Domain Event 发生后（如 TaskStateChanged, ApprovalRequested）：
+  │
+  ├─ EventBus 捕获 → 映射为 Notification 实体
+  │
+  ├─ NotificationRepository.save(notification)   <span class="cm"># 持久化</span>
+  │
+  ├─ Redis: INCR "unread_count:{user_id}"         <span class="cm"># 未读计数</span>
+  │
+  └─ Redis Pub/Sub → WS Push:
+       {
+         type: "inbox_update",
+         unread_count: 5,
+         latest_notification: { title, category, ... }
+       }
+         │
+         ▼
+       L4 WS Handler → L5 前端
+         → 左侧导航栏收件箱图标 Badge 更新
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="s-context">
+      <div class="sec-head">
+        <div class="tag">§13 数据流</div>
+        <h2>上下文注入 & Pin</h2>
+      </div>
+
+      <div class="diagram">
+<span class="cm">每次 Agent 执行前的上下文构建：</span>
+L2 Harness.build_agent_context(task):
+  │
+  ├─ 1. GlobalContext:
+  │      · task_definition: 当前任务描述 + 输入 Schema
+  │      · shared_artifact_refs: 已接受的共享制品引用列表
+  │      · conversation_summary: 用户原始需求的压缩摘要 (&lt;500 tokens)
+  │
+  ├─ 2. PrivateContext:
+  │      · 从 Redis/L1 获取:
+  │        - 该 Agent 在此会话中的前序工具调用历史
+  │        - 该 Agent 的中间产物列表
+  │        - 该 Agent 的跨步骤工作记忆
+  │
+  └─ 3. 编译为 System Prompt → 注入 LLM 调用
+
+<span class="cm">Pin 消息流程：</span>
+用户长按消息 → 选择"Pin 为长期上下文"
+L5 → L4: POST /api/messages/{message_id}/pin
+  → L3: 标记 message.pinned = True
+  → 重新生成会话摘要（含 Pin 消息内容）
+  → 下次 Agent 调用时自动注入
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="bus">
+      <div class="sec-head">
+        <div class="tag">§14 附录</div>
+        <h2>事件总线全景</h2>
+      </div>
+      <div class="tbl-wrap">
+        <table><thead><tr><th>场景</th><th>发布的事件</th><th>消费者</th></tr></thead>
+        <tbody>
+          <tr><td>S1 创建 Agent</td><td>AgentCreated</td><td>日志</td></tr>
+          <tr><td>S2 编辑 Agent</td><td>AgentUpdated</td><td>相关群组 WS 通知</td></tr>
+          <tr><td>S3 删除 Agent</td><td>AgentDeleted</td><td>GroupService（踢出）+ 会话关闭</td></tr>
+          <tr><td>S5 创建群组</td><td>GroupCreated</td><td>WS 通知创建者</td></tr>
+          <tr><td>S6 添加成员</td><td>MemberAdded</td><td>WS 通知群组全体</td></tr>
+          <tr><td>S7 移除成员</td><td>MemberRemoved</td><td>WS 通知群组全体</td></tr>
+          <tr><td>S8 群聊消息</td><td>MessageSent</td><td>WS 广播给会话所有客户端</td></tr>
+          <tr><td>S8 分解任务</td><td>TaskCreated + SubTaskCreated</td><td>WS 推送到群聊</td></tr>
+          <tr><td>S13 入队执行</td><td>TaskStateChanged</td><td>WS 推送状态变更</td></tr>
+          <tr><td>S14 Worker 执行</td><td>StreamingToken × N</td><td>WS 推送流式 token</td></tr>
+          <tr><td>S14 执行完成</td><td>TaskStateChanged(completed)</td><td>WS + 检查依赖解锁</td></tr>
+          <tr><td>S15 任务失败</td><td>TaskStateChanged(failed)</td><td>Harness（重试）+ WS</td></tr>
+          <tr><td>S18 请求审批</td><td>ApprovalRequested</td><td>InboxService + WS</td></tr>
+          <tr><td>S19 APPROVE</td><td>ApprovalResolved</td><td>Harness（恢复执行）+ 收件箱</td></tr>
+          <tr><td>S20 通知</td><td>NotificationCreated</td><td>WS 推送到收件箱</td></tr>
+          <tr><td>S24 压缩上下文</td><td>ContextCompressed</td><td>日志 + Session 元数据</td></tr>
+        </tbody></table>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="impl">
+      <div class="sec-head">
+        <div class="tag">§15 附录</div>
+        <h2>实现要点</h2>
+      </div>
+
+      <h3><span class="dot"></span>L3 Service 事务边界</h3>
+      <div class="code-block">
+<span class="kw">class</span> <span class="ty">AgentService</span>:
+    <span class="kw">async def</span> <span class="fn">create</span>(self, cmd: CreateAgentCommand) -> AgentResponse:
+        <span class="cm"># 1. 领域校验（L2）</span>
+        <span class="kw">if</span> <span class="kw">await</span> self.agent_repo.exists_by_name(cmd.name):
+            <span class="kw">raise</span> DomainError(<span class="str">"Agent name already exists"</span>)
+
+        <span class="cm"># 2. 创建聚合根（L2）</span>
+        agent = Agent(
+            name=cmd.name, avatar=cmd.avatar, role=cmd.role,
+            provider=cmd.provider, model=cmd.model,
+            api_key_encrypted=encrypt(cmd.api_key),  <span class="cm"># L3 负责加密</span>
+        )
+
+        <span class="cm"># 3. 持久化（L1）</span>
+        <span class="kw">await</span> self.agent_repo.save(agent)
+
+        <span class="cm"># 4. 发布事件</span>
+        <span class="kw">await</span> self.event_bus.publish(AgentCreated(
+            agent_id=agent.id, name=agent.name, timestamp=datetime.utcnow(),
+        ))
+
+        <span class="kw">return</span> AgentResponse.from_domain(agent)
+      </div>
+
+      <h3><span class="dot"></span>关键设计决策</h3>
+      <div class="grid g2">
+        <div class="card hl"><h4>为什么用 Docker Compose 不用 K8s？</h4><p>MVP 阶段需要最简单的部署方案。Docker Compose 一台机器即可跑通全部 5 个服务（前端/后端/PG/Redis/Celery），减少运维心智负担。</p></div>
+        <div class="card hl"><h4>为什么异步优先？</h4><p>WebSocket + 流式输出 + LLM 调用全部是 IO-bound。FastAPI 原生 async + SQLAlchemy 2.0 async 模式 + async Redis 客户端，全程非阻塞。</p></div>
+        <div class="card hl"><h4>为什么不使用 LangChain 框架？</h4><p>LangChain 抽象层过厚，调试困难。自研 UnifiedAgent + Harness 架构更轻量、可测试、可推理。</p></div>
+        <div class="card hl"><h4>为什么四道硬闸防止 token 爆炸？</h4><p>LLM token 消耗直接关系到成本。硬闸：最大步骤数 / 最大 Token / 最大执行时长 / 最大工具调用次数，任一超限则终止。</p></div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="arch-api">
+      <div class="sec-head">
+        <div class="tag">§16 附录</div>
+        <h2>完整 API 映射</h2>
+      </div>
+      <div class="tbl-wrap">
+        <table><thead><tr><th>文件</th><th>路由</th><th>Command</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>agents.py</td><td>POST /api/agents</td><td>CreateAgentCommand</td><td>创建 Agent</td></tr>
+          <tr><td>agents.py</td><td>GET /api/agents</td><td>—</td><td>Agent 列表</td></tr>
+          <tr><td>agents.py</td><td>GET /api/agents/{id}</td><td>—</td><td>Agent 详情</td></tr>
+          <tr><td>agents.py</td><td>PATCH /api/agents/{id}</td><td>UpdateAgentCommand</td><td>更新 Agent</td></tr>
+          <tr><td>agents.py</td><td>DELETE /api/agents/{id}</td><td>DeleteAgentCommand</td><td>删除 Agent</td></tr>
+          <tr><td>groups.py</td><td>POST /api/groups</td><td>CreateGroupCommand</td><td>创建群组</td></tr>
+          <tr><td>groups.py</td><td>POST /api/groups/{id}/members</td><td>AddMemberCommand</td><td>添加成员</td></tr>
+          <tr><td>groups.py</td><td>DELETE /api/groups/{id}/members/{a_id}</td><td>RemoveMemberCommand</td><td>移除成员</td></tr>
+          <tr><td>sessions.py</td><td>POST /api/sessions</td><td>CreateSessionCommand</td><td>创建会话</td></tr>
+          <tr><td>sessions.py</td><td>POST /api/sessions/{id}/messages</td><td>SendMessageCommand</td><td>发送消息</td></tr>
+          <tr><td>sessions.py</td><td>WS /ws/sessions/{id}</td><td>—</td><td>WebSocket 实时通信</td></tr>
+          <tr><td>sessions.py</td><td>POST /api/messages/{id}/pin</td><td>PinMessageCommand</td><td>Pin 消息</td></tr>
+          <tr><td>tasks.py</td><td>POST /api/tasks</td><td>CreateTaskCommand</td><td>创建任务</td></tr>
+          <tr><td>tasks.py</td><td>GET /api/tasks</td><td>ListTasksCommand</td><td>任务列表</td></tr>
+          <tr><td>tasks.py</td><td>PATCH /api/tasks/{id}</td><td>UpdateTaskCommand</td><td>更新任务</td></tr>
+          <tr><td>inbox.py</td><td>GET /api/inbox</td><td>ListInboxCommand</td><td>通知列表</td></tr>
+          <tr><td>inbox.py</td><td>PATCH /api/inbox/{id}/read</td><td>MarkReadCommand</td><td>标记已读</td></tr>
+        </tbody></table>
+      </div>
+    </section>
+
+    <footer>
+      <span>AgentHub 架构设计 · v1.0</span>
+      <span>生成于 <code>2026-05-22</code></span>
+    </footer>
+
+    <button class="toTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" id="topBtn">↑</button>
+  </main>
+</div>
+<script>
+  const btn = document.getElementById('topBtn');
+  window.addEventListener('scroll',()=>{btn.classList.toggle('show',window.scrollY>300)});
+  document.querySelectorAll('nav a').forEach(a=>{
+    a.addEventListener('click',function(e){e.preventDefault();const id=this.getAttribute('href').slice(1);document.getElementById(id).scrollIntoView({behavior:'smooth'});document.querySelectorAll('nav a').forEach(x=>x.classList.remove('active'));this.classList.add('active')})
+  });
+</script>
+</body>
+</html>

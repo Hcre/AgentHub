@@ -22,7 +22,7 @@ echo.
 
 REM 3. Update roadmap
 echo -- 3/7 update roadmap --
-echo Check spec/roadmap_开发路线图.md
+echo Check docs/plan/开发清单_roadmap.md
 echo Mark completed tasks with ✅, add completion date and notes.
 echo.
 set /p roadmap_ok="Updated? (y/n): "
@@ -45,13 +45,13 @@ if %errorlevel% neq 0 (
     echo [OK] worklog template generated
 )
 echo.
-echo Edit file in .agenthub/worklogs/%who%
+echo Edit file in worklogs/%who%
 pause
 
 REM 5. Update STATUS
 echo.
 echo -- 5/7 update STATUS.md --
-echo Update your row in .agenthub/worklogs/STATUS.md:
+echo Update your row in worklogs/STATUS.md:
 echo   - "Working on" -> next task
 echo   - "Done this week" -> add this feature
 echo   - Update "Last updated" date

@@ -48,7 +48,7 @@ if docs_root.is_dir():
         if f.is_dir():
             continue
         if f.suffix == ".html":
-            error(f"docs/{f.name}: HTML files should not be committed (markdown is source)")
+            error(f"docs/{f.name}: HTML files should not be in docs/ root (move to docs/reports/)")
             continue
         if f.suffix != ".md":
             continue
@@ -107,11 +107,26 @@ if archive_dir.is_dir():
         if not ARCHIVE_PATTERN.match(f.name):
             error(f"docs/archive/{f.name}: missing DEPRECATED_ prefix")
 
-# 4. worklogs/
-worklogs_dir = ROOT / ".agenthub" / "worklogs"
+# 4. worklogs/ (按人分子目录 + decisions/ ADR 子目录)
+WORKLOG_NON_PERSONAL_DIRS = {"decisions"}  # ADR 用 NNNN-<slug>.md 命名，跳过日期格式校验
+ADR_PATTERN = re.compile(r"^\d{4}-[a-z0-9-]+\.md$")
+
+worklogs_dir = ROOT / "worklogs"
 if worklogs_dir.is_dir():
     for f in worklogs_dir.iterdir():
         if f.is_dir():
+            # ADR 子目录：要求 NNNN-<slug>.md
+            if f.name in WORKLOG_NON_PERSONAL_DIRS:
+                for sub in f.iterdir():
+                    if sub.suffix != ".md":
+                        continue
+                    if not ADR_PATTERN.match(sub.name):
+                        error(
+                            f"worklogs/{f.name}/{sub.name}: "
+                            f"ADR must be NNNN-<slug>.md (4-digit number)"
+                        )
+                continue
+            # 个人子目录：要求 YYYY-MM-DD_<desc>.md
             for sub in f.iterdir():
                 if sub.suffix != ".md":
                     continue
@@ -119,7 +134,7 @@ if worklogs_dir.is_dir():
                     continue
                 if not WORKLOG_PATTERN.match(sub.name):
                     error(
-                        f".agenthub/worklogs/{f.name}/{sub.name}: "
+                        f"worklogs/{f.name}/{sub.name}: "
                         f"worklog must start with YYYY-MM-DD_"
                     )
         else:
@@ -129,13 +144,17 @@ if worklogs_dir.is_dir():
                 continue
             if not WORKLOG_PATTERN.match(f.name):
                 error(
-                    f".agenthub/worklogs/{f.name}: "
+                    f"worklogs/{f.name}: "
                     f"worklog must start with YYYY-MM-DD_ (or move to docs/explore/)"
                 )
 
-# 5. No .html in docs/ tree
+# 5. No .html in docs/ prose tree
+#    例外：docs/reports/（渲染产物）、skills/ 与 .agenthub/（Skill 资产，可含 html 模板）
+HTML_ALLOWED_DIRS = {"reports", "skills", ".agenthub"}
 for html_file in ROOT.glob("docs/**/*.html"):
     rel = html_file.relative_to(ROOT)
+    if HTML_ALLOWED_DIRS & set(rel.parts):
+        continue
     error(f"{rel}: HTML files should not be committed, markdown is source")
 
 # 6. No version suffix in docs/ (except archive/)

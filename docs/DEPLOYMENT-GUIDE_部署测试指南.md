@@ -53,8 +53,8 @@ cd ..
 ### 2. 环境变量
 
 ```bash
-cp backend/.env.example backend/.env
-# 编辑 backend/.env，确认：
+cp src/backend/.env.example src/backend/.env
+# 编辑 src/backend/.env，确认：
 #   DATABASE_URL=postgresql+asyncpg://agenthub:agenthub_dev_pwd@localhost:5432/agenthub
 #   REDIS_URL=redis://localhost:6379/0
 #   SECRET_KEY=<有效的 base64 32 字节密钥>

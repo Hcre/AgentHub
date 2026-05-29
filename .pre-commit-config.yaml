@@ -4,20 +4,20 @@ repos:
     hooks:
       - id: ruff
         name: ruff (backend)
-        files: ^backend/
-        args: [--config, backend/pyproject.toml]
+        files: ^src/backend/
+        args: [--config, src/backend/pyproject.toml]
       - id: ruff-format
         name: ruff format (backend)
-        files: ^backend/
-        args: [--config, backend/pyproject.toml]
+        files: ^src/backend/
+        args: [--config, src/backend/pyproject.toml]
 
   - repo: https://github.com/pre-commit/mirrors-eslint
     rev: v9.23.0
     hooks:
       - id: eslint
         name: eslint (frontend)
-        files: ^frontend/
-        args: [--config, frontend/.eslintrc.json]
+        files: ^src/frontend/
+        args: [--config, src/frontend/.eslintrc.json]
         additional_dependencies:
           - eslint@9.23.0
 
@@ -25,9 +25,9 @@ repos:
     hooks:
       - id: tsc-typecheck
         name: TypeScript 类型检查
-        entry: bash -c "cd frontend && npx tsc --noEmit"
+        entry: bash -c "cd src/frontend && npx tsc --noEmit"
         language: system
-        files: ^frontend/
+        files: ^src/frontend/
         pass_filenames: false
 
       - id: branch-name

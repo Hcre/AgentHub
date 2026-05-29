@@ -24,7 +24,7 @@ docker ps
 
 ```bash
 cd /mnt/d/AgentHub/repo
-docker compose -f docker/docker-compose.yml up --build -d
+docker compose -f src/docker/docker-compose.yml up --build -d
 ```
 
 ### 4. 验证
@@ -41,19 +41,19 @@ docker compose -f docker/docker-compose.yml up --build -d
 
 ```bash
 cd /mnt/d/AgentHub/repo
-docker compose -f docker/docker-compose.yml up --build -d
+docker compose -f src/docker/docker-compose.yml up --build -d
 ```
 
 ### 查看日志
 
 ```bash
-docker compose -f docker/docker-compose.yml logs -f <service>
+docker compose -f src/docker/docker-compose.yml logs -f <service>
 ```
 
 ### 停止
 
 ```bash
-docker compose -f docker/docker-compose.yml down
+docker compose -f src/docker/docker-compose.yml down
 ```
 
 ---

@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentHub · 适配器接口契约</title>
+<style>
+  :root{
+    --bg:#F0EEE6; --bg-soft:#F5F3EC; --panel:#FBFAF6; --panel-2:#F6F3EA;
+    --line:#E2DDD0; --line-soft:#EAE6DA; --txt:#28261F; --txt-dim:#6A6457;
+    --txt-faint:#9A9385; --brand:#C9613C; --brand-2:#D97757; --accent:#4F6F8F;
+    --gold:#B68A3E; --good:#5C8A56; --warn:#C08A2E; --bad:#C0533F; --code-bg:#2D2B28;
+    --radius:16px; --shadow:0 18px 40px -24px rgba(80,60,40,.35);
+    --mono:'SFMono-Regular',ui-monospace,'Cascadia Code','Consolas',monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;font-size:15px}
+  body{
+    font-family:var(--sans);background:radial-gradient(1100px 700px at 82% -8%,#F0E6DC 0%,transparent 55%),radial-gradient(900px 650px at -8% 8%,#EEEADD 0%,transparent 50%),var(--bg);
+    color:var(--txt);line-height:1.7;-webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--brand);color:#fff}
+  .shell{display:flex;min-height:100vh}
+  .side{
+    position:fixed;top:0;left:0;bottom:0;width:238px;
+    background:linear-gradient(180deg,#F6F3EA,#F2EFE5);border-right:1px solid var(--line);
+    padding:24px 14px 30px;overflow-y:auto;z-index:50;
+  }
+  .side::-webkit-scrollbar{width:6px}
+  .side::-webkit-scrollbar-thumb{background:#DCD6C8;border-radius:8px}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:5px;padding:0 6px}
+  .brand .mark{
+    width:34px;height:34px;border-radius:9px;flex:0 0 auto;
+    background:linear-gradient(135deg,#4F6F8F,#6A8FAA);
+    display:grid;place-items:center;font-weight:800;color:#fff;font-size:15px;
+    box-shadow:0 8px 20px -8px var(--accent);
+  }
+  .brand b{font-size:14px;letter-spacing:.3px;display:block;line-height:1.25;color:var(--txt)}
+  .brand span{font-size:10px;color:var(--txt-faint);letter-spacing:1.5px}
+  .side .meta{font-size:10px;color:var(--txt-faint);padding:0 6px;margin:10px 0 12px;border-top:1px solid var(--line);padding-top:10px}
+  nav a{
+    display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:7px;
+    color:var(--txt-dim);text-decoration:none;font-size:12px;transition:.18s;margin-bottom:1px;
+  }
+  nav a .n{font-family:var(--mono);font-size:9.5px;color:var(--txt-faint);width:16px;text-align:center}
+  nav a:hover{background:#EBE6D8;color:var(--txt)}
+  nav a.active{background:linear-gradient(90deg,rgba(79,111,143,.12),transparent);color:#2a2620;box-shadow:inset 2px 0 0 var(--accent)}
+  nav a.active .n{color:var(--accent)}
+  nav .grp{font-size:9px;letter-spacing:2px;color:var(--txt-faint);text-transform:uppercase;margin:14px 0 5px 9px}
+  .main{margin-left:238px;flex:1;padding:36px 44px 60px;max-width:1120px}
+
+  .sec-head{margin-bottom:24px}
+  .sec-head .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:1.5px;color:var(--accent);margin-bottom:3px}
+  .sec-head h2{font-size:25px;font-weight:800;letter-spacing:-.5px;margin:3px 0 8px}
+  .sec-head p{font-size:13.5px;color:var(--txt-dim);max-width:700px}
+  h2{font-size:22px;font-weight:800;margin:36px 0 12px;letter-spacing:-.3px}
+  h3{font-size:17px;font-weight:700;margin:26px 0 10px;display:flex;align-items:center;gap:10px}
+  h3 .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:0 0 auto}
+  h4{font-size:14px;font-weight:700;margin:16px 0 7px;color:var(--txt)}
+  p{font-size:13px;color:var(--txt-dim);margin-bottom:9px;line-height:1.75}
+  .mono{font-family:var(--mono)}
+
+  .card{border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:var(--panel);box-shadow:var(--shadow)}
+  .card.hl{border-left:3px solid var(--accent)}
+  .card h4{font-size:13.5px;margin:0 0 7px}
+  .card p{font-size:12px}
+  .grid{display:grid;gap:12px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr 1fr}
+
+  .code-block{
+    background:var(--code-bg);color:#E8E4DB;border-radius:11px;padding:16px 18px;
+    font-family:var(--mono);font-size:12px;line-height:1.6;overflow-x:auto;white-space:pre;
+    box-shadow:var(--shadow);margin:12px 0;
+  }
+  .code-block .kw{color:#C9A87C}
+  .code-block .str{color:#9BBF8F}
+  .code-block .cm{color:#8A867A;font-style:italic}
+  .code-block .ty{color:#87B9D9}
+  .code-block .fn{color:#D9A987}
+  .code-block .op{color:#C9A87C}
+
+  .diagram{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px;font-family:var(--mono);font-size:11.5px;line-height:1.5;overflow-x:auto;white-space:pre;box-shadow:var(--shadow)}
+  .diagram .hl{color:var(--accent);font-weight:700}
+  .diagram .cm{color:var(--txt-faint)}
+
+  .tbl-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--line);background:var(--panel)}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  thead{background:var(--bg-soft)}th{padding:9px 12px;text-align:left;font-weight:700;font-size:11.5px;color:var(--txt-dim);border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:8px 12px;border-bottom:1px solid var(--line-soft);color:var(--txt-dim)}
+  tr:last-child td{border-bottom:none}
+  td.num{font-family:var(--mono);text-align:right;white-space:nowrap}
+
+  .b-pill{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;display:inline-block}
+  .b-pill.ok{background:#E1F0DD;color:var(--good)}
+  .b-pill.mid{background:#F3E9D0;color:var(--warn)}
+  .b-pill.no{background:#F2DDD8;color:var(--bad)}
+  .b-pill.inf{background:rgba(79,111,143,.12);color:var(--accent)}
+
+  .note{padding:13px 15px;border-radius:10px;display:flex;gap:10px;align-items:flex-start;font-size:12.5px;margin:14px 0;border:1px solid}
+  .note .ico{font-size:17px;flex:0 0 auto;margin-top:1px}
+  .note.info{border-color:rgba(79,111,143,.3);background:rgba(79,111,143,.08)}
+  .note.warn{border-color:rgba(192,138,46,.3);background:rgba(192,138,46,.08)}
+
+  .chip-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+  .chip{font-size:10.5px;padding:3px 9px;border-radius:5px;background:#EDE8DD;color:var(--txt-dim);font-family:var(--mono);border:1px solid var(--line)}
+  .chip.b{background:rgba(79,111,143,.1);color:var(--accent);border-color:rgba(79,111,143,.2)}
+
+  .flow-row{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;align-items:center}
+  .flow-step{font-size:11px;padding:4px 10px;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--txt-dim);display:flex;align-items:center;gap:5px}
+  .flow-step .dot{width:5px;height:5px;border-radius:50%;flex:0 0 auto}
+  .flow-arrow{color:var(--txt-faint);font-size:16px;font-family:var(--mono)}
+
+  .verdict{border:2px solid var(--accent);border-radius:13px;padding:20px 24px;background:linear-gradient(135deg,var(--panel),#F5F3EE);box-shadow:var(--shadow)}
+  .verdict .lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:2px;color:var(--accent);font-weight:700;margin-bottom:6px}
+  .verdict h4{font-size:16px;font-weight:800;margin:0 0 10px}
+
+  .tag-cloud{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+  .tag-item{font-size:11px;padding:4px 12px;border-radius:20px;background:white;border:1px solid var(--line);color:var(--txt-dim)}
+  .tag-item.b{background:rgba(79,111,143,.08);border-color:rgba(79,111,143,.2);color:var(--accent)}
+
+  .checklist{list-style:none;display:flex;flex-direction:column;gap:8px;margin:10px 0}
+  .checklist li{font-size:12.5px;color:var(--txt-dim);padding-left:22px;position:relative}
+  .checklist li::before{content:"☐";position:absolute;left:0;color:var(--accent)}
+  .checklist li.done{color:var(--txt)}
+  .checklist li.done::before{content:"☑";color:var(--good)}
+
+  .src{font-size:10px;color:var(--txt-faint);font-family:var(--mono);margin-top:10px;display:flex;flex-wrap:wrap;gap:4px 12px}
+  .divider{height:1px;background:var(--line);margin:36px 0}
+  footer{border-top:1px solid var(--line);padding:22px 0 8px;margin-top:36px;color:var(--txt-faint);font-size:11px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+  footer code{font-family:var(--mono);color:var(--accent)}
+  .toTop{position:fixed;right:22px;bottom:22px;width:40px;height:40px;border-radius:10px;background:var(--panel);border:1px solid var(--line);color:var(--txt);display:grid;place-items:center;cursor:pointer;opacity:0;transition:.25s;z-index:60;font-size:15px;box-shadow:var(--shadow)}
+  .toTop.show{opacity:1}
+  .toTop:hover{border-color:var(--accent);color:var(--accent)}
+  @media(max-width:900px){.side{display:none}.main{margin-left:0;padding:22px 16px}.g2,.g3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">
+      <div class="mark">I</div>
+      <div><b>AgentHub</b><span>接口契约文档</span></div>
+    </div>
+    <div class="meta">v0.1 · 2026-05-21 · <code>域 2 ↔ 域 3</code></div>
+    <nav>
+      <div class="grp">架构</div>
+      <a href="#overview" class="active"><span class="n">01</span>架构定位</a>
+      <div class="grp">接口</div>
+      <a href="#unified"><span class="n">02</span>UnifiedAgent</a>
+      <a href="#stream"><span class="n">03</span>StreamEvent</a>
+      <a href="#tool-protocol"><span class="n">04</span>Tool 协议</a>
+      <div class="grp">工具</div>
+      <a href="#tools"><span class="n">05</span>Tool 清单</a>
+      <a href="#memory"><span class="n">06</span>MemoryContext</a>
+      <a href="#callbacks"><span class="n">07</span>回调事件</a>
+      <a href="#validation"><span class="n">08</span>验收清单</a>
+      <a href="#version"><span class="n">09</span>版本管理</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <section id="overview">
+      <div class="sec-head">
+        <div class="tag">§1 领域边界</div>
+        <h2>架构定位</h2>
+        <p>域 2（编排层）与域 3（工具链层）之间的接口契约。域 2 负责 UnifiedAgent 抽象 + 适配器 + Tool 调度框架，域 3 负责实现具体 Tool 并挂载到 Tool Registry。</p>
+      </div>
+
+      <h3><span class="dot"></span>三层领域划分</h3>
+      <div class="diagram">
+┌──────────────────────────────────────────────────────┐
+│  Domain 1 (Chat)                                     │
+│  send_message() → AsyncIterator[StreamEvent]         │
+│  只依赖 UnifiedAgent 抽象，不感知实现                  │
+└────────────────────────┬─────────────────────────────┘
+                         │
+┌────────────────────────┴─────────────────────────────┐
+│  Domain 2 (Orchestration) — 本文档范围                │
+│                                                      │
+│  UnifiedAgent (ABC)                                  │
+│    ├── ClaudeAdapter    → claude CLI                 │
+│    ├── CodexAdapter     → codex CLI                  │
+│    └── LiteLLMGateway   → unified API                │
+│                                                      │
+│  ToolScheduler                                       │
+│    → 接收 StreamEvent(tool_call)                     │
+│    → ToolRegistry.lookup(tool_name)                  │
+│    → if requires_approval: HITL.prompt()             │
+│    → tool.execute(**params)                          │
+│    → 回传 StreamEvent(tool_result) 给 Agent           │
+└────────────────────────┬─────────────────────────────┘
+                         │
+┌────────────────────────┴─────────────────────────────┐
+│  Domain 3 (Toolchain) — 实现 Tool                     │
+│                                                      │
+│  ToolRegistry.register(DiffTool())                   │
+│  ToolRegistry.register(DeployTool())                 │
+│  ToolRegistry.register(GitTool())                    │
+│  ToolRegistry.register(MemoryTool())                 │
+│  ...                                                 │
+└──────────────────────────────────────────────────────┘
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="unified">
+      <div class="sec-head">
+        <div class="tag">§2 核心接口</div>
+        <h2>UnifiedAgent 接口</h2>
+      </div>
+
+      <h3><span class="dot"></span>请求模型 — AgentRequest</h3>
+      <div class="code-block">
+<span class="kw">from</span> pydantic <span class="kw">import</span> BaseModel
+<span class="kw">from</span> typing <span class="kw">import</span> Optional
+<span class="kw">from</span> uuid <span class="kw">import</span> UUID
+
+<span class="kw">class</span> <span class="ty">MemoryContext</span>(BaseModel):
+    <span class="cm">"""域 3 记忆系统打包，注入到每次 Agent 调用"""</span>
+    l1_working: <span class="ty">list</span>[dict]           <span class="cm"># Redis 滑动窗口最近 20 条消息</span>
+    l2_summary: Optional[str] = <span class="kw">None</span>
+    l3_specs: Optional[str] = <span class="kw">None</span>
+    l4_rag: Optional[str] = <span class="kw">None</span>
+
+<span class="kw">class</span> <span class="ty">AgentRequest</span>(BaseModel):
+    request_id: <span class="ty">str</span>                  <span class="cm"># UUID，全链路追踪</span>
+    session_id: UUID
+    messages: <span class="ty">list</span>[dict]
+    system_prompt: Optional[str] = <span class="kw">None</span>
+    memory: Optional[MemoryContext] = <span class="kw">None</span>
+    available_tools: <span class="ty">list</span>[str] = []
+    max_tokens: int = <span class="num">16000</span>
+    temperature: <span class="ty">float</span> = <span class="num">0.7</span>
+      </div>
+
+      <h3><span class="dot"></span>抽象接口 — UnifiedAgent</h3>
+      <div class="code-block">
+<span class="kw">class</span> <span class="ty">UnifiedAgent</span>(ABC):
+    <span class="cm">"""所有 Agent 适配器的统一接口"""</span>
+
+    <span class="fn">@property</span>
+    <span class="fn">@abstractmethod</span>
+    <span class="kw">def</span> <span class="fn">agent_id</span>(self) -> <span class="ty">str</span>:
+        ...
+
+    <span class="fn">@property</span>
+    <span class="fn">@abstractmethod</span>
+    <span class="kw">def</span> <span class="fn">capabilities</span>(self) -> <span class="ty">list</span>[str]:
+        ...
+
+    <span class="fn">@abstractmethod</span>
+    <span class="kw">async def</span> <span class="fn">send_message</span>(
+        self, request: AgentRequest
+    ) -> AsyncIterator[StreamEvent]:
+        <span class="cm">"""核心接口：发送消息，返回流式事件"""</span>
+        ...
+
+    <span class="fn">@abstractmethod</span>
+    <span class="kw">async def</span> <span class="fn">health_check</span>(self) -> <span class="ty">bool</span>:
+        ...
+
+    <span class="fn">@abstractmethod</span>
+    <span class="kw">async def</span> <span class="fn">get_supported_tools</span>(self) -> <span class="ty">list</span>[str]:
+        ...
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="stream">
+      <div class="sec-head">
+        <div class="tag">§3 事件流</div>
+        <h2>StreamEvent 响应模型</h2>
+      </div>
+
+      <div class="tag-cloud">
+        <span class="tag-item b">TEXT</span>
+        <span class="tag-item b">THINKING</span>
+        <span class="tag-item b">TOOL_CALL</span>
+        <span class="tag-item b">TOOL_RESULT</span>
+        <span class="tag-item b">REQUEST_APPROVAL</span>
+        <span class="tag-item b">TASK_PLAN</span>
+        <span class="tag-item b">ERROR</span>
+        <span class="tag-item b">DONE</span>
+      </div>
+
+      <div class="code-block">
+<span class="kw">class</span> <span class="ty">StreamEventType</span>(StrEnum):
+    TEXT = <span class="str">"text"</span>               <span class="cm"># 文本 token</span>
+    THINKING = <span class="str">"thinking"</span>       <span class="cm"># 扩展思考 token</span>
+    TOOL_CALL = <span class="str">"tool_call"</span>     <span class="cm"># Agent 请求调用工具</span>
+    TOOL_RESULT = <span class="str">"tool_result"</span> <span class="cm"># 工具返回结果</span>
+    REQUEST_APPROVAL = <span class="str">"request_approval"</span>
+    TASK_PLAN = <span class="str">"task_plan"</span>     <span class="cm"># Coordinator 任务分解 JSON</span>
+    ERROR = <span class="str">"error"</span>             <span class="cm"># 错误事件</span>
+    DONE = <span class="str">"done"</span>               <span class="cm"># 流结束</span>
+
+<span class="kw">class</span> <span class="ty">StreamEvent</span>(BaseModel):
+    type: StreamEventType
+    seq: int                    <span class="cm"># 事件序号</span>
+    content: Optional[str] = <span class="kw">None</span>
+    tool_call: Optional[ToolCall] = <span class="kw">None</span>
+    tool_result: Optional[ToolResult] = <span class="kw">None</span>
+    task_plan: Optional[dict] = <span class="kw">None</span>
+    metadata: dict[str, Any] = {}  <span class="cm"># token_usage, model, latency_ms</span>
+      </div>
+
+      <h3><span class="dot"></span>事件流全景</h3>
+      <div class="diagram">
+ ┌─────────┐    ┌───────────┐    ┌───────────┐    ┌───────────┐
+ │ 用户发送  │───▶│ L3 Service │───▶│ L2 Worker │───▶│ LLM       │
+ │ 消息     │    │           │    │           │    │ Adapter   │
+ └─────────┘    └───────────┘    └───────────┘    └───────────┘
+                                      │
+                                      │ TEXT/THINKING token
+                                      ▼
+                                ┌───────────┐
+                                │ Redis     │
+                                │ Pub/Sub   │
+                                └─────┬─────┘
+                                      │
+                    ┌─────────────────┼──────────────────┐
+                    ▼                 ▼                   ▼
+              ┌──────────┐    ┌────────────┐     ┌──────────────┐
+              │ L4 WS    │    │ Tool-      │     │ ToolRegistry │
+              │ Handler  │    │ Scheduler  │     │ (lookup)     │
+              └──────────┘    └─────┬──────┘     └──────────────┘
+                    │               │
+                    ▼               ▼
+              ┌──────────┐   ┌──────────────┐
+              │ L5 前端  │   │ Domain 3     │
+              │ Streaming│   │ Tool.execute │
+              └──────────┘   └──────────────┘
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="tool-protocol">
+      <div class="sec-head">
+        <div class="tag">§4 Tool 协议</div>
+        <h2>Tool 基类与调度链路</h2>
+      </div>
+
+      <h3><span class="dot"></span>Tool 元数据</h3>
+      <div class="code-block">
+<span class="kw">class</span> <span class="ty">Permission</span>(StrEnum):
+    READ = <span class="str">"read"</span>
+    WRITE = <span class="str">"write"</span>
+    EXECUTE = <span class="str">"execute"</span>
+    NETWORK = <span class="str">"network"</span>
+
+<span class="kw">class</span> <span class="ty">ToolCategory</span>(StrEnum):
+    FILESYSTEM = <span class="str">"filesystem"</span>
+    GIT = <span class="str">"git"</span>
+    PREVIEW = <span class="str">"preview"</span>
+    DEPLOY = <span class="str">"deploy"</span>
+    MEMORY = <span class="str">"memory"</span>
+    KNOWLEDGE = <span class="str">"knowledge"</span>
+
+<span class="kw">class</span> <span class="ty">ToolDefinition</span>(BaseModel):
+    name: <span class="ty">str</span>
+    description: <span class="ty">str</span>                        <span class="cm"># LLM 理解用</span>
+    parameters: dict[str, Any]              <span class="cm"># JSON Schema 格式</span>
+    category: ToolCategory
+    permissions: <span class="ty">list</span>[Permission]
+    requires_approval: <span class="ty">bool</span>                 <span class="cm"># True → HITL</span>
+    max_timeout_seconds: int = <span class="num">30</span>
+      </div>
+
+      <h3><span class="dot"></span>完整调用链路</h3>
+      <div class="diagram">
+Agent 输出 tool_use 块
+  → ClaudeAdapter 解析 → StreamEvent(tool_call)
+  → Harness.ToolScheduler.receive(tool_call)
+  → tool = ToolRegistry.lookup(tool_call.name)
+  → if tool.requires_approval:
+       emit StreamEvent(request_approval) → HITL 弹窗
+       await user_decision  # 阻塞等待
+       if rejected: return ToolResult(success=False, error="User rejected")
+  → await tool.execute(tool_call.call_id, tool_call.arguments, session_id)
+  → result = ToolResult(...)
+  → emit StreamEvent(tool_result)
+  → ClaudeAdapter.send(result) → Agent 继续推理
+      </div>
+
+      <h3><span class="dot"></span>错误代码</h3>
+      <div class="tag-cloud">
+        <span class="tag-item">TIMEOUT</span>
+        <span class="tag-item">INVALID_ARGUMENTS</span>
+        <span class="tag-item">PERMISSION_DENIED</span>
+        <span class="tag-item">FILE_NOT_FOUND</span>
+        <span class="tag-item">GIT_CONFLICT</span>
+        <span class="tag-item">DEPLOY_FAILED</span>
+        <span class="tag-item">MEMORY_UNAVAILABLE</span>
+        <span class="tag-item">NETWORK_ERROR</span>
+      </div>
+      <div class="note warn"><span class="ico">⚠</span><div>错误一律通过 <code>ToolResult</code> 返回，不裸抛异常：<br><code>ToolResult(success=False, error=ToolError.INVALID_ARGUMENTS, content="path 参数不能为空")</code></div></div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="tools">
+      <div class="sec-head">
+        <div class="tag">§5 域 3 Tool 清单</div>
+        <h2>9 个 Tool 定义</h2>
+      </div>
+
+      <div class="tbl-wrap">
+        <table><thead><tr><th>#</th><th>Tool</th><th>Category</th><th>需审批</th><th>Phase</th></tr></thead>
+        <tbody>
+          <tr><td>3.1</td><td><code>memory_retrieve</code></td><td>memory</td><td><span class="b-pill ok">否</span></td><td>P1 W2</td></tr>
+          <tr><td>3.2</td><td><code>memory_save</code></td><td>memory</td><td><span class="b-pill ok">否</span></td><td>P1 W2</td></tr>
+          <tr><td>3.3</td><td><code>git_diff</code></td><td>git</td><td><span class="b-pill ok">否</span></td><td>P2 W4</td></tr>
+          <tr><td>3.4</td><td><code>git_commit</code></td><td>git</td><td><span class="b-pill no">是</span></td><td>P2 W4</td></tr>
+          <tr><td>3.5</td><td><code>diff_preview</code></td><td>preview</td><td><span class="b-pill ok">否</span></td><td>P3 W5</td></tr>
+          <tr><td>3.6</td><td><code>web_preview</code></td><td>preview</td><td><span class="b-pill ok">否</span></td><td>P3 W5</td></tr>
+          <tr><td>3.7</td><td><code>deploy</code></td><td>deploy</td><td><span class="b-pill no">是</span></td><td>P3 W5-6</td></tr>
+          <tr><td>3.8</td><td><code>knowledge_search</code></td><td>knowledge</td><td><span class="b-pill ok">否</span></td><td>P3 W6</td></tr>
+          <tr><td>3.9</td><td><code>knowledge_index</code></td><td>knowledge</td><td><span class="b-pill ok">否</span></td><td>P3 W6</td></tr>
+        </tbody></table>
+      </div>
+
+      <h3><span class="dot"></span>memory_retrieve</h3>
+      <div class="code-block">
+<span class="kw">class</span> <span class="ty">ToolDefinition</span>(
+    name=<span class="str">"memory_retrieve"</span>,
+    description=<span class="str">"检索当前会话的上下文记忆"</span>,
+    parameters={
+        <span class="str">"type"</span>: <span class="str">"object"</span>,
+        <span class="str">"properties"</span>: {
+            <span class="str">"session_id"</span>:  {<span class="str">"type"</span>: <span class="str">"string"</span>},
+            <span class="str">"limit"</span>:       {<span class="str">"type"</span>: <span class="str">"integer"</span>, <span class="str">"default"</span>: <span class="num">20</span>, <span class="str">"maximum"</span>: <span class="num">50</span>},
+            <span class="str">"memory_type"</span>: {<span class="str">"type"</span>: <span class="str">"string"</span>, <span class="str">"enum"</span>: [<span class="str">"working"</span>, <span class="str">"summary"</span>, <span class="str">"both"</span>]},
+        },
+        <span class="str">"required"</span>: [<span class="str">"session_id"</span>]
+    },
+    category=ToolCategory.MEMORY,
+    permissions=[Permission.READ],
+    requires_approval=<span class="kw">False</span>,
+    max_timeout_seconds=<span class="num">5</span>,
+)
+      </div>
+
+      <h3><span class="dot"></span>git_commit（需审批）</h3>
+      <div class="code-block">
+<span class="kw">class</span> <span class="ty">ToolDefinition</span>(
+    name=<span class="str">"git_commit"</span>,
+    description=<span class="str">"提交代码变更到 Git。操作不可逆，需要人工审批"</span>,
+    parameters={
+        <span class="str">"type"</span>: <span class="str">"object"</span>,
+        <span class="str">"properties"</span>: {
+            <span class="str">"message"</span>: {<span class="str">"type"</span>: <span class="str">"string"</span>},
+            <span class="str">"paths"</span>:   {<span class="str">"type"</span>: <span class="str">"array"</span>, <span class="str">"items"</span>: {<span class="str">"type"</span>: <span class="str">"string"</span>}},
+        },
+        <span class="str">"required"</span>: [<span class="str">"message"</span>]
+    },
+    category=ToolCategory.GIT,
+    permissions=[Permission.WRITE],
+    <span class="hl">requires_approval=True</span>,         <span class="cm"># HITL 审批</span>
+    max_timeout_seconds=<span class="num">15</span>,
+)
+      </div>
+
+      <h3><span class="dot"></span>deploy（需审批）</h3>
+      <div class="code-block">
+<span class="kw">class</span> <span class="ty">ToolDefinition</span>(
+    name=<span class="str">"deploy"</span>,
+    description=<span class="str">"一键部署到生产环境。操作不可逆，需要人工审批"</span>,
+    parameters={
+        <span class="str">"type"</span>: <span class="str">"object"</span>,
+        <span class="str">"properties"</span>: {
+            <span class="str">"build_cmd"</span>:     {<span class="str">"type"</span>: <span class="str">"string"</span>},
+            <span class="str">"deploy_target"</span>: {<span class="str">"type"</span>: <span class="str">"string"</span>, <span class="str">"enum"</span>: [<span class="str">"docker"</span>, <span class="str">"vercel"</span>, <span class="str">"github_pages"</span>]},
+            <span class="str">"env_vars"</span>:      {<span class="str">"type"</span>: <span class="str">"object"</span>, <span class="str">"default"</span>: {}},
+        },
+        <span class="str">"required"</span>: []
+    },
+    category=ToolCategory.DEPLOY,
+    permissions=[Permission.EXECUTE, Permission.NETWORK],
+    <span class="hl">requires_approval=True</span>,
+    max_timeout_seconds=<span class="num">300</span>,
+)
+      </div>
+
+      <div class="note info"><span class="ico">📋</span><div>每个 Tool 定义包含：name / description / parameters（JSON Schema）/ category / permissions / requires_approval / max_timeout_seconds。域 3 实现时需继承 <code>BaseTool</code> 并实现 <code>execute()</code> 方法。</div></div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="memory">
+      <div class="sec-head">
+        <div class="tag">§6 记忆注入</div>
+        <h2>MemoryContext 注入流程</h2>
+      </div>
+
+      <div class="diagram">
+每次 Agent 调用前：
+  1. Harness 调用 MemoryContextBuilder
+  2. → L1: Redis 滑动窗口取最近 20 条
+  3. → L2: 超过阈值时查 PG 摘要
+  4. → L3: 读 .agenthub/ 项目上下文
+  5. → L4: 按当前意图做 pgvector Top-K
+  6. 组装为 MemoryContext → 传入 AgentRequest
+  7. Adapter.inject_memory(request) → 拼到 system_prompt
+      </div>
+
+      <div class="code-block">
+<span class="cm"># 域 3 暴露的 MemoryContextBuilder 接口</span>
+<span class="kw">class</span> <span class="ty">MemoryContextBuilder</span>:
+    <span class="kw">async def</span> <span class="fn">build</span>(
+        self, session_id: UUID, intent_hint: <span class="ty">str</span> = <span class="str">""</span>
+    ) -> MemoryContext:
+        <span class="kw">return</span> MemoryContext(
+            l1_working=<span class="kw">await</span> self._get_working_memory(session_id),
+            l2_summary=<span class="kw">await</span> self._get_summary(session_id),
+            l3_specs=<span class="kw">await</span> self._get_living_specs(session_id),
+            l4_rag=<span class="kw">await</span> self._rag_search(session_id, intent_hint),
+        )
+      </div>
+
+      <h3><span class="dot"></span>四层记忆体系</h3>
+      <div class="tbl-wrap">
+        <table><thead><tr><th>层级</th><th>存储</th><th>内容</th><th>延迟</th></tr></thead>
+        <tbody>
+          <tr><td><b>L1</b> 工作记忆</td><td>Redis 滑动窗口</td><td>最近 20 条消息</td><td>&lt; 5ms</td></tr>
+          <tr><td><b>L2</b> 摘要</td><td>PostgreSQL</td><td>超长对话的压缩摘要</td><td>&lt; 20ms</td></tr>
+          <tr><td><b>L3</b> 项目上下文</td><td>.agenthub/ 文件</td><td>项目规格/Living Specs</td><td>&lt; 10ms</td></tr>
+          <tr><td><b>L4</b> RAG 检索</td><td>pgvector</td><td>按意图语义 Top-K</td><td>&lt; 50ms</td></tr>
+        </tbody></table>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="callbacks">
+      <div class="sec-head">
+        <div class="tag">§7 跨域通信</div>
+        <h2>域 2 → 域 3 回调事件</h2>
+      </div>
+
+      <div class="code-block">
+<span class="kw">class</span> <span class="ty">CallbackEvents</span>(StrEnum):
+    TOOL_EXEC_START = <span class="str">"tool.exec.start"</span>       <span class="cm"># {tool_name, arguments}</span>
+    TOOL_EXEC_DONE = <span class="str">"tool.exec.done"</span>         <span class="cm"># {tool_name, duration_ms, success}</span>
+    TOOL_EXEC_FAILED = <span class="str">"tool.exec.failed"</span>     <span class="cm"># {tool_name, error}</span>
+    TOOL_APPROVAL_REQUIRED = <span class="str">"tool.approval.required"</span>
+    TOOL_APPROVAL_GRANTED = <span class="str">"tool.approval.granted"</span>
+    TOOL_APPROVAL_REJECTED = <span class="str">"tool.approval.rejected"</span>
+    DEPLOY_PROGRESS = <span class="str">"deploy.progress"</span>       <span class="cm"># {stage, progress, message}</span>
+      </div>
+      <div class="note info"><span class="ico">💡</span><div>域 3 通过订阅 <code>TOOL_EXEC_*</code> 事件，在自己的 UI 卡片（DiffCard / DeployCard）展示实时状态，无需域 2 关心 UI 细节。</div></div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="validation">
+      <div class="sec-head">
+        <div class="tag">§8 联调验收</div>
+        <h2>验收清单（域 2 ↔ 域 3）</h2>
+      </div>
+      <div class="tbl-wrap">
+        <table><thead><tr><th>#</th><th>测试场景</th><th>预期结果</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Agent 调用 <code>memory_retrieve</code></td><td>返回最近 20 条，延迟 &lt; 5ms</td></tr>
+          <tr><td>2</td><td>Agent 调用 <code>memory_save</code></td><td>写入 pgvector，下次检索可召回</td></tr>
+          <tr><td>3</td><td>Agent 调用 <code>git_diff</code></td><td>返回 unified diff 文本</td></tr>
+          <tr><td>4</td><td>Agent 调用 <code>git_commit</code></td><td>触发 HITL 弹窗，确认后提交</td></tr>
+          <tr><td>5</td><td>Agent 调用 <code>diff_preview</code></td><td>artifact 返回有效预览 URL</td></tr>
+          <tr><td>6</td><td>Agent 调用 <code>web_preview</code></td><td>Dev Server 启动，iframe 可访问</td></tr>
+          <tr><td>7</td><td>Agent 调用 <code>deploy</code></td><td>审批 → Docker build → 生产 URL</td></tr>
+          <tr><td>8</td><td>Agent 调用 <code>knowledge_search</code></td><td>Top-K 结果含 source 和分数</td></tr>
+          <tr><td>9</td><td>Tool 超时</td><td>TIMEOUT 错误，不阻塞后续推理</td></tr>
+          <tr><td>10</td><td>HITL 拒绝 <code>git_commit</code></td><td>PERMISSION_DENIED，Agent 继续推理</td></tr>
+        </tbody></table>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="version">
+      <div class="sec-head">
+        <div class="tag">§9 版本管理</div>
+        <h2>变更历史</h2>
+      </div>
+      <div class="tbl-wrap">
+        <table><thead><tr><th>版本</th><th>日期</th><th>变更</th></tr></thead>
+        <tbody>
+          <tr><td>v0.1</td><td>2026-05-21</td><td>初稿：UnifiedAgent + Tool 协议 + 9 个 Tool 定义 + MemoryContext + 验收清单</td></tr>
+        </tbody></table>
+      </div>
+      <div class="note info" style="margin-top:16px"><span class="ico">📌</span><div><b>下一步</b>：域 3 审查本协议后，域 2 在 <code>src/backend/app/adapters/base.py</code> 落地 UnifiedAgent 和 BaseTool 抽象类，域 3 在 <code>src/backend/app/tools/</code> 下实现本域 Tool。</div></div>
+    </section>
+
+    <footer>
+      <span>AgentHub Adapter Interface Spec · v0.1</span>
+      <span>生成于 <code>2026-05-22</code></span>
+    </footer>
+
+    <button class="toTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" id="topBtn">↑</button>
+  </main>
+</div>
+<script>
+  const btn = document.getElementById('topBtn');
+  window.addEventListener('scroll',()=>{btn.classList.toggle('show',window.scrollY>300)});
+  document.querySelectorAll('nav a').forEach(a=>{
+    a.addEventListener('click',function(e){e.preventDefault();const id=this.getAttribute('href').slice(1);document.getElementById(id).scrollIntoView({behavior:'smooth'});document.querySelectorAll('nav a').forEach(x=>x.classList.remove('active'));this.classList.add('active')})
+  });
+</script>
+</body>
+</html>

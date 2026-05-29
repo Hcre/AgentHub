@@ -45,7 +45,7 @@ echo ┌────────────────────────
 echo │ ✅ feat-start 完成                    │
 echo ├─────────────────────────────────────┤
 echo │ 接下来:                               │
-echo │ 1. 读 PRD: docs/PRD_AgentHub_v4_统一方案.md │
+echo │ 1. 读 PRD: docs/plan/背景_PRD_AgentHub_统一方案.md │
 echo │ 2. 编辑 worklog                        │
 echo │ 3. 更新 STATUS.md 中你的行             │
 echo │ 4. 开始开发                            │

@@ -28,4 +28,4 @@ Step 1 点"自定义" → CustomAgentModal → 确认后回到 Step 2
 |------|------|
 | `CreateAgentModal.tsx` | 修改 |
 | `CustomAgentModal.tsx` | 新建 |
-| `backend/app/api/routers/skills.py` | 新建 |
+| `src/backend/app/api/routers/skills.py` | 新建 |

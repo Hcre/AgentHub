@@ -109,7 +109,7 @@ git diff main...feature/<domain>/<desc> --stat
 | **新增文件** (新 feature、新 test) | 安全检查：是否有测试、是否遵循项目规范 |
 | **修改已有代码** | 重点审查：是否引入回归风险、是否影响其他域 |
 | **删除文件/代码** | **必须确认**：展示给用户 |
-| **配置变更** (.env, config.py, docker/) | **必须确认**：可能影响部署 |
+| **配置变更** (.env, config.py, src/docker/) | **必须确认**：可能影响部署 |
 
 ### B4. 合并
 
@@ -198,7 +198,7 @@ git merge main   # 将最新 main 合并到 feature
 ```
 ## 差异审查 — 需要你确认
 
-### 文件: backend/app/domain/entities/session.py
+### 文件: src/backend/app/domain/entities/session.py
 - origin/main 新增了 `status` 字段
 - 你的分支也修改了 `Session` 类的 `__post_init__`
 - 风险: 字段定义位置可能冲突

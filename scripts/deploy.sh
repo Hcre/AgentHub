@@ -23,7 +23,7 @@ echo "► 部署项目..."
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR/.."
 
-docker compose -f docker/docker-compose.yml up --build -d
+docker compose -f src/docker/docker-compose.yml up --build -d
 
 echo ""
 echo "► 验证..."

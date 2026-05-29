@@ -37,7 +37,7 @@ cat << 'EOF'
 │ ✅ feat-start 完成                     │
 ├──────────────────────────────────────┤
 │ 接下来:                                │
-│ 1. 读 PRD: docs/PRD_AgentHub_v4_统一方案.md  │
+│ 1. 读 PRD: docs/plan/背景_PRD_AgentHub_统一方案.md │
 │ 2. 编辑 worklog                        │
 │ 3. 更新 STATUS.md 中你的行              │
 │ 4. 开始开发                             │
