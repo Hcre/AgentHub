@@ -145,7 +145,7 @@ AgentHub/                                # 仓库根：仅放顶层入口文件�
 ├── meta/                                # 【元信息】描述仓库自身
 │   └── FILE_GRAPH.md                     #   本文件
 │
-├── uploads/                             # 【运行时】用户上传目录（gitignored）
+├── _assets/                             # 【本地资产】统一容纳：scraps/草图 + screenshots/截图 + uploads/运行时上传（整目录 gitignored）
 │
 ├── CLAUDE.md                            # 顶层：AI 项目上下文（新会话自动加载）
 ├── README.md                            # 顶层：人类使用指南

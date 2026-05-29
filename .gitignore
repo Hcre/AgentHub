@@ -45,9 +45,8 @@ docker/data/
 .worktrees/
 
 # === Runtime / personal artifacts ===
-scraps/
-screenshots/
-uploads/
+# 统一容纳：scraps/（草图）+ screenshots/（截图）+ uploads/（运行时上传）
+_assets/
 
 # === AI session caches ===
 .deepseek/
