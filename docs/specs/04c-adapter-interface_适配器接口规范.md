@@ -57,7 +57,7 @@ class MemoryContext(BaseModel):
     """域 3 记忆系统打包，注入到每次 Agent 调用"""
     l1_working: list[dict]           # Redis 滑动窗口最近 20 条消息
     l2_summary: Optional[str] = None # 超长历史的摘要
-    l3_specs: Optional[str] = None   # .agenthub/ 中项目上下文
+    l3_specs: Optional[str] = None   # docs/.agenthub/ 中项目上下文
     l4_rag: Optional[str] = None     # pgvector Top-K 检索结果
 
 class AgentRequest(BaseModel):
@@ -477,7 +477,7 @@ ToolDefinition(
   1. Harness 调用 MemoryContextBuilder
   2. MemoryContextBuilder → L1: Redis 滑动窗口取最近 20 条
   3. MemoryContextBuilder → L2: 超过阈值时查 PG 摘要
-  4. MemoryContextBuilder → L3: 读 .agenthub/ 项目上下文
+  4. MemoryContextBuilder → L3: 读 docs/.agenthub/ 项目上下文
   5. MemoryContextBuilder → L4: 按当前意图做 pgvector Top-K
   6. 组装为 MemoryContext → 传入 AgentRequest
   7. Adapter.inject_memory(request) → 拼到 system_prompt
@@ -538,4 +538,4 @@ class CallbackEvents(StrEnum):
 | v0.1 | 2026-05-21 | 初稿：UnifiedAgent + Tool 协议 + 9 个 Tool 定义 + MemoryContext + 验收清单 |
 | v0.2 | 2026-05-22 | 接口精简：`send_message()` → `stream()`，移除 `agent_id/capabilities/health_check/get_supported_tools`，与代码 `domain/llm/protocol.py` 对齐 |
 
-**下一步**：域 3 审查本协议后，在 `backend/app/tools/` 下实现本域 Tool。UnifiedAgent 和 StreamEvent 已在 `backend/app/domain/llm/protocol.py` 落地并冻结。
+**下一步**：域 3 审查本协议后，在 `src/backend/app/tools/` 下实现本域 Tool。UnifiedAgent 和 StreamEvent 已在 `src/backend/app/domain/llm/protocol.py` 落地并冻结。

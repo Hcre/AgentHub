@@ -103,7 +103,7 @@
 ## 四、关键文件
 
 ```
-frontend/src/
+src/frontend/src/
 ├── components/chat/
 │   ├── ChatWindow.tsx         # 主聊天区域
 │   ├── SessionList.tsx        # 左侧会话列表

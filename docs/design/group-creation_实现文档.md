@@ -39,13 +39,13 @@ import { channels, nav, org, user } from '../../data/mock'   // :3
 
 | 文件 | 动作 | 说明 |
 |------|------|------|
-| `frontend/src/types/index.ts` | 改 | 在「后端 API DTO」段（`:280` 后）新增 `ApiGroup` / `ApiGroupMember` / `ApiGroupCoordinator` |
-| `frontend/src/api/groups.ts` | 新建 | `groupsApi.list / create / checkName`，对齐 `api/agents.ts` |
-| `frontend/src/hooks/useDebounce.ts` | 新建 | 通用防抖 hook（名称实时校验 + 成员搜索用） |
-| `frontend/src/stores/groupStore.ts` | 改 | 新增 `fetchGroups` / `createGroup`（API-first + 降级），对齐 `agentStore`；mock 聊天段保留 |
-| `frontend/src/components/group/CreateGroupModal.tsx` | 新建 | 创建弹窗，对齐 `CreateAgentModal` |
-| `frontend/src/components/layout/LeftPanel.tsx` | 改 | 数据源切到 `groupStore.groups` + 「频道」→「群组」+「+」入口 + 挂载弹窗 |
-| `frontend/src/App.tsx` | 改 | 挂载时 `void fetchGroups()`，与 `loadAgents()` 并列 |
+| `src/frontend/src/types/index.ts` | 改 | 在「后端 API DTO」段（`:280` 后）新增 `ApiGroup` / `ApiGroupMember` / `ApiGroupCoordinator` |
+| `src/frontend/src/api/groups.ts` | 新建 | `groupsApi.list / create / checkName`，对齐 `api/agents.ts` |
+| `src/frontend/src/hooks/useDebounce.ts` | 新建 | 通用防抖 hook（名称实时校验 + 成员搜索用） |
+| `src/frontend/src/stores/groupStore.ts` | 改 | 新增 `fetchGroups` / `createGroup`（API-first + 降级），对齐 `agentStore`；mock 聊天段保留 |
+| `src/frontend/src/components/group/CreateGroupModal.tsx` | 新建 | 创建弹窗，对齐 `CreateAgentModal` |
+| `src/frontend/src/components/layout/LeftPanel.tsx` | 改 | 数据源切到 `groupStore.groups` + 「频道」→「群组」+「+」入口 + 挂载弹窗 |
+| `src/frontend/src/App.tsx` | 改 | 挂载时 `void fetchGroups()`，与 `loadAgents()` 并列 |
 
 后端文件清单与流程见设计文档 §四，本文档不重复；前端依赖的后端契约见 §7。
 
@@ -154,7 +154,7 @@ export function useDebounce<T>(value: T, delay: number): T {
 }
 ```
 
-> 若已存在 `hooks/` 目录里的等价实现，复用之，不要重复造。先 `grep -rn "useDebounce" frontend/src`。
+> 若已存在 `hooks/` 目录里的等价实现，复用之，不要重复造。先 `grep -rn "useDebounce" src/frontend/src`。
 
 ### 3.4 `stores/groupStore.ts`（改）—— 对齐 `agentStore` 的 API-first + 降级
 

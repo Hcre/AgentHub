@@ -14,7 +14,7 @@
 `CreateAgentModal.tsx` TEMPLATES 数组每项加 `skills: string[]`
 
 ### 2. 后端技能列表
-`GET /api/skills/library` → 读 `/skills/` 目录返回文件名列表
+`GET /api/docs/skills/library` → 读 `/docs/skills/` 目录返回文件名列表
 
 ### 3. CustomAgentModal 组件
 新建弹窗：名称 + 职责 + Skill checkbox + 确认回调
@@ -28,4 +28,4 @@ Step 1 点"自定义" → CustomAgentModal → 确认后回到 Step 2
 |------|------|
 | `CreateAgentModal.tsx` | 修改 |
 | `CustomAgentModal.tsx` | 新建 |
-| `backend/app/api/routers/skills.py` | 新建 |
+| `src/backend/app/api/routers/skills.py` | 新建 |

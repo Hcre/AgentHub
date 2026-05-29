@@ -191,7 +191,7 @@ StructuredContext（6层）
   ├── conversation   — 对话历史（L1 Redis + pinned + 当前消息）
   ├── capabilities   — 工具 + Skills（ToolRegistry + SkillRegistry）
   ├── memory         — L2/L3/L4 记忆（MemoryContextBuilder）
-  ├── project        — 项目上下文（.agenthub/ 目录）
+  ├── project        — 项目上下文（docs/.agenthub/ 目录）
   └── params         — 调用参数（Agent.settings）
 ```
 
@@ -1717,7 +1717,7 @@ L3 ChatService.compress_context(session_id):
   ├─ 5. 后续 Agent 调用的 system prompt:
   │      "## 历史对话摘要: {compressed_summary}"
   │
-  ├─ 6. 完整对话历史保留在 本地文件系统 (.agenthub/sessions/{id}/full_history.json)
+  ├─ 6. 完整对话历史保留在 本地文件系统 (docs/.agenthub/sessions/{id}/full_history.json)
   │      用户可通过 "查看完整对话" 按钮展开
   │
   └─ 事件: ContextCompressed → 更新 Session 元数据

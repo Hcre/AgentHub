@@ -17,26 +17,29 @@ IM 聊天式多 Agent 协作平台。**5 层洋葱架构**（L1 Infrastructure �
 
 ```
 AgentHub/
-├── conventions/                       # 【规范】01-08 + ai-workflow/ + 99-* 附录
-├── docs/                              # 【文档资产】
-│   ├── plan/                          #   PRD / 路线图 / 任务分配 / 设计
-│   ├── specs/                         #   功能规格（含 domains/）
-│   ├── templates/                     #   ★模板权威（给新项目复制用）
-│   ├── reports/                       #   汇报产出 + HTML 渲染
-│   ├── research/                      #   调研
-│   ├── explore/                       #   技术探索 + EVOLUTION 演进日志
-│   └── archive/                       #   历史快照（DEPRECATED_ 前缀）
-├── worklogs/                          # 【工作日志】按人分子目录 + decisions/ ADR
+├── CLAUDE.md README.md STATUS.md dashboard.html   # 顶层入口
+├── src/                              # 【产品代码】
+│   ├── backend/app/                  #   5 层洋葱：api/ application/ core/ domain/ infrastructure/ schemas/
+│   ├── frontend/src/                 #   React + TypeScript
+│   └── docker/                       #   docker-compose + nginx + postgres
+├── docs/                            # 【全部协作文档】
+│   ├── conventions/                  #   规范 01-08 + ai-workflow/ + 99-* 附录
+│   ├── skills/                       #   通用 Claude Code Skills
+│   ├── .agenthub/                    #   运行时配置 + 项目专有 Skill (xhs 系列)
+│   ├── plan/                         #   PRD / 路线图 / 任务分配
+│   ├── specs/                        #   功能规格（含 domains/）
+│   ├── design/                       #   复杂功能设计（群聊系列）
+│   ├── templates/                    #   ★模板权威（给新项目复制用）
+│   ├── reports/                      #   汇报产出 + HTML 渲染
+│   ├── research/                     #   调研
+│   ├── explore/                      #   技术探索 + EVOLUTION 演进日志
+│   └── archive/                      #   历史快照（DEPRECATED_ 前缀）
+├── worklogs/                         # 【工作日志】按人分子目录 + decisions/ ADR
 │   ├── {董,黎,袁}/
 │   └── decisions/
-├── meta/FILE_GRAPH.md                 # 【元信息】文件归类权威
-├── .agenthub/                         # 运行时配置 + 项目专有 Skill (xhs 系列)
-├── skills/                            # 通用 Claude Code Skills
-├── backend/app/                       # 5 层洋葱
-│   ├── api/ application/ core/ domain/ infrastructure/ schemas/
-├── frontend/src/                      # React + TypeScript
-├── docker/ scripts/
-├── CLAUDE.md README.md STATUS.md dashboard.html
+├── meta/FILE_GRAPH.md               # 【元信息】文件归类权威
+├── scripts/                         # 工具脚本（check_*.py / verify / deploy / ...）
+└── _assets/                         # 本地资产（scraps/screenshots/uploads，gitignored）
 ```
 
 按需读取，不要一次性读完。
@@ -44,11 +47,11 @@ AgentHub/
 | 文档 | 何时读 |
 |------|--------|
 | `meta/FILE_GRAPH.md` | 新增/移动文件前（决策树） |
-| `conventions/CLAUDE-规范导航.md` | 任务 → 规范定位 + 红线总表（AR/CR/PR/AP/T/D）|
-| conventions/0X-*.md | 写代码/接口/测试前对应查（01 架构 / 02 代码 / 03 Git / 04 API / 05 测试 / 06 文档 / 08 图谱） |
-| `conventions/99-boundaries_边界矩阵.md` | 写 Agent 权限/审批前 |
-| `conventions/99-process-rules_流程红线全集.md` | PR-01~09 全集 |
-| `conventions/ai-workflow_AI协作开发流程/` | 流程方法论（调研→计划→开发→收束→汇报） |
+| `docs/conventions/CLAUDE-规范导航.md` | 任务 → 规范定位 + 红线总表（AR/CR/PR/AP/T/D）|
+| docs/conventions/0X-*.md | 写代码/接口/测试前对应查（01 架构 / 02 代码 / 03 Git / 04 API / 05 测试 / 06 文档 / 08 图谱） |
+| `docs/conventions/99-boundaries_边界矩阵.md` | 写 Agent 权限/审批前 |
+| `docs/conventions/99-process-rules_流程红线全集.md` | PR-01~09 全集 |
+| `docs/conventions/ai-workflow_AI协作开发流程/` | 流程方法论（调研→计划→开发→收束→汇报） |
 | `docs/specs/00-overview_项目主规格.md` | 首次接触，了解全貌 |
 | `docs/specs/01-architecture_架构定义.md` | 做架构决策前 |
 | `docs/specs/01b-architecture-design_分层与数据流.md` | 写后端逻辑前查数据流 |
@@ -71,11 +74,11 @@ AgentHub/
 ## 引用关系（改一处要同步哪些）
 
 ```
-conventions/规范 (01-08)  ←──互检──→  docs/specs/ (00-05 + domains)
+docs/conventions/规范 (01-08)  ←──互检──→  docs/specs/ (00-05 + domains)
         │                                     │
         │ ai-workflow/06-第三步_收束节点         │ 验收标准
         ↓                                     ↓
-  backend/ + frontend/  ──落地──→  docs/specs/04b/04c (实现细化)
+  src/backend/ + src/frontend/  ──落地──→  docs/specs/04b/04c (实现细化)
 
 docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解析──→ dashboard.html
                                                      ↑
@@ -86,7 +89,7 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 ```
 
 **关键约束**（修改时必须同步）：
-1. 改 `conventions/` 规范 → 同步对应 `docs/specs/` 规格
+1. 改 `docs/conventions/` 规范 → 同步对应 `docs/specs/` 规格
 2. 新增功能点 → 同时写入 `docs/plan/开发清单_roadmap.md` 和根 `STATUS.md`
 3. 改架构 → 先改 `docs/specs/01-architecture` → 再实现（PR-09）
 4. 改数据模型 → 先改 `docs/specs/03-data-model` + Alembic migration（CR-03 + PR-09）
@@ -99,14 +102,14 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 ### 禁止
 - 奉承话、空话、猜测 —— 不确定就查代码/文档
 - 过度设计 —— 不做 spec 里没写的功能
-- 跳过红线 —— `conventions/` 任一条红线都不能违反
+- 跳过红线 —— `docs/conventions/` 任一条红线都不能违反
 - 裸 `print` / 裸 SQL / `any` / `console.log` 生产路径
 
 ### 必须
 - 技术决策前横向对比 2-3 个选项
-- 质疑与 `conventions/01-architecture` 或 AR-01~06 矛盾的方案
+- 质疑与 `docs/conventions/01-architecture` 或 AR-01~06 矛盾的方案
 - 增量交付，每步验证
-- 自行补充边界条件（参考 `conventions/99-boundaries_边界矩阵.md`）
+- 自行补充边界条件（参考 `docs/conventions/99-boundaries_边界矩阵.md`）
 
 ### 技术约束
 - **Python**: FastAPI async + Pydantic v2 + SQLAlchemy ORM + ruff。禁同步阻塞（CR-12）
@@ -120,15 +123,15 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 
 | 维度 | 红线 | 详见 |
 |------|------|------|
-| 架构 | AR-01 5 层洋葱 / AR-02 新 Agent 只加 Adapter / AR-03 Harness 无 LLM / AR-04 Agent 不直通 / AR-05 FSM 事件溯源 / AR-06 system-model 解耦 | [01-architecture](conventions/01-architecture_架构设计规范.md) |
-| 代码 | CR-01~12（Python 7 + TS 3 + 通用 2，详见 [CLAUDE-规范导航 §2](conventions/CLAUDE-规范导航.md)） | [02-coding](conventions/02-coding_代码编写规范.md) |
-| Git | PR-02 分支命名 / PR-03 Conventional / PR-06 ≥1 Approve / PR-07 verify | [03-git](conventions/03-git_Git协作规范.md) |
-| API | AP-01~07（kebab + `{error:{code,message}}` + JWT + Pydantic + 版本 + 兼容 + WS request_id） | [04-api](conventions/04-api_API设计规范.md) |
-| 测试 | T-01~06（独立 / Mock 边界 / 三路径 / 无 flaky / Adapter & FSM 必测） | [05-testing](conventions/05-testing_测试规范.md) |
-| 文档 | D-01~12（命名 + 自动校验，详见 `check_docs.py`） | [06-documentation](conventions/06-documentation_文档规范.md) |
-| 流程 | PR-01~09 完整流程红线 | [99-process-rules](conventions/99-process-rules_流程红线全集.md) |
+| 架构 | AR-01 5 层洋葱 / AR-02 新 Agent 只加 Adapter / AR-03 Harness 无 LLM / AR-04 Agent 不直通 / AR-05 FSM 事件溯源 / AR-06 system-model 解耦 | [01-architecture](docs/conventions/01-architecture_架构设计规范.md) |
+| 代码 | CR-01~12（Python 7 + TS 3 + 通用 2，详见 [CLAUDE-规范导航 §2](docs/conventions/CLAUDE-规范导航.md)） | [02-coding](docs/conventions/02-coding_代码编写规范.md) |
+| Git | PR-02 分支命名 / PR-03 Conventional / PR-06 ≥1 Approve / PR-07 verify | [03-git](docs/conventions/03-git_Git协作规范.md) |
+| API | AP-01~07（kebab + `{error:{code,message}}` + JWT + Pydantic + 版本 + 兼容 + WS request_id） | [04-api](docs/conventions/04-api_API设计规范.md) |
+| 测试 | T-01~06（独立 / Mock 边界 / 三路径 / 无 flaky / Adapter & FSM 必测） | [05-testing](docs/conventions/05-testing_测试规范.md) |
+| 文档 | D-01~12（命名 + 自动校验，详见 `check_docs.py`） | [06-documentation](docs/conventions/06-documentation_文档规范.md) |
+| 流程 | PR-01~09 完整流程红线 | [99-process-rules](docs/conventions/99-process-rules_流程红线全集.md) |
 
-任务定位、单一权威、改动同步规则全在 [`conventions/CLAUDE-规范导航.md`](conventions/CLAUDE-规范导航.md)。
+任务定位、单一权威、改动同步规则全在 [`docs/conventions/CLAUDE-规范导航.md`](docs/conventions/CLAUDE-规范导航.md)。
 
 ---
 
@@ -136,17 +139,17 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 
 | Skill | 何时用 |
 |-------|--------|
-| `skills/feat-start/` | 开始新功能：读 spec → 建分支 → 更新 STATUS → 生成 worklog 模板 |
-| `skills/feat-complete/` | 完成功能：跑 verify → 更新 roadmap → 提 PR → 写 worklog |
-| `skills/git-workflow/` | Git 分支管理：同步 main / diff 审查 / 合并前检查 |
-| `skills/code-review/` | CR 自查/互查：对照 AR/CR/PR 红线逐条 |
-| `skills/doc-sync/` | 文档同步：个人探索归档 / 团队决策落地 / 例行审查 |
-| `skills/deploy/` | 部署项目：docker compose up → 验证 |
-| `skills/spec-driven-development/` | 新功能无 spec 时先写规格再写代码 |
-| `skills/test-claude-adapter/` | ClaudeAdapter 联调 |
-| `skills/前端统一规范/` | 前端规约 |
+| `docs/skills/feat-start/` | 开始新功能：读 spec → 建分支 → 更新 STATUS → 生成 worklog 模板 |
+| `docs/skills/feat-complete/` | 完成功能：跑 verify → 更新 roadmap → 提 PR → 写 worklog |
+| `docs/skills/git-workflow/` | Git 分支管理：同步 main / diff 审查 / 合并前检查 |
+| `docs/skills/code-review/` | CR 自查/互查：对照 AR/CR/PR 红线逐条 |
+| `docs/skills/doc-sync/` | 文档同步：个人探索归档 / 团队决策落地 / 例行审查 |
+| `docs/skills/deploy/` | 部署项目：docker compose up → 验证 |
+| `docs/skills/spec-driven-development/` | 新功能无 spec 时先写规格再写代码 |
+| `docs/skills/test-claude-adapter/` | ClaudeAdapter 联调 |
+| `docs/skills/前端统一规范/` | 前端规约 |
 
-每个 Skill 内置检查清单，按步执行。AgentHub 项目专有 Skill（xhs/dbs 系列）在 `.agenthub/skills/`。
+每个 Skill 内置检查清单，按步执行。AgentHub 项目专有 Skill（xhs/dbs 系列）在 `docs/.agenthub/skills/`。
 
 ---
 
@@ -173,7 +176,7 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 
 ## 工作流程
 
-> 流程全文见 `conventions/ai-workflow_AI协作开发流程/`（01-07 共 7 篇）。
+> 流程全文见 `docs/conventions/ai-workflow_AI协作开发流程/`（01-07 共 7 篇）。
 
 ```
 第零步 调研 → 第一步 计划（含预设收束节点）→ 第二步 迭代开发（每功能点循环）
@@ -188,7 +191,7 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 ```
 
 ### 每次工作前
-1. `skills/git-workflow/` 检查分支 + 同步 main（不要在 main 上开发）
+1. `docs/skills/git-workflow/` 检查分支 + 同步 main（不要在 main 上开发）
 2. 读根 `STATUS.md` 了解其他人在做什么
 3. 读 `docs/plan/开发清单_roadmap.md` 确认当前进度
 
@@ -206,7 +209,7 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 ## 当前状态
 
 - **进度**：见根 `STATUS.md`（dashboard.html 解析此文件可视化）
-- **架构**：5 层洋葱（backend/app/{api,application,core,domain,infrastructure,schemas}）+ CLI/SDK 双轨适配器
+- **架构**：5 层洋葱（src/backend/app/{api,application,core,domain,infrastructure,schemas}）+ CLI/SDK 双轨适配器
 - **规范**：v3.0（按通用开发规范模板对齐 + AgentHub 特化红线）
 - **ADR**：`worklogs/decisions/0001-cli-first-pivot.md`
 - **协作**：董 / 黎 / 袁 三人 + Claude Agent，按业务域分支

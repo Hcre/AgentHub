@@ -256,7 +256,7 @@ async function executeForkedSkill(
 ### 5.3 Skill 加载机制
 
 ```typescript
-// src/skills/loadSkillsDir.ts
+// src/docs/skills/loadSkillsDir.ts
 export function loadSkillsFromDir(dir: string): Command[] {
   // 从目录加载 .md 文件
   // 解析 frontmatter

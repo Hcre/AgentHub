@@ -148,11 +148,13 @@ if worklogs_dir.is_dir():
                     f"worklog must start with YYYY-MM-DD_ (or move to docs/explore/)"
                 )
 
-# 5. No .html in docs/ tree (except docs/reports/ which houses rendered artifacts)
+# 5. No .html in docs/ prose tree
+#    例外：docs/reports/（渲染产物）、docs/skills/ 与 docs/.agenthub/（Skill 资产，可含 html 模板）
+HTML_ALLOWED_DIRS = {"reports", "skills", ".agenthub"}
 for html_file in ROOT.glob("docs/**/*.html"):
     rel = html_file.relative_to(ROOT)
-    if "reports" in rel.parts:
-        continue  # docs/reports/*.html 是渲染产物存档，允许
+    if HTML_ALLOWED_DIRS & set(rel.parts):
+        continue
     error(f"{rel}: HTML files should not be committed, markdown is source")
 
 # 6. No version suffix in docs/ (except archive/)

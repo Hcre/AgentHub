@@ -138,7 +138,7 @@ CREATE INDEX idx_gm_agent ON group_members (agent_id);
 ### 4.1 文件清单
 
 ```
-backend/
+src/backend/
 ├── app/
 │   ├── infrastructure/db/models.py          # + GroupModel, GroupMemberModel
 │   ├── domain/entities/group.py             # 新建：Group, GroupMember 实体
@@ -205,7 +205,7 @@ Router (groups.py)
 ### 5.1 文件清单
 
 ```
-frontend/src/
+src/frontend/src/
 ├── api/groups.ts                  # 新建：groupsApi（create, list, checkName）
 ├── stores/groupStore.ts           # 修改：替换 mock 为真实 API
 ├── components/group/
@@ -281,7 +281,7 @@ frontend/src/
 
 ### 5.5 LeftPanel 群组入口改造（具体改法）
 
-目标文件：`frontend/src/components/layout/LeftPanel.tsx`。
+目标文件：`src/frontend/src/components/layout/LeftPanel.tsx`。
 
 **定位**：现有「频道」段标题在 `LeftPanel.tsx:148`：
 
@@ -363,6 +363,6 @@ import { CreateGroupModal } from '../group/CreateGroupModal'
 | `docs/specs/01-architecture_架构定义.md` §2.2 | 群组与协调者定义 |
 | `docs/specs/03-data-model_数据模型.md` §2.4-2.5 | groups/group_members DDL |
 | `docs/specs/04-commands_命令接口.md` §2.2 | Group API 规范 |
-| `conventions/99-boundaries_边界矩阵.md` §二 | 群组管理权限 + 20 人上限 |
-| `conventions/arch-rules_架构红线.md` | 架构约束（五层洋葱，依赖方向） |
-| `frontend/src/components/group/HANDOFF.md` | 前端 mock seam 说明 |
+| `docs/conventions/99-boundaries_边界矩阵.md` §二 | 群组管理权限 + 20 人上限 |
+| `docs/conventions/arch-rules_架构红线.md` | 架构约束（五层洋葱，依赖方向） |
+| `src/frontend/src/components/group/HANDOFF.md` | 前端 mock seam 说明 |

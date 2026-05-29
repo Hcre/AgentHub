@@ -114,7 +114,7 @@
 ## 四、关键文件
 
 ```
-backend/app/
+src/backend/app/
 ├── api/
 │   ├── agents.py              # L4 Agent CRUD
 │   ├── groups.py              # L4 Group CRUD + member

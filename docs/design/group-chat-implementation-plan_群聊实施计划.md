@@ -114,10 +114,10 @@
 
 ### Phase 8：前端（5h）
 
-- `frontend/src/components/chat/ChatView.tsx`
+- `src/frontend/src/components/chat/ChatView.tsx`
   - 气泡按 `sender_agent_id` 分色渲染
   - `@` 输入下拉（键入 `@` 弹群成员列表，按名过滤）
-- `frontend/src/stores/groupStore.ts`
+- `src/frontend/src/stores/groupStore.ts`
   - `messagesByGroup[id]` 数据通道
 - （可选）Selector 评估期间 "Agent 正在思考" 占位
 

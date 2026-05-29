@@ -335,7 +335,7 @@ L1 单维度后，「Agent 被删除」**不需要清 L1**（L1 记的是群消�
 - 回车或点击选中 → `@AgentName` 插入消息文本
 - 发送时 `mentions: ["AgentName"]` 随消息传给后端
 
-复刻现有 `frontend/src/components/chat/ChatView.tsx` 的输入区，加 `@` 触发逻辑。
+复刻现有 `src/frontend/src/components/chat/ChatView.tsx` 的输入区，加 `@` 触发逻辑。
 
 ### 5.2 消息渲染
 

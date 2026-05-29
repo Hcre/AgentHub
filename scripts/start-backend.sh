@@ -11,5 +11,5 @@ export SECRET_KEY="test"
 export LLM_ADAPTER_MODE="mock"
 export CORS_ORIGINS="http://localhost:5173,http://localhost:4180"
 
-cd "$WORKTREE_DIR/backend"
+cd "$WORKTREE_DIR/src/backend"
 exec "$MAIN_VENV/bin/python" -m uvicorn app.main:app --host 127.0.0.1 --port 8000

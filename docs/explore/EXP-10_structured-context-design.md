@@ -96,18 +96,18 @@ class CapabilityContext(BaseModel):
 
 # ===== 4. 记忆层 =====
 # ownership: MemoryContextBuilder (域3)
-# 数据源: L2 PG 摘要 / L3 .agenthub/ / L4 pgvector
+# 数据源: L2 PG 摘要 / L3 docs/.agenthub/ / L4 pgvector
 
 class MemoryContext(BaseModel):
     l1_working: list[dict] = []              # Redis 滑动窗口
     l2_summary: str | None = None            # 超长历史压缩摘要
-    l3_specs: str | None = None              # .agenthub/ 项目上下文
+    l3_specs: str | None = None              # docs/.agenthub/ 项目上下文
     l4_rag: str | None = None                # pgvector Top-K
 
 
 # ===== 5. 项目层 =====
 # ownership: ProjectContext (域3)
-# 数据源: .agenthub/ 目录
+# 数据源: docs/.agenthub/ 目录
 
 class ProjectContext(BaseModel):
     workspace_dir: str                       # Agent 工作空间路径

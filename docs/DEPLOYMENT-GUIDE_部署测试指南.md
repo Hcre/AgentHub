@@ -53,8 +53,8 @@ cd ..
 ### 2. 环境变量
 
 ```bash
-cp backend/.env.example backend/.env
-# 编辑 backend/.env，确认：
+cp src/backend/.env.example src/backend/.env
+# 编辑 src/backend/.env，确认：
 #   DATABASE_URL=postgresql+asyncpg://agenthub:agenthub_dev_pwd@localhost:5432/agenthub
 #   REDIS_URL=redis://localhost:6379/0
 #   SECRET_KEY=<有效的 base64 32 字节密钥>
@@ -252,4 +252,4 @@ wscat -c ws://127.0.0.1:8000/ws/sessions/<session_id>
 | `docs/adapter-cli-flow-analysis.md` | 7 个场景的 CLI 调用流程 |
 | `docs/DOC-15-claude-adapter-design.md` | 双轨架构设计 |
 | `决策/dong/踩坑记录-ClaudeCode适配器联调.md` | 联调踩坑详细记录 |
-| `skills/test-claude-adapter.md` | 测试 Skill |
+| `docs/skills/test-claude-adapter.md` | 测试 Skill |

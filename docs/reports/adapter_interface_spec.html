@@ -502,7 +502,7 @@ Agent 输出 tool_use 块
   1. Harness 调用 MemoryContextBuilder
   2. → L1: Redis 滑动窗口取最近 20 条
   3. → L2: 超过阈值时查 PG 摘要
-  4. → L3: 读 .agenthub/ 项目上下文
+  4. → L3: 读 docs/.agenthub/ 项目上下文
   5. → L4: 按当前意图做 pgvector Top-K
   6. 组装为 MemoryContext → 传入 AgentRequest
   7. Adapter.inject_memory(request) → 拼到 system_prompt
@@ -528,7 +528,7 @@ Agent 输出 tool_use 块
         <tbody>
           <tr><td><b>L1</b> 工作记忆</td><td>Redis 滑动窗口</td><td>最近 20 条消息</td><td>&lt; 5ms</td></tr>
           <tr><td><b>L2</b> 摘要</td><td>PostgreSQL</td><td>超长对话的压缩摘要</td><td>&lt; 20ms</td></tr>
-          <tr><td><b>L3</b> 项目上下文</td><td>.agenthub/ 文件</td><td>项目规格/Living Specs</td><td>&lt; 10ms</td></tr>
+          <tr><td><b>L3</b> 项目上下文</td><td>docs/.agenthub/ 文件</td><td>项目规格/Living Specs</td><td>&lt; 10ms</td></tr>
           <tr><td><b>L4</b> RAG 检索</td><td>pgvector</td><td>按意图语义 Top-K</td><td>&lt; 50ms</td></tr>
         </tbody></table>
       </div>
@@ -592,7 +592,7 @@ Agent 输出 tool_use 块
           <tr><td>v0.1</td><td>2026-05-21</td><td>初稿：UnifiedAgent + Tool 协议 + 9 个 Tool 定义 + MemoryContext + 验收清单</td></tr>
         </tbody></table>
       </div>
-      <div class="note info" style="margin-top:16px"><span class="ico">📌</span><div><b>下一步</b>：域 3 审查本协议后，域 2 在 <code>backend/app/adapters/base.py</code> 落地 UnifiedAgent 和 BaseTool 抽象类，域 3 在 <code>backend/app/tools/</code> 下实现本域 Tool。</div></div>
+      <div class="note info" style="margin-top:16px"><span class="ico">📌</span><div><b>下一步</b>：域 3 审查本协议后，域 2 在 <code>src/backend/app/adapters/base.py</code> 落地 UnifiedAgent 和 BaseTool 抽象类，域 3 在 <code>src/backend/app/tools/</code> 下实现本域 Tool。</div></div>
     </section>
 
     <footer>

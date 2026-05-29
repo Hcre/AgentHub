@@ -160,7 +160,7 @@ build_adapter(mode, **kwargs) → UnifiedAgent:
 | **Codex** | gpt-4o, gpt-4o-mini... |
 | **TRAE** | TRAE 内置模型 |
 
-创建流程：选系统 → 填写 name/avatar/role → 选 provider/model → 填 api_key → 可选 skills/system_prompt/capability_tags
+创建流程：选系统 → 填写 name/avatar/role → 选 provider/model → 填 api_key → 可选 docs/skills/system_prompt/capability_tags
 
 ### 2.2 群组与协调者
 
@@ -236,13 +236,13 @@ PENDING → QUEUED → RUNNING → COMPLETED (终态)
 
 ```
 agenthub/
-├── frontend/              # React + TypeScript (L5)
+├── src/frontend/              # React + TypeScript (L5)
 │   ├── src/
 │   │   ├── components/    # chat/ agent/ task/ inbox/ common/
 │   │   ├── hooks/         # useWebSocket, useStreaming, useAgent...
 │   │   ├── stores/        # Zustand: agent/group/chat/task/inbox/ws
 │   │   └── services/      # REST + WS 封装
-├── backend/               # FastAPI Python (L1-L4)
+├── src/backend/               # FastAPI Python (L1-L4)
 │   ├── app/
 │   │   ├── api/           # L4: Routers + WS Handlers
 │   │   ├── services/      # L3: AgentService, ChatService, TaskService...
@@ -256,7 +256,7 @@ agenthub/
 │   │   └── schemas/       # Pydantic v2 Request/Response
 │   ├── migrations/        # Alembic
 │   └── tests/
-├── docker/                # Docker Compose + Nginx
+├── src/docker/                # Docker Compose + Nginx
 ├── spec/                  # SPEC + PRD + 架构设计
 └── skill/                 # Claude Code Skills
 ```

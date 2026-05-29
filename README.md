@@ -9,11 +9,11 @@ IM 聊天式多 Agent 协作平台。用户通过类飞书聊天界面与 AI Age
 7 层洋葱模型，后端落地为 5 层（L1 Infrastructure → L2 Domain → L3 Application → L4 API → L5 Presentation）。
 
 ```
-L5 Presentation   React 18 + TS (frontend/)
-L4 API Gateway    FastAPI Routers / WS Handlers (backend/app/api/)
-L3 Application     Service 用例编排 (backend/app/application/)
-L2 Domain          实体 + Task Engine (FSM/Harness/Coordinator) (backend/app/domain/)
-L1 Infrastructure  PG / Redis / Celery / LLM Adapter (backend/app/infrastructure/)
+L5 Presentation   React 18 + TS (src/frontend/)
+L4 API Gateway    FastAPI Routers / WS Handlers (src/backend/app/api/)
+L3 Application     Service 用例编排 (src/backend/app/application/)
+L2 Domain          实体 + Task Engine (FSM/Harness/Coordinator) (src/backend/app/domain/)
+L1 Infrastructure  PG / Redis / Celery / LLM Adapter (src/backend/app/infrastructure/)
 ```
 
 依赖方向：`L5 → L4 → L3 → L2 ← L1`（L1 实现 L2 定义的抽象接口，依赖倒置）。
@@ -45,7 +45,7 @@ L1 Infrastructure  PG / Redis / Celery / LLM Adapter (backend/app/infrastructure
 
 ```bash
 cp .env.example .env            # 填入 LLM API Key
-cd docker
+cd src/docker
 docker compose up --build
 ```
 
@@ -58,7 +58,7 @@ docker compose up --build
 后端：
 
 ```bash
-cd backend
+cd src/backend
 python -m venv .venv && . .venv/Scripts/activate   # Windows PowerShell: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 cp .env.example .env
@@ -69,7 +69,7 @@ uvicorn app.main:app --reload --port 8000
 前端：
 
 ```bash
-cd frontend
+cd src/frontend
 npm install
 cp .env.example .env
 npm run dev
@@ -83,10 +83,18 @@ agenthub/
 ├── CLAUDE.md           # AI/Agent 入口
 ├── STATUS.md           # 进度仪表盘数据源
 ├── dashboard.html      # 可视化进度面板
-├── conventions/        # 规范 01-08 + ai-workflow + 99-* 附录
-├── docs/               # 文档资产
-│   ├── plan/           #   PRD / 路线图 / 任务分配 / 设计
+├── src/                # 产品代码
+│   ├── backend/        #   L1-L4 FastAPI
+│   │   └── app/        #     api/ application/ domain/ infrastructure/ core/ schemas/
+│   ├── frontend/       #   L5 React + TypeScript
+│   └── docker/         #   Docker Compose + Nginx + Postgres
+├── docs/               # 全部协作文档
+│   ├── conventions/    #   规范 01-08 + ai-workflow + 99-* 附录
+│   ├── skills/         #   通用 Claude Code Skills
+│   ├── .agenthub/      #   运行时配置 + 项目专有 Skill（小红书系列）
+│   ├── plan/           #   PRD / 路线图 / 任务分配
 │   ├── specs/          #   功能规格（含 domains/）
+│   ├── design/         #   复杂功能设计（群聊系列）
 │   ├── templates/      #   ★模板权威（给新项目复制用）
 │   ├── reports/        #   汇报产出 + HTML 渲染产物
 │   ├── research/       #   调研
@@ -96,20 +104,6 @@ agenthub/
 │   ├── 董/ 黎/ 袁/
 │   └── decisions/      #   ADR（架构决策记录）
 ├── meta/FILE_GRAPH.md  # 文件归类权威
-├── .agenthub/          # 运行时配置 + 项目专有 Skill
-│   ├── config.json
-│   └── skills/         #   小红书相关 skill
-├── skills/             # 通用 Claude Code Skills
-├── frontend/           # L5 React + TypeScript
-├── backend/            # L1-L4 FastAPI
-│   └── app/
-│       ├── api/            # L4 路由 + WS
-│       ├── application/    # L3 Service + Command + DTO
-│       ├── domain/         # L2 实体 + Task Engine
-│       ├── infrastructure/ # L1 DB / Redis / LLM Adapter / WS
-│       ├── core/           # 配置 / 安全 / 事件总线
-│       └── schemas/        # Pydantic 请求/响应
-├── docker/             # Docker Compose + Nginx
 └── scripts/            # 自动化脚本（含 check_docs.py / check_worklog.py）
 ```
 
@@ -130,8 +124,8 @@ agenthub/
 ## 测试
 
 ```bash
-cd backend && pytest          # 后端单测，覆盖率目标 80%
-cd frontend && npm run test   # 前端单测
+cd src/backend && pytest          # 后端单测，覆盖率目标 80%
+cd src/frontend && npm run test   # 前端单测
 ```
 
 ## 文档

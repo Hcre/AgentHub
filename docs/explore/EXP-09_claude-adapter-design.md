@@ -111,7 +111,7 @@ class AgentRequest(BaseModel):
 class MemoryContext(BaseModel):
     l1_working: list[dict]             # Redis 滑动窗口最近 20 条
     l2_summary: str | None             # 超长历史摘要
-    l3_specs: str | None               # .agenthub/ 项目上下文
+    l3_specs: str | None               # docs/.agenthub/ 项目上下文
     l4_rag: str | None                 # pgvector Top-K 检索
 ```
 
@@ -459,11 +459,11 @@ thinking_budget: int = 4000          # 思考 token 预算
 ## 十二、文件结构
 
 ```
-backend/app/domain/llm/
+src/backend/app/domain/llm/
 ├── protocol.py             # UnifiedAgent + LLMAdapter + AgentRuntime ABC
 └── __init__.py
 
-backend/app/infrastructure/llm/
+src/backend/app/infrastructure/llm/
 ├── __init__.py
 ├── factory.py              # build_adapter() 工厂                        ✅
 ├── mock_adapter.py         # MockAdapter — 无 API Key 时使用              ✅

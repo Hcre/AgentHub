@@ -113,19 +113,19 @@ Adapter 内部:
 
 ```
 agenthub/
-├── frontend/src/
+├── src/frontend/src/
 │   ├── components/    # chat/ agent/ task/ inbox/ common/
 │   ├── hooks/         # useWebSocket, useStreaming, useAgent...
 │   ├── stores/        # Zustand: agent/group/chat/task/inbox/ws
 │   └── services/      # REST + WS 封装
-├── backend/app/
+├── src/backend/app/
 │   ├── api/           # L4: Routers + WS Handlers
 │   ├── services/      # L3: AgentService, ChatService, TaskService...
 │   ├── domain/        # L2: Agent, Group, Task, TaskFSM, TaskEngine...
 │   ├── adapters/      # L1: ClaudeAdapter, CodexAdapter, TraeAdapter
 │   ├── infrastructure/# L1: PG Repos, Redis, asyncio.gather, FileSystem
 │   └── schemas/       # Pydantic v2
-├── docker/
+├── src/docker/
 ├── docs/specs/        # SPEC 文档
 └── skill/             # Claude Code Skills
 ```
