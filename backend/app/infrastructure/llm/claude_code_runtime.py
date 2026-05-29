@@ -46,6 +46,12 @@ _DEFAULT_TIMEOUT = 300  # 秒
 _DEFAULT_MAX_TURNS = 10
 _DEFAULT_PERMISSION_MODE = "acceptEdits"
 
+# 进程级状态：哪些 session_key 已经至少 spawn 过一次。
+# 用于 V1 路径的崩溃恢复 — 重 spawn 时若 key 在此集合中，使用 --resume
+# 而不是 --session-id，让 CLI 从磁盘恢复对话历史。
+# （V5 已验证 --resume + --input-format stream-json 兼容。）
+_SEEN_SESSION_KEYS: set[str] = set()
+
 
 class ClaudeCodeRuntime(AgentRuntime):
     """Claude Code CLI 运行时（claude_code 模式）。"""
@@ -83,6 +89,8 @@ class ClaudeCodeRuntime(AgentRuntime):
             return
 
         # V0 短驻：先 resume，找不到 session fallback 新建
+        # V0 历史行为：delta 与 persona 拼在 system_prompt 里 → 拼回保持 bit-for-bit 兼容
+        request = self._merge_delta_into_system_prompt_v0(request)
         prompt = self._extract_prompt(request)
         session_key = self._compute_session_key(request)
         async for event in self._run_cli(prompt, request, session_key, resume=True):
@@ -115,34 +123,26 @@ class ClaudeCodeRuntime(AgentRuntime):
     ) -> AsyncIterator[StreamEvent]:
         """长驻模式：复用进程池，stdin 写 JSONL，stdout 流式读取。
 
-        system_prompt 守卫：handle 缓存了 spawn 时的 sp 快照，本次请求 sp 不同时
-        drop 旧进程重 spawn。私聊场景 sp 稳定 → 复用收益最大；群聊场景 ContextBuilder
-        把 delta 拼进 sp，每轮都变 → 退化为每次 spawn（功能正确无收益，待后续工单
-        把 delta 从 sp 中拆出来）。
+        system_prompt 守卫：handle 缓存 spawn 时的 sp 快照，本次请求 sp 不同时
+        drop 旧进程重 spawn。ContextBuilder 已把动态 delta 从 sp 中拆出（见
+        AgentRequest.group_delta_text），sp 现在跨轮稳定 → 长驻收益完整生效。
+
+        崩溃恢复（Step 2）：mid-stream RuntimeError 时 drop + 用 --resume 重 spawn
+        + 重试一次。仅重试一次防止死循环。
         """
         session_key = self._compute_session_key(request)
         sp = request.system_prompt or ""
-        prompt = self._extract_prompt(request)
+        # V1：稳定 sp 留 spawn 时用；动态 delta 嵌进 user message 逐轮注入
+        prompt = self._build_v1_user_prompt(request)
         pool = get_pool()
 
-        spawn = partial(self._spawn_long, sp, session_key)
-        handle = await pool.acquire(session_key, spawn)
-
-        if handle.spawn_system_prompt and handle.spawn_system_prompt != sp:
-            logger.info(
-                "Claude CLI key=%s system_prompt 变化，drop 重 spawn", session_key
-            )
-            await pool.drop(session_key)
-            handle = await pool.acquire(session_key, spawn)
-        handle.spawn_system_prompt = sp
+        handle = await self._acquire_with_sp_guard(pool, session_key, sp)
 
         seq = 0
         try:
-            async with handle.stdin_lock:
-                await self._send_user_jsonl(handle, prompt)
-                async for evt in self._read_until_done(handle, seq):
-                    yield evt
-                    seq = evt.seq + 1
+            async for evt in self._send_and_read(handle, prompt, seq):
+                yield evt
+                seq = evt.seq + 1
         except TimeoutError:
             # 卡死的进程不应留池里 —— 下次请求会重 spawn
             await pool.drop(session_key)
@@ -152,18 +152,59 @@ class ClaudeCodeRuntime(AgentRuntime):
                 content=f"Claude CLI 长驻超时 ({self._timeout}s)",
             )
         except RuntimeError as exc:
-            # stdout EOF / 子进程意外退出
-            await pool.drop(session_key)
-            yield StreamEvent(
-                type=StreamEventType.ERROR,
-                seq=seq,
-                content=f"Claude CLI 长驻进程异常: {exc}",
+            # stdout EOF / 子进程意外退出：drop → --resume 重 spawn → 重试一次
+            logger.warning(
+                "Claude CLI key=%s 流中崩溃 (%s)，尝试 --resume 恢复重试",
+                session_key,
+                exc,
             )
+            await pool.drop(session_key)
+            try:
+                new_handle = await self._acquire_with_sp_guard(pool, session_key, sp)
+                async for evt in self._send_and_read(new_handle, prompt, seq):
+                    yield evt
+                    seq = evt.seq + 1
+            except (TimeoutError, RuntimeError) as exc2:
+                await pool.drop(session_key)
+                yield StreamEvent(
+                    type=StreamEventType.ERROR,
+                    seq=seq,
+                    content=f"Claude CLI 长驻进程崩溃恢复失败: {exc2}",
+                )
+
+    async def _acquire_with_sp_guard(
+        self, pool, session_key: str, sp: str
+    ) -> ProcessHandle:
+        """从池子取 handle，spawn-time sp 不匹配时 drop+重 spawn。"""
+        spawn = partial(self._spawn_long, sp, session_key)
+        handle = await pool.acquire(session_key, spawn)
+        if handle.spawn_system_prompt and handle.spawn_system_prompt != sp:
+            logger.info(
+                "Claude CLI key=%s system_prompt 变化，drop 重 spawn", session_key
+            )
+            await pool.drop(session_key)
+            handle = await pool.acquire(session_key, spawn)
+        handle.spawn_system_prompt = sp
+        return handle
+
+    async def _send_and_read(
+        self, handle: ProcessHandle, prompt: str, start_seq: int
+    ) -> AsyncIterator[StreamEvent]:
+        """串行写 stdin + 读 stdout 到 DONE 的标准段，独立出来便于重试复用。"""
+        async with handle.stdin_lock:
+            await self._send_user_jsonl(handle, prompt)
+            async for evt in self._read_until_done(handle, start_seq):
+                yield evt
 
     async def _spawn_long(
         self, system_prompt: str, session_key: str
     ) -> asyncio.subprocess.Process:
-        """长驻 spawn：--input-format stream-json + --session-id，stdin 保留。"""
+        """长驻 spawn：--input-format stream-json，stdin 保留。
+
+        首次见 session_key 用 --session-id 新建；后续（崩溃恢复）用 --resume
+        让 CLI 从磁盘恢复历史。
+        """
+        is_resume = session_key in _SEEN_SESSION_KEYS
         cmd = [
             "claude",
             "--print",
@@ -176,20 +217,28 @@ class ClaudeCodeRuntime(AgentRuntime):
             self._permission_mode,
             "--max-turns",
             str(self._max_turns),
-            "--session-id",
-            session_key,
         ]
+        if is_resume:
+            cmd.extend(["--resume", session_key])
+        else:
+            cmd.extend(["--session-id", session_key])
         if system_prompt:
             cmd.extend(["--system-prompt", system_prompt])
         env = self._build_env()
-        logger.info("Claude CLI 长驻 spawn key=%s", session_key)
-        return await asyncio.create_subprocess_exec(
+        logger.info(
+            "Claude CLI 长驻 spawn key=%s mode=%s",
+            session_key,
+            "resume" if is_resume else "new",
+        )
+        proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=env,
         )
+        _SEEN_SESSION_KEYS.add(session_key)
+        return proc
 
     @staticmethod
     async def _send_user_jsonl(handle: ProcessHandle, content: str) -> None:
@@ -324,6 +373,34 @@ class ClaudeCodeRuntime(AgentRuntime):
             if msg.get("role") == "user":
                 return msg.get("content", "")
         return ""
+
+    @staticmethod
+    def _merge_delta_into_system_prompt_v0(request: AgentRequest) -> AgentRequest:
+        """V0 兼容：把 group_delta_text 拼回 system_prompt（历史行为）。
+
+        ContextBuilder 拆分后，sp 只剩稳定部分。V0 路径需把 delta 拼回避免行为变化。
+        """
+        if not request.group_delta_text:
+            return request
+        merged_sp = "\n\n".join(
+            filter(None, [request.system_prompt, request.group_delta_text])
+        )
+        return request.model_copy(
+            update={"system_prompt": merged_sp, "group_delta_text": None}
+        )
+
+    @staticmethod
+    def _build_v1_user_prompt(request: AgentRequest) -> str:
+        """V1：把 group_delta_text 嵌进 user message 头部，触发文本附后。
+
+        长驻 CLI 模式下 sp 一次性 spawn 注入；每轮通过 user message 把新群聊 delta
+        告知 CLI。私聊（无 delta）退化为原始 trigger 文本。
+        """
+        trigger = ClaudeCodeRuntime._extract_prompt(request)
+        delta = request.group_delta_text
+        if not delta:
+            return trigger
+        return f"{delta}\n\n---\n[本轮触发]\n{trigger}"
 
     @staticmethod
     def _compute_session_key(request: AgentRequest) -> str:

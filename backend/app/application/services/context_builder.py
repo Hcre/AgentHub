@@ -94,32 +94,30 @@ class ContextBuilder:
         members = await self._load_members(group)
         members_block = format_members(members, target_agent)
 
-        # 3. 拼 stable_prefix（cache 友好）
+        # 3. 稳定 system_prompt（persona + 契约 + 成员）—— 跨轮不变
+        # delta 动态部分独立到 group_delta_text 字段，让 V1 长驻 CLI 复用 spawn 参数
+        # （CLI 的 --system-prompt 仅 spawn 时生效，不支持热更新）
         persona = target_agent.system_prompt or (
             f"你是 {target_agent.name}，本群成员之一。"
             f"你只代表你自己发言，不要替其他成员说话，不要模仿他人的口癖或说话风格。"
         )
+        system_prompt = "\n\n".join(
+            filter(None, [persona, GROUP_CHAT_CONTRACT, members_block])
+        )
+
+        # 4. 渲染 delta（动态部分）
         agent_name_by_id = {m.id: m.name for m in members}
         delta_block = format_delta(delta.messages, agent_name_by_id)
         truncated_hint = (
-            f"\n[省略了更早的 {delta.truncated_count} 条群聊消息]\n"
+            f"[省略了更早的 {delta.truncated_count} 条群聊消息]\n"
             if delta.truncated_count > 0
             else ""
         )
-
-        system_prompt = "\n\n".join(
-            filter(
-                None,
-                [
-                    persona,
-                    GROUP_CHAT_CONTRACT,
-                    members_block,
-                    truncated_hint + delta_block if delta_block else None,
-                ],
-            )
+        group_delta_text = (
+            (truncated_hint + delta_block) if delta_block else None
         )
 
-        # 4. L1 窗口仅作为辅助记忆传递（CLI Runtime 实际只用 system_prompt + 最后一条 user）
+        # 5. L1 窗口仅作为辅助记忆传递（CLI Runtime 实际只用 system_prompt + 最后一条 user）
         window = await self._l1.get_window(session.id)
 
         return AgentRequest(
@@ -132,6 +130,7 @@ class ContextBuilder:
             agent_id=target_agent.id,
             group_id=group.id,
             is_group_chat=True,
+            group_delta_text=group_delta_text,
         )
 
     # --- 私聊路径（向后兼容 MVP 行为） ---
