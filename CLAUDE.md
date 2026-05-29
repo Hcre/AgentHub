@@ -229,7 +229,7 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 | "新 Agent 系统" | 01 §4.2 + docs/specs/04c-adapter-interface |
 | "写文档 / 移动文件" | 06 文档 + meta/FILE_GRAPH §三 决策树 |
 | "Agent 操作权限" | 99-boundaries 边界矩阵 |
-| "调用图 / 影响分析" | 08-code-understanding（M3+ 中大型才用）|
+| "调用图 / 影响分析 / 代码地图" | 查 `CODE_MAP.md`（后端模块全景 + 入口表）；AI 查 `.codegraph/graph.json`（节点/边/缺陷）；人看 `.understand-anything/graph.html`（浏览器交互）；重建跑 `python scripts/gen_codegraph.py`。规范见 `docs/conventions/08-code-understanding_*` |
 | "汇报" | 更新 worklog + STATUS（必做）→ 功能点汇报对话内联不落盘 |
 | "收束" | 人触发，按 ai-workflow/06 四阶段（整理→测试→审计→验证）→ ADR + 收束报告 `docs/reports/` |
 | "新增/移动文件" | 先查 meta/FILE_GRAPH §三 决策树 → 操作 → 同步 FILE_GRAPH → 汇报 |

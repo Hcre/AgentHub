@@ -1,0 +1,21 @@
+{
+  "node_types": [
+    "MODULE",
+    "CLASS",
+    "FUNCTION"
+  ],
+  "edge_types": [
+    "CONTAINS",
+    "IMPORTS"
+  ],
+  "layers": [
+    "L4-api",
+    "L3-application",
+    "L2-domain",
+    "L1-infrastructure",
+    "L0-core",
+    "LX-schemas"
+  ],
+  "dependency_rule": "L5→L4→L3→L2←L1（低层禁依赖高层；L1→L2 依赖倒置例外）",
+  "note": "依赖关系以 IMPORTS（静态精确）为准；不抽 CALLS（Python 无类型推断时按名解析会产生假边）"
+}

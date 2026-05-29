@@ -104,6 +104,10 @@ AgentHub/                                # 仓库根：仅放顶层入口文件 
 ├── meta/                               # 【元信息】描述仓库自身
 │   └── FILE_GRAPH.md                    #   本文件
 │
+├── CODE_MAP.md                         # 【代码地图】后端模块全景（Mermaid）+ 入口表（gen_codegraph.py 生成，入 git）
+├── .codegraph/                         # 【代码图谱·AI 侧】graph_schema.json 入 git；graph.json gitignored
+├── .understand-anything/               # 【代码图谱·人侧】graph.html 交互可视化（gitignored，可重建）
+│
 └── _assets/                            # 【本地资产】scraps/草图 + screenshots/截图 + uploads/上传（整目录 gitignored）
 ```
 
