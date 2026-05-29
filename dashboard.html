@@ -17,6 +17,7 @@
     --red: #c0573f; --red-tint: #f6e2dc;
     --serif: 'Tiempos Text', 'Iowan Old Style', Georgia, 'Songti SC', 'STSong', serif;
     --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', ui-sans-serif, sans-serif;
+    --mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
     --shadow: 0 1px 2px rgba(40,33,26,.04), 0 4px 16px rgba(40,33,26,.05);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -29,14 +30,21 @@
   a { color: var(--clay-deep); text-decoration: none; }
   a:hover { text-decoration: underline; text-underline-offset: 2px; }
   code { background: var(--surface-2); border: 1px solid var(--border); padding: .1rem .4rem;
-         border-radius: 5px; font-size: .85em; font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; }
+         border-radius: 5px; font-size: .85em; font-family: var(--mono); }
 
   /* ---- header ---- */
   header { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem;
            padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
   h1 { font-family: var(--serif); font-weight: 500; font-size: 1.85rem; letter-spacing: -.01em; color: var(--ink); }
   h1 .dot { color: var(--clay); }
-  .nav { margin-top: .5rem; font-size: .86rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: .2rem .7rem; }
+  .tabs { margin-top: .7rem; display: flex; gap: .4rem; }
+  .tab {
+    background: transparent; border: 1px solid transparent; color: var(--muted);
+    border-radius: 8px; padding: .4rem .9rem; cursor: pointer; font-size: .9rem; font-family: var(--sans);
+    transition: all .15s; display: inline-flex; align-items: center; gap: .4rem;
+  }
+  .tab:hover { color: var(--ink-soft); background: var(--surface-2); }
+  .tab.active { background: var(--ink); border-color: var(--ink); color: #fff; }
   .controls { display: flex; align-items: center; gap: 1rem; }
   .stamp { font-size: .76rem; color: var(--faint); text-align: right; line-height: 1.45; }
   .stamp b { color: var(--muted); font-weight: 600; }
@@ -57,8 +65,6 @@
   .summary-top h2 { font-family: var(--serif); font-weight: 500; font-size: 1.15rem; color: var(--ink-soft); }
   .pct { font-family: var(--serif); font-size: 3rem; font-weight: 500; line-height: 1; color: var(--clay); letter-spacing: -.02em; }
   .pct small { font-size: 1rem; color: var(--muted); font-family: var(--sans); margin-left: .5rem; }
-  .track { height: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; overflow: hidden; margin: 1.25rem 0 .25rem; }
-  .fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--clay), var(--clay-deep)); border-radius: 999px; transition: width .7s cubic-bezier(.4,0,.2,1); }
   .sub { color: var(--muted); font-size: .88rem; }
   .chips { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: 1.4rem; }
   .chip { border: 1px solid var(--border-strong); border-radius: 999px; padding: .38rem .85rem; font-size: .82rem;
@@ -95,12 +101,10 @@
   .section { margin-top: 2.5rem; }
   .section h2 { font-family: var(--serif); font-weight: 500; font-size: 1.25rem; margin-bottom: .9rem;
                 display: flex; align-items: center; gap: .5rem; }
-  .section h2.blocked { color: var(--red); } .section h2.debt { color: var(--amber); }
   .section h2 .count { font-family: var(--sans); font-size: .78rem; color: var(--muted); font-weight: 500; }
   .row { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
          padding: .8rem 1.1rem; margin-bottom: .6rem; font-size: .9rem; color: var(--ink-soft); }
   .row.blocked { border-left: 3px solid var(--red); }
-  .row.debt { border-left: 3px solid var(--amber); }
 
   /* ---- gate table ---- */
   .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
@@ -116,19 +120,68 @@
   .empty.error b { color: var(--red); }
   footer { text-align: center; color: var(--faint); font-size: .78rem; margin-top: 4rem;
            padding-top: 1.5rem; border-top: 1px solid var(--border); }
+
+  /* ---- docs view ---- */
+  #view-docs { margin-top: 2rem; }
+  .doc-nav { display: flex; flex-wrap: wrap; gap: .55rem; margin-bottom: 1.5rem; }
+  .doc-pill { border: 1px solid var(--border-strong); border-radius: 999px; padding: .42rem .95rem; font-size: .85rem;
+              cursor: pointer; color: var(--ink-soft); background: var(--surface); user-select: none;
+              transition: all .15s; display: inline-flex; align-items: center; gap: .45rem; }
+  .doc-pill:hover { border-color: var(--clay); color: var(--clay-deep); }
+  .doc-pill.active { background: var(--clay); border-color: var(--clay); color: #fff; }
+  .doc-pill code { background: rgba(255,255,255,.18); border: none; color: inherit; padding: 0 .2rem; }
+  .doc-pill:not(.active) code { background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); }
+  .doc-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+               padding: 2.25rem 2.5rem; box-shadow: var(--shadow); min-height: 12rem; }
+  .doc-source { font-size: .76rem; color: var(--faint); margin-bottom: 1.25rem; padding-bottom: 1rem;
+                border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  .doc-source code { font-size: .9em; }
+
+  /* ---- rendered markdown (.md-body) ---- */
+  .md-body { color: var(--ink-soft); font-size: .92rem; line-height: 1.72; }
+  .md-body > :first-child { margin-top: 0; }
+  .md-body h1, .md-body h2, .md-body h3, .md-body h4, .md-body h5, .md-body h6 {
+    font-family: var(--serif); font-weight: 500; color: var(--ink); line-height: 1.3;
+    margin: 1.8rem 0 .8rem; letter-spacing: -.01em; }
+  .md-body h1 { font-size: 1.7rem; padding-bottom: .4rem; border-bottom: 1px solid var(--border); }
+  .md-body h2 { font-size: 1.35rem; padding-bottom: .3rem; border-bottom: 1px solid var(--border); }
+  .md-body h3 { font-size: 1.12rem; }
+  .md-body h4 { font-size: 1rem; }
+  .md-body h5, .md-body h6 { font-size: .9rem; color: var(--ink-soft); }
+  .md-body p { margin: .8rem 0; }
+  .md-body ul, .md-body ol { margin: .7rem 0; padding-left: 1.5rem; }
+  .md-body li { margin: .3rem 0; }
+  .md-body li > ul, .md-body li > ol { margin: .3rem 0; }
+  .md-body a { color: var(--clay-deep); }
+  .md-body strong { color: var(--ink); font-weight: 600; }
+  .md-body hr { border: none; border-top: 1px solid var(--border); margin: 1.8rem 0; }
+  .md-body blockquote { border-left: 3px solid var(--clay); background: var(--clay-tint);
+                        margin: 1rem 0; padding: .6rem 1.1rem; border-radius: 0 8px 8px 0; color: var(--ink-soft); }
+  .md-body blockquote > :first-child { margin-top: 0; } .md-body blockquote > :last-child { margin-bottom: 0; }
+  .md-body code { background: var(--surface-2); border: 1px solid var(--border); padding: .1rem .4rem;
+                  border-radius: 5px; font-size: .85em; font-family: var(--mono); color: var(--clay-deep); }
+  .md-body pre { background: #2b2823; border: 1px solid var(--border-strong); border-radius: 10px;
+                 padding: 1rem 1.2rem; overflow-x: auto; margin: 1rem 0; }
+  .md-body pre code { background: none; border: none; padding: 0; color: #e9e4d8; font-size: .82rem; line-height: 1.6; }
+  .md-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; margin: 1.1rem 0; }
+  .md-body table.md-table { width: 100%; border-collapse: collapse; font-size: .85rem; min-width: 0; }
+  .md-body table.md-table th, .md-body table.md-table td {
+    padding: .55rem .85rem; text-align: left; border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border); white-space: normal; vertical-align: top; }
+  .md-body table.md-table th { background: var(--surface-2); color: var(--ink-soft); font-weight: 600; }
+  .md-body table.md-table tr:last-child td { border-bottom: none; }
+  .md-body table.md-table th:last-child, .md-body table.md-table td:last-child { border-right: none; }
+  .md-body table.md-table tbody tr:hover { background: var(--surface-2); }
+  .hidden { display: none !important; }
 </style>
 </head>
 <body>
 <header>
   <div>
     <h1>AgentHub<span class="dot"> · </span>协作看板</h1>
-    <nav class="nav">
-      <a href="README.md">README</a>·
-      <a href="docs/plan/开发清单_roadmap.md">开发清单</a>·
-      <a href="docs/conventions/README.md">规范</a>·
-      <a href="meta/FILE_GRAPH.md">文件图谱</a>·
-      <a href="STATUS.md">STATUS.md</a>·
-      <a href="CLAUDE.md">CLAUDE.md</a>
+    <nav class="tabs">
+      <button class="tab active" data-view="board">📊 看板</button>
+      <button class="tab" data-view="docs">📖 文档</button>
     </nav>
   </div>
   <div class="controls">
@@ -140,7 +193,8 @@
   </div>
 </header>
 
-<main>
+<!-- ===== 看板视图 ===== -->
+<main id="view-board">
   <section class="summary">
     <div class="summary-top">
       <h2>本周完成</h2>
@@ -158,26 +212,180 @@
   </section>
 </main>
 
-<footer>数据源 <code>STATUS.md</code>（按人协作表）· 每 60 秒原地刷新 · AI 协作开发流程驱动</footer>
+<!-- ===== 文档视图 ===== -->
+<main id="view-docs" class="hidden">
+  <nav class="doc-nav" id="doc-nav"></nav>
+  <section class="doc-panel">
+    <div class="doc-source" id="doc-source"></div>
+    <article class="md-body" id="doc-body"><div class="empty">选择上方文档查看</div></article>
+  </section>
+</main>
+
+<footer>数据源 <code>STATUS.md</code>（看板）+ 各 <code>README</code> / <code>CODE_MAP.md</code>（文档，实时渲染）· 看板每 60 秒原地刷新</footer>
 
 <script>
 "use strict";
 const REFRESH_MS = 60000;
-const state = { filter: "all", countdown: REFRESH_MS / 1000, loaded: false, stale: false, lastData: null };
+const state = { filter: "all", countdown: REFRESH_MS / 1000, loaded: false, stale: false, lastData: null, view: "board" };
 const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 
-// 一个人是否阻塞：阻塞列非空且不是“无”
+// 人向文档清单（实时 fetch + 内置渲染）
+const DOCS = [
+  { id: "readme",   label: "总览 README",  path: "README.md",                 hint: "项目入口（人向）" },
+  { id: "conv",     label: "规范导航",      path: "docs/conventions/README.md", hint: "开发规范 01-08" },
+  { id: "explore",  label: "Explore 索引",  path: "docs/explore/README.md",     hint: "技术探索文档" },
+  { id: "frontend", label: "前端 README",   path: "src/frontend/README.md",     hint: "前端工程说明" },
+  { id: "codemap",  label: "CODE_MAP",      path: "CODE_MAP.md",                hint: "后端模块全景" },
+];
+
+// ======================================================================
+// 内置 mini-markdown 渲染器（无外部依赖）
+// 支持：标题 / 表格 / 代码块 / 行内代码 / 加粗 / 斜体 / 链接 / 列表(嵌套) / 引用 / 分割线
+// ======================================================================
+const SENT = String.fromCharCode(0xE000);    // 行内代码占位哨兵（私有区字符：regex 安全且不会出现在正文）
+const PIPE_PH = String.fromCharCode(0xE001); // 转义管道 \| 的占位（NUL 在 RegExp 中不可靠，故用私有区）
+
+function inline(t) {
+  const codes = [];
+  // 1) 先抽出行内代码，避免内部内容被当作其它语法处理
+  t = t.replace(/`([^`]+)`/g, (_, c) => { codes.push(c); return SENT + (codes.length - 1) + SENT; });
+  // 2) 转义 HTML
+  t = esc(t);
+  // 3) 加粗 / 斜体
+  t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  t = t.replace(/(^|[^*\w])\*([^*\n]+)\*(?=[^*\w]|$)/g, "$1<em>$2</em>");
+  // 4) 链接 [text](url)，外链新窗口
+  t = t.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, txt, url) => {
+    const u = esc(url), ext = /^https?:\/\//.test(url);
+    return `<a href="${u}"${ext ? ' target="_blank" rel="noopener"' : ""}>${txt}</a>`;
+  });
+  // 5) 还原行内代码
+  t = t.replace(new RegExp(SENT + "(\\d+)" + SENT, "g"), (_, n) => `<code>${esc(codes[+n])}</code>`);
+  return t;
+}
+
+function splitRow(line) {
+  const s = line.trim().replace(/^\|/, "").replace(/\|$/, "").replace(/\\\|/g, PIPE_PH);
+  return s.split("|").map(c => inline(c.split(PIPE_PH).join("|").trim()));
+}
+
+function renderTable(header, rows) {
+  const th = header.map(h => `<th>${h}</th>`).join("");
+  const body = rows.map(r =>
+    `<tr>${header.map((_, i) => `<td>${r[i] || ""}</td>`).join("")}</tr>`).join("");
+  return `<div class="md-table-wrap"><table class="md-table"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
+}
+
+function renderList(block) {
+  const items = [];
+  for (const l of block) {
+    const m = l.match(/^(\s*)([-*+]|\d+\.)\s+(.*)$/);
+    if (m) items.push({ indent: m[1].replace(/\t/g, "  ").length, ordered: /\d/.test(m[2]), text: m[3] });
+    else if (items.length) items[items.length - 1].text += " " + l.trim();
+  }
+  if (!items.length) return "";
+  let pos = 0;
+  function level(indent) {
+    const ordered = items[pos].ordered;
+    let out = ordered ? "<ol>" : "<ul>";
+    while (pos < items.length && items[pos].indent >= indent) {
+      if (items[pos].indent > indent) { out += level(items[pos].indent); continue; }
+      const cur = items[pos]; pos++;
+      let li = inline(cur.text);
+      if (pos < items.length && items[pos].indent > cur.indent) li += level(items[pos].indent);
+      out += `<li>${li}</li>`;
+    }
+    return out + (ordered ? "</ol>" : "</ul>");
+  }
+  return level(items[0].indent);
+}
+
+function mdToHtml(md) {
+  let lines = md.replace(/\r\n/g, "\n").split("\n");
+  // 跳过 YAML front-matter
+  if (lines[0] && lines[0].trim() === "---") {
+    const end = lines.indexOf("---", 1);
+    if (end > 0) lines = lines.slice(end + 1);
+  }
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // 代码块
+    const fence = line.match(/^\s*(```|~~~)/);
+    if (fence) {
+      const marker = fence[1], buf = []; i++;
+      while (i < lines.length && !lines[i].trim().startsWith(marker)) { buf.push(lines[i]); i++; }
+      i++;
+      out.push(`<pre><code>${esc(buf.join("\n"))}</code></pre>`);
+      continue;
+    }
+
+    // 表格：当前行是 | … |，下一行是分隔行 | --- | --- |
+    if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length &&
+        /^\s*\|?[\s:|-]+\|?\s*$/.test(lines[i + 1]) && lines[i + 1].includes("-")) {
+      const header = splitRow(line); i += 2;
+      const rows = [];
+      while (i < lines.length && /^\s*\|.*\|?\s*$/.test(lines[i]) && lines[i].includes("|")) {
+        rows.push(splitRow(lines[i])); i++;
+      }
+      out.push(renderTable(header, rows));
+      continue;
+    }
+
+    // 标题
+    const h = line.match(/^(#{1,6})\s+(.*)$/);
+    if (h) { out.push(`<h${h[1].length}>${inline(h[2].replace(/\s*#+\s*$/, ""))}</h${h[1].length}>`); i++; continue; }
+
+    // 分割线
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) { out.push("<hr>"); i++; continue; }
+
+    // 引用（连续收集后递归渲染）
+    if (/^\s*>\s?/.test(line)) {
+      const buf = [];
+      while (i < lines.length && /^\s*>\s?/.test(lines[i])) { buf.push(lines[i].replace(/^\s*>\s?/, "")); i++; }
+      out.push(`<blockquote>${mdToHtml(buf.join("\n"))}</blockquote>`);
+      continue;
+    }
+
+    // 列表（含缩进续行）
+    if (/^\s*([-*+]|\d+\.)\s+/.test(line)) {
+      const block = [];
+      while (i < lines.length && (/^\s*([-*+]|\d+\.)\s+/.test(lines[i]) || (block.length && /^\s+\S/.test(lines[i])))) {
+        block.push(lines[i]); i++;
+      }
+      out.push(renderList(block));
+      continue;
+    }
+
+    // 空行
+    if (/^\s*$/.test(line)) { i++; continue; }
+
+    // 段落
+    const buf = [line]; i++;
+    while (i < lines.length && !/^\s*$/.test(lines[i]) &&
+           !/^#{1,6}\s/.test(lines[i]) && !/^\s*([-*+]|\d+\.)\s+/.test(lines[i]) &&
+           !/^\s*\|.*\|\s*$/.test(lines[i]) && !/^\s*(```|~~~)/.test(lines[i]) &&
+           !/^\s*>\s?/.test(lines[i]) && !/^\s*([-*_])(\s*\1){2,}\s*$/.test(lines[i])) {
+      buf.push(lines[i]); i++;
+    }
+    out.push(`<p>${inline(buf.join(" "))}</p>`);
+  }
+  return out.join("\n");
+}
+
+// ======================================================================
+// 看板：STATUS.md 解析 + 渲染
+// ======================================================================
 const isBlocked = b => !!b && !/^无$|^—$|^-$/.test(b.trim());
-// “这周完成了”里的 ✅ 计数（粗略完成项数）
 const doneCount = s => (s.match(/✅/g) || []).length;
-// 拆完成项：按 ✅ 切，保留每段文字
 function splitDone(s) {
   if (!s) return [];
   return s.split("✅").map(x => x.replace(/^[\s+·、]+|[\s+·、]+$/g, "").trim())
           .filter(x => x && x !== "—" && x !== "-");
 }
 
-// --- STATUS.md 解析（按人协作表 + Git 映射）---
 function parse(md) {
   const lines = md.split(/\r?\n/);
   const out = { people: [], gitmap: [], updated: "", legend: [] };
@@ -195,7 +403,6 @@ function parse(md) {
     const isRow = line.startsWith("|") && !/^\|[\s|:-]+\|?$/.test(line);
     if (isRow) {
       const cols = line.split("|").slice(1, -1).map(c => c.trim());
-      // 协作表表头：| 我 | 正在做 | 阻塞？| 这周完成了 |
       if ((section === "head" || section === "other") && cols[0] && cols[0] !== "我"
           && !/^Git用户名$/.test(cols[0]) && cols.length >= 4) {
         out.people.push({ who: cols[0], doing: cols[1] || "", blocked: cols[2] || "", done: cols[3] || "" });
@@ -308,13 +515,66 @@ async function load() {
   }
 }
 
+// ======================================================================
+// 文档视图：fetch + 渲染
+// ======================================================================
+const docCache = {};
+let activeDoc = DOCS[0].id;
+
+function renderDocNav() {
+  document.getElementById("doc-nav").innerHTML = DOCS.map(d =>
+    `<button class="doc-pill ${d.id === activeDoc ? "active" : ""}" data-id="${d.id}" title="${esc(d.hint)}">
+       ${esc(d.label)} <code>${esc(d.path.split("/").pop())}</code>
+     </button>`).join("");
+  document.querySelectorAll(".doc-pill").forEach(b =>
+    b.onclick = () => loadDoc(b.dataset.id));
+}
+
+async function loadDoc(id, force) {
+  activeDoc = id;
+  renderDocNav();
+  const doc = DOCS.find(d => d.id === id);
+  const src = document.getElementById("doc-source");
+  const body = document.getElementById("doc-body");
+  src.innerHTML = `<span>📄 <code>${esc(doc.path)}</code> · ${esc(doc.hint)}</span><a href="${esc(doc.path)}" target="_blank" rel="noopener">查看原文 ↗</a>`;
+  if (docCache[id] && !force) { body.innerHTML = docCache[id]; return; }
+  body.innerHTML = `<div class="empty">加载中 …</div>`;
+  try {
+    const res = await fetch(doc.path, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    docCache[id] = mdToHtml(await res.text());
+    body.innerHTML = docCache[id];
+  } catch (e) {
+    body.innerHTML = `<div class="empty error"><b>⚠️ 无法加载 ${esc(doc.path)}</b><br><br>
+      本页需通过 HTTP 服务访问（<code>python scripts/start_server.py</code>），不能用 <code>file://</code> 打开。<br>
+      <small>(${esc(e.message)})</small></div>`;
+  }
+}
+
+// ======================================================================
+// Tab 切换
+// ======================================================================
+function switchView(view) {
+  state.view = view;
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === view));
+  document.getElementById("view-board").classList.toggle("hidden", view !== "board");
+  document.getElementById("view-docs").classList.toggle("hidden", view !== "docs");
+  if (view === "docs" && !docCache[activeDoc]) loadDoc(activeDoc);
+}
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => switchView(t.dataset.view));
+
+// 刷新按钮：看板刷 STATUS，文档刷当前文档
+document.getElementById("refresh").onclick = () =>
+  state.view === "docs" ? loadDoc(activeDoc, true) : load();
+
 setInterval(() => {
+  if (state.view !== "board") return;
   state.countdown--;
   if (state.countdown <= 0) load();
   else setStamp();
 }, 1000);
 
-document.getElementById("refresh").onclick = load;
+renderDocNav();
 load();
 </script>
 </body>

@@ -80,13 +80,13 @@ Zustand store: `useApiKeyStore`，persist 到 localStorage key `agenthub-apikeys
 
 | 文件 | 说明 |
 |------|------|
-| `frontend/src/stores/apiKeyStore.ts` | Zustand persist store |
-| `frontend/src/components/settings/ApiKeyManager.tsx` | 管理页面 |
-| `frontend/src/components/settings/ApiKeyDialog.tsx` | 添加/编辑弹窗 |
-| `frontend/src/stores/uiStore.ts` | 加 `api-keys` section |
-| `frontend/src/components/layout/CenterPanel.tsx` | 加路由 |
-| `frontend/src/components/agent/CreateAgentModal.tsx` | 改造 Key 输入 |
-| `frontend/src/components/agent/CustomAgentModal.tsx` | 改造 Key 输入 |
+| `src/frontend/src/stores/apiKeyStore.ts` | Zustand persist store |
+| `src/frontend/src/components/settings/ApiKeyManager.tsx` | 管理页面 |
+| `src/frontend/src/components/settings/ApiKeyDialog.tsx` | 添加/编辑弹窗 |
+| `src/frontend/src/stores/uiStore.ts` | 加 `api-keys` section |
+| `src/frontend/src/components/layout/CenterPanel.tsx` | 加路由 |
+| `src/frontend/src/components/agent/CreateAgentModal.tsx` | 改造 Key 输入 |
+| `src/frontend/src/components/agent/CustomAgentModal.tsx` | 改造 Key 输入 |
 
 ### 不影响范围
 
