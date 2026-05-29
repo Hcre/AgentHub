@@ -45,11 +45,10 @@ L1 Infrastructure  PG / Redis / Celery / LLM Adapter (src/backend/app/infrastruc
 
 ```bash
 cp .env.example .env            # 填入 LLM API Key
-cd src/docker
-docker compose up --build
+docker compose -f src/docker/docker-compose.yml up --build -d
 ```
 
-- 前端：http://localhost:5173
+- 前端：http://localhost:5174
 - 后端 API 文档：http://localhost:8000/docs
 - 健康检查：http://localhost:8000/health
 
@@ -74,6 +73,57 @@ npm install
 cp .env.example .env
 npm run dev
 ```
+
+## 使用手册
+
+### 服务与端口
+
+| 服务 | 端口 | 说明 |
+|------|------|------|
+| frontend | http://localhost:5174 | React 静态站（nginx 托管） |
+| backend | http://localhost:8000 | FastAPI；`/docs` Swagger、`/health` 健康检查 |
+| postgres | 5432 | pgvector |
+| redis | 6379 | 缓存 + Celery broker |
+
+### 日常运维（Docker）
+
+```bash
+# 启动 / 重建 / 停止
+docker compose -f src/docker/docker-compose.yml up -d --build
+docker compose -f src/docker/docker-compose.yml ps
+docker compose -f src/docker/docker-compose.yml logs -f backend
+docker compose -f src/docker/docker-compose.yml down
+
+# 进容器跑迁移 / 测试
+docker compose -f src/docker/docker-compose.yml exec backend alembic upgrade head
+docker compose -f src/docker/docker-compose.yml exec backend pytest -q
+```
+
+> ⚠️ 若启动后见 postgres `Exited(127)` 或前端在 5173：是 Docker Desktop 开机自启的**重组前旧容器**。
+> `docker rm -f $(docker ps -aq --filter name=agenthub)` 清掉，再用上面命令重建。
+
+### 校验与提交
+
+```bash
+scripts/verify.bat            # ruff + ruff-format + mypy + tsc + eslint（提交前必跑）
+pre-commit install --hook-type pre-push && pre-commit install   # 克隆后首装钩子
+```
+
+### 进度看板 dashboard
+
+```bash
+python scripts/start_server.py    # 起本地 HTTP（dashboard 需 HTTP，不能 file:// 直开）
+# 浏览器开 http://localhost:8000/dashboard.html（或脚本提示的端口）
+```
+解析根 `STATUS.md` 的按人协作表，展示董/黎/袁的「正在做 / 阻塞 / 本周完成」+ Git↔目录映射。
+
+### 代码图谱（后端）
+
+```bash
+python scripts/gen_codegraph.py   # 重建图谱（改后端结构后跑）
+```
+- 人看：浏览器开 `.understand-anything/graph.html`（分层依赖图，点节点看上下游）或 `CODE_MAP.md`
+- AI 查：`.codegraph/graph.json`（节点/边/缺陷：跨层违规、循环依赖、死代码）
 
 ## 目录结构
 

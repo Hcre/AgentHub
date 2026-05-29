@@ -47,7 +47,7 @@ AgentHub/
 | 文档 | 何时读 |
 |------|--------|
 | `meta/FILE_GRAPH.md` | 新增/移动文件前（决策树） |
-| `docs/conventions/CLAUDE-规范导航.md` | 任务 → 规范定位 + 红线总表（AR/CR/PR/AP/T/D）|
+| `docs/conventions/CLAUDE.md` | 任务 → 规范定位 + 红线总表（AR/CR/PR/AP/T/D）|
 | docs/conventions/0X-*.md | 写代码/接口/测试前对应查（01 架构 / 02 代码 / 03 Git / 04 API / 05 测试 / 06 文档 / 08 图谱） |
 | `docs/conventions/99-boundaries_边界矩阵.md` | 写 Agent 权限/审批前 |
 | `docs/conventions/99-process-rules_流程红线全集.md` | PR-01~09 全集 |
@@ -124,14 +124,14 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 | 维度 | 红线 | 详见 |
 |------|------|------|
 | 架构 | AR-01 5 层洋葱 / AR-02 新 Agent 只加 Adapter / AR-03 Harness 无 LLM / AR-04 Agent 不直通 / AR-05 FSM 事件溯源 / AR-06 system-model 解耦 | [01-architecture](docs/conventions/01-architecture_架构设计规范.md) |
-| 代码 | CR-01~12（Python 7 + TS 3 + 通用 2，详见 [CLAUDE-规范导航 §2](docs/conventions/CLAUDE-规范导航.md)） | [02-coding](docs/conventions/02-coding_代码编写规范.md) |
+| 代码 | CR-01~12（Python 7 + TS 3 + 通用 2，详见 [CLAUDE.md §2](docs/conventions/CLAUDE.md)） | [02-coding](docs/conventions/02-coding_代码编写规范.md) |
 | Git | PR-02 分支命名 / PR-03 Conventional / PR-06 ≥1 Approve / PR-07 verify | [03-git](docs/conventions/03-git_Git协作规范.md) |
 | API | AP-01~07（kebab + `{error:{code,message}}` + JWT + Pydantic + 版本 + 兼容 + WS request_id） | [04-api](docs/conventions/04-api_API设计规范.md) |
 | 测试 | T-01~06（独立 / Mock 边界 / 三路径 / 无 flaky / Adapter & FSM 必测） | [05-testing](docs/conventions/05-testing_测试规范.md) |
 | 文档 | D-01~12（命名 + 自动校验，详见 `check_docs.py`） | [06-documentation](docs/conventions/06-documentation_文档规范.md) |
 | 流程 | PR-01~09 完整流程红线 | [99-process-rules](docs/conventions/99-process-rules_流程红线全集.md) |
 
-任务定位、单一权威、改动同步规则全在 [`docs/conventions/CLAUDE-规范导航.md`](docs/conventions/CLAUDE-规范导航.md)。
+任务定位、单一权威、改动同步规则全在 [`docs/conventions/CLAUDE.md`](docs/conventions/CLAUDE.md)。
 
 ---
 
@@ -171,6 +171,26 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 
 > **首次克隆后必装**：`pre-commit install --hook-type pre-push && pre-commit install`
 > 否则以上所有检查都不会触发。
+
+---
+
+## 使用手册（操作速查）
+
+> 详细人向手册见 `README.md` §使用手册；下表是 AI 高频操作命令。
+
+| 要做什么 | 命令 |
+|---------|------|
+| 跑起全栈 | `docker compose -f src/docker/docker-compose.yml up -d --build` |
+| 看状态 / 日志 | `docker compose -f src/docker/docker-compose.yml ps` · `... logs -f backend` |
+| 停止 | `docker compose -f src/docker/docker-compose.yml down` |
+| 跑迁移 / 测试 | `... exec backend alembic upgrade head` · `... exec backend pytest -q` |
+| 提交前校验 | `scripts/verify.bat`（ruff+mypy+tsc+eslint） |
+| 重建代码图谱 | `python scripts/gen_codegraph.py` → 查 `.codegraph/graph.json`（缺陷/影响分析）|
+| 起 dashboard | `python scripts/start_server.py` → `http://localhost:8000/dashboard.html` |
+| 文档/worklog 校验 | `python scripts/check_docs.py` · `python scripts/check_worklog.py` |
+
+**端口**：frontend 5174 · backend 8000（`/docs` `/health`）· postgres 5432 · redis 6379。
+**排错**：启动见 postgres `Exited(127)` 或前端在 5173 → 是开机自启的旧容器，`docker rm -f $(docker ps -aq --filter name=agenthub)` 清掉重建。
 
 ---
 

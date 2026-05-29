@@ -51,9 +51,8 @@ AgentHub/                                # 仓库根：仅放顶层入口文件 
 │
 ├── docs/                               # 【协作文档】
 │   ├── conventions/                     #   规范正文（开发者日常查阅）
-│   │   ├── README.md                    #     入口索引
-│   │   ├── README-规范导航.md            #     人类入口：快速索引 + 红线速查
-│   │   ├── CLAUDE-规范导航.md            #     AI 入口：任务→规范定位 + 红线总表
+│   │   ├── README.md                    #     👤 人类入口：索引 + 红线速查 + 常用规约
+│   │   ├── CLAUDE.md                     #     🤖 AI 入口：任务→规范定位 + 红线总表
 │   │   ├── 01-architecture_架构设计规范.md   #   AR-01~06
 │   │   ├── 02-coding_代码编写规范.md         #   CR-01~12
 │   │   ├── 03-git_Git协作规范.md            #   PR-02/03
@@ -64,11 +63,11 @@ AgentHub/                                # 仓库根：仅放顶层入口文件 
 │   │   ├── 99-boundaries_边界矩阵.md         #   Agent 操作权限矩阵
 │   │   ├── 99-process-rules_流程红线全集.md  #   PR-01~09
 │   │   └── ai-workflow_AI协作开发流程/        #   方法论（01-07）
-│   ├── plan/                            #   项目计划与功能设计
+│   ├── plan/                            #   项目计划
 │   │   ├── 背景_PRD_AgentHub_统一方案.md  #     PRD 权威
 │   │   ├── 开发清单_roadmap.md            #     功能点列表
 │   │   ├── task-assignment_任务分配.md   #     分工
-│   │   └── 前端实施计划.md
+│   │   └── frontend/                     #     前端计划/交接（实施计划 / Phase0 转换 / HANDOFF / 项目交接）
 │   ├── specs/                           #   功能规格
 │   │   ├── 00-overview_项目主规格.md
 │   │   ├── 01-architecture_架构定义.md
@@ -142,7 +141,7 @@ docs/templates/ ──复制为──→ 新项目的 CLAUDE/STATUS/README/plan/
 3. `dashboard.html` 只解析根 `STATUS.md` 表格（fetch 路径 = `./STATUS.md`），改表头需同步改 dashboard.html 解析器。
 4. 模板权威来源是 `docs/templates/`，根目录的 `CLAUDE.md`/`STATUS.md` 等是 AgentHub 自身实例（非给别人复制的模板）。
 5. `scripts/check_docs.py` 与 `check_worklog.py` 硬编码了 `worklogs/` 和 `{黎,董,袁}` 成员；新增协作者需同步改脚本。
-6. AR/CR/PR 红线分散在 `docs/conventions/01/02/03/99-process-rules`，新增红线必须更新对应条号且红线总表（`docs/conventions/CLAUDE-规范导航.md`）同步刷新。
+6. AR/CR/PR 红线分散在 `docs/conventions/01/02/03/99-process-rules`，新增红线必须更新对应条号且红线总表（`docs/conventions/CLAUDE.md`）同步刷新。
 7. Docker / pre-commit 路径前缀：产品代码在 `src/`，compose 在 `src/docker/`，钩子 `files:` 模式为 `^src/backend/`、`^src/frontend/`。
 
 ---
@@ -169,7 +168,7 @@ docs/templates/ ──复制为──→ 新项目的 CLAUDE/STATUS/README/plan/
 │     → 大型调研：docs/research/<主题>_<中文>.md
 │
 ├─ 项目计划/PRD/分工/路线图？
-│     → docs/plan/{背景,开发清单,task-assignment,前端实施计划}_*.md
+│     → docs/plan/{背景,开发清单,task-assignment}_*.md；前端计划/交接 → docs/plan/frontend/
 │
 ├─ 复杂功能设计文档（背景/目标/方案/影响/风险）？
 │     → docs/design/<功能名>_<中文>.md

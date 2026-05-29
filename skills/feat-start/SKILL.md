@@ -23,7 +23,7 @@ git pull origin main
 ```
 
 读 `docs/plan/开发清单_roadmap.md` 确认当前进度。
-读 `docs/conventions/CLAUDE-规范导航.md` 红线总表（AR/CR/PR/AP/T/D）确认红线。
+读 `docs/conventions/CLAUDE.md` 红线总表（AR/CR/PR/AP/T/D）确认红线。
 
 ### 2. 读相关 SPEC
 
@@ -62,7 +62,7 @@ python scripts/gen_worklog.py 黎 add-websocket-heartbeat
 
 ### 6. 开发
 
-遵循 `CLAUDE.md` 中的行为准则和 `docs/conventions/CLAUDE-规范导航.md` 红线总表（AR/CR/PR/AP/T/D 全集）。
+遵循 `CLAUDE.md` 中的行为准则和 `docs/conventions/CLAUDE.md` 红线总表（AR/CR/PR/AP/T/D 全集）。
 
 ---
 

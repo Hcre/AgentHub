@@ -1,16 +1,7 @@
-# AgentHub 开发规范
+# AgentHub 开发规范（👤 人类入口）
 
-> 版本: v3.0 | 2026-05-28
-> AgentHub 项目通用开发规范的**统一入口**，适用于所有开发者（人类 & AI Agent）。
-
----
-
-## 入口
-
-| 你是 | 读哪个 |
-|------|--------|
-| 👤 人类（项目协作者） | [README-规范导航.md](README-规范导航.md) — 快速索引 + 红线速查 |
-| 🤖 AI Agent | [CLAUDE-规范导航.md](CLAUDE-规范导航.md) — 任务→规范定位 + 红线总表 + 去重映射 |
+> 版本: v3.1 | 2026-05-29
+> 本文件是**人类**的规范入口；🤖 AI Agent 请读 [CLAUDE.md](CLAUDE.md)（任务→规范定位 + 红线总表 + 去重映射）。
 
 ---
 
@@ -53,10 +44,21 @@
 
 ---
 
+## 常用规约一览
+
+- **分支**：`feature/<domain>/<desc>`，禁直 push main
+- **提交**：Conventional Commits（`feat:`/`fix:`/`refactor:`/`docs:`/`test:`/`chore:`）
+- **验证**：每次 commit 前 `scripts/verify.bat` 或手动 ruff / tsc / eslint / pytest
+- **日志**：每次工作后 `worklogs/{你}/YYYY-MM-DD_<desc>.md`，更新根 `STATUS.md`
+- **文档**：命名 `{English}_{中文}.md`，pre-push 钩子自动检查
+- **依赖安装**：克隆后首装 `pre-commit install --hook-type pre-push && pre-commit install`
+
+---
+
 ## 改规范时
 
 1. 改 `NN-*.md` → 同步 `docs/specs/NN-*.md` 规格（若有对应）
-2. 红线增删 → 同步 `CLAUDE-规范导航.md` §2 + `README-规范导航.md` 红线速查
+2. 红线增删 → 同步 [CLAUDE.md](CLAUDE.md) §2 红线总表 + 本文红线速查
 3. 改 §二落地配置 → 同步实际配置（`src/backend/pyproject.toml` / `.pre-commit-config.yaml` / `src/frontend/eslint.config.js`）
 4. 改文档命名/分支命名/worklog 路径 → 同步对应 `scripts/check_*.py`
 5. 同 PR 内写 worklog + 更 STATUS.md（pre-push 自动校）

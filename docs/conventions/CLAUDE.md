@@ -1,6 +1,6 @@
 # 规范导航（AI 版） — AgentHub
 
-> **⚠️ 仅供 AI Agent**。人类读 `README-规范导航.md`。
+> **⚠️ 仅供 AI Agent**。人类读 `README.md`。
 > 用途：开工前先按「任务→规范」定位该加载哪几篇，再读对应篇的 §一红线 + §二落地配置。不要一次读完 9 篇。
 
 ---
@@ -136,7 +136,7 @@
 ## 5. 改规范时的同步清单
 
 1. 改 `docs/conventions/NN-*.md` → 同步 `docs/specs/NN-*.md` 规格（若有对应）
-2. 红线增删 → 同步本文件 §2 + `README-规范导航.md` 红线速查
+2. 红线增删 → 同步本文件 §2 + `README.md` 红线速查
 3. 改 §二落地配置 → 同步实际配置文件（`pyproject.toml` / `.pre-commit-config.yaml` / `eslint.config.js`）
 4. 改文档命名规则 → 同步 `scripts/check_docs.py`
 5. 改分支命名规则 → 同步 `scripts/check_branch.py`
