@@ -1,11 +1,17 @@
 """ClaudeCodeRuntime：Claude Code CLI 运行时适配器。
 
-通过 `claude --output-format stream-json --verbose` 启动子进程，
-解析事件类型（system/assistant/user/result）映射为 StreamEvent。
+支持两种 IO 模式（由 settings.claude_code_long_running 切换）：
 
-会话持久化策略（利用 CLI 自带 session 机制，不自己拼历史）：
-- 先尝试 --resume <session_id> 恢复对话
-- CLI 返回 "No conversation found" 时 fallback --session-id 新建
+V0（默认，短驻 + --resume）：
+- 每次请求 spawn 新进程：stdin.write(prompt) + write_eof() → 读到 result → 退出
+- 历史复用：先 --resume <session_key> 恢复；CLI 报 "No conversation found" → fallback --session-id 新建
+
+V1（长驻 + stream-json，见 ADR-02 Phase 1）：
+- 进程池缓存按 session_key 复用长驻进程，stdin 不关
+- 每次请求通过 stdin 写一行 user JSONL；CLI 累积对话历史
+- system_prompt 变化时 drop + 重 spawn（CLI 的 --system-prompt 仅 spawn 时生效）
+
+session_key 规则（V0/V1 一致）：
 - 私聊：session_key = session_id（UUID）
 - 群聊：session_key = uuid5(session_id:agent_id)（确定性映射，CLI 只接受合法 UUID）
 """
@@ -18,7 +24,9 @@ import logging
 import os
 import uuid
 from collections.abc import AsyncIterator
+from functools import partial
 
+from app.core.config import settings
 from app.domain.llm.protocol import (
     AgentRequest,
     AgentRuntime,
@@ -26,6 +34,10 @@ from app.domain.llm.protocol import (
     StreamEventType,
     ToolCall,
     ToolResult,
+)
+from app.infrastructure.llm.claude_code_process_pool import (
+    ProcessHandle,
+    get_pool,
 )
 
 logger = logging.getLogger(__name__)
@@ -58,15 +70,21 @@ class ClaudeCodeRuntime(AgentRuntime):
         self._process: asyncio.subprocess.Process | None = None
 
     async def stream(self, request: AgentRequest) -> AsyncIterator[StreamEvent]:
-        """先 resume，找不到 session 时 fallback 新建。
+        """按 settings.claude_code_long_running 分流到 V0 / V1。"""
+        logger.info(
+            "Claude CLI request_id=%s session=%s mode=%s",
+            request.request_id,
+            request.session_id,
+            "long" if settings.claude_code_long_running else "short",
+        )
+        if settings.claude_code_long_running:
+            async for evt in self._stream_long_running(request):
+                yield evt
+            return
 
-        群聊 session key 通过 uuid5 确定性映射为合法 UUID，
-        --resume / --session-id 均接受合法 UUID，无需特殊处理。
-        """
-        logger.info("Claude CLI request_id=%s session=%s", request.request_id, request.session_id)
+        # V0 短驻：先 resume，找不到 session fallback 新建
         prompt = self._extract_prompt(request)
         session_key = self._compute_session_key(request)
-
         async for event in self._run_cli(prompt, request, session_key, resume=True):
             if "No conversation found" in (event.content or "") or (
                 event.type == StreamEventType.DONE
@@ -81,7 +99,7 @@ class ClaudeCodeRuntime(AgentRuntime):
             yield event
 
     async def stop(self) -> None:
-        """终止运行中的 CLI 进程。"""
+        """终止运行中的 CLI 进程（仅 V0 短驻进程；V1 长驻进程由进程池管理）。"""
         if self._process and self._process.returncode is None:
             self._process.terminate()
             try:
@@ -89,6 +107,124 @@ class ClaudeCodeRuntime(AgentRuntime):
             except TimeoutError:
                 self._process.kill()
             self._process = None
+
+    # --- V1 长驻路径 ---
+
+    async def _stream_long_running(
+        self, request: AgentRequest
+    ) -> AsyncIterator[StreamEvent]:
+        """长驻模式：复用进程池，stdin 写 JSONL，stdout 流式读取。
+
+        system_prompt 守卫：handle 缓存了 spawn 时的 sp 快照，本次请求 sp 不同时
+        drop 旧进程重 spawn。私聊场景 sp 稳定 → 复用收益最大；群聊场景 ContextBuilder
+        把 delta 拼进 sp，每轮都变 → 退化为每次 spawn（功能正确无收益，待后续工单
+        把 delta 从 sp 中拆出来）。
+        """
+        session_key = self._compute_session_key(request)
+        sp = request.system_prompt or ""
+        prompt = self._extract_prompt(request)
+        pool = get_pool()
+
+        spawn = partial(self._spawn_long, sp, session_key)
+        handle = await pool.acquire(session_key, spawn)
+
+        if handle.spawn_system_prompt and handle.spawn_system_prompt != sp:
+            logger.info(
+                "Claude CLI key=%s system_prompt 变化，drop 重 spawn", session_key
+            )
+            await pool.drop(session_key)
+            handle = await pool.acquire(session_key, spawn)
+        handle.spawn_system_prompt = sp
+
+        seq = 0
+        try:
+            async with handle.stdin_lock:
+                await self._send_user_jsonl(handle, prompt)
+                async for evt in self._read_until_done(handle, seq):
+                    yield evt
+                    seq = evt.seq + 1
+        except TimeoutError:
+            # 卡死的进程不应留池里 —— 下次请求会重 spawn
+            await pool.drop(session_key)
+            yield StreamEvent(
+                type=StreamEventType.ERROR,
+                seq=seq,
+                content=f"Claude CLI 长驻超时 ({self._timeout}s)",
+            )
+        except RuntimeError as exc:
+            # stdout EOF / 子进程意外退出
+            await pool.drop(session_key)
+            yield StreamEvent(
+                type=StreamEventType.ERROR,
+                seq=seq,
+                content=f"Claude CLI 长驻进程异常: {exc}",
+            )
+
+    async def _spawn_long(
+        self, system_prompt: str, session_key: str
+    ) -> asyncio.subprocess.Process:
+        """长驻 spawn：--input-format stream-json + --session-id，stdin 保留。"""
+        cmd = [
+            "claude",
+            "--print",
+            "--input-format",
+            "stream-json",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--permission-mode",
+            self._permission_mode,
+            "--max-turns",
+            str(self._max_turns),
+            "--session-id",
+            session_key,
+        ]
+        if system_prompt:
+            cmd.extend(["--system-prompt", system_prompt])
+        env = self._build_env()
+        logger.info("Claude CLI 长驻 spawn key=%s", session_key)
+        return await asyncio.create_subprocess_exec(
+            *cmd,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+        )
+
+    @staticmethod
+    async def _send_user_jsonl(handle: ProcessHandle, content: str) -> None:
+        """往长驻进程 stdin 推一行 user message JSONL。"""
+        assert handle.proc.stdin is not None
+        payload = {"type": "user", "message": {"role": "user", "content": content}}
+        line = json.dumps(payload, ensure_ascii=False) + "\n"
+        handle.proc.stdin.write(line.encode())
+        await handle.proc.stdin.drain()
+
+    async def _read_until_done(
+        self, handle: ProcessHandle, start_seq: int
+    ) -> AsyncIterator[StreamEvent]:
+        """读 stdout 直到 type=result（DONE）；遇 EOF 抛 RuntimeError，超时抛 TimeoutError。"""
+        assert handle.proc.stdout is not None
+        seq = start_seq
+        deadline = asyncio.get_event_loop().time() + self._timeout
+        while True:
+            remaining = deadline - asyncio.get_event_loop().time()
+            if remaining <= 0:
+                raise TimeoutError
+            raw = await asyncio.wait_for(handle.proc.stdout.readline(), timeout=remaining)
+            if not raw:
+                raise RuntimeError(
+                    f"stdout 关闭 (returncode={handle.proc.returncode})"
+                )
+            line = raw.decode(errors="replace").strip()
+            if not line:
+                continue
+            events = self._parse_line(line, seq)
+            for evt in events:
+                yield evt
+                seq = evt.seq + 1
+                if evt.type == StreamEventType.DONE:
+                    return
 
     # --- 内部方法 ---
 
