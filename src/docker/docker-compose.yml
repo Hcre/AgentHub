@@ -72,6 +72,16 @@ services:
       postgres:
         condition: service_healthy
     command: celery -A app.infrastructure.queue.celery_app worker --loglevel=info
+    # 覆盖 backend 镜像继承的 HTTP /health 探针——celery 不跑 HTTP 服务，
+    # 改用 celery inspect ping 探 worker 真实存活
+    healthcheck:
+      # 不带 -d：ping 所有在线 worker，任一回应即健康（CMD exec 形式不展开 $HOSTNAME，故不用 -d 指定节点）
+      # -t 8：给 worker 经 broker 回应留足时间，避免默认 1s 超时误判
+      test: ["CMD", "celery", "-A", "app.infrastructure.queue.celery_app", "inspect", "ping", "-t", "8"]
+      interval: 30s
+      timeout: 12s
+      retries: 3
+      start_period: 25s
 
   # 新前端：v0.dev 静态原型（nginx 托管，纯 mock 数据，不连后端）
   frontend:
