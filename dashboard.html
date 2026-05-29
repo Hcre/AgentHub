@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>开发规范 · 项目仪表盘</title>
+<title>AgentHub · 协作看板</title>
 <style>
   :root {
     /* Claude 官网风：暖米底 + 黏土强调色 */
@@ -121,10 +121,11 @@
 <body>
 <header>
   <div>
-    <h1>开发规范<span class="dot"> · </span>项目仪表盘</h1>
+    <h1>AgentHub<span class="dot"> · </span>协作看板</h1>
     <nav class="nav">
       <a href="README.md">README</a>·
-      <a href="plan/开发清单.md">开发清单</a>·
+      <a href="docs/plan/开发清单_roadmap.md">开发清单</a>·
+      <a href="docs/conventions/README.md">规范</a>·
       <a href="meta/FILE_GRAPH.md">文件图谱</a>·
       <a href="STATUS.md">STATUS.md</a>·
       <a href="CLAUDE.md">CLAUDE.md</a>
@@ -142,110 +143,85 @@
 <main>
   <section class="summary">
     <div class="summary-top">
-      <h2>总体进度</h2>
-      <span class="pct"><span id="pct">0</span>%<small id="count">— / —</small></span>
+      <h2>本周完成</h2>
+      <span class="pct"><span id="pct">0</span><small id="count">项 · — 人</small></span>
     </div>
-    <div class="track"><div class="fill" id="fill"></div></div>
     <p class="sub" id="summary-sub">正在加载 STATUS.md …</p>
     <div class="chips" id="chips"></div>
   </section>
 
   <section class="cards" id="cards"></section>
 
-  <section class="section" id="blocked-section" hidden>
-    <h2 class="blocked">🚫 阻塞项 <span class="count" id="blocked-count"></span></h2>
-    <div id="blocked-list"></div>
-  </section>
-
-  <section class="section" id="debt-section" hidden>
-    <h2 class="debt">⚠️ 技术债 <span class="count" id="debt-count"></span></h2>
-    <div id="debt-list"></div>
-  </section>
-
-  <section class="section" id="gate-section" hidden>
-    <h2>🚦 收束节点历史 <span class="count" id="gate-count"></span></h2>
-    <div class="table-wrap"><table id="gate-table"></table></div>
+  <section class="section" id="map-section" hidden>
+    <h2>🧭 Git ↔ 目录映射 <span class="count" id="map-count"></span></h2>
+    <div class="table-wrap"><table id="map-table"></table></div>
   </section>
 </main>
 
-<footer>数据源 <code>STATUS.md</code> · 每 60 秒原地刷新（保留筛选与滚动位置） · AI 协作开发流程驱动</footer>
+<footer>数据源 <code>STATUS.md</code>（按人协作表）· 每 60 秒原地刷新 · AI 协作开发流程驱动</footer>
 
 <script>
 "use strict";
 const REFRESH_MS = 60000;
 const state = { filter: "all", countdown: REFRESH_MS / 1000, loaded: false, stale: false, lastData: null };
-
-const STATUS = {
-  done:    { label: "已完成", test: s => /✅|已完成/.test(s) },
-  active:  { label: "进行中", test: s => /🔄|进行中/.test(s) },
-  blocked: { label: "阻塞",   test: s => /🚫|阻塞/.test(s) },
-  pending: { label: "待开始", test: () => true },
-};
-const ORDER = ["done", "active", "blocked", "pending"];
-const classify = s => ORDER.find(k => STATUS[k].test(s)) || "pending";
 const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 
-// --- STATUS.md 解析 ---
+// 一个人是否阻塞：阻塞列非空且不是“无”
+const isBlocked = b => !!b && !/^无$|^—$|^-$/.test(b.trim());
+// “这周完成了”里的 ✅ 计数（粗略完成项数）
+const doneCount = s => (s.match(/✅/g) || []).length;
+// 拆完成项：按 ✅ 切，保留每段文字
+function splitDone(s) {
+  if (!s) return [];
+  return s.split("✅").map(x => x.replace(/^[\s+·、]+|[\s+·、]+$/g, "").trim())
+          .filter(x => x && x !== "—" && x !== "-");
+}
+
+// --- STATUS.md 解析（按人协作表 + Git 映射）---
 function parse(md) {
   const lines = md.split(/\r?\n/);
-  const out = { features: [], blocked: [], debt: [], gates: [], updated: "" };
-  let section = "";
+  const out = { people: [], gitmap: [], updated: "", legend: [] };
+  let section = "head";
   for (const raw of lines) {
     const line = raw.trim();
     const dm = line.match(/^>\s*(?:最后)?更新[:：]\s*(.+)$/);
     if (dm) out.updated = dm[1].trim();
     if (line.startsWith("## ")) {
       const h = line.slice(3);
-      section = h.includes("进度") ? "features"
-        : h.includes("阻塞") ? "blocked"
-        : h.includes("技术债") ? "debt"
-        : h.includes("收束") ? "gates"
-        : "other";
+      section = h.includes("Git") || h.includes("映射") ? "gitmap"
+        : h.includes("图例") ? "legend" : "other";
       continue;
     }
-    const isTableRow = line.startsWith("|") && !/^\|[\s|:-]+\|?$/.test(line);
-    if (isTableRow) {
+    const isRow = line.startsWith("|") && !/^\|[\s|:-]+\|?$/.test(line);
+    if (isRow) {
       const cols = line.split("|").slice(1, -1).map(c => c.trim());
-      if (section === "features" && cols[0] && cols[0] !== "功能点") {
-        out.features.push({ name: cols[0], bdd: cols[1] || "-", status: cols[2] || "", date: cols[3] || "-" });
-      } else if (section === "gates" && cols[0] && cols[0] !== "节点" && !/尚无/.test(cols[0])) {
-        out.gates.push(cols);
+      // 协作表表头：| 我 | 正在做 | 阻塞？| 这周完成了 |
+      if ((section === "head" || section === "other") && cols[0] && cols[0] !== "我"
+          && !/^Git用户名$/.test(cols[0]) && cols.length >= 4) {
+        out.people.push({ who: cols[0], doing: cols[1] || "", blocked: cols[2] || "", done: cols[3] || "" });
+      } else if (section === "gitmap" && cols[0] && cols[0] !== "Git用户名") {
+        out.gitmap.push({ user: cols[0], dir: cols[1] || "" });
       }
     }
-    if (line.startsWith("- ")) {
-      const item = line.slice(2).trim();
-      if (item && item !== "（无）") {
-        if (section === "blocked") out.blocked.push(item);
-        if (section === "debt") out.debt.push(item);
-      }
-    }
+    if (line.startsWith("- ") && section === "legend") out.legend.push(line.slice(2).trim());
   }
   return out;
 }
 
-// STATUS.md 写 specs/xx.md，实际位于 docs/specs/
-function bddLink(bdd) {
-  if (!bdd || bdd === "-") return "—";
-  if (/^specs\//.test(bdd)) return `<a href="docs/${bdd}">${esc(bdd)}</a>`;
-  if (/^docs\//.test(bdd)) return `<a href="${bdd}">${esc(bdd)}</a>`;
-  return esc(bdd);
-}
-
-function renderSummary(data, counts, total, done) {
-  const pct = total ? Math.round(done / total * 100) : 0;
-  document.getElementById("pct").textContent = pct;
-  document.getElementById("fill").style.width = pct + "%";
-  document.getElementById("count").textContent = `${done} / ${total}`;
-  document.getElementById("summary-sub").textContent =
-    total ? `${total} 个功能点，${done} 个已完成${counts.active ? `，${counts.active} 进行中` : ""}${counts.blocked ? `，${counts.blocked} 阻塞` : ""}。`
-          : "未解析到功能点。";
+function renderSummary(data) {
+  const ppl = data.people;
+  const totalDone = ppl.reduce((n, p) => n + doneCount(p.done), 0);
+  const blocked = ppl.filter(p => isBlocked(p.blocked)).length;
+  document.getElementById("pct").textContent = totalDone;
+  document.getElementById("count").textContent = `项 · ${ppl.length} 人`;
+  document.getElementById("summary-sub").textContent = ppl.length
+    ? `${ppl.length} 人在协作，本周累计完成 ${totalDone} 项${blocked ? `，${blocked} 人有阻塞` : "，无阻塞"}。`
+    : "未解析到协作成员（STATUS.md 应含「我｜正在做｜阻塞？｜这周完成了」表）。";
 
   const defs = [
-    ["all", "全部", total, ""],
-    ["done", "已完成", counts.done, "d-done"],
-    ["active", "进行中", counts.active, "d-active"],
-    ["pending", "待开始", counts.pending, "d-pending"],
-    ["blocked", "阻塞", counts.blocked, "d-blocked"],
+    ["all", "全部", ppl.length, ""],
+    ["active", "进行中", ppl.filter(p => p.doing && !isBlocked(p.blocked)).length, "d-active"],
+    ["blocked", "有阻塞", blocked, "d-blocked"],
   ];
   const chips = document.getElementById("chips");
   chips.innerHTML = defs.map(([k, lbl, n, dot]) =>
@@ -257,52 +233,47 @@ function renderSummary(data, counts, total, done) {
 }
 
 function renderCards(data) {
-  const shown = data.features.filter(f => state.filter === "all" || classify(f.status) === state.filter);
+  let ppl = data.people;
+  if (state.filter === "blocked") ppl = ppl.filter(p => isBlocked(p.blocked));
+  else if (state.filter === "active") ppl = ppl.filter(p => p.doing && !isBlocked(p.blocked));
   const el = document.getElementById("cards");
-  if (!shown.length) { el.innerHTML = `<div class="empty">该筛选下暂无功能点</div>`; return; }
-  el.innerHTML = shown.map(f => {
-    const k = classify(f.status);
-    const txt = f.status.replace(/^[✅🔄⏳🚫]\s*/, "").trim() || STATUS[k].label;
-    const date = f.date && f.date !== "-" ? `<span>📅 ${esc(f.date)}</span>` : "";
+  if (!ppl.length) { el.innerHTML = `<div class="empty">该筛选下暂无成员</div>`; return; }
+  el.innerHTML = ppl.map(p => {
+    const blk = isBlocked(p.blocked);
+    const k = blk ? "blocked" : (p.doing ? "active" : "pending");
+    const dir = (data.gitmap.find(g => g.dir === p.who) || {}).user;
+    const dones = splitDone(p.done);
+    const doneHtml = dones.length
+      ? `<ul style="margin:.5rem 0 0;padding-left:1.1rem;color:var(--ink-soft);font-size:.83rem">`
+        + dones.map(d => `<li style="margin:.15rem 0">✅ ${esc(d)}</li>`).join("") + `</ul>`
+      : `<div class="card-meta">本周暂无完成项</div>`;
     return `<article class="card s-${k}">
       <div class="card-head">
-        <span class="card-title">${esc(f.name)}</span>
-        <span class="badge badge-${k}">${esc(txt)}</span>
+        <span class="card-title">${esc(p.who)}${dir ? ` <span style="color:var(--faint);font-weight:400;font-size:.78rem">(${esc(dir)})</span>` : ""}</span>
+        <span class="badge badge-${blk ? "blocked" : "active"}">${blk ? "阻塞" : "进行中"}</span>
       </div>
-      <div class="card-meta"><span>BDD: ${bddLink(f.bdd)}</span>${date}</div>
+      <div class="card-meta" style="margin-top:.5rem"><span>🔧 正在做：${esc(p.doing) || "—"}</span></div>
+      ${blk ? `<div class="row blocked" style="margin-top:.55rem">🚫 ${esc(p.blocked)}</div>` : ""}
+      <div style="margin-top:.55rem;font-size:.82rem;color:var(--muted)">本周完成 ${dones.length} 项${doneHtml}</div>
     </article>`;
   }).join("");
 }
 
-function renderList(name, items, cls) {
-  const sec = document.getElementById(name + "-section");
-  sec.hidden = !items.length;
-  if (!items.length) return;
-  document.getElementById(name + "-count").textContent = `(${items.length})`;
-  document.getElementById(name + "-list").innerHTML =
-    items.map(x => `<div class="row ${cls}">${esc(x)}</div>`).join("");
-}
-
-function renderGates(gates) {
-  const sec = document.getElementById("gate-section");
-  sec.hidden = !gates.length;
-  if (!gates.length) return;
-  document.getElementById("gate-count").textContent = `(${gates.length})`;
-  const head = ["节点", "日期", "范围", "整理", "测试", "AI审计", "人审计", "验证", "遗留"];
-  document.getElementById("gate-table").innerHTML =
-    `<thead><tr>${head.map(h => `<th>${h}</th>`).join("")}</tr></thead>` +
-    `<tbody>${gates.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody>`;
+function renderGitMap(gitmap) {
+  const sec = document.getElementById("map-section");
+  sec.hidden = !gitmap.length;
+  if (!gitmap.length) return;
+  document.getElementById("map-count").textContent = `(${gitmap.length})`;
+  document.getElementById("map-table").innerHTML =
+    `<thead><tr><th>Git 用户名</th><th>日志目录</th></tr></thead>` +
+    `<tbody>${gitmap.map(g => `<tr><td><code>${esc(g.user)}</code></td><td>worklogs/${esc(g.dir)}/</td></tr>`).join("")}</tbody>`;
 }
 
 function render(data) {
   state.lastData = data;
-  const counts = { done: 0, active: 0, pending: 0, blocked: 0 };
-  data.features.forEach(f => counts[classify(f.status)]++);
-  renderSummary(data, counts, data.features.length, counts.done);
+  renderSummary(data);
   renderCards(data);
-  renderList("blocked", data.blocked, "blocked");
-  renderList("debt", data.debt, "debt");
-  renderGates(data.gates);
+  renderGitMap(data.gitmap);
   state.loaded = true;
 }
 
@@ -321,8 +292,6 @@ async function load() {
     render(parse(await res.text()));
     state.stale = false;
   } catch (e) {
-    // 关键修复：只有首次加载失败才清空页面；
-    // 后续刷新失败保留上次数据，仅在时间戳处提示，避免内容“消失”。
     if (!state.loaded) {
       document.getElementById("cards").innerHTML =
         `<div class="empty error"><b>⚠️ 无法加载 STATUS.md</b><br><br>

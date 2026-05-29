@@ -35,7 +35,7 @@ AgentHub/                                # 仓库根：仅放顶层入口文件 
 │   │   └── Dockerfile
 │   ├── frontend/                        #   React + TypeScript + Vite
 │   │   ├── src/                         #     L5：UI
-│   │   ├── public/ prototype/ docs/ 问题/
+│   │   ├── public/ prototype/        #   静态资源 / 原型（文档已外迁 docs/，前端目录只留代码 + README）
 │   │   ├── package.json + vite.config.ts + tsconfig.*.json
 │   │   └── Dockerfile
 │   └── docker/                          #   docker-compose + nginx + postgres
