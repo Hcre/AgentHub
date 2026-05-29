@@ -4,7 +4,7 @@
 >
 > 更新: 2026-05-29 | 维护规则：新增/移动文件或目录时同步更新本图谱。
 >
-> 本次整合（2026-05-29）：产品代码归入 `src/`（backend/frontend/docker），全部协作文档归入 `docs/`（含 conventions/skills/.agenthub）。根目录只保留 4 个入口 + meta/scripts/worklogs。
+> 本次整合（2026-05-29）：产品代码归入 `src/`（backend/frontend/docker），协作文档归入 `docs/`。`skills/`（通用 Claude Code Skills）与 `.agenthub/`（运行时配置 + 项目专有 skill）保留在**根目录**——Claude Code 只扫描根 `skills/`，docker-compose 挂载根 `.agenthub/skills`。
 
 ---
 
@@ -40,7 +40,16 @@ AgentHub/                                # 仓库根：仅放顶层入口文件 
 │   │   └── Dockerfile
 │   └── docker/                          #   docker-compose + nginx + postgres
 │
-├── docs/                               # 【全部协作文档】
+├── skills/                             # 【通用 Claude Code Skills】根目录（Claude Code 扫描此处）
+│   ├── code-review/ deploy/ doc-sync/ feat-complete/ feat-start/
+│   ├── git-workflow/ spec-driven-development/ test-claude-adapter/
+│   └── 前端统一规范/
+│
+├── .agenthub/                          # 【运行时配置 + 项目专有 Skill】根目录（docker 挂载 skills/）
+│   ├── config.json                      #   运行时配置
+│   └── skills/                          #   项目专有（dbs-xhs-title / html-ppt-xhs-post / xhs-interact）
+│
+├── docs/                               # 【协作文档】
 │   ├── conventions/                     #   规范正文（开发者日常查阅）
 │   │   ├── README.md                    #     入口索引
 │   │   ├── README-规范导航.md            #     人类入口：快速索引 + 红线速查
@@ -55,13 +64,6 @@ AgentHub/                                # 仓库根：仅放顶层入口文件 
 │   │   ├── 99-boundaries_边界矩阵.md         #   Agent 操作权限矩阵
 │   │   ├── 99-process-rules_流程红线全集.md  #   PR-01~09
 │   │   └── ai-workflow_AI协作开发流程/        #   方法论（01-07）
-│   ├── skills/                          #   通用 Claude Code Skills
-│   │   ├── code-review/ deploy/ doc-sync/ feat-complete/ feat-start/
-│   │   ├── git-workflow/ spec-driven-development/ test-claude-adapter/
-│   │   └── 前端统一规范/
-│   ├── .agenthub/                       #   AgentHub 运行时配置 + 项目专有 Skill
-│   │   ├── config.json                  #     运行时配置
-│   │   └── skills/                      #     项目专有（dbs-xhs-title / html-ppt-xhs-post / xhs-interact）
 │   ├── plan/                            #   项目计划与功能设计
 │   │   ├── 背景_PRD_AgentHub_统一方案.md  #     PRD 权威
 │   │   ├── 开发清单_roadmap.md            #     功能点列表
@@ -190,10 +192,10 @@ docs/templates/ ──复制为──→ 新项目的 CLAUDE/STATUS/README/plan/
 │       Git 用户名 → 人名 映射见 STATUS.md「Git ↔ 目录映射」表
 │
 ├─ Claude Code Skill（通用 AI 工作流）？
-│     → docs/skills/<skill-name>/SKILL.md
+│     → skills/<skill-name>/SKILL.md
 │
 ├─ AgentHub 项目专有 Skill（如小红书相关）？
-│     → docs/.agenthub/skills/<skill-name>/...
+│     → .agenthub/skills/<skill-name>/...
 │
 ├─ 工具/辅助脚本（构建、启动、校验、部署）？
 │     → scripts/<name>.{py,bat,sh}
@@ -217,12 +219,12 @@ docs/templates/ ──复制为──→ 新项目的 CLAUDE/STATUS/README/plan/
 
 | 何时用 | Skill |
 |---|---|
-| 开始新功能 | `docs/skills/feat-start/` |
-| 完成功能 | `docs/skills/feat-complete/` |
-| Git 分支管理 | `docs/skills/git-workflow/` |
-| CR 自查/互查 | `docs/skills/code-review/` |
-| 文档同步 | `docs/skills/doc-sync/` |
-| 部署 | `docs/skills/deploy/` |
-| 无 spec 时先写规格 | `docs/skills/spec-driven-development/` |
-| ClaudeAdapter 联调 | `docs/skills/test-claude-adapter/` |
-| 前端规约 | `docs/skills/前端统一规范/` |
+| 开始新功能 | `skills/feat-start/` |
+| 完成功能 | `skills/feat-complete/` |
+| Git 分支管理 | `skills/git-workflow/` |
+| CR 自查/互查 | `skills/code-review/` |
+| 文档同步 | `skills/doc-sync/` |
+| 部署 | `skills/deploy/` |
+| 无 spec 时先写规格 | `skills/spec-driven-development/` |
+| ClaudeAdapter 联调 | `skills/test-claude-adapter/` |
+| 前端规约 | `skills/前端统一规范/` |

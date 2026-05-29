@@ -211,7 +211,7 @@ PRD 写完导出 PRD.html 放 docs/ 根 → 与 md 源争权威。
 | 文档自动校验脚本 | `scripts/check_docs.py` |
 | ADR 时机 | [第三步·收束节点](ai-workflow_AI协作开发流程/06-第三步_收束节点.md) |
 | 代码地图 / 知识图谱 | [08-代码理解与图谱规范](08-code-understanding_代码理解与图谱规范.md) |
-| Skill: 文档同步 | `docs/skills/doc-sync/` |
+| Skill: 文档同步 | `skills/doc-sync/` |
 
 ---
 

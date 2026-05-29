@@ -160,7 +160,7 @@ build_adapter(mode, **kwargs) → UnifiedAgent:
 | **Codex** | gpt-4o, gpt-4o-mini... |
 | **TRAE** | TRAE 内置模型 |
 
-创建流程：选系统 → 填写 name/avatar/role → 选 provider/model → 填 api_key → 可选 docs/skills/system_prompt/capability_tags
+创建流程：选系统 → 填写 name/avatar/role → 选 provider/model → 填 api_key → 可选 skills/system_prompt/capability_tags
 
 ### 2.2 群组与协调者
 

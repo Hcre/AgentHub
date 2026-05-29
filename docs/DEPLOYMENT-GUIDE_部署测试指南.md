@@ -252,4 +252,4 @@ wscat -c ws://127.0.0.1:8000/ws/sessions/<session_id>
 | `docs/adapter-cli-flow-analysis.md` | 7 个场景的 CLI 调用流程 |
 | `docs/DOC-15-claude-adapter-design.md` | 双轨架构设计 |
 | `决策/dong/踩坑记录-ClaudeCode适配器联调.md` | 联调踩坑详细记录 |
-| `docs/skills/test-claude-adapter.md` | 测试 Skill |
+| `skills/test-claude-adapter.md` | 测试 Skill |

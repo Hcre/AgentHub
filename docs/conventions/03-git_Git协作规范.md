@@ -169,8 +169,8 @@ module.exports = {
 | 细化自 | [ai-workflow 第二步 §2.6 Git 提交](ai-workflow_AI协作开发流程/04-第二步_迭代开发.md) |
 | 完整流程红线 | [99-process-rules_流程红线全集](99-process-rules_流程红线全集.md)（PR-01~09） |
 | 验证证据要求 | [ai-workflow §2.2 可观测验证](ai-workflow_AI协作开发流程/04-第二步_迭代开发.md) |
-| Skill: 分支同步与合并前检查 | `docs/skills/git-workflow/` |
-| Skill: 完成功能（含 push 前自动校验） | `docs/skills/feat-complete/` |
+| Skill: 分支同步与合并前检查 | `skills/git-workflow/` |
+| Skill: 完成功能（含 push 前自动校验） | `skills/feat-complete/` |
 
 ---
 

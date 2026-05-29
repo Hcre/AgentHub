@@ -73,7 +73,7 @@ IM 聊天式多 Agent 协作平台。用户创建 Agent（选系统 + 配模型 
 │                                  │ · per-agent 独立 env vars       │  │
 │                                  │ · per-agent 独立 work dir       │  │
 │                                  │ · --resume 维持长对话           │  │
-│                                  │ · .claude/docs/skills/ 文件落地      │  │
+│                                  │ · .claude/skills/ 文件落地      │  │
 │                                  │ · StructuredContext 每轮注入    │  │
 │                                  └────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘
@@ -343,13 +343,13 @@ def _to_cli_prompt(self, request: AgentRequest) -> str:
 AgentHub 记忆系统（每次注入到 AgentRequest）
   L1 Redis 滑动窗口 (最近 20 条) → messages 字段
   L2 PG 摘要 (长对话压缩)       → memory.l2_summary
-  L3 docs/.agenthub/ 项目上下文       → memory.l3_specs
+  L3 .agenthub/ 项目上下文       → memory.l3_specs
   L4 pgvector RAG (M4)          → memory.l4_rag
 
 Claude Code CLI 内部（进程内自动管理）
   对话历史 (messages[] 数组)
   CLAUDE.md（系统级上下文，首次创建 + 每次可被 AgentHub 覆盖）
-  Skills 文件 (.claude/docs/skills/)
+  Skills 文件 (.claude/skills/)
   JSONL session 文件 (--resume 恢复)
 ```
 
@@ -365,7 +365,7 @@ Claude Code CLI 内部（进程内自动管理）
 
 | 渠道 | 适用于 | 机制 |
 |------|--------|------|
-| **文件系统** `.claude/docs/skills/` | 静态 Skills（代码规范、框架指南、设计系统） | Agent 创建时复制 `.md` 文件到 workspace |
+| **文件系统** `.claude/skills/` | 静态 Skills（代码规范、框架指南、设计系统） | Agent 创建时复制 `.md` 文件到 workspace |
 | **SkillRegistry**（AgentHub） | 动态 Skills（运行时注册、跨 Agent 共享、统计） | `CapabilityContext.skills` 每轮拼入 prompt |
 
 不互斥：
@@ -426,7 +426,7 @@ make dev
 3. 创建 Agent 聚合根
 4. 如果 `agent_system == "claude_code"`：
    - 创建 work_dir: `/tmp/agenthub/sessions/{agent_id}/`
-   - 复制选中的 skill 文件到 `.claude/docs/skills/`
+   - 复制选中的 skill 文件到 `.claude/skills/`
    - 写入初始 `CLAUDE.md`（含 system_prompt）
 5. 持久化到 agents 表
 6. 发布 AgentCreated 事件

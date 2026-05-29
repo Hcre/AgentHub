@@ -204,7 +204,7 @@ PRD §七要求在仓库体现 Spec/Skill/Rules/Harness。**显式分工，非�
 | Spec | `specs/chat-ui.md` | 袁 | 会话/消息 I/O + 边界 + 用例 |
 | Spec | `specs/orchestrator.md`、`specs/agent-management.md` | 董 | 分解/FSM/Agent 模块规格 |
 | Spec | `specs/inbox.md`、`specs/artifact.md` | 黎 | 审批/产物模块规格 |
-| Skill | `docs/skills/react-component.skill`、`docs/skills/api-endpoint.skill` | 袁/董 | AI 生成符合规范代码模板 |
+| Skill | `skills/react-component.skill`、`skills/api-endpoint.skill` | 袁/董 | AI 生成符合规范代码模板 |
 | Rules | `rules/coding-style.rule`、`rules/api-design.rule` | 三人共维护 | 已有 CLAUDE.md 编码规范，落为 rule |
 | Harness | `harness/workflow.md` | 董 | 需求→Agent→review→合并产物流程 |
 

@@ -39,7 +39,7 @@
 
 - **决策**: 建立 worklog + STATUS.md + Skills + pre-commit 自动检查的协作流程
 - **原因**: 多人协作需要明确的交接机制和质量门禁
-- **影响文件**: `worklogs/`、`docs/skills/`、`scripts/check_worklog.py`、`CLAUDE.md`
+- **影响文件**: `worklogs/`、`skills/`、`scripts/check_worklog.py`、`CLAUDE.md`
 
 ## 2026-05-21 — 项目脚手架初始化
 

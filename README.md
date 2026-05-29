@@ -88,10 +88,10 @@ agenthub/
 │   │   └── app/        #     api/ application/ domain/ infrastructure/ core/ schemas/
 │   ├── frontend/       #   L5 React + TypeScript
 │   └── docker/         #   Docker Compose + Nginx + Postgres
-├── docs/               # 全部协作文档
+├── skills/             # 通用 Claude Code Skills（根目录，供 Claude Code 扫描）
+├── .agenthub/          # 运行时配置 + 项目专有 Skill（小红书系列；docker 挂载 skills/）
+├── docs/               # 协作文档
 │   ├── conventions/    #   规范 01-08 + ai-workflow + 99-* 附录
-│   ├── skills/         #   通用 Claude Code Skills
-│   ├── .agenthub/      #   运行时配置 + 项目专有 Skill（小红书系列）
 │   ├── plan/           #   PRD / 路线图 / 任务分配
 │   ├── specs/          #   功能规格（含 domains/）
 │   ├── design/         #   复杂功能设计（群聊系列）

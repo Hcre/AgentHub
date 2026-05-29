@@ -58,7 +58,7 @@ ChatService 检测 DONE event 中的 permission_denials
 | 填写 name/avatar/role | Always | name 全局唯一，重复创建拒绝 |
 | 配置 provider/model/api_key | Always | api_key 前端密码模式输入，AES-256-GCM 加密存储 |
 | 配置 base_url（自定义端点） | Always | 可选，不填则用 provider 默认端点 |
-| 填写 docs/skills/system_prompt/capability_tags | Always | 可选，不填则用系统默认模板 |
+| 填写 skills/system_prompt/capability_tags | Always | 可选，不填则用系统默认模板 |
 | 对话式创建（自然语言→草案→确认） | Always | 系统仅生成草案，最终由用户确认 |
 | 删除 Agent | Ask First | 确认弹窗。自动从所有群组移除。影响的旧 @mention 失效需提示 |
 | 重置 API Key | Ask First | api_key 不可查看明文，仅支持重置 |

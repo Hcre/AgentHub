@@ -111,7 +111,7 @@ class AgentRequest(BaseModel):
 class MemoryContext(BaseModel):
     l1_working: list[dict]             # Redis 滑动窗口最近 20 条
     l2_summary: str | None             # 超长历史摘要
-    l3_specs: str | None               # docs/.agenthub/ 项目上下文
+    l3_specs: str | None               # .agenthub/ 项目上下文
     l4_rag: str | None                 # pgvector Top-K 检索
 ```
 

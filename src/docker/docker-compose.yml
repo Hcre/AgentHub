@@ -39,7 +39,7 @@ services:
       context: ../backend
       dockerfile: Dockerfile
     volumes:
-      - ../../docs/.agenthub/skills:/skills
+      - ../../.agenthub/skills:/skills
     env_file:
       - ../../.env
     environment:

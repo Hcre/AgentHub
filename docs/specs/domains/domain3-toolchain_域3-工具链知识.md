@@ -29,7 +29,7 @@
 │ L1                                   │
 │ FileSystem (Sandbox + Virtual)       │
 │ GitPython / Docker SDK              │
-│ docs/.agenthub/ 文件系统                  │
+│ .agenthub/ 文件系统                  │
 │ IndexedDB (PWA 离线)                 │
 └─────────────────────────────────────┘
 ```
@@ -69,7 +69,7 @@
 | 3.10 | 网页预览：Vite Dev Server + iframe Sandbox | 6h | 点击预览→iframe 渲染 |
 | 3.11 | 一键部署：Docker build → push → deploy | 8h | 状态卡片(building→deploying→deployed) |
 | 3.12 | Pin 消息 + 长期上下文 (PostgreSQL) | 4h | Pin 后跨会话可见 |
-| 3.13 | 历史预览 (本地 docs/.agenthub/ 归档) | 2h | "查看完整对话"展开 |
+| 3.13 | 历史预览 (本地 .agenthub/ 归档) | 2h | "查看完整对话"展开 |
 
 ### M5（6/6-9）：多端 + 测试
 

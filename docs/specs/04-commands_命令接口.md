@@ -24,7 +24,7 @@ DEFAULT_MODEL=claude-sonnet-4-20250514
 
 # CLI 模式
 CLAUDE_CLI_TIMEOUT=300
-AGENT_WORKSPACE_DIR=docs/.agenthub/workspaces
+AGENT_WORKSPACE_DIR=.agenthub/workspaces
 CLAUDE_ALLOWED_TOOLS=Read,Write,Edit,Grep,Glob
 
 # 可选

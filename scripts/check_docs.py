@@ -149,7 +149,7 @@ if worklogs_dir.is_dir():
                 )
 
 # 5. No .html in docs/ prose tree
-#    例外：docs/reports/（渲染产物）、docs/skills/ 与 docs/.agenthub/（Skill 资产，可含 html 模板）
+#    例外：docs/reports/（渲染产物）、skills/ 与 .agenthub/（Skill 资产，可含 html 模板）
 HTML_ALLOWED_DIRS = {"reports", "skills", ".agenthub"}
 for html_file in ROOT.glob("docs/**/*.html"):
     rel = html_file.relative_to(ROOT)

@@ -22,10 +22,10 @@ AgentHub/
 │   ├── backend/app/                  #   5 层洋葱：api/ application/ core/ domain/ infrastructure/ schemas/
 │   ├── frontend/src/                 #   React + TypeScript
 │   └── docker/                       #   docker-compose + nginx + postgres
-├── docs/                            # 【全部协作文档】
+├── skills/                          # 【通用 Claude Code Skills】（根目录，供 Claude Code 扫描）
+├── .agenthub/                       # 【运行时配置 + 项目专有 Skill】config.json + skills/ (xhs 系列)
+├── docs/                            # 【协作文档】
 │   ├── conventions/                  #   规范 01-08 + ai-workflow/ + 99-* 附录
-│   ├── skills/                       #   通用 Claude Code Skills
-│   ├── .agenthub/                    #   运行时配置 + 项目专有 Skill (xhs 系列)
 │   ├── plan/                         #   PRD / 路线图 / 任务分配
 │   ├── specs/                        #   功能规格（含 domains/）
 │   ├── design/                       #   复杂功能设计（群聊系列）
@@ -139,17 +139,17 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 
 | Skill | 何时用 |
 |-------|--------|
-| `docs/skills/feat-start/` | 开始新功能：读 spec → 建分支 → 更新 STATUS → 生成 worklog 模板 |
-| `docs/skills/feat-complete/` | 完成功能：跑 verify → 更新 roadmap → 提 PR → 写 worklog |
-| `docs/skills/git-workflow/` | Git 分支管理：同步 main / diff 审查 / 合并前检查 |
-| `docs/skills/code-review/` | CR 自查/互查：对照 AR/CR/PR 红线逐条 |
-| `docs/skills/doc-sync/` | 文档同步：个人探索归档 / 团队决策落地 / 例行审查 |
-| `docs/skills/deploy/` | 部署项目：docker compose up → 验证 |
-| `docs/skills/spec-driven-development/` | 新功能无 spec 时先写规格再写代码 |
-| `docs/skills/test-claude-adapter/` | ClaudeAdapter 联调 |
-| `docs/skills/前端统一规范/` | 前端规约 |
+| `skills/feat-start/` | 开始新功能：读 spec → 建分支 → 更新 STATUS → 生成 worklog 模板 |
+| `skills/feat-complete/` | 完成功能：跑 verify → 更新 roadmap → 提 PR → 写 worklog |
+| `skills/git-workflow/` | Git 分支管理：同步 main / diff 审查 / 合并前检查 |
+| `skills/code-review/` | CR 自查/互查：对照 AR/CR/PR 红线逐条 |
+| `skills/doc-sync/` | 文档同步：个人探索归档 / 团队决策落地 / 例行审查 |
+| `skills/deploy/` | 部署项目：docker compose up → 验证 |
+| `skills/spec-driven-development/` | 新功能无 spec 时先写规格再写代码 |
+| `skills/test-claude-adapter/` | ClaudeAdapter 联调 |
+| `skills/前端统一规范/` | 前端规约 |
 
-每个 Skill 内置检查清单，按步执行。AgentHub 项目专有 Skill（xhs/dbs 系列）在 `docs/.agenthub/skills/`。
+每个 Skill 内置检查清单，按步执行。AgentHub 项目专有 Skill（xhs/dbs 系列）在 `.agenthub/skills/`。
 
 ---
 
@@ -191,7 +191,7 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 ```
 
 ### 每次工作前
-1. `docs/skills/git-workflow/` 检查分支 + 同步 main（不要在 main 上开发）
+1. `skills/git-workflow/` 检查分支 + 同步 main（不要在 main 上开发）
 2. 读根 `STATUS.md` 了解其他人在做什么
 3. 读 `docs/plan/开发清单_roadmap.md` 确认当前进度
 
