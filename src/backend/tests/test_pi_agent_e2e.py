@@ -14,8 +14,8 @@ import sys
 from pathlib import Path
 from uuid import uuid4
 
-# 设置 backend 路径
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
+# 设置 backend 路径（src/backend，含 app 包）以支持 standalone 运行
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # 确保 npm 全局 bin 路径在 PATH 中（Pi CLI 安装位置）
 npm_bin = str(Path.home() / "AppData" / "Roaming" / "npm")

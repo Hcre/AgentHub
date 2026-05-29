@@ -40,5 +40,5 @@ Error handling:     [PASS] No API key -> ERROR event
 ## 结论
 
 Pi Agent 适配器集成已就绪，核心代码路径可工作。完整功能需要：
-1. 设置 `ANTHROPIC_API_KEY` 环境变量后运行 `python tests/test_pi_agent_e2e.py`
+1. 设置 `ANTHROPIC_API_KEY` 环境变量后运行 `python src/backend/tests/test_pi_agent_e2e.py`
 2. 启动 AgentHub 后端服务（PG + Redis + FastAPI + 前端）进行全栈验证
