@@ -253,3 +253,91 @@ class TestStop:
     async def test_stop_no_process(self) -> None:
         runtime = ClaudeCodeRuntime()
         await runtime.stop()  # should not raise
+
+
+class TestDeltaSplit:
+    """Phase 1 拆 delta：AgentRequest.group_delta_text 处理。"""
+
+    def test_v0_merge_no_delta_keeps_sp(self) -> None:
+        req = AgentRequest(
+            request_id="r",
+            session_id=uuid4(),
+            messages=[{"role": "user", "content": "hi"}],
+            system_prompt="你是 Bob",
+            is_group_chat=True,
+            agent_id=uuid4(),
+        )
+        m = ClaudeCodeRuntime._merge_delta_into_system_prompt_v0(req)
+        assert m.system_prompt == "你是 Bob"
+        assert m.group_delta_text is None
+
+    def test_v0_merge_with_delta(self) -> None:
+        req = AgentRequest(
+            request_id="r",
+            session_id=uuid4(),
+            messages=[{"role": "user", "content": "hi"}],
+            system_prompt="你是 Bob\n\n契约...",
+            group_delta_text="Alice: 大家好",
+            is_group_chat=True,
+            agent_id=uuid4(),
+        )
+        m = ClaudeCodeRuntime._merge_delta_into_system_prompt_v0(req)
+        assert "Alice: 大家好" in m.system_prompt
+        assert m.system_prompt.endswith("Alice: 大家好")
+        assert m.group_delta_text is None
+
+    def test_v1_user_prompt_no_delta(self) -> None:
+        req = AgentRequest(
+            request_id="r",
+            session_id=uuid4(),
+            messages=[{"role": "user", "content": "hello"}],
+            system_prompt="sp",
+        )
+        assert ClaudeCodeRuntime._build_v1_user_prompt(req) == "hello"
+
+    def test_v1_user_prompt_with_delta(self) -> None:
+        req = AgentRequest(
+            request_id="r",
+            session_id=uuid4(),
+            messages=[{"role": "user", "content": "回复请"}],
+            system_prompt="sp",
+            group_delta_text="Alice: 大家好",
+            is_group_chat=True,
+            agent_id=uuid4(),
+        )
+        out = ClaudeCodeRuntime._build_v1_user_prompt(req)
+        assert "Alice: 大家好" in out
+        assert "回复请" in out
+        # delta 在 trigger 之前
+        assert out.index("Alice") < out.index("回复请")
+
+
+class TestComputeSessionKey:
+    """V1 长驻 + V0 短驻共用：私聊 = session_id，群聊 = uuid5(session_id:agent_id)。"""
+
+    def test_private_chat_uses_session_id(self) -> None:
+        sid = uuid4()
+        req = AgentRequest(
+            request_id="r",
+            session_id=sid,
+            messages=[{"role": "user", "content": "hi"}],
+            is_group_chat=False,
+        )
+        assert ClaudeCodeRuntime._compute_session_key(req) == str(sid)
+
+    def test_group_chat_deterministic_uuid5(self) -> None:
+        sid = uuid4()
+        aid = uuid4()
+        req = AgentRequest(
+            request_id="r",
+            session_id=sid,
+            messages=[{"role": "user", "content": "hi"}],
+            is_group_chat=True,
+            agent_id=aid,
+        )
+        k1 = ClaudeCodeRuntime._compute_session_key(req)
+        k2 = ClaudeCodeRuntime._compute_session_key(req)
+        assert k1 == k2  # 同输入相同输出
+        # 不同 agent_id 不同 key
+        req2 = req.model_copy(update={"agent_id": uuid4()})
+        assert ClaudeCodeRuntime._compute_session_key(req2) != k1

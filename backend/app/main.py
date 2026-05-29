@@ -22,6 +22,10 @@ from app.core.exceptions import (
 )
 from app.core.logging import setup_logging
 from app.infrastructure.cache.redis_client import close_redis
+from app.infrastructure.llm.claude_code_process_pool import (
+    shutdown_pool,
+    start_pool_sweeper,
+)
 
 
 @asynccontextmanager
@@ -29,7 +33,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     setup_logging()
     client = httpx.AsyncClient(timeout=300.0)
     app.state.client = client
+    # 长驻 CLI 进程池 idle sweeper（仅 V1 模式下池会被填充，sweeper 始终安全启动）
+    if settings.claude_code_long_running:
+        start_pool_sweeper()
     yield
+    await shutdown_pool()
     await client.aclose()
     await close_redis()
 

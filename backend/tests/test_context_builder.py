@@ -58,10 +58,12 @@ async def test_group_first_touch_uses_seed_history(db_session) -> None:  # type:
     assert req.is_group_chat is True
     assert req.agent_id == a.id
     assert req.group_id == group.id
-    # GROUP_CHAT_CONTRACT 应被注入
+    # GROUP_CHAT_CONTRACT 应被注入到稳定的 system_prompt
     assert GROUP_CHAT_CONTRACT.split("\n")[0] in req.system_prompt
-    # 种子历史的内容应出现在 prompt
-    assert "u0" in req.system_prompt
+    # 种子历史走 group_delta_text 字段（拆 delta 后稳定 sp 不含动态内容）
+    assert req.group_delta_text is not None
+    assert "u0" in req.group_delta_text
+    assert "u0" not in req.system_prompt
     # messages 只含 trigger
     assert req.messages == [{"role": "user", "content": "trigger"}]
 
@@ -85,11 +87,12 @@ async def test_group_delta_only_after_watermark(db_session) -> None:  # type: ig
         session=session, group=group, target_agent=a, trigger=trigger
     )
 
-    # delta 应只含 m2, m3，不含 m0, m1
-    assert "m2" in req.system_prompt
-    assert "m3" in req.system_prompt
-    assert "m0" not in req.system_prompt
-    assert "m1" not in req.system_prompt
+    # delta 应只含 m2, m3，不含 m0, m1（拆 delta 后走 group_delta_text）
+    assert req.group_delta_text is not None
+    assert "m2" in req.group_delta_text
+    assert "m3" in req.group_delta_text
+    assert "m0" not in req.group_delta_text
+    assert "m1" not in req.group_delta_text
 
 
 @pytest.mark.asyncio
@@ -110,8 +113,9 @@ async def test_watermark_dangling_falls_back_to_seed(db_session) -> None:  # typ
     req = await ctx.build_for_agent(
         session=session, group=group, target_agent=a, trigger=trigger
     )
-    # 应使用种子历史回退，而不是返回空 delta
-    assert "alive" in req.system_prompt
+    # 应使用种子历史回退，而不是返回空 delta（走 group_delta_text）
+    assert req.group_delta_text is not None
+    assert "alive" in req.group_delta_text
 
 
 @pytest.mark.asyncio

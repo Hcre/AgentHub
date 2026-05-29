@@ -40,6 +40,19 @@ class Settings(BaseSettings):
     claude_cli_timeout: int = 300
     proxy_base_url: str = "http://127.0.0.1:8000"
 
+    # --- Claude Code 长驻进程（Phase 1，见 ADR-02）---
+    # False = V0：每次请求 spawn 新进程 + --resume 复用历史
+    # True  = V1：长驻进程 + --input-format stream-json，stdin JSONL 多轮注入
+    claude_code_long_running: bool = False
+    # 软上限：超过仅 warning（用于发现配置问题）
+    claude_code_pool_soft_max: int = 32
+    # 硬上限：超过按 LRU 淘汰，防止 OOM（Step 3）
+    claude_code_pool_hard_max: int = 64
+    # idle TTL：handle 超过这个秒数未使用 → 后台 sweeper 淘汰（Step 3）
+    claude_code_idle_ttl_seconds: int = 300
+    # idle sweeper 扫描周期（Step 3）
+    claude_code_idle_sweep_interval: int = 60
+
     # --- 群聊增量注入 ---
     max_delta_messages: int = 50              # ContextBuilder delta 上限，超过截断
     watermark_ttl_seconds: int = 604800       # Watermark Redis TTL (7天)
