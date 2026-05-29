@@ -3,6 +3,23 @@
 > 记录每次重大方向变更：做了什么决定、为什么、影响了哪些文件。
 > 倒序排列（最新在上）。
 
+## 2026-05-29 — CLI-only + 长驻 stream-json 方向
+
+- **决策**:
+  1. 项目主路径正式 CLI-only，SDK（ClaudeAdapter）降级为测试/降级用，不再演进
+  2. 群聊身份错乱方案分阶段：Phase 0 措辞修复 + Phase 0.5 实测验证 + Phase 1 长驻 + stream-json
+  3. 记忆系统作为未来参考归档，不进当前 PRD
+- **原因**:
+  - 当前 ClaudeCodeRuntime「短驻 + resume」模式下，messages 时间交错与 `--resume` 重放冲突无干净解
+  - cc-haha 项目验证了长驻 + stream-json 的工程范式，但身份错乱核心（注意力机制）不受进程模型影响，必须先做措辞修复
+  - SDK 路径与群聊主流程价值不匹配，双轨维护成本不必要
+- **影响文件**:
+  - `docs/explore/董/group-chat-pipeline-proposal.md` v2 → v3 重写
+  - `docs/explore/cli-streamjson-feasibility-test.md` 新建（Phase 0.5 验证计划，项目共享技术结论）
+  - `docs/explore/董/memory-system-future.md` 新建（cc-haha 记忆系统作为未来参考）
+  - 待办 spec 同步：`spec/architecture_架构定义.md` 双轨改 CLI 主、`CLAUDE.md` 同步、`roadmap` 新增任务
+- **参考**: 与用户 黎 的 2026-05-29 设计讨论；cc-haha 上下文管理 / 记忆系统分析（D:\Edge_files\，未入仓）
+
 ## 2026-05-23 — 文档治理体系建立
 
 - **决策**: 统一文档目录结构 — docs/（人类入口）+ spec/（Agent入口），explore/ 和 archive/ 纳入 docs/ 管理
