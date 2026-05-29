@@ -303,79 +303,170 @@ def render_code_map(graph: dict) -> str:
 
 
 def render_html(graph: dict) -> str:
-    """人看：浏览器交互式力导向图（内联，零依赖，CDN 加载 d3）。"""
-    mods = [n for n in graph["nodes"] if n["type"] == "MODULE"]
-    layer_color = {"L4-api": "#6366f1", "L3-application": "#0ea5e9", "L2-domain": "#10b981",
-                   "L1-infrastructure": "#f59e0b", "L0-core": "#94a3b8", "LX-schemas": "#a78bfa", "other": "#cbd5e1"}
-    d3nodes = [{"id": m["id"], "layer": m["layer"], "color": layer_color.get(m["layer"], "#ccc")} for m in mods]
+    """人看：浏览器交互式分层图。零外部依赖（纯原生 SVG/JS，无 CDN），离线可开。
+
+    按 5 层洋葱横向分带布局，点节点高亮上下游（依赖/被依赖），可缩放平移。
+    """
+    mods = [n for n in graph["nodes"] if n["type"] == "MODULE" and not n.get("is_package")]
     modset = {m["id"] for m in mods}
-    d3links = [{"source": e["src"], "target": e["dst"], "rel": e["rel"]}
-               for e in graph["edges"] if e["rel"] == "IMPORTS"
-               and e["src"] in modset and e["dst"] in modset]
-    data = json.dumps({"nodes": d3nodes, "links": d3links}, ensure_ascii=False)
-    defects = json.dumps(graph["defects"], ensure_ascii=False)
-    return _HTML_TEMPLATE.replace("__DATA__", data).replace("__DEFECTS__", defects)
+    links = [{"s": e["src"], "t": e["dst"]}
+             for e in graph["edges"] if e["rel"] == "IMPORTS"
+             and e["src"] in modset and e["dst"] in modset]
+    payload = {
+        "nodes": [{"id": m["id"], "layer": m["layer"]} for m in mods],
+        "links": links,
+        "defects": graph["defects"],
+        "stats": graph["stats"],
+    }
+    return _HTML_TEMPLATE.replace("__PAYLOAD__", json.dumps(payload, ensure_ascii=False))
 
 
 _HTML_TEMPLATE = """<!doctype html>
 <html lang="zh"><head><meta charset="utf-8"><title>AgentHub 代码图谱（人视图）</title>
-<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <style>
-  body{margin:0;font:14px system-ui;background:#0f172a;color:#e2e8f0}
-  #bar{padding:10px 16px;background:#1e293b;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
-  .legend{display:flex;gap:6px;align-items:center}
-  .dot{width:12px;height:12px;border-radius:50%}
-  svg{width:100vw;height:calc(100vh - 90px)}
-  .node text{font-size:10px;fill:#e2e8f0;pointer-events:none}
-  .link{stroke:#475569;stroke-opacity:.5}
-  .link.CALLS{stroke:#f87171;stroke-dasharray:3 2}
-  #info{padding:6px 16px;background:#1e293b;font-size:12px;color:#94a3b8}
-  .hl{stroke:#fde047;stroke-width:2.5px}
+  *{box-sizing:border-box}
+  body{margin:0;font:13px system-ui,"Microsoft YaHei";background:#0f172a;color:#e2e8f0;overflow:hidden}
+  #bar{padding:8px 14px;background:#1e293b;display:flex;gap:14px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #334155}
+  #bar b{font-size:15px}
+  .legend{display:flex;gap:5px;align-items:center;font-size:12px}
+  .dot{width:11px;height:11px;border-radius:50%;display:inline-block}
+  #wrap{display:flex;height:calc(100vh - 88px)}
+  svg{flex:1;background:#0f172a;cursor:grab}
+  svg:active{cursor:grabbing}
+  #side{width:300px;background:#1e293b;border-left:1px solid #334155;padding:12px 14px;overflow:auto;font-size:12px}
+  #side h3{margin:0 0 6px;font-size:13px;color:#cbd5e1}
+  #side .mut{color:#94a3b8}
+  #side code{background:#0f172a;padding:1px 5px;border-radius:4px;color:#93c5fd;font-size:11px}
+  .lbl{font-size:9px;fill:#cbd5e1;pointer-events:none}
+  .edge{stroke:#3b4960;stroke-width:1;fill:none}
+  .edge.up{stroke:#fbbf24;stroke-width:1.6}
+  .edge.down{stroke:#38bdf8;stroke-width:1.6}
+  circle.nd{stroke:#0f172a;stroke-width:1.2;cursor:pointer}
+  circle.nd.sel{stroke:#fde047;stroke-width:3}
+  circle.nd.bad{stroke:#f87171;stroke-width:3}
+  .band{fill:#1e293b;opacity:.35}
+  .bandlbl{fill:#64748b;font-size:11px;font-weight:bold}
+  #status{padding:5px 14px;background:#1e293b;border-top:1px solid #334155;font-size:12px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 </style></head><body>
-<div id="bar"><b>AgentHub 代码图谱</b><span style="color:#94a3b8">点节点高亮其依赖 · 拖动布局 · 滚轮缩放</span>
+<div id="bar"><b>AgentHub 代码图谱</b>
 <span class="legend"><span class="dot" style="background:#6366f1"></span>L4-api</span>
 <span class="legend"><span class="dot" style="background:#0ea5e9"></span>L3-app</span>
 <span class="legend"><span class="dot" style="background:#10b981"></span>L2-domain</span>
 <span class="legend"><span class="dot" style="background:#f59e0b"></span>L1-infra</span>
-<span style="color:#94a3b8">边=IMPORTS</span>
+<span class="legend"><span class="dot" style="background:#94a3b8"></span>L0-core</span>
+<span class="legend"><span class="dot" style="background:#a78bfa"></span>schemas</span>
+<span class="mut" style="color:#94a3b8">｜ <span style="color:#fbbf24">━</span> 上游(被它依赖) <span style="color:#38bdf8">━</span> 下游(它依赖) ｜ 点节点查看 · 滚轮缩放 · 拖空白平移</span>
 </div>
-<div id="info">就绪</div>
-<svg></svg>
+<div id="wrap">
+  <svg id="svg"></svg>
+  <div id="side"><h3>使用</h3><p class="mut">点任意节点：高亮它的<b style="color:#fbbf24">上游</b>（谁 import 它，改它会波及）和<b style="color:#38bdf8">下游</b>（它 import 谁）。点空白处复位。</p><div id="detail"></div></div>
+</div>
+<div id="status"></div>
 <script>
-const G=__DATA__, DEF=__DEFECTS__;
-const svg=d3.select("svg"), W=window.innerWidth, H=window.innerHeight-90;
-const g=svg.append("g");
-svg.call(d3.zoom().on("zoom",e=>g.attr("transform",e.transform)));
-const sim=d3.forceSimulation(G.nodes)
-  .force("link",d3.forceLink(G.links).id(d=>d.id).distance(60))
-  .force("charge",d3.forceManyBody().strength(-180))
-  .force("center",d3.forceCenter(W/2,H/2));
-const link=g.append("g").selectAll("line").data(G.links).join("line")
-  .attr("class",d=>"link "+d.rel);
-const node=g.append("g").selectAll("g").data(G.nodes).join("g").attr("class","node")
-  .call(d3.drag().on("start",ds).on("drag",dd).on("end",de));
-node.append("circle").attr("r",6).attr("fill",d=>d.color).attr("stroke","#0f172a");
-node.append("text").attr("x",8).attr("dy",3).text(d=>d.id.replace("app.",""));
-const adj={}; G.links.forEach(l=>{(adj[l.source.id||l.source]=adj[l.source.id||l.source]||new Set()).add(l.target.id||l.target);});
-node.on("click",(e,d)=>{
-  const keep=new Set([d.id]); (adj[d.id]||[]).forEach(x=>keep.add(x));
-  node.select("circle").classed("hl",n=>n.id===d.id);
-  node.style("opacity",n=>keep.has(n.id)?1:.15);
-  link.style("opacity",l=>((l.source.id===d.id)||(l.target.id===d.id))?.9:.04);
-  const outs=[...(adj[d.id]||[])].map(x=>x.replace("app.","")).join(", ")||"（无）";
-  document.getElementById("info").innerHTML=`<b>${d.id}</b> ｜ ${d.layer} ｜ 依赖→ ${outs}`;
+const P=__PAYLOAD__;
+const LC={"L4-api":"#6366f1","L3-application":"#0ea5e9","L2-domain":"#10b981","L1-infrastructure":"#f59e0b","L0-core":"#94a3b8","LX-schemas":"#a78bfa","other":"#cbd5e1"};
+const ORDER=["L4-api","L3-application","L2-domain","L1-infrastructure","L0-core","LX-schemas","other"];
+const svg=document.getElementById("svg");
+const NS="http://www.w3.org/2000/svg";
+const Wd=svg.clientWidth||window.innerWidth-300, Ht=svg.clientHeight||window.innerHeight-88;
+
+// 分层布局：每层一条横带，带内按 id 排开
+const byLayer={}; ORDER.forEach(l=>byLayer[l]=[]);
+P.nodes.forEach(n=>{(byLayer[n.layer]=byLayer[n.layer]||[]).push(n);});
+const usedLayers=ORDER.filter(l=>byLayer[l]&&byLayer[l].length);
+const bandH=Math.max(70,(Ht-40)/usedLayers.length);
+const pos={};
+usedLayers.forEach((l,li)=>{
+  const arr=byLayer[l].sort((a,b)=>a.id.localeCompare(b.id));
+  const y=30+li*bandH+bandH/2;
+  arr.forEach((n,i)=>{pos[n.id]={x:70+(i+0.5)*((Wd-120)/arr.length),y:y+((i%2)?14:-14)};});
 });
-svg.on("dblclick.zoom",null);
-svg.on("click",e=>{if(e.target.tagName==="svg"){node.style("opacity",1);link.style("opacity",null);node.select("circle").classed("hl",false);document.getElementById("info").textContent="就绪";}});
-sim.on("tick",()=>{
-  link.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y).attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
-  node.attr("transform",d=>`translate(${d.x},${d.y})`);
+
+// 邻接
+const out={},inc={};
+P.nodes.forEach(n=>{out[n.id]=new Set();inc[n.id]=new Set();});
+P.links.forEach(l=>{if(out[l.s]){out[l.s].add(l.t);inc[l.t].add(l.s);}});
+
+const root=document.createElementNS(NS,"g");svg.appendChild(root);
+// 层带 + 标签
+usedLayers.forEach((l,li)=>{
+  const y=30+li*bandH;
+  const r=document.createElementNS(NS,"rect");
+  r.setAttribute("class","band");r.setAttribute("x",0);r.setAttribute("y",y);
+  r.setAttribute("width",Wd);r.setAttribute("height",bandH-6);root.appendChild(r);
+  const t=document.createElementNS(NS,"text");t.setAttribute("class","bandlbl");
+  t.setAttribute("x",8);t.setAttribute("y",y+16);t.textContent=l;root.appendChild(t);
 });
-function ds(e,d){if(!e.active)sim.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y;}
-function dd(e,d){d.fx=e.x;d.fy=e.y;}
-function de(e,d){if(!e.active)sim.alphaTarget(0);d.fx=null;d.fy=null;}
-const nv=DEF.layer_violations.length, nc=DEF.cycles.length, nd=DEF.dead_modules.length;
-document.getElementById("info").textContent=`就绪 · 跨层违规 ${nv} · 循环依赖 ${nc} · 无入边模块 ${nd}（点节点查依赖）`;
+// 边
+const elayer=document.createElementNS(NS,"g");root.appendChild(elayer);
+const edgeEls=P.links.map(l=>{
+  const p=document.createElementNS(NS,"line");p.setAttribute("class","edge");
+  const a=pos[l.s],b=pos[l.t];if(!a||!b)return null;
+  p.setAttribute("x1",a.x);p.setAttribute("y1",a.y);p.setAttribute("x2",b.x);p.setAttribute("y2",b.y);
+  p.__s=l.s;p.__t=l.t;elayer.appendChild(p);return p;
+}).filter(Boolean);
+// 节点
+const nlayer=document.createElementNS(NS,"g");root.appendChild(nlayer);
+const dead=new Set(P.defects.dead_modules||[]);
+const circles={};
+P.nodes.forEach(n=>{
+  const p=pos[n.id];if(!p)return;
+  const c=document.createElementNS(NS,"circle");
+  c.setAttribute("class","nd"+(dead.has(n.id)?" bad":""));
+  c.setAttribute("cx",p.x);c.setAttribute("cy",p.y);c.setAttribute("r",5);
+  c.setAttribute("fill",LC[n.layer]||"#ccc");
+  c.addEventListener("click",ev=>{ev.stopPropagation();select(n.id);});
+  nlayer.appendChild(c);circles[n.id]=c;
+  const t=document.createElementNS(NS,"text");t.setAttribute("class","lbl");
+  t.setAttribute("x",p.x+7);t.setAttribute("y",p.y+3);t.textContent=n.id.replace("app.","");
+  nlayer.appendChild(t);
+});
+
+function select(id){
+  edgeEls.forEach(e=>{
+    e.setAttribute("class","edge"+(e.__t===id?" up":e.__s===id?" down":""));
+  });
+  Object.entries(circles).forEach(([k,c])=>{
+    const on=k===id||out[id].has(k)||inc[id].has(k);
+    c.style.opacity=on?1:.18;
+    c.classList.toggle("sel",k===id);
+  });
+  const ups=[...inc[id]].sort(), downs=[...out[id]].sort();
+  document.getElementById("detail").innerHTML=
+    `<h3>${id}</h3>`+
+    `<p><b style="color:#fbbf24">上游 ${ups.length}</b>（改它会波及）<br>`+
+    (ups.map(x=>`<code>${x.replace("app.","")}</code>`).join(" ")||"<span class=mut>（无，叶子）</span>")+`</p>`+
+    `<p><b style="color:#38bdf8">下游 ${downs.length}</b>（它依赖）<br>`+
+    (downs.map(x=>`<code>${x.replace("app.","")}</code>`).join(" ")||"<span class=mut>（无）</span>")+`</p>`+
+    (dead.has(id)?`<p style="color:#f87171">⚠ 无入边模块（疑似死代码，需人工确认）</p>`:"");
+}
+svg.addEventListener("click",()=>{
+  edgeEls.forEach(e=>e.setAttribute("class","edge"));
+  Object.values(circles).forEach(c=>{c.style.opacity=1;c.classList.remove("sel");});
+  document.getElementById("detail").innerHTML="";
+});
+// 缩放/平移
+let vb={x:0,y:0,w:Wd,h:Ht};svg.setAttribute("viewBox",`0 0 ${Wd} ${Ht}`);
+svg.addEventListener("wheel",e=>{e.preventDefault();const k=e.deltaY<0?.9:1.1;
+  const mx=vb.x+vb.w*e.offsetX/svg.clientWidth,my=vb.y+vb.h*e.offsetY/svg.clientHeight;
+  vb.w*=k;vb.h*=k;vb.x=mx-(mx-vb.x)*k;vb.y=my-(my-vb.y)*k;
+  svg.setAttribute("viewBox",`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);},{passive:false});
+let pan=null;
+svg.addEventListener("mousedown",e=>{pan={x:e.clientX,y:e.clientY,vx:vb.x,vy:vb.y};});
+window.addEventListener("mousemove",e=>{if(!pan)return;
+  vb.x=pan.vx-(e.clientX-pan.x)*vb.w/svg.clientWidth;vb.y=pan.vy-(e.clientY-pan.y)*vb.h/svg.clientHeight;
+  svg.setAttribute("viewBox",`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);});
+window.addEventListener("mouseup",()=>pan=null);
+
+// 状态栏
+const d=P.defects,s=P.stats;
+const top=Object.entries(inc).map(([k,v])=>[k,v.size]).sort((a,b)=>b[1]-a[1])[0];
+document.getElementById("status").innerHTML=
+  `📊 ${P.nodes.length} 模块 · ${P.links.length} IMPORTS 边 · ${s.classes} 类 · ${s.functions} 函数 ｜ `+
+  `${d.layer_violations.length?"🔴":"✅"} 跨层违规 ${d.layer_violations.length} · `+
+  `${d.cycles.length?"🔴":"✅"} 循环依赖 ${d.cycles.length} · `+
+  `${d.dead_modules.length?"🟡":"✅"} 无入边模块 ${d.dead_modules.length} ｜ `+
+  `被依赖最多：<code style="background:#0f172a;padding:1px 5px;border-radius:4px;color:#93c5fd">${(top[0]||"").replace("app.","")}</code>（${top[1]||0} 入度）`;
 </script></body></html>
 """
 
