@@ -1,6 +1,8 @@
 # === Python ===
 __pycache__/
 *.py[cod]
+*.db
+*.sqlite3
 *.egg-info/
 .venv/
 venv/

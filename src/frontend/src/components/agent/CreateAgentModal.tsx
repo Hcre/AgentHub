@@ -6,12 +6,14 @@ import { useUIStore } from '../../stores/uiStore'
 import { Button, Dialog, DialogContent, Icon, Input, Textarea } from '../ui'
 import { agentsApi } from '../../api/agents'
 import { sessionsApi } from '../../api/sessions'
+import { useApiKeyStore } from '../../stores/apiKeyStore'
 
 const SELECT_CLS =
   'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
 const RUNTIMES = [
   { id: 'claude_code', label: 'Claude CLI · 代理接入第三方' },
+  { id: 'pi_agent', label: 'Pi Agent · 多Provider CLI' },
   { id: 'mock', label: 'Mock · 演示假数据' },
 ]
 
@@ -78,6 +80,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
   const addConversation = useChatStore((s) => s.addConversation)
   const openConversation = useUIStore((s) => s.openConversation)
   const setSection = useUIStore((s) => s.setSection)
+  const savedKeys = useApiKeyStore((s) => s.keys)
 
   // Wizard state
   const [step, setStep] = useState(1)
@@ -94,6 +97,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
   const [model, setModel] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
   const [apiKey, setApiKey] = useState('')
+  const [selectedKeyId, setSelectedKeyId] = useState('')
   // Step 3
   const [status, setStatus] = useState<'idle' | 'creating' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
@@ -128,7 +132,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
     )
   }
 
-  const showProviderSection = agentSystem === 'claude_code'
+  const showProviderSection = agentSystem === 'claude_code' || agentSystem === 'pi_agent'
 
   const reset = () => {
     setStep(1)
@@ -142,6 +146,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
     setModel('')
     setBaseUrl('')
     setApiKey('')
+    setSelectedKeyId('')
     setStatus('idle')
     setErrorMsg('')
   }
@@ -193,7 +198,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
       })
 
       // 2. 连通性测试：创建临时 Session 发一条测试消息
-      if (agentSystem === 'claude_code' && apiKey) {
+      if ((agentSystem === 'claude_code' || agentSystem === 'pi_agent') && apiKey) {
         try {
           const session = await sessionsApi.createPrivate(id)
           await new Promise<void>((resolve, reject) => {
@@ -415,51 +420,63 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
               {showProviderSection && (
                 <>
                   <label className="flex flex-col gap-1">
-                    <Label>提供商</Label>
-                    <select
-                      className={SELECT_CLS}
-                      value={providerId}
-                      onChange={(e) => {
-                        setProviderId(e.target.value)
-                        const p = providers.find((x) => x.id === e.target.value)
-                        setModel(p?.models[0] ?? '')
-                      }}
-                    >
-                      {providers.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.label}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex items-center justify-between">
+                      <Label>选择配置</Label>
+                      <button
+                        type="button"
+                        onClick={() => setSection('api-keys')}
+                        className="text-[11px] text-brand hover:underline"
+                      >
+                        管理配置 →
+                      </button>
+                    </div>
+                    {savedKeys.length > 0 ? (
+                      <select
+                        className={SELECT_CLS}
+                        value={selectedKeyId}
+                        onChange={(e) => {
+                          const id = e.target.value
+                          setSelectedKeyId(id)
+                          const found = savedKeys.find((k) => k.id === id)
+                          if (found) {
+                            setApiKey(found.apiKey)
+                            setProviderId(found.provider)
+                            setModel(found.model)
+                            setBaseUrl(found.baseUrl)
+                          }
+                        }}
+                      >
+                        <option value="">选择已保存的配置…</option>
+                        {savedKeys.map((k) => (
+                          <option key={k.id} value={k.id}>
+                            {k.name} · {k.keyPrefix}****
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="rounded-md border border-dashed p-3 text-center text-[12px] text-muted-foreground">
+                        还没有保存的配置，请先
+                        <button type="button" onClick={() => setSection('api-keys')} className="mx-0.5 text-brand underline">添加 Provider 配置</button>
+                        或下方手动填写
+                      </div>
+                    )}
                   </label>
 
-                  <label className="flex flex-col gap-1">
-                    <Label>Model</Label>
-                    <Input
-                      value={model}
-                      onChange={(e) => setModel(e.target.value)}
-                      placeholder={providers.find(p => p.id === providerId)?.models[0] || '输入模型名'}
-                    />
-                  </label>
-
-                  <label className="flex flex-col gap-1">
-                    <Label>请求地址（Base URL，须为 Anthropic 兼容端点）</Label>
-                    <Input
-                      value={baseUrl}
-                      onChange={(e) => setBaseUrl(e.target.value)}
-                      placeholder="例如 https://api.deepseek.com/anthropic"
-                    />
-                  </label>
-
-                  <label className="flex flex-col gap-1">
-                    <Label>API Key</Label>
-                    <Input
-                      type="password"
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="sk-…（加密传输）"
-                    />
-                  </label>
+                  {/* 显示选中配置摘要 */}
+                  {selectedKeyId && savedKeys.find(k => k.id === selectedKeyId) && (
+                    <div className="rounded-md border bg-muted/50 p-2.5 text-[12px] text-muted-foreground space-y-0.5">
+                      {(() => {
+                        const cfg = savedKeys.find(k => k.id === selectedKeyId)!
+                        return (
+                          <>
+                            <div><span className="font-medium text-foreground">{cfg.name}</span></div>
+                            <div>提供商: {cfg.provider} · 模型: {cfg.model || '默认'}</div>
+                            {cfg.baseUrl && <div className="truncate">地址: {cfg.baseUrl}</div>}
+                          </>
+                        )
+                      })()}
+                    </div>
+                  )}
                 </>
               )}
             </div>

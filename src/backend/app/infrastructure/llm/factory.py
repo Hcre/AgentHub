@@ -50,6 +50,25 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
             timeout=s.get("cli_timeout", settings.claude_cli_timeout),
         )
 
+    if system == AgentSystem.PI_AGENT:
+        from app.infrastructure.llm.claude_adapter import ClaudeAdapter
+
+        s = agent.settings or {}
+        api_key = decrypt_secret(agent.api_key_encrypted) if agent.api_key_encrypted else ""
+
+        # 第三方 provider 的 Anthropic 兼容端点需要 Anthropic 模型名
+        model = agent.model
+        if agent.provider.value == "deepseek":
+            model = s.get("anthropic_model", "claude-sonnet-4-20250514")
+
+        # 用 ClaudeAdapter 通过 proxy 调 API（Pi CLI 在 Windows 下有网络问题）
+        base_url = f"{settings.proxy_base_url}/proxy/agents/{agent.id}"
+        return ClaudeAdapter(
+            api_key="agenthub-proxy",  # proxy 会替换为真实 key
+            model=model,
+            base_url=base_url,
+        )
+
     # AgentSystem.MOCK 或未知
     return MockAdapter()
 
@@ -64,9 +83,7 @@ def build_adapter() -> UnifiedAgent:
             return MockAdapter()
         from app.infrastructure.llm.claude_adapter import ClaudeAdapter
 
-        return ClaudeAdapter(
-            api_key=settings.anthropic_api_key, model=settings.default_model
-        )
+        return ClaudeAdapter(api_key=settings.anthropic_api_key, model=settings.default_model)
 
     if mode == "claude_cli":
         from app.infrastructure.llm.claude_code_runtime import ClaudeCodeRuntime
