@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useMemo, useRef, useState } from 'react'
 import { cn } from '../../lib/cn'
 import { useAgentStore } from '../../stores/agentStore'
 import { Button, Icon } from '../ui'
@@ -12,6 +12,26 @@ interface Mentionable {
 }
 
 const MENTION_RE = /@\S*$/
+// 渲染时匹配：完整 mention（与气泡渲染保持一致），遇标点/空格停
+const MENTION_RENDER_RE = /(@[\p{L}\p{N}_]+)/gu
+
+/** 把文本里的 @mention 渲染成带底色的 span（叠在 textarea 之下）。 */
+function renderHighlighted(text: string) {
+  if (!text) return null
+  const parts = text.split(MENTION_RENDER_RE)
+  return parts.map((part, i) =>
+    part.startsWith('@') ? (
+      <span
+        key={i}
+        className="rounded bg-brand/10 px-1 font-medium text-brand"
+      >
+        {part}
+      </span>
+    ) : (
+      <Fragment key={i}>{part}</Fragment>
+    ),
+  )
+}
 
 /**
  * 从 textarea 的文本 + selectionStart 检测当前是否在输入一个 @mention。
@@ -138,21 +158,41 @@ export function GroupComposer({
         </div>
       )}
 
-      <textarea
-        ref={textareaRef}
-        rows={1}
-        placeholder={`在 #${group.name} 里说点什么，或 @协调者 派活…`}
-        value={val}
-        onChange={(e) => handleChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault()
-            send()
-          }
-        }}
-        className="w-full resize-none rounded-t-xl border-0 bg-transparent px-3 py-3 text-[14px] outline-none placeholder:text-muted-foreground"
-        style={{ maxHeight: 200 }}
-      />
+      {/* textarea + 高亮 overlay：textarea 透明，overlay 同位置呈现带色 @mention */}
+      <div className="relative">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words rounded-t-xl px-3 py-3 text-[14px] leading-[1.5] text-foreground"
+        >
+          {renderHighlighted(val)}
+          {/* 末尾零宽空格：让 overlay 在 val 末尾换行时不塌陷 */}
+          <span>{'​'}</span>
+        </div>
+        <textarea
+          ref={textareaRef}
+          rows={1}
+          placeholder={`在 #${group.name} 里说点什么，或 @协调者 派活…`}
+          value={val}
+          onChange={(e) => handleChange(e.target.value)}
+          onScroll={(e) => {
+            // 同步 overlay 滚动位置（textarea 超过 maxHeight 会自身滚动）
+            const ov = (e.currentTarget.previousElementSibling as HTMLElement | null)
+            if (ov) ov.scrollTop = e.currentTarget.scrollTop
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              send()
+            }
+          }}
+          className="relative w-full resize-none rounded-t-xl border-0 bg-transparent px-3 py-3 text-[14px] leading-[1.5] outline-none placeholder:text-muted-foreground"
+          style={{
+            maxHeight: 200,
+            color: 'transparent',
+            caretColor: 'currentColor',
+          }}
+        />
+      </div>
 
       <div className="flex items-center justify-between px-2 py-2">
         <div className="flex items-center gap-0.5">

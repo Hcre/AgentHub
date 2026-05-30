@@ -36,18 +36,24 @@ export function MessageBubble({
               rehypePlugins={[rehypeHighlight]}
               components={{
                 pre: ({ children }: any) => (
-                  <pre className="overflow-x-auto rounded-lg border bg-muted/40 p-3 text-[12px]">
+                  <pre className="my-2 overflow-x-auto rounded-lg border border-slate-700/50 bg-slate-800 p-3 text-[12px] leading-[1.5] text-slate-100">
                     {children}
                   </pre>
                 ),
                 code: ({ className, children, ...props }: any) => {
-                  const isInline = !className
-                  return isInline ? (
-                    <code className="rounded bg-muted/60 px-1 py-0.5 text-[12px] font-mono" {...props}>
+                  const text = String(children ?? '')
+                  const isBlock =
+                    text.includes('\n') ||
+                    (typeof className === 'string' && className.includes('language-'))
+                  return isBlock ? (
+                    <code className={className} {...props}>
                       {children}
                     </code>
                   ) : (
-                    <code className={className} {...props}>
+                    <code
+                      className="rounded bg-muted/50 px-1 py-0.5 font-mono text-[12px] text-foreground"
+                      {...props}
+                    >
                       {children}
                     </code>
                   )

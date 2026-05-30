@@ -22,6 +22,7 @@ export function useGroupWebSocket(groupId: string | null, sessionId: string | nu
   const apply = useGroupStore((s) => s.applyGroupStreamEvent)
   const setWs = useGroupStore((s) => s.setWs)
   const setConnected = useGroupStore((s) => s.setConnected)
+  const flushPending = useGroupStore((s) => s.flushPending)
 
   useEffect(() => {
     if (!sessionId) return
@@ -37,6 +38,9 @@ export function useGroupWebSocket(groupId: string | null, sessionId: string | nu
       ws.onopen = () => {
         setConnected(true)
         attempts = 0
+        // 把 CONNECTING 期间用户已点 send 但未发出去的消息回放
+        const gid = gidRef.current
+        if (gid) flushPending(gid)
       }
 
       ws.onclose = () => {
@@ -70,5 +74,5 @@ export function useGroupWebSocket(groupId: string | null, sessionId: string | nu
       setWs(null)
       setConnected(false)
     }
-  }, [sessionId, apply, setWs, setConnected])
+  }, [sessionId, apply, setWs, setConnected, flushPending])
 }
