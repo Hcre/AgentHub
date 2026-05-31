@@ -30,13 +30,13 @@ IM 聊天式多 Agent 协作平台。用户创建 Agent（选系统+配模型）
 
 ### 1.4 假设清单
 
-见 [`assumptions_假设清单.md`](assumptions_假设清单.md)。
+见 [`02-assumptions_假设清单.md`](02-assumptions_假设清单.md)。
 
 ---
 
 ## 二、Commands — 可执行命令
 
-完整见 [`commands_命令接口.md`](commands_命令接口.md)。核心速查：
+完整见 [`commands_命令接口.md`](04-commands_命令接口.md)。核心速查：
 
 ```bash
 # 环境
@@ -78,7 +78,7 @@ L2  Domain           Agent/Group/Task 聚合根 + TaskEngine (Coordinator+Harnes
 L1  Infrastructure   PostgreSQL/Redis/ClaudeCodeRuntime/ClaudeAdapter/MockAdapter
 ```
 
-完整架构见 [`architecture_架构定义.md`](architecture_架构定义.md)。
+完整架构见 [`architecture_架构定义.md`](01-architecture_架构定义.md)。
 
 ### 3.2 Agent 系统与模型（两级选择 + 本地协议代理）
 
@@ -98,7 +98,7 @@ Adapter 内部:
       → 转发到实际 API
 ```
 
-借鉴 [ccswitch](https://github.com/farion1231/cc-switch) 的本地代理模式。详见 [`architecture_架构定义.md`](architecture_架构定义.md) §2.1。
+借鉴 [ccswitch](https://github.com/farion1231/cc-switch) 的本地代理模式。详见 [`architecture_架构定义.md`](01-architecture_架构定义.md) §2.1。
 
 ### 3.3 审批模式（嵌套权限处理）
 
@@ -107,7 +107,7 @@ Adapter 内部:
 | **正常模式** | Always | Ask First | 捕获 permission_request → 转 AgentHub 审批卡片 |
 | **执行模式** | Always | Always | `--dangerously-skip-permissions` |
 
-详见 [`boundaries_边界矩阵.md`](boundaries_边界矩阵.md) §零。
+详见 [`boundaries_边界矩阵.md`](../conventions/99-boundaries_边界矩阵.md) §零。
 
 ### 3.4 目录布局
 
@@ -172,7 +172,7 @@ PENDING → QUEUED → RUNNING → COMPLETED (终态)
 
 ## 五、Testing Strategy
 
-见 [`testing-strategy_测试策略.md`](testing-strategy_测试策略.md)。
+见 [`testing-strategy_测试策略.md`](05-testing-strategy_测试策略.md)。
 
 - 后端覆盖率 >= 80%，前端 >= 70%
 - Mock: LLM API(Fixture) / Tunnel(HTTP Mock)
@@ -183,7 +183,7 @@ PENDING → QUEUED → RUNNING → COMPLETED (终态)
 
 ## 六、Boundaries
 
-见 [`boundaries_边界矩阵.md`](boundaries_边界矩阵.md)。关键速查：
+见 [`boundaries_边界矩阵.md`](../conventions/99-boundaries_边界矩阵.md)。关键速查：
 
 | Always | Ask First | Never |
 |--------|-----------|-------|
@@ -213,15 +213,15 @@ PENDING → QUEUED → RUNNING → COMPLETED (终态)
 
 | 文档 | 内容 |
 |------|------|
-| [`PRD_AgentHub_v4_统一方案.md`](../docs/PRD_AgentHub_v4_统一方案.md) | 产品需求文档（User Stories + 功能需求） |
-| [`架构设计_分层与数据流.md`](架构设计_分层与数据流.md) | 24 个场景完整数据流 + 时序图 |
-| [`architecture_架构定义.md`](architecture_架构定义.md) | 5 层架构 + 核心模块定义 |
-| [`data-model_数据模型.md`](data-model_数据模型.md) | 6 张表 DDL + Pydantic Schema |
-| [`commands_命令接口.md`](commands_命令接口.md) | REST API + WS + CLI 全集 |
-| [`boundaries_边界矩阵.md`](boundaries_边界矩阵.md) | Always/Ask First/Never |
-| [`testing-strategy_测试策略.md`](testing-strategy_测试策略.md) | 测试策略 + Mock 边界 |
-| [`assumptions_假设清单.md`](assumptions_假设清单.md) | 显式假设 |
-| [`rules/`](rules/) | 架构/代码/流程红线 |
+| [`PRD_AgentHub_v4_统一方案.md`](../plan/背景_PRD_AgentHub_统一方案.md) | 产品需求文档（User Stories + 功能需求） |
+| [`架构设计_分层与数据流.md`](01b-architecture-design_分层与数据流.md) | 24 个场景完整数据流 + 时序图 |
+| [`architecture_架构定义.md`](01-architecture_架构定义.md) | 5 层架构 + 核心模块定义 |
+| [`data-model_数据模型.md`](03-data-model_数据模型.md) | 6 张表 DDL + Pydantic Schema |
+| [`commands_命令接口.md`](04-commands_命令接口.md) | REST API + WS + CLI 全集 |
+| [`boundaries_边界矩阵.md`](../conventions/99-boundaries_边界矩阵.md) | Always/Ask First/Never |
+| [`testing-strategy_测试策略.md`](05-testing-strategy_测试策略.md) | 测试策略 + Mock 边界 |
+| [`02-assumptions_假设清单.md`](02-assumptions_假设清单.md) | 显式假设 |
+| [`rules/`](../conventions/) | 架构/代码/流程红线 |
 
 ---
 
