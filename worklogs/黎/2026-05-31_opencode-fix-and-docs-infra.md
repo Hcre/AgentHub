@@ -23,6 +23,10 @@
 | `docs/explore/黎/artifact-preview-research.md` | M4 产物预览调研 |
 | `docs/explore/黎/opencode-json-parsing-fix.md` | opencode 集成审查报告 |
 
+### 补充修复 (21:30)
+
+- **step_finish 误触发 DONE** — opencode 多步流程 `step_start → tool_use → step_finish → step_start → text`，step_finish 被映射为 DONE 导致循环提前 break，丢失后续 text 事件。修复：step_finish 静默处理，循环靠进程自然退出。
+
 ## 给下一位的交接
 
 - 后端重启后 opencode 对话应该能正常工作

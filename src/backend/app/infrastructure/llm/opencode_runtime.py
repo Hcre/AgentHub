@@ -257,10 +257,14 @@ class OpenCodeRuntime(AgentRuntime):
                     ),
                 )
             )
-        elif event_type in ("done", "result", "complete", "exit", "step_finish"):
+        elif event_type in ("done", "result", "complete", "exit"):
             events.append(
                 StreamEvent(type=StreamEventType.DONE, seq=seq, metadata={"model": self._model})
             )
+        elif event_type == "step_finish":
+            # 多步流程中间事件（tool_use 后必有 step_finish，之后可能还有 step_start + text）
+            # 不产生 DONE，循环靠进程退出自然结束
+            pass
         elif event_type == "error":
             events.append(
                 StreamEvent(
