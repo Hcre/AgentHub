@@ -66,10 +66,17 @@ export const useChatStore = create<ChatState>()(
 
   addUserMessage: (key, text) => {
     const userMsg: ChatMessage = { id: uid('u'), from: 'user', time: nowStamp(), text }
-    set((s) => ({
-      messages: { ...s.messages, [key]: [...(s.messages[key] ?? []), userMsg] },
-      typing: { ...s.typing, [key]: true },
-    }))
+    set((s) => {
+      const prev = s.messages[key] ?? []
+      // 关闭还在流式的旧哨兵（防止新回复追加到旧消息上）
+      const list = prev.map((m) =>
+        m.streaming ? { ...m, id: uid('a'), streaming: false } : m,
+      )
+      return {
+        messages: { ...s.messages, [key]: [...list, userMsg] },
+        typing: { ...s.typing, [key]: true },
+      }
+    })
   },
 
   applyStreamEvent: (key, event) => {
