@@ -1,29 +1,34 @@
 # OpenCode 集成问题记录
 
-## 当前状态
+## 当前状态 (2026-05-31)
 
-**Ping 测试通过，真实对话不通。**
+**仍未完全调通。** 已修复 7 个 bug，push 到 main。待验证。
 
-### 已确认可以工作
-- 终端直接运行 `opencode run` ✅ (2026-05-31 验证)
-- `POST /api/providers/ping` opencode ✅ (3827ms)
-- opencode.jsonc 配置正确 ✅
-- AgentHub → OpenCodeRuntime → spawn opencode → `step_start` 事件 ✅
-- `_write_provider_config` 写入正确 JSON ✅
+### 已修复 (7ad2abc → f9ad8a5)
 
-### 不通的地方
-- 通过 AgentHub 创建 OpenCode Agent → 发消息 → 无响应
-- 前端显示 `⚠️` 错误
+| # | 问题 | 根因 | 修复 |
+|---|------|------|------|
+| 1 | opencode 静默卡死 | `create_subprocess_exec` 没设 `stdin=DEVNULL`，继承父进程 stdin 等待输入 | 加 `stdin=asyncio.subprocess.DEVNULL` |
+| 2 | opencode 找不到配置 | Windows 无 `HOME` 环境变量，opencode Unix 风格读 `$HOME/.config` | `env["HOME"] = USERPROFILE` |
+| 3 | `.format()` KeyError | Python `.format()` 与 opencode.jsonc 的 `{` 冲突 | 改用 `.replace("{api_key}", key)` |
+| 4 | `--dir` 触发 agent 流水线卡死 | opencode 带 `--dir` 进入完整 coding agent 模式，分析项目卡住 | 去掉 `--dir`，用 cwd 替代 |
+| 5 | `--session` 报 Session not found | 首次调用就带 `--session`，session 还没创建 | 首次不加，从 stdout 捕获 sessionID 后复用 |
+| 6 | npm 全局路径找不到 | `shutil.which` 在 Windows 不查 npm 全局目录 | 改用 `_resolve_binary`(Windows fallback) |
+| 7 | base_url env var 名错误 | PiAgentRuntime 对 deepseek 设了 `ANTHROPIC_BASE_URL` | 改为 provider-aware: anthropic→ANTHROPIC_BASE_URL, 其他→OPENAI_BASE_URL |
+| 8 | AgentResponse 丢 settings | `from_domain()` 漏了 `settings` 字段 | 添加 `settings=a.settings` |
+| 9 | Step 2 关闭按钮无响应 | `reset()` 未重置 `wsBrowserOpen`，残留 Portal 遮罩 | 添加 `setWsBrowserOpen(false)` |
 
-### 已修复的问题
-1. `--dir` 参数触发完整 agent 流水线 → 已去掉
-2. `--session` 找不到已存在 session → 已去掉（首次不用）
-3. `.format()` 与 JSON 花括号冲突 → 改用 `.replace()`
-4. Windows 缺少 `HOME` 环境变量 → 已补 `env["HOME"] = USERPROFILE`
-5. `apiKey: "{env:DEEPSEEK_API_KEY}"` 不支持 → 改为硬编码 + 动态覆写
-6. `shutil.which` 找不到 npm 全局路径 → 改用 `_resolve_binary`
+### 验证矩阵
 
-### 待排查
-- 为什么 E2E 测试 `adapter.stream()` 能捕获 `step_start`，但实际对话无响应
-- ChatService → ContextBuilder → AgentRequest 链路是否正确传递 system_prompt
-- WebSocket 事件流是否正确转发
+| 项目 | 状态 |
+|------|:---:|
+| 终端 `opencode run "你好"` | ✅ |
+| `POST /api/providers/ping` (opencode) | ✅ 3827ms |
+| opencode.jsonc 动态覆写 | ✅ |
+| AgentHub WebSocket 对话 | ❌ 待验证 |
+
+### 架构决策
+
+- **OpenCode 多轮对话**: 首次 spawn 无 `--session`，从 stdout 捕获 sessionID，后续复用
+- **Key 注入**: 每次 spawn 前 `_write_provider_config()` 覆写 `~/.config/opencode/opencode.jsonc`
+- **模型**: 默认 `deepseek/deepseek-v4-flash`，`--pure` 跳过项目分析
