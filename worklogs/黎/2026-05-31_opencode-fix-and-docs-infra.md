@@ -26,6 +26,7 @@
 ### 补充修复 (21:30)
 
 - **step_finish 误触发 DONE** — opencode 多步流程 `step_start → tool_use → step_finish → step_start → text`，step_finish 被映射为 DONE 导致循环提前 break，丢失后续 text 事件。修复：step_finish 静默处理，循环靠进程自然退出。
+- **流式哨兵碰撞导致消息替换** — chatStore 全局 `__streaming__` 导致多轮并发时 findIndex 跨轮匹配，第二轮 text 追加到第一轮消息。修复：哨兵改为 per-key scoped `__streaming__:convKey`，ChatView key 统一用 convKey()。
 
 ## 给下一位的交接
 
