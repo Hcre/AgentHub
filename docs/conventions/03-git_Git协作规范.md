@@ -16,6 +16,7 @@
 | **PR-07** | 提交前跑 `verify.{bat,sh}`：ruff + pytest（cov ≥80）+ tsc + eslint | pre-commit + CI |
 | — | 一个 commit 只做一件事，禁 `WIP`/`fix`/`update code` 等模糊提交 | commitlint + CR |
 | — | 禁 `git push --force` 到 `main`/`develop`/共享 feature 分支 | GitHub 分支保护 |
+| **PR-10** | **AI Agent 不得自主 push / merge**。可以在分支上 commit，等用户明确指令再 push/merge/切回 main/删分支。 | 人工确认 |
 
 > 完整 PR-01 ~ PR-09 流程红线见 [99-process-rules_流程红线全集](99-process-rules_流程红线全集.md)。
 
