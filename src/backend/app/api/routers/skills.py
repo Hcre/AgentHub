@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -178,3 +179,64 @@ def _parse_github_url(github_url: str) -> tuple[str, str, str, str] | None:
     owner, repo, branch, path = m.group(1), m.group(2), m.group(3), m.group(4)
     repo = re.sub(r"\.git$", "", repo)
     return owner, repo, branch, path
+
+
+# ── Filesystem browsing ──────────────────────────────────────────
+# 为前端提供目录浏览功能，解决浏览器无法获取完整本地路径的问题
+
+FS_ROUTER = APIRouter(prefix="/api/fs", tags=["filesystem"])
+
+
+def _resolve_path(path: str) -> str:
+    """解析路径：先试原生 → 再试 Docker mount。"""
+    if os.path.isdir(path):
+        return path
+    m = re.match(r"^([A-Za-z]):[/\\]?(.*)", path.strip())
+    if m:
+        container = f"/mnt/host_{m.group(1).lower()}/" + m.group(2).replace("\\", "/")
+        if os.path.isdir(container):
+            return container
+    return path
+
+
+def _to_win_path(path: str) -> str:
+    """任意路径 → Windows 格式。"""
+    m = re.match(r"^/mnt/host_([a-z])/(.*)", path)
+    if m:
+        return f"{m.group(1).upper()}:\\" + m.group(2).replace("/", "\\")
+    # 已经是 Windows 路径或 Unix 路径，原样返回
+    return path
+
+
+@FS_ROUTER.get("/drives")
+async def list_drives():
+    """列出可用的盘符。"""
+    drives = []
+    for d in "CDEFGHIJKLMNOPQRSTUVWXYZ":
+        win = f"{d}:/"
+        container = f"/mnt/host_{d.lower()}"
+        if os.path.isdir(win) or os.path.isdir(container):
+            drives.append({"letter": f"{d}:", "path": win, "label": f"本地磁盘 ({d}:)"})
+    return drives
+
+
+@FS_ROUTER.get("/browse")
+async def browse_dir(path: str = ""):
+    """浏览指定目录，返回子目录列表。"""
+    if not path:
+        return await list_drives()
+    real = _resolve_path(path)
+    if not os.path.isdir(real):
+        return {"error": f"目录不存在: {path}", "items": []}
+    items = []
+    try:
+        for name in sorted(os.listdir(real)):
+            full = os.path.join(real, name)
+            if os.path.isdir(full) and not name.startswith("."):
+                win = _to_win_path(full)
+                items.append({"name": name, "path": win, "type": "dir"})
+    except PermissionError:
+        pass
+    parent = str(Path(real).parent)
+    parent_win = _to_win_path(parent) if parent != real else ""
+    return {"path": path, "parent": parent_win, "items": items}

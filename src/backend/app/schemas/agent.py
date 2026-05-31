@@ -21,6 +21,7 @@ class AgentCreateRequest(BaseModel):
     base_url: str | None = None
     skills: list[str] = []
     system_prompt: str | None = None
+    settings: dict | None = None
 
 
 class AgentUpdateRequest(BaseModel):
@@ -50,4 +51,5 @@ class AgentOut(BaseModel):
     skills: list[str]
     capability_tags: list[str]
     is_system: bool
+    settings: dict | None = None
     created_at: datetime

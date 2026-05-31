@@ -36,17 +36,18 @@ class SessionService:
             group_id=cmd.group_id,
             agent_id=cmd.agent_id,
             title=cmd.title,
+            workspace_path=cmd.workspace_path or "",
         )
         await self._sessions.save(session)
         participants = [p for p in (cmd.group_id, cmd.agent_id) if p is not None]
         await self._bus.publish(
-            SessionCreated(
-                session_id=session.id, type=str(session.type), participants=participants
-            )
+            SessionCreated(session_id=session.id, type=str(session.type), participants=participants)
         )
         return SessionResponse.from_domain(session)
 
-    async def list(self, *, type: str | None = None, query: str | None = None) -> list[SessionResponse]:
+    async def list(
+        self, *, type: str | None = None, query: str | None = None
+    ) -> list[SessionResponse]:
         sessions = await self._sessions.list(type=type, query=query)
         return [SessionResponse.from_domain(s) for s in sessions]
 
@@ -59,9 +60,7 @@ class SessionService:
     async def list_messages(
         self, session_id: UUID, *, before: UUID | None = None, limit: int = 50
     ) -> list[MessageResponse]:
-        msgs = await self._messages.list_by_session(
-            session_id, before=before, limit=limit
-        )
+        msgs = await self._messages.list_by_session(session_id, before=before, limit=limit)
         return [MessageResponse.from_domain(m) for m in msgs]
 
     async def update(self, cmd: UpdateSessionCommand) -> SessionResponse:
@@ -70,6 +69,8 @@ class SessionService:
             raise NotFoundError(f"会话不存在: {cmd.session_id}")
         if cmd.title is not None:
             session.title = cmd.title
+        if cmd.workspace_path is not None:
+            session.workspace_path = cmd.workspace_path
         await self._sessions.save(session)
         return SessionResponse.from_domain(session)
 
@@ -90,9 +91,7 @@ class SessionService:
         if msg is None:
             raise NotFoundError(f"消息不存在: {cmd.message_id}")
         await self._messages.set_pinned(cmd.message_id, True)
-        await self._bus.publish(
-            MessagePinned(session_id=cmd.session_id, message_id=cmd.message_id)
-        )
+        await self._bus.publish(MessagePinned(session_id=cmd.session_id, message_id=cmd.message_id))
 
     async def unpin_message(self, cmd: UnpinMessageCommand) -> None:
         msg = await self._messages.get_by_id(cmd.message_id)

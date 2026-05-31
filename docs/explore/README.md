@@ -49,7 +49,7 @@ docs/explore/
 
 | 文件 | 主题 | 状态 |
 |------|------|------|
-| [group-chat-boundary-and-dependencies](group-chat-boundary-and-dependencies.md) | 群聊模块边界、依赖分析与接口契约 | 讨论中 |
+| [group-chat-boundary-and-dependencies](EXP-12_group-chat-boundary-and-dependencies.md) | 群聊模块边界、依赖分析与接口契约 | 讨论中 |
 
 ## 架构决策记录
 

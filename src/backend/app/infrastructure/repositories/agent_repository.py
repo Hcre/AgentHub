@@ -61,9 +61,7 @@ class PostgresAgentRepository(AgentRepository):
         return (await self._s.execute(stmt)).first() is not None
 
     async def get_by_name(self, name: str) -> Agent | None:
-        stmt = select(AgentModel).where(
-            AgentModel.name == name, AgentModel.is_deleted.is_(False)
-        )
+        stmt = select(AgentModel).where(AgentModel.name == name, AgentModel.is_deleted.is_(False))
         m = (await self._s.execute(stmt)).scalars().first()
         return _to_domain(m) if m else None
 

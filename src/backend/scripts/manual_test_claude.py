@@ -29,20 +29,30 @@ async def main():
     # 1. 创建 agent
     print(">>> 创建 agent (agent_system=claude_code) ...")
     async with httpx.AsyncClient() as c:
-        r = await c.post(f"{BASE}/api/agents", json={
-            "name": f"test-cli-{uuid4().hex[:6]}",
-            "avatar": "🤖", "role": "开发助手",
-            "agent_system": "claude_code", "provider": "anthropic",
-        })
+        r = await c.post(
+            f"{BASE}/api/agents",
+            json={
+                "name": f"test-cli-{uuid4().hex[:6]}",
+                "avatar": "🤖",
+                "role": "开发助手",
+                "agent_system": "claude_code",
+                "provider": "anthropic",
+            },
+        )
         r.raise_for_status()
         agent = r.json()
         print(f"Agent: {agent['id']}")
 
         # 2. 创建 session
         print(">>> 创建 session ...")
-        r = await c.post(f"{BASE}/api/sessions", json={
-            "type": "private", "agent_id": agent["id"], "title": "手动测试",
-        })
+        r = await c.post(
+            f"{BASE}/api/sessions",
+            json={
+                "type": "private",
+                "agent_id": agent["id"],
+                "title": "手动测试",
+            },
+        )
         r.raise_for_status()
         session = r.json()
         print(f"Session: {session['id']}\n")
@@ -66,10 +76,14 @@ async def main():
                     print(evt.get("content", ""), end="", flush=True)
                 elif t == "tool_call":
                     tc = evt.get("tool_call", {})
-                    print(f"\n[TOOL] {tc.get('name')}: {json.dumps(tc.get('arguments', {}), ensure_ascii=False)[:200]}")
+                    print(
+                        f"\n[TOOL] {tc.get('name')}: {json.dumps(tc.get('arguments', {}), ensure_ascii=False)[:200]}"
+                    )
                 elif t == "done":
                     m = evt.get("metadata", {})
-                    print(f"\n[DONE] ${m.get('total_cost_usd', 0):.4f} {m.get('duration_ms', 0)}ms\n")
+                    print(
+                        f"\n[DONE] ${m.get('total_cost_usd', 0):.4f} {m.get('duration_ms', 0)}ms\n"
+                    )
                     break
                 elif t == "error":
                     print(f"\n[ERROR] {evt.get('content')}\n")

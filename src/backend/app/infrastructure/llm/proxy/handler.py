@@ -9,6 +9,7 @@ CLI 子进程的 ANTHROPIC_BASE_URL 指向本代理，代理解析 agent_id 后�
 
 from __future__ import annotations
 
+import json
 import logging
 from uuid import UUID
 
@@ -88,8 +89,20 @@ class ProxyHandler:
         }
         forward_headers["x-api-key"] = real_key
 
-        # 5. 流式转发
+        # 5. 处理 body — 非 Anthropic 提供商过滤 system 消息
         body = await request.body()
+        if body and "deepseek" in (agent.base_url or "").lower():
+            try:
+                data = json.loads(body)
+                msgs = data.get("messages", [])
+                if msgs:
+                    data["messages"] = [m for m in msgs if m.get("role") != "system"]
+                    body = json.dumps(data).encode()
+                    forward_headers["content-length"] = str(len(body))
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        # 6. 流式转发
         upstream = await client.send(
             client.build_request(
                 method=request.method,

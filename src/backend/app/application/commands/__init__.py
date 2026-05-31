@@ -19,10 +19,11 @@ class CreateAgentCommand:
     agent_system: str = "mock"
     provider: str = "anthropic"
     model: str = ""
-    api_key: str | None = None         # 明文传入，L3 加密后交 L1；CLI 模式可为空
+    api_key: str | None = None  # 明文传入，L3 加密后交 L1；CLI 模式可为空
     base_url: str | None = None
     skills: list[str] = field(default_factory=list)
     system_prompt: str | None = None
+    settings: dict | None = None
 
 
 @dataclass
@@ -40,6 +41,7 @@ class UpdateAgentCommand:
     capability_tags: list[str] | None = None
     settings: dict | None = None
     system_prompt: str | None = None
+    settings: dict | None = None
 
 
 @dataclass
@@ -73,10 +75,11 @@ class DeleteGroupCommand:
 
 @dataclass
 class CreateSessionCommand:
-    type: str                          # "group" | "private"
+    type: str  # "group" | "private"
     group_id: UUID | None = None
     agent_id: UUID | None = None
     title: str = ""
+    workspace_path: str = ""
 
 
 @dataclass
@@ -105,6 +108,7 @@ class UnpinMessageCommand:
 class UpdateSessionCommand:
     session_id: UUID
     title: str | None = None
+    workspace_path: str | None = None
 
 
 # === Task Commands ===

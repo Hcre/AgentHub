@@ -60,3 +60,4 @@ _assets/
 # 仅 graph_schema.json（节点/边定义）入 git。docs/CODE_MAP.md 照常入库。
 .codegraph/graph.json
 .understand-anything/
+backend/

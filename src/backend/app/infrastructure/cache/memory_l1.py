@@ -55,9 +55,7 @@ class InMemoryL1Store(L1MemoryStore):
 
     def __init__(self, window: int | None = None) -> None:
         self._window = window or settings.l1_window_size
-        self._data: dict[UUID, deque[dict]] = defaultdict(
-            lambda: deque(maxlen=self._window)
-        )
+        self._data: dict[UUID, deque[dict]] = defaultdict(lambda: deque(maxlen=self._window))
 
     async def append(self, session_id: UUID, message: dict) -> None:
         self._data[session_id].append(message)

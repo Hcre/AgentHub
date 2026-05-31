@@ -5,7 +5,7 @@
 > 基于设计文档：
 > - `docs/design/group-chat_群聊功能设计方案.md` — V1 @ 路由 + 增量注入 §3.4
 > - `docs/design/group-chat-discussion-mode_群聊讨论模式设计方案.md` — 讨论模式 + Selector
-> - `docs/explore/group-chat-boundary-and-dependencies.md` — 模块边界与接口契约
+> - `docs/explore/EXP-12_group-chat-boundary-and-dependencies.md` — 模块边界与接口契约
 
 ## 一、范围
 
@@ -239,6 +239,6 @@
 |------|------|
 | `group-chat_群聊功能设计方案.md` | V1 @ 路由 + 增量注入（§3.4） |
 | `group-chat-discussion-mode_群聊讨论模式设计方案.md` | Selector 选人 / 防循环 / Bypass / 模式预留 |
-| `group-chat-boundary-and-dependencies.md` | 模块边界与接口契约 |
+| `EXP-12_group-chat-boundary-and-dependencies.md` | 模块边界与接口契约 |
 | `docs/plan/开发清单_roadmap.md` | 原始 M3 任务清单 |
 | `docs/specs/01-architecture_架构定义.md` | 五层架构 + 上下文三层体系 |

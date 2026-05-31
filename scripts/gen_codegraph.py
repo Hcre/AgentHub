@@ -7,7 +7,7 @@
   .codegraph/graph.json          AI 侧：节点(MODULE/CLASS/FUNCTION) + 边(IMPORTS/CALLS/CONTAINS) + 缺陷检测
   .codegraph/graph_schema.json   节点/边定义（入 git）
   .understand-anything/graph.html 人侧：浏览器交互式可视化
-  docs/CODE_MAP.md               人侧：Mermaid 全景图 + 关键入口表
+  docs/CODE-MAP_代码地图.md               人侧：Mermaid 全景图 + 关键入口表
 
 用法: python scripts/gen_codegraph.py
 """
@@ -217,7 +217,7 @@ def main() -> int:
     ua.mkdir(exist_ok=True)
     (ua / "graph.html").write_text(render_html(graph), encoding="utf-8")
 
-    (ROOT / "docs" / "CODE_MAP.md").write_text(render_code_map(graph), encoding="utf-8")
+    (ROOT / "docs" / "CODE-MAP_代码地图.md").write_text(render_code_map(graph), encoding="utf-8")
 
     s = graph["stats"]
     d = graph["defects"]
@@ -225,7 +225,7 @@ def main() -> int:
                 s["modules"], s["classes"], s["functions"], s["edges"])
     logger.info("🔍 跨层违规 %d · 循环依赖 %d · 死代码模块 %d",
                 len(d["layer_violations"]), len(d["cycles"]), len(d["dead_modules"]))
-    logger.info("产出: .codegraph/graph.json · .understand-anything/graph.html · docs/CODE_MAP.md")
+    logger.info("产出: .codegraph/graph.json · .understand-anything/graph.html · docs/CODE-MAP_代码地图.md")
     return 0
 
 

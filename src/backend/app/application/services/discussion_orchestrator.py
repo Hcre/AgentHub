@@ -122,10 +122,9 @@ class DiscussionOrchestrator:
             # 用户消息首轮不能落空：Selector 判 DONE 时随机选一人兜底
             if round_no == 0 and decision.done and decision.picks == ():
                 import random as _random
+
                 fallback = _random.choice(members)
-                logger.info(
-                    "讨论 round=0 Selector=DONE，随机兜底 agent=%s", fallback.name
-                )
+                logger.info("讨论 round=0 Selector=DONE，随机兜底 agent=%s", fallback.name)
                 decision = SelectorDecision.pick(
                     fallback.id, reason="fallback: selector done, random pick"
                 )
@@ -166,18 +165,18 @@ class DiscussionOrchestrator:
                 async def _stream_into_q(agent: Agent) -> None:
                     try:
                         async for evt in self._stream_one(
-                            session=session, group=group, target=agent,
+                            session=session,
+                            group=group,
+                            target=agent,
                             trigger=last_msg_for_history,
                         ):
-                            await queue.put(evt)
+                            await queue.put(evt)  # noqa: B023
                     except Exception:
                         logger.exception("multi-pick 流式失败 agent=%s", agent.id)
                     finally:
-                        await queue.put(None)  # sentinel
+                        await queue.put(None)  # noqa: B023
 
-                tasks = [
-                    _asyncio.create_task(_stream_into_q(a)) for a in pick_targets
-                ]
+                tasks = [_asyncio.create_task(_stream_into_q(a)) for a in pick_targets]
                 finished = 0
                 while finished < len(tasks):
                     evt = await queue.get()
@@ -197,9 +196,7 @@ class DiscussionOrchestrator:
             # 5. 取目标 Agent（单人）
             target = await self._agents.get_by_id(decision.next_agent_id)
             if target is None:
-                logger.warning(
-                    "讨论中目标 Agent %s 不存在，跳过", decision.next_agent_id
-                )
+                logger.warning("讨论中目标 Agent %s 不存在，跳过", decision.next_agent_id)
                 continue
 
             # 6. 单 Agent 流式
@@ -214,9 +211,7 @@ class DiscussionOrchestrator:
             # 7. 标记已发言
             already_spoken.add(target.id)
 
-        logger.info(
-            "讨论达到 max_round=%d，自然结束 session=%s", max_round, session.id
-        )
+        logger.info("讨论达到 max_round=%d，自然结束 session=%s", max_round, session.id)
 
     # --- 流式单 Agent（与 ChatService._stream_one_agent 同构，避免循环依赖单独实现） ---
 
@@ -309,13 +304,9 @@ class DiscussionOrchestrator:
                 members.append(a)
         return members
 
-    async def _fetch_history(
-        self, session: Session, *, since: Message
-    ) -> list[Message]:
+    async def _fetch_history(self, session: Session, *, since: Message) -> list[Message]:
         # 取最近 N 条作为讨论快照；since 仅用于上下文，不做时间裁剪
-        recent = await self._messages.list_by_session(
-            session.id, limit=settings.l1_window_size
-        )
+        recent = await self._messages.list_by_session(session.id, limit=settings.l1_window_size)
         return recent
 
 

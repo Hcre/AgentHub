@@ -68,12 +68,11 @@ async def test_send_and_stream_private(db_session) -> None:  # type: ignore[no-u
         PostgresMessageRepository(db_session),
         bus,
     )
-    session = await session_svc.create(
-        CreateSessionCommand(type="private", agent_id=agent.id)
-    )
+    session = await session_svc.create(CreateSessionCommand(type="private", agent_id=agent.id))
 
     events = [
-        e async for e in chat.send_and_stream(
+        e
+        async for e in chat.send_and_stream(
             SendMessageCommand(session_id=session.id, content="你好")
         )
     ]
@@ -107,9 +106,7 @@ async def test_group_at_routing_single_mention(db_session) -> None:  # type: ign
         await agent_repo.save(ag)
 
     group_repo = PostgresGroupRepository(db_session)
-    group = Group(
-        name="proj-x", coordinator_id=coord.id, member_ids=[a.id, b.id]
-    )
+    group = Group(name="proj-x", coordinator_id=coord.id, member_ids=[a.id, b.id])
     await group_repo.save(group)
 
     session_repo = PostgresSessionRepository(db_session)
@@ -119,7 +116,8 @@ async def test_group_at_routing_single_mention(db_session) -> None:  # type: ign
     chat, _l1, wm, _bus = _build_chat(db_session)
 
     events = [
-        e async for e in chat.send_and_stream(
+        e
+        async for e in chat.send_and_stream(
             SendMessageCommand(
                 session_id=session.id, content="@AgentA 帮我看看", mentions=["AgentA"]
             )
@@ -161,7 +159,8 @@ async def test_group_at_routing_multi_mention_serial(db_session) -> None:  # typ
 
     chat, _l1, wm, _bus = _build_chat(db_session)
     events = [
-        e async for e in chat.send_and_stream(
+        e
+        async for e in chat.send_and_stream(
             SendMessageCommand(
                 session_id=session.id,
                 content="@AgentA @AgentB 一起看下",
@@ -198,7 +197,8 @@ async def test_group_no_mention_silent(db_session) -> None:  # type: ignore[no-u
 
     chat, _l1, wm, _bus = _build_chat(db_session)
     events = [
-        e async for e in chat.send_and_stream(
+        e
+        async for e in chat.send_and_stream(
             SendMessageCommand(session_id=session.id, content="大家好")
         )
     ]
@@ -228,7 +228,8 @@ async def test_group_invalid_mention_skipped(db_session) -> None:  # type: ignor
 
     chat, _l1, _wm, _bus = _build_chat(db_session)
     events = [
-        e async for e in chat.send_and_stream(
+        e
+        async for e in chat.send_and_stream(
             SendMessageCommand(
                 session_id=session.id,
                 content="@AgentA @Outsider @NotExist 测试",

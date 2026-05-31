@@ -16,7 +16,7 @@ class PlannedTask:
 
     title: str
     description: str
-    suggested_worker: str               # 建议的 Agent name
+    suggested_worker: str  # 建议的 Agent name
     depends_on: list[int] = field(default_factory=list)  # 依赖的子任务索引
     assigned_worker: UUID | None = None  # Harness 路由后的实际 Agent id
 

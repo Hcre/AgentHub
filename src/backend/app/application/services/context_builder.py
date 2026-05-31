@@ -101,9 +101,7 @@ class ContextBuilder:
             f"你是 {target_agent.name}，本群成员之一。"
             f"你只代表你自己发言，不要替其他成员说话，不要模仿他人的口癖或说话风格。"
         )
-        system_prompt = "\n\n".join(
-            filter(None, [persona, GROUP_CHAT_CONTRACT, members_block])
-        )
+        system_prompt = "\n\n".join(filter(None, [persona, GROUP_CHAT_CONTRACT, members_block]))
 
         # 4. 渲染 delta（动态部分）
         agent_name_by_id = {m.id: m.name for m in members}
@@ -113,9 +111,7 @@ class ContextBuilder:
             if delta.truncated_count > 0
             else ""
         )
-        group_delta_text = (
-            (truncated_hint + delta_block) if delta_block else None
-        )
+        group_delta_text = (truncated_hint + delta_block) if delta_block else None
 
         # 5. L1 窗口仅作为辅助记忆传递（CLI Runtime 实际只用 system_prompt + 最后一条 user）
         window = await self._l1.get_window(session.id)
@@ -130,6 +126,7 @@ class ContextBuilder:
             agent_id=target_agent.id,
             group_id=group.id,
             is_group_chat=True,
+            working_directory=session.workspace_path or None,
             group_delta_text=group_delta_text,
         )
 
@@ -152,6 +149,7 @@ class ContextBuilder:
             max_tokens=settings.max_tokens,
             agent_id=target_agent.id,
             is_group_chat=False,
+            working_directory=session.workspace_path or None,
         )
 
     # --- delta 计算 ---
@@ -162,9 +160,7 @@ class ContextBuilder:
         wm = await self._wm.get(group_id, agent_id)
         if wm is None:
             # 首次接触：给一段种子历史
-            seed = await self._messages.list_by_session(
-                session_id, limit=settings.l1_window_size
-            )
+            seed = await self._messages.list_by_session(session_id, limit=settings.l1_window_size)
             return self._maybe_truncate(seed)
 
         # 优先走 L1 cache
@@ -185,16 +181,12 @@ class ContextBuilder:
                 session_id,
                 agent_id,
             )
-            seed = await self._messages.list_by_session(
-                session_id, limit=settings.l1_window_size
-            )
+            seed = await self._messages.list_by_session(session_id, limit=settings.l1_window_size)
             return self._maybe_truncate(seed)
         return self._maybe_truncate(delta)
 
     @staticmethod
-    def _extract_delta_from_l1(
-        window: list[dict], wm: uuid.UUID
-    ) -> list[Message] | None:
+    def _extract_delta_from_l1(window: list[dict], wm: uuid.UUID) -> list[Message] | None:
         """L1 当前以 role/content 字典存储，未带 message_id，暂无法从 L1 过滤 → 走 PG。
 
         预留接口：未来 L1 改成 List[Message dict with id] 后启用快路径。

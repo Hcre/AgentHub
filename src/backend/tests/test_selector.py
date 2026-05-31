@@ -6,7 +6,7 @@ import uuid
 
 import pytest
 
-from app.application.services.selector import Selector, SelectorDecision
+from app.application.services.selector import Selector
 from app.domain.entities.agent import Agent
 from app.domain.entities.message import Message
 from app.domain.enums import AgentSystem, MessageRole, Provider
@@ -31,9 +31,7 @@ async def test_mention_field_resolves_to_member() -> None:
     a = _mk_agent("AgentA", "前端", ["frontend"])
     b = _mk_agent("AgentB", "后端", ["backend"])
     sid = uuid.uuid4()
-    msg = Message(
-        session_id=sid, role=MessageRole.USER, content="hi", mentions=["AgentB"]
-    )
+    msg = Message(session_id=sid, role=MessageRole.USER, content="hi", mentions=["AgentB"])
 
     sel = Selector()
     decision = await sel.pick(members=[a, b], history=[msg])
@@ -81,9 +79,7 @@ async def test_capability_keyword_matches() -> None:
     a = _mk_agent("AgentA", "前端", ["frontend", "react"])
     b = _mk_agent("AgentB", "后端", ["backend"])
     sid = uuid.uuid4()
-    msg = Message(
-        session_id=sid, role=MessageRole.USER, content="这个 react 组件有 bug"
-    )
+    msg = Message(session_id=sid, role=MessageRole.USER, content="这个 react 组件有 bug")
     sel = Selector()
     decision = await sel.pick(members=[a, b], history=[msg])
     assert decision.next_agent_id == a.id
@@ -208,9 +204,7 @@ def test_total_prompt_length_guard_trims_oldest() -> None:
             )
         )
     name_by_id = {a.id: a.name, b.id: b.name}
-    system, prompt = Selector._build_prompts(
-        candidates=[a, b], history=msgs, name_by_id=name_by_id
-    )
+    system, prompt = Selector._build_prompts(candidates=[a, b], history=msgs, name_by_id=name_by_id)
     # prompt 不应超过 settings.selector_max_prompt_chars
     assert len(system) + len(prompt) <= settings.selector_max_prompt_chars + 500  # 允许一定容差
     # 至少保留 1 条消息

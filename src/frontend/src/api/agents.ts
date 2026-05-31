@@ -5,7 +5,7 @@ export interface CreateAgentInput {
   name: string;
   avatar: string;
   role: string;
-  /** 运行时：claude_code / anthropic_api / mock。决定后端适配器选择。 */
+  /** 运行时：自动检测的 CLI (opencode/claude_code/pi_agent/codex/gemini/cursor_agent) 或 mock。 */
   agent_system: string;
   provider: string;
   model: string;
@@ -14,6 +14,7 @@ export interface CreateAgentInput {
   api_key: string;
   skills?: string[];
   system_prompt?: string;
+  settings?: Record<string, unknown>;
 }
 
 export const agentsApi = {

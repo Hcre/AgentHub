@@ -94,7 +94,5 @@ class PostgresGroupRepository(GroupRepository):
         return [_to_domain(m, await self._member_ids(m.id)) for m in rows]
 
     async def _member_ids(self, group_id: UUID) -> list[UUID]:
-        stmt = select(GroupMemberModel.agent_id).where(
-            GroupMemberModel.group_id == group_id
-        )
+        stmt = select(GroupMemberModel.agent_id).where(GroupMemberModel.group_id == group_id)
         return [row[0] for row in (await self._s.execute(stmt)).all()]

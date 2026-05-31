@@ -13,6 +13,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shutil
 from collections.abc import AsyncIterator
 from contextlib import suppress
@@ -33,16 +34,47 @@ _DEFAULT_TIMEOUT = 300
 _DEFAULT_THINKING_LEVEL = "off"
 
 # Provider → Pi --provider 参数
+# Provider → Pi CLI --provider 参数值
 _PROVIDER_MAP: dict[str, str] = {
     "anthropic": "anthropic",
     "openai": "openai",
+    "deepseek": "deepseek",  # pi CLI 原生支持 deepseek provider（OpenAI 协议）
+    "siliconflow": "openai",  # 硅基流动走 OpenAI 兼容协议
 }
 
 # Provider → API Key 环境变量
 _PROVIDER_ENV_KEY: dict[str, str] = {
     "anthropic": "ANTHROPIC_API_KEY",
     "openai": "OPENAI_API_KEY",
+    "deepseek": "DEEPSEEK_API_KEY",
+    "siliconflow": "OPENAI_API_KEY",
 }
+
+# Provider → 默认 Base URL（第三方端点需要显式设置）
+_PROVIDER_BASE_URL: dict[str, str] = {
+    "siliconflow": "https://api.siliconflow.cn/v1",
+}
+
+
+def _resolve_cwd(workspace: str | None) -> str | None:
+    """将 workspace 转为可用 cwd。自动检测宿主机/Docker。"""
+    if not workspace:
+        return None
+    path = workspace.strip()
+    if not path:
+        return None
+    m = re.match(r"^([A-Za-z]):[/\\](.*)", path)
+    if m:
+        # 先试原始路径（宿主机）
+        if os.path.exists(path):
+            return path
+        # 再试 Docker mount
+        rest = m.group(2).replace("\\", "/")
+        container = f"/mnt/host_{m.group(1).lower()}/{rest}"
+        if os.path.exists(container):
+            return container
+        return None
+    return path if os.path.exists(path) else None
 
 
 class PiAgentRuntime(AgentRuntime):
@@ -53,6 +85,7 @@ class PiAgentRuntime(AgentRuntime):
         *,
         model: str = "",
         agent_id: str = "",
+        agent_name: str = "",
         provider: str = "anthropic",
         api_key: str = "",
         base_url: str = "",
@@ -63,6 +96,7 @@ class PiAgentRuntime(AgentRuntime):
     ) -> None:
         self._model = model
         self._agent_id = agent_id
+        self._agent_name = agent_name
         self._provider = provider
         self._api_key = api_key
         self._base_url = base_url
@@ -99,12 +133,15 @@ class PiAgentRuntime(AgentRuntime):
         env = self._build_env()
         logger.debug("Pi CLI cmd: %s", " ".join(cmd))
 
+        cwd = _resolve_cwd(request.working_directory)
+
         self._process = await asyncio.create_subprocess_exec(
             *cmd,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=env,
+            cwd=cwd,
         )
         assert self._process.stdin is not None
         assert self._process.stdout is not None
@@ -203,7 +240,10 @@ class PiAgentRuntime(AgentRuntime):
             cmd.extend(["--thinking", self._thinking_level])
 
         if request.system_prompt:
-            cmd.extend(["--system-prompt", request.system_prompt])
+            prompt = request.system_prompt
+            if self._agent_name:
+                prompt = f"你的名字是{self._agent_name}。\n\n{prompt}"
+            cmd.extend(["--system-prompt", prompt])
 
         if self._api_key and not self._proxy_url:
             cmd.extend(["--api-key", self._api_key])
@@ -214,21 +254,19 @@ class PiAgentRuntime(AgentRuntime):
         env = os.environ.copy()
 
         if self._proxy_url:
-            # 代理模式：API 流量经 AgentHub proxy 转发
             env["ANTHROPIC_BASE_URL"] = self._proxy_url
             env["ANTHROPIC_API_KEY"] = "agenthub-proxy"
         else:
-            # 直连模式
             if self._api_key:
-                env_key = _PROVIDER_ENV_KEY.get(self._provider)
-                if env_key:
-                    env[env_key] = self._api_key
-                else:
-                    # 第三方 provider（deepseek 等）→ 用 Anthropic 兼容端点
-                    env["ANTHROPIC_API_KEY"] = self._api_key
-            if self._base_url:
-                # 设置 base URL（Pi 的 --provider anthropic 读取 ANTHROPIC_BASE_URL）
-                env["ANTHROPIC_BASE_URL"] = self._base_url
+                env_key = _PROVIDER_ENV_KEY.get(self._provider, "ANTHROPIC_API_KEY")
+                env[env_key] = self._api_key
+            # base_url: anthropic 用 ANTHROPIC_BASE_URL，其他用 OPENAI_BASE_URL
+            base = self._base_url or _PROVIDER_BASE_URL.get(self._provider, "")
+            if base:
+                base_key = (
+                    "ANTHROPIC_BASE_URL" if self._provider == "anthropic" else "OPENAI_BASE_URL"
+                )
+                env[base_key] = base
 
         return env
 
@@ -302,6 +340,11 @@ class PiAgentRuntime(AgentRuntime):
         elif event_type == "tool_execution_end":
             te = data
             is_error = te.get("isError", False)
+            raw = te.get("result")
+            if isinstance(raw, dict):
+                raw = json.dumps(raw, ensure_ascii=False)
+            elif not isinstance(raw, str):
+                raw = str(raw) if raw is not None else ""
             events = [
                 StreamEvent(
                     type=StreamEventType.TOOL_RESULT,
@@ -309,8 +352,8 @@ class PiAgentRuntime(AgentRuntime):
                     tool_result=ToolResult(
                         call_id=te.get("toolCallId", ""),
                         success=not is_error,
-                        content=te.get("result") if not is_error else None,
-                        error=te.get("result") if is_error else None,
+                        content=raw if not is_error else None,
+                        error=raw if is_error else None,
                     ),
                 )
             ]

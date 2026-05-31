@@ -35,6 +35,7 @@ async def create_agent(body: AgentCreateRequest, svc: ServiceDep) -> AgentOut:
             base_url=body.base_url,
             skills=body.skills,
             system_prompt=body.system_prompt,
+            settings=body.settings,
         )
     )
     return AgentOut(**resp.__dict__)
@@ -56,9 +57,7 @@ async def get_agent(agent_id: UUID, svc: ServiceDep) -> AgentOut:
 
 
 @router.patch("/{agent_id}", response_model=AgentOut)
-async def update_agent(
-    agent_id: UUID, body: AgentUpdateRequest, svc: ServiceDep
-) -> AgentOut:
+async def update_agent(agent_id: UUID, body: AgentUpdateRequest, svc: ServiceDep) -> AgentOut:
     resp = await svc.update(
         UpdateAgentCommand(
             agent_id=agent_id,

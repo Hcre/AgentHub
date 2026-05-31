@@ -164,9 +164,7 @@ class ChatService:
         # AT_ROUTING / 其他：死群静默（设计决策见实施计划 §六）
         logger.debug("群组 %s 无 @ 提及，静默处理", group.id)
 
-    async def _resolve_mentions(
-        self, mention_names: list[str], group: Group
-    ) -> list[Agent]:
+    async def _resolve_mentions(self, mention_names: list[str], group: Group) -> list[Agent]:
         """按 @name 解析为 Agent 实体（跳过不存在 / 不在群成员的）。"""
         if not mention_names:
             return []
@@ -257,22 +255,16 @@ class ChatService:
         assistant_msg.content = full
         assistant_msg.status = MessageStatus.COMPLETED
         await self._messages.save(assistant_msg)
-        await self._l1.append(
-            session.id, {"role": "assistant", "content": full}
-        )
+        await self._l1.append(session.id, {"role": "assistant", "content": full})
         if group is not None:
             await self._wm.set(group.id, target.id, assistant_msg.id)
         await self._bus.publish(
-            StreamingCompleted(
-                session_id=session.id, message_id=assistant_msg.id
-            )
+            StreamingCompleted(session_id=session.id, message_id=assistant_msg.id)
         )
 
     # --- 工具 ---
 
-    async def _persist_user_message(
-        self, session: Session, cmd: SendMessageCommand
-    ) -> Message:
+    async def _persist_user_message(self, session: Session, cmd: SendMessageCommand) -> Message:
         msg = Message(
             session_id=session.id,
             role=MessageRole.USER,
@@ -281,9 +273,7 @@ class ChatService:
             reply_to=cmd.reply_to,
         )
         await self._messages.save(msg)
-        await self._l1.append(
-            session.id, {"role": "user", "content": cmd.content}
-        )
+        await self._l1.append(session.id, {"role": "user", "content": cmd.content})
         await self._bus.publish(
             MessageSent(
                 session_id=session.id,

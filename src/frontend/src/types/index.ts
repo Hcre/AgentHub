@@ -330,6 +330,7 @@ export interface Session {
   title: string
   group_id: string | null
   agent_id: string | null
+  workspace_path: string
   created_at: string
 }
 

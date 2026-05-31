@@ -34,6 +34,7 @@ async def create_session(body: SessionCreateRequest, svc: ServiceDep) -> Session
             group_id=body.group_id,
             agent_id=body.agent_id,
             title=body.title,
+            workspace_path=body.workspace_path or "",
         )
     )
     return SessionOut(**resp.__dict__)
@@ -64,11 +65,13 @@ async def list_messages(
 
 
 @router.patch("/sessions/{session_id}", response_model=SessionOut)
-async def update_session(
-    session_id: UUID, body: dict, svc: ServiceDep
-) -> SessionOut:
+async def update_session(session_id: UUID, body: dict, svc: ServiceDep) -> SessionOut:
     resp = await svc.update(
-        UpdateSessionCommand(session_id=session_id, title=body.get("title"))
+        UpdateSessionCommand(
+            session_id=session_id,
+            title=body.get("title"),
+            workspace_path=body.get("workspace_path"),
+        )
     )
     return SessionOut(**resp.__dict__)
 
@@ -86,20 +89,12 @@ async def delete_message(message_id: UUID, svc: ServiceDep) -> Response:
 
 
 @router.post("/messages/{message_id}/pin", status_code=status.HTTP_204_NO_CONTENT)
-async def pin_message(
-    message_id: UUID, session_id: UUID, svc: ServiceDep
-) -> Response:
-    await svc.pin_message(
-        PinMessageCommand(session_id=session_id, message_id=message_id)
-    )
+async def pin_message(message_id: UUID, session_id: UUID, svc: ServiceDep) -> Response:
+    await svc.pin_message(PinMessageCommand(session_id=session_id, message_id=message_id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.delete("/messages/{message_id}/pin", status_code=status.HTTP_204_NO_CONTENT)
-async def unpin_message(
-    message_id: UUID, session_id: UUID, svc: ServiceDep
-) -> Response:
-    await svc.unpin_message(
-        UnpinMessageCommand(session_id=session_id, message_id=message_id)
-    )
+async def unpin_message(message_id: UUID, session_id: UUID, svc: ServiceDep) -> Response:
+    await svc.unpin_message(UnpinMessageCommand(session_id=session_id, message_id=message_id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)

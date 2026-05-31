@@ -8,6 +8,10 @@ class AgentSystem(StrEnum):
 
     CLAUDE_CODE = "claude_code"  # CLI 运行时（自带 Harness）
     PI_AGENT = "pi_agent"  # Pi Agent CLI 运行时（自带 Harness，多 Provider）
+    OPENCODE = "opencode"  # OpenCode CLI 运行时（Terminal Dot）
+    CODEX = "codex"  # OpenAI Codex CLI
+    GEMINI = "gemini"  # Google Gemini CLI
+    CURSOR_AGENT = "cursor_agent"  # Cursor CLI Agent
     ANTHROPIC_API = "anthropic_api"  # Anthropic Messages API
     OPENAI_API = "openai_api"  # OpenAI-compatible API (DeepSeek/Groq/vLLM)
     MOCK = "mock"  # 本地假数据
