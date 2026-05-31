@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { user } from '../../data/mock'
-import { useChatStore } from '../../stores/chatStore'
+import { convKey, useChatStore } from '../../stores/chatStore'
 import { useUIStore } from '../../stores/uiStore'
 import { sessionsApi } from '../../api/sessions'
 import { useWebSocket } from '../../hooks/useWebSocket'
@@ -94,7 +94,7 @@ export function ChatView({ agent }: { agent: Agent }) {
   const [wsInput, setWsInput] = useState('')
   const [browserOpen, setBrowserOpen] = useState(false)
 
-  const key = activeConversationId ? `${agent.id}|${activeConversationId}` : null
+  const key = activeConversationId ? convKey(agent.id, activeConversationId) : null
   const list = key ? (messages[key] ?? []) : []
   const isTyping = key ? (typing[key] ?? false) : false
   const sessionId = key ? (sessionIds[key] ?? null) : null
