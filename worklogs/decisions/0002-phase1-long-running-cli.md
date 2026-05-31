@@ -1,6 +1,6 @@
 # ADR-02：Phase 1 长驻 CLI + stream-json 改造
 
-> 日期：2026-05-29 | 状态：**Accepted** | 上游：[ADR-01](./ADR-01-cli-first-pivot.md)
+> 日期：2026-05-29 | 状态：**Accepted** | 上游：[ADR-01](./0001-cli-first-pivot.md)
 
 ## 一、背景
 

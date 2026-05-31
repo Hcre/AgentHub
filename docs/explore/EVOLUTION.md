@@ -47,7 +47,7 @@
 
 ## 2026-05-23 — CLI-first 双轨架构确立
 
-- **决策**: [ADR-01](ADR-01-cli-first-pivot.md) — Agent 接入从纯 API 模式转向 CLI 优先的双轨架构（LLMAdapter + AgentRuntime）
+- **决策**: [ADR-01](../../worklogs/decisions/0001-cli-first-pivot.md) — Agent 接入从纯 API 模式转向 CLI 优先的双轨架构（LLMAdapter + AgentRuntime）
 - **原因**: Claude Code CLI 子进程模式在工具链完整性、代码生成质量上优于纯 API；保留 SDK 路径供轻量调用
 - **影响文件**: `claude_adapter.py` 重写、新增 `claude_code_runtime.py`、`domain/llm/protocol.py` 扩展
 

@@ -253,3 +253,9 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 | "汇报" | 更新 worklog + STATUS（必做）→ 功能点汇报对话内联不落盘 |
 | "收束" | 人触发，按 ai-workflow/06 四阶段（整理→测试→审计→验证）→ ADR + 收束报告 `docs/reports/` |
 | "新增/移动文件" | 先查 meta/FILE_GRAPH §三 决策树 → 操作 → 同步 FILE_GRAPH → 汇报 |
+
+---
+
+## AI 产出文件写入规则
+
+> **每次产出文件前查 `docs/conventions/06-documentation_文档规范.md` §三「文档放哪」决策表 + §三附「Git→人名映射」**。不知道自己是谁？跑 `git config user.name` 对照映射表。

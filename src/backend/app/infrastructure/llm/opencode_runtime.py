@@ -203,8 +203,14 @@ class OpenCodeRuntime(AgentRuntime):
         except json.JSONDecodeError:
             return [StreamEvent(type=StreamEventType.TEXT, seq=seq, content=line)]
 
+        # opencode v1.15+ JSON schema: 大部分字段嵌套在 data.part 内
+        part = data.get("part", {})
+
         def _s(key: str, default: str = "") -> str:
-            v = data.get(key, default)
+            # 优先取 part 内字段（opencode v1.15+ 标准），fallback 到顶层（兼容旧版）
+            v = part.get(key) if part else None
+            if v is None:
+                v = data.get(key, default)
             if isinstance(v, str):
                 return v
             if v:
@@ -228,15 +234,16 @@ class OpenCodeRuntime(AgentRuntime):
                     type=StreamEventType.TOOL_CALL,
                     seq=seq,
                     tool_call=ToolCall(
-                        call_id=str(data.get("id", data.get("call_id", ""))),
-                        name=str(data.get("name", "")),
-                        arguments=data.get("arguments", data.get("args", {})),
+                        call_id=str(data.get("id", data.get("call_id", part.get("id", "")))),
+                        name=str(part.get("name", data.get("name", ""))),
+                        arguments=part.get(
+                            "arguments", data.get("arguments", data.get("args", {}))
+                        ),
                     ),
                 )
             )
         elif event_type == "tool_result":
-            tr = data
-            tr_content = tr.get("content", tr.get("result", ""))
+            tr_content = part.get("content", data.get("content", data.get("result", "")))
             if not isinstance(tr_content, str):
                 tr_content = json.dumps(tr_content, ensure_ascii=False)
             events.append(
@@ -244,13 +251,13 @@ class OpenCodeRuntime(AgentRuntime):
                     type=StreamEventType.TOOL_RESULT,
                     seq=seq,
                     tool_result=ToolResult(
-                        call_id=str(tr.get("id", tr.get("call_id", ""))),
-                        success=not tr.get("is_error", False),
+                        call_id=str(part.get("id", data.get("id", data.get("call_id", "")))),
+                        success=not part.get("is_error", data.get("is_error", False)),
                         content=tr_content,
                     ),
                 )
             )
-        elif event_type in ("done", "result", "complete", "exit"):
+        elif event_type in ("done", "result", "complete", "exit", "step_finish"):
             events.append(
                 StreamEvent(type=StreamEventType.DONE, seq=seq, metadata={"model": self._model})
             )
@@ -262,6 +269,9 @@ class OpenCodeRuntime(AgentRuntime):
                     content=_s("message") or _s("error") or "OpenCode error",
                 )
             )
+        elif event_type == "step_start":
+            # 仅提取 sessionID，不产生用户可见事件
+            pass
         else:
             text = _s("text") or _s("content")
             if text:

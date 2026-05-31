@@ -49,13 +49,13 @@ docs/explore/
 
 | 文件 | 主题 | 状态 |
 |------|------|------|
-| [group-chat-boundary-and-dependencies](EXP-12_group-chat-boundary-and-dependencies.md) | 群聊模块边界、依赖分析与接口契约 | 讨论中 |
+| [group-chat-boundary-and-dependencies](黎/EXP-12_group-chat-boundary-and-dependencies.md) | 群聊模块边界、依赖分析与接口契约 | 讨论中 |
 
 ## 架构决策记录
 
 | 文件 | 决策摘要 |
 |------|----------|
-| [ADR-01-cli-first-pivot.md](ADR-01-cli-first-pivot.md) | CLI优先双轨架构：SDK/CLI 双路径，CLI 为主 |
+| [ADR-01-cli-first-pivot.md](../../worklogs/decisions/0001-cli-first-pivot.md) | CLI优先双轨架构：SDK/CLI 双路径，CLI 为主 |
 
 ## 个人探索
 

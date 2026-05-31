@@ -797,7 +797,7 @@ class FeishuAdapter:
             await self.feishu.send_card(
                 chat_id=result.chat_id,
                 title="📋 任务完成",
-                body=f"{result.summary}\n\n🔗 [查看详情]({result.web_url})"
+                body=f"{result.summary}\n\n🔗 查看详情: {result.web_url}"
             )
         else:
             # 纯文本 → 直接发
