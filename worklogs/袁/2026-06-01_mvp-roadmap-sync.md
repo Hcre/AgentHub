@@ -88,3 +88,46 @@
 1. 评审组过 PR #15（仅 docs 类，风险低，预计 1-2h）
 2. 通过后 squash merge → main
 3. 6/2 开工 P0-1 网页预览 iframe 卡片（按 PR-02 + 04 API 冻结 + 分支 `feature/chat/inline-iframe-card`）
+
+## 闭环备注（16:12 追加 — bf93c4e 引用修复踩坑）
+
+第三轮推进把 21 处旧路径引用按用户指令 a) 一次到位，但**踩坑了**：
+
+### 第一次尝试（失败 → 立刻回滚）
+
+用 PowerShell 的 `[System.IO.File]::WriteAllText($path, $string, $encoding)` 走 string 中转：
+- 破坏 UTF-8 BOM / CRLF
+- 10 个文件被乱码（`版本: v3.0` 变成 `鐗堟�?` —— GBK 字节被 UTF-8 解码）
+- git diff 看到 22+/22- 但内容全是乱码
+
+**救场**：`git checkout HEAD -- docs/` 立刻回滚 → 4 个 rename + 21 处旧路径全部恢复，工作树干净。
+
+### 第二次尝试（成功）
+
+改用 **字节级 Read/Write**（`ReadAllBytes` + `MemoryStream` 字节级模式匹配 + `WriteAllBytes`）：
+- UTF-8 里 ASCII 1 字节 1 字符，和中文 3 字节不会混淆
+- 模式 `99-process-rules` / `99-boundaries` 全是 ASCII，字节级安全
+- 编码 / BOM / CRLF 全部原样保留
+
+最终 `bf93c4e fix(docs): 同步 4 个规范 rename 的 21 处交叉引用`：
+- 10 文件 +22/-22（22 行变 = 11 行原内容 99-/10-/09- 替换）
+- 0 残留（`Select-String` 全量扫 docs/ + src/ + scripts/）
+- 中文显示正常（`版本: v3.0` / `流程合规校验` / `Agent 操作权限`）
+
+### 教训（已写入 agent memory）
+
+跨项目适用：**中文 / 混合语言 markdown 批量字符串替换必须走字节级**。PowerShell 5.1 的任何 string 中转都会破坏编码。
+- 反模式：`Get-Content -Raw` + `-replace` + `Set-Content`
+- 正解：`ReadAllBytes` → 内存流字节级匹配 → `WriteAllBytes`
+- 替代首选：**Edit 工具按 Read 改写**（更稳），或 **Python 字节脚本**（跨平台无歧义）
+
+### PR #15 最终状态
+
+```
+6ccbbbc  docs(worklog): 闭环 PR #15 推送记录 + 引用自查清单  (e56806e+a43e7c3)
+bf93c4e  fix(docs): 同步 4 个规范 rename 的 21 处交叉引用    (本次)
+a43e7c3  chore(docs): 规范入口/边界/红线文件重命名
+e56806e  docs(plan): sync MVP 收尾冲刺到 roadmap+status+worklog
+```
+
+**风险评估**：4 个 docs-only commit，零代码改动，零运行时影响。评审组可放心 squash merge。
