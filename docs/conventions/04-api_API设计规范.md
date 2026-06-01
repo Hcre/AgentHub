@@ -17,7 +17,7 @@
 | **AP-05** | API 版本号在 URL 路径 `/api/v1/...`；主版本号变 = 不兼容；同时维护 ≥ 2 个大版本 | URL lint + spec diff |
 | **AP-06** | 向后兼容：不删 / 不重命名已有字段；新增字段必须为 optional | spec diff + CR |
 | **AP-07** | WS 消息必须包含 `type` + `payload`；服务端推送带 `request_id` 与原 HTTP 请求关联 | CR |
-| **PR-01** | API 接口先冻结再实现：endpoint 路径 + Request/Response Schema 在 spec 中冻结 → 2 人 Review → 才能开始实现 | 流程规则（见 [99-process-rules](99-process-rules_流程红线全集.md)） |
+| **PR-01** | API 接口先冻结再实现：endpoint 路径 + Request/Response Schema 在 spec 中冻结 → 2 人 Review → 才能开始实现 | 流程规则（见 [10-process-rules](10-process-rules_流程红线全集.md)） |
 
 ---
 
@@ -131,7 +131,7 @@ GET 列表 / 详情 / PATCH / POST 创建：**直接返回资源对象**（不�
 |------|-----------|
 | 资源 | `AGENT_NOT_FOUND` / `TASK_NOT_FOUND` / `GROUP_NOT_FOUND` |
 | 认证 | `UNAUTHORIZED` / `TOKEN_EXPIRED` / `INVALID_TOKEN` |
-| 权限 | `FORBIDDEN` / `BOUNDARY_VIOLATION`（参考 [99-boundaries](99-boundaries_边界矩阵.md)） |
+| 权限 | `FORBIDDEN` / `BOUNDARY_VIOLATION`（参考 [09-boundaries](09-boundaries_边界矩阵.md)） |
 | 输入 | `VALIDATION_ERROR` / `MISSING_REQUIRED_FIELD` |
 | 状态 | `INVALID_STATE_TRANSITION`（落 AR-05） |
 | 配额 | `TOKEN_BUDGET_EXCEEDED` / `RATE_LIMITED` |
@@ -241,8 +241,8 @@ v2 顺手把 `agent_id` 改成 `agentId` → 未迁移调用方生产事故。
 | CLI 适配器 API 流程 | [docs/specs/04b-adapter-cli-flow_适配器CLI流程分析.md](../specs/04b-adapter-cli-flow_适配器CLI流程分析.md) |
 | Adapter 接口契约 | [docs/specs/04c-adapter-interface_适配器接口规范.md](../specs/04c-adapter-interface_适配器接口规范.md) |
 | 错误处理 / 异常类型 | [02-代码编写规范 §四](02-coding_代码编写规范.md) |
-| Agent 权限 / 边界 | [99-boundaries_边界矩阵](99-boundaries_边界矩阵.md) |
-| 流程红线（接口先行）| [99-process-rules_流程红线全集 PR-01](99-process-rules_流程红线全集.md) |
+| Agent 权限 / 边界 | [09-boundaries_边界矩阵](09-boundaries_边界矩阵.md) |
+| 流程红线（接口先行）| [10-process-rules_流程红线全集 PR-01](10-process-rules_流程红线全集.md) |
 | API 路由全景图 | [08-代码理解与图谱规范](08-code-understanding_代码理解与图谱规范.md) |
 
 ---
