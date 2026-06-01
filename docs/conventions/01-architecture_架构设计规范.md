@@ -224,7 +224,7 @@ db.commit()
 | 数据流细节 | [docs/specs/01b-architecture-design_分层与数据流.md](../specs/01b-architecture-design_分层与数据流.md) |
 | 适配器接口 | [docs/specs/04c-adapter-interface_适配器接口规范.md](../specs/04c-adapter-interface_适配器接口规范.md) |
 | CLI 流程 | [docs/specs/04b-adapter-cli-flow_适配器CLI流程分析.md](../specs/04b-adapter-cli-flow_适配器CLI流程分析.md) |
-| Agent 边界 / 权限矩阵 | [99-boundaries_边界矩阵](99-boundaries_边界矩阵.md) |
+| Agent 边界 / 权限矩阵 | [09-boundaries_边界矩阵](09-boundaries_边界矩阵.md) |
 | 密钥 / 代码级安全 | [02-代码编写规范 CR-10](02-coding_代码编写规范.md) |
 | 调用图 / 依赖黑洞 | [08-代码理解与图谱规范](08-code-understanding_代码理解与图谱规范.md) |
 | CLI 优先 ADR | [worklogs/decisions/0001-cli-first-pivot.md](../../worklogs/decisions/0001-cli-first-pivot.md) |

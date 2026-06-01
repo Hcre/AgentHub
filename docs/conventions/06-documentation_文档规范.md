@@ -61,7 +61,7 @@ async def dispatch_message(
 
     Raises:
         AgentNotFoundError: target_id 对应的 Agent 不存在
-        BoundaryViolation: 触发 99-boundaries 权限矩阵的拦截
+        BoundaryViolation: 触发 09-boundaries 权限矩阵的拦截
     """
 ```
 

@@ -107,7 +107,7 @@ Adapter 内部:
 | **正常模式** | Always | Ask First | 捕获 permission_request → 转 AgentHub 审批卡片 |
 | **执行模式** | Always | Always | `--dangerously-skip-permissions` |
 
-详见 [`boundaries_边界矩阵.md`](../conventions/99-boundaries_边界矩阵.md) §零。
+详见 [`boundaries_边界矩阵.md`](../conventions/09-boundaries_边界矩阵.md) §零。
 
 ### 3.4 目录布局
 
@@ -183,7 +183,7 @@ PENDING → QUEUED → RUNNING → COMPLETED (终态)
 
 ## 六、Boundaries
 
-见 [`boundaries_边界矩阵.md`](../conventions/99-boundaries_边界矩阵.md)。关键速查：
+见 [`boundaries_边界矩阵.md`](../conventions/09-boundaries_边界矩阵.md)。关键速查：
 
 | Always | Ask First | Never |
 |--------|-----------|-------|
@@ -218,7 +218,7 @@ PENDING → QUEUED → RUNNING → COMPLETED (终态)
 | [`architecture_架构定义.md`](01-architecture_架构定义.md) | 5 层架构 + 核心模块定义 |
 | [`data-model_数据模型.md`](03-data-model_数据模型.md) | 6 张表 DDL + Pydantic Schema |
 | [`commands_命令接口.md`](04-commands_命令接口.md) | REST API + WS + CLI 全集 |
-| [`boundaries_边界矩阵.md`](../conventions/99-boundaries_边界矩阵.md) | Always/Ask First/Never |
+| [`boundaries_边界矩阵.md`](../conventions/09-boundaries_边界矩阵.md) | Always/Ask First/Never |
 | [`testing-strategy_测试策略.md`](05-testing-strategy_测试策略.md) | 测试策略 + Mock 边界 |
 | [`02-assumptions_假设清单.md`](02-assumptions_假设清单.md) | 显式假设 |
 | [`rules/`](../conventions/) | 架构/代码/流程红线 |

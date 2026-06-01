@@ -363,6 +363,6 @@ import { CreateGroupModal } from '../group/CreateGroupModal'
 | `docs/specs/01-architecture_架构定义.md` §2.2 | 群组与协调者定义 |
 | `docs/specs/03-data-model_数据模型.md` §2.4-2.5 | groups/group_members DDL |
 | `docs/specs/04-commands_命令接口.md` §2.2 | Group API 规范 |
-| `docs/conventions/99-boundaries_边界矩阵.md` §二 | 群组管理权限 + 20 人上限 |
+| `docs/conventions/09-boundaries_边界矩阵.md` §二 | 群组管理权限 + 20 人上限 |
 | `docs/conventions/arch-rules_架构红线.md` | 架构约束（五层洋葱，依赖方向） |
 | `src/frontend/src/components/group/HANDOFF.md` | 前端 mock seam 说明 |

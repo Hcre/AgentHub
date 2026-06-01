@@ -23,8 +23,8 @@
 
 | 文件 | 用途 |
 |------|------|
-| [99-boundaries_边界矩阵.md](99-boundaries_边界矩阵.md) | Agent 操作权限矩阵：Always / Ask First / Never |
-| [99-process-rules_流程红线全集.md](99-process-rules_流程红线全集.md) | 完整 PR-01 ~ PR-09，03 Git 摘要的扩展 |
+| [09-boundaries_边界矩阵.md](09-boundaries_边界矩阵.md) | Agent 操作权限矩阵：Always / Ask First / Never |
+| [10-process-rules_流程红线全集.md](10-process-rules_流程红线全集.md) | 完整 PR-01 ~ PR-09，03 Git 摘要的扩展 |
 
 ### 协作流程方法论
 
