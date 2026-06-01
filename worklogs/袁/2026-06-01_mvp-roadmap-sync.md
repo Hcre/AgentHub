@@ -64,6 +64,27 @@
   - 6/1 之前的工作日志都已 merge 进 main，本 worklog 是 6/1 唯一入口
 
 ## 未完成 / 阻塞
-- [ ] 启动 dashboard.html（待本会话最后一步执行）
-- [ ] commit + PR（待人 review）
+- [x] 启动 dashboard.html → http://127.0.0.1:8080/dashboard.html 200（PID 55944 端口 8080 监听，**非本会话启动**，是上一会话遗留）
+- [x] commit — `e56806e docs(plan): sync MVP 收尾冲刺到 roadmap+status+worklog`
+- [x] commit — `a43e7c3 chore(docs): 规范入口/边界/红线文件重命名`（4 个 100% rename，CLAUDE/README → *-规范导航，99-* → 09/10-*）
+- [x] push → `origin/chore/mvp-roadmap-sync`
+- [x] 开 PR #15 — https://github.com/Hcre/AgentHub/pull/15
+- [ ] **PR-06 ≥1 Approve**（待评审组过审）
 - [ ] 后续计划 v1.0 评审组过审（待评审）
+
+## 闭环备注（15:58 追加）
+
+第二轮推进把 4 个 conventions 命名按用户指令 a) 一起塞进 `chore/mvp-roadmap-sync`：
+- 用 `git add -A docs/conventions/` 让 git 自动按 100% 相似度检测为 rename，保留历史
+- 单独 commit `a43e7c3` 而非 amend `e56806e`，保持 commit message 单一职责
+- 8 个变更（4 删 + 4 新增）= 4 个 rename，diff 净增 0 行
+
+**关于 4 个规范的旧路径引用**：
+- `docs/conventions/CLAUDE-规范导航.md` 等需要自查哪些地方引用了 `99-boundaries_*.md` / `99-process-rules_*.md` / `CLAUDE.md`（旧）
+- pre-push 钩子 `check_docs.py` 不一定检查到内部引用，需人工跑 `rg "99-(boundaries|process-rules)" docs/` 查引用
+- 如果评审前发现引用断链，可以新 commit 修，不必再开新分支
+
+**下一步动作**（评审组视角）：
+1. 评审组过 PR #15（仅 docs 类，风险低，预计 1-2h）
+2. 通过后 squash merge → main
+3. 6/2 开工 P0-1 网页预览 iframe 卡片（按 PR-02 + 04 API 冻结 + 分支 `feature/chat/inline-iframe-card`）
