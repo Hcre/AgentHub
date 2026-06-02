@@ -26,6 +26,7 @@ ignore = ["E501", "RUF001", "RUF002", "RUF003"]  # RUF=中文注释/docstring �
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["T20"]  # 测试文件允许 print 调试
+"scripts/**/*.py" = ["T20"]  # 手动调试/smoke脚本允许 print
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]

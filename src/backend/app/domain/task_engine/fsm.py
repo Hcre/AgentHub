@@ -42,9 +42,7 @@ class TaskFSM:
     @staticmethod
     def assert_transition(from_state: TaskStatus, to_state: TaskStatus) -> None:
         if not TaskFSM.can_transition(from_state, to_state):
-            raise InvalidTransitionError(
-                f"非法状态转换：{from_state} → {to_state}"
-            )
+            raise InvalidTransitionError(f"非法状态转换：{from_state} → {to_state}")
 
     @staticmethod
     def is_terminal(state: TaskStatus) -> bool:

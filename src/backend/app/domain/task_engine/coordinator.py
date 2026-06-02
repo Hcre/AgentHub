@@ -27,9 +27,7 @@ class Coordinator:
         plan = self._parse(decision)
         return self._harness.validate(plan)
 
-    def _build_prompt(
-        self, message: str, agents: list[str], history: list[dict]
-    ) -> str:
+    def _build_prompt(self, message: str, agents: list[str], history: list[dict]) -> str:
         # M3：替换为精心设计的 System Prompt + Few-shot 示例
         return (
             "你是任务协调者。将用户需求分解为可分派给以下 Agent 的子任务，"

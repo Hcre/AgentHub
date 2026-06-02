@@ -16,8 +16,9 @@
 | **PR-07** | 提交前跑 `verify.{bat,sh}`：ruff + pytest（cov ≥80）+ tsc + eslint | pre-commit + CI |
 | — | 一个 commit 只做一件事，禁 `WIP`/`fix`/`update code` 等模糊提交 | commitlint + CR |
 | — | 禁 `git push --force` 到 `main`/`develop`/共享 feature 分支 | GitHub 分支保护 |
+| **PR-10** | **AI Agent 不得自主 push / merge**。可以在分支上 commit，等用户明确指令再 push/merge/切回 main/删分支。 | 人工确认 |
 
-> 完整 PR-01 ~ PR-09 流程红线见 [99-process-rules_流程红线全集](99-process-rules_流程红线全集.md)。
+> 完整 PR-01 ~ PR-09 流程红线见 [10-process-rules_流程红线全集](10-process-rules_流程红线全集.md)。
 
 ---
 
@@ -167,7 +168,7 @@ module.exports = {
 | 方向 | 链接 |
 |------|------|
 | 细化自 | [ai-workflow 第二步 §2.6 Git 提交](ai-workflow_AI协作开发流程/04-第二步_迭代开发.md) |
-| 完整流程红线 | [99-process-rules_流程红线全集](99-process-rules_流程红线全集.md)（PR-01~09） |
+| 完整流程红线 | [10-process-rules_流程红线全集](10-process-rules_流程红线全集.md)（PR-01~09） |
 | 验证证据要求 | [ai-workflow §2.2 可观测验证](ai-workflow_AI协作开发流程/04-第二步_迭代开发.md) |
 | Skill: 分支同步与合并前检查 | `skills/git-workflow/` |
 | Skill: 完成功能（含 push 前自动校验） | `skills/feat-complete/` |

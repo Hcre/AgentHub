@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { providers } from '../../data/extra'
+import { resolveProviderConfig } from '../../data/cliProviderMatrix'
 import { useAgentStore } from '../../stores/agentStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useUIStore } from '../../stores/uiStore'
 import { Button, Dialog, DialogContent, Icon, Input, Textarea } from '../ui'
+import { WorkspaceBrowser } from '../ui/WorkspaceBrowser'
 import { agentsApi } from '../../api/agents'
 import { sessionsApi } from '../../api/sessions'
 import { useApiKeyStore } from '../../stores/apiKeyStore'
@@ -11,11 +13,16 @@ import { useApiKeyStore } from '../../stores/apiKeyStore'
 const SELECT_CLS =
   'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
-const RUNTIMES = [
-  { id: 'claude_code', label: 'Claude CLI · 代理接入第三方' },
-  { id: 'pi_agent', label: 'Pi Agent · 多Provider CLI' },
-  { id: 'mock', label: 'Mock · 演示假数据' },
-]
+interface ProviderInfo {
+  name: string
+  display_name: string
+  binary: string
+  executable_path: string
+  version: string | null
+  adapter: string
+  description: string
+  available: boolean
+}
 
 // --- Step 1 模板 ---
 interface Template {
@@ -74,6 +81,30 @@ function Label({ children }: { children: string }) {
 /** 跳转技能市场时暂存草稿，回来后恢复 */
 let wizardDraft: { name: string; prompt: string; skills: string[] } | null = null
 
+/** CLI provider 扫描缓存（模块级，页面不刷新则保留） */
+let providerCache: ProviderInfo[] | null = null
+let providerScanned = false
+
+const DEFAULT_RUNTIMES = [
+  { id: 'claude_code', label: 'Claude CLI · 代理接入第三方' },
+  { id: 'pi_agent', label: 'Pi Agent · 多Provider CLI' },
+  { id: 'mock', label: 'Mock · 演示假数据' },
+]
+
+function buildRuntimes(scanned: ProviderInfo[] | null, scanning: boolean): {id:string;label:string}[] {
+  // 还没扫描过 → 显示硬编码兜底
+  if (!scanned || scanning) return DEFAULT_RUNTIMES
+  // 扫描完成 → 只显示实际检测到的 CLI + mock 兜底
+  const list = scanned
+    .filter(p => p.available)
+    .map(p => ({ id: p.name, label: p.display_name + (p.version ? ` · ${p.version}` : '') }))
+  // 始终保留 mock 作为兜底
+  if (!list.find(r => r.id === 'mock')) {
+    list.push({ id: 'mock', label: 'Mock · 演示假数据' })
+  }
+  return list.length > 0 ? list : DEFAULT_RUNTIMES
+}
+
 export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const createAgent = useAgentStore((s) => s.createAgent)
   const removeAgent = useAgentStore((s) => s.removeAgent)
@@ -83,6 +114,9 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
   const savedKeys = useApiKeyStore((s) => s.keys)
 
   // Wizard state
+  const [scannedProviders, setScannedProviders] = useState<ProviderInfo[] | null>(null)
+  const [scanning, setScanning] = useState(false)
+  const runtimes = buildRuntimes(scannedProviders, scanning)
   const [step, setStep] = useState(1)
   // Step 1
   const [pickedIndex, setPickedIndex] = useState<number | null>(null)
@@ -97,10 +131,30 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
   const [model, setModel] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
   const [apiKey, setApiKey] = useState('')
+  const [workDir, setWorkDir] = useState('')
+  const [wsBrowserOpen, setWsBrowserOpen] = useState(false)
   const [selectedKeyId, setSelectedKeyId] = useState('')
+  // 连通性预检
+  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle')
+  const [testError, setTestError] = useState('')
   // Step 3
   const [status, setStatus] = useState<'idle' | 'creating' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
+
+  // CLI + Provider → 自动推导 base_url / 协议 / 模型
+  const derivedConfig = resolveProviderConfig(agentSystem, providerId)
+  const derivedBaseUrl = derivedConfig?.baseUrl ?? ''
+  const derivedModels = derivedConfig?.models ?? []
+  const derivedProtocol = derivedConfig?.protocol ?? ''
+
+  // 选 CLI 或 Provider 变化时自动填默认值
+  useEffect(() => {
+    if (!derivedConfig) return
+    if (!baseUrl) setBaseUrl(derivedConfig.baseUrl)
+    if (!model || !derivedConfig.models.includes(model)) {
+      setModel(derivedConfig.models[0] ?? '')
+    }
+  }, [agentSystem, providerId])
 
   const isCustom = pickedIndex === TEMPLATES.length
   const selectedTemplate = pickedIndex !== null && pickedIndex < TEMPLATES.length ? TEMPLATES[pickedIndex] : null
@@ -132,7 +186,8 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
     )
   }
 
-  const showProviderSection = agentSystem === 'claude_code' || agentSystem === 'pi_agent'
+  // CLI subprocess 类型的 provider 需要显示配置区（key/model/base_url）
+  const showProviderSection = agentSystem !== 'mock'
 
   const reset = () => {
     setStep(1)
@@ -146,6 +201,10 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
     setModel('')
     setBaseUrl('')
     setApiKey('')
+    setWorkDir('')
+    setWsBrowserOpen(false)
+    setTestStatus('idle')
+    setTestError('')
     setSelectedKeyId('')
     setStatus('idle')
     setErrorMsg('')
@@ -166,25 +225,102 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
 
   const goNext = () => {
     if (!canNext) return
-    // 模板套用 deepseek / claude_code / deepseek-chat 作为默认
     setAgentSystem('claude_code')
     setProviderId('deepseek')
     setModel(providers.find(p => p.id === 'deepseek')?.models[0] ?? '')
     setBaseUrl('')
     setApiKey('')
     setStep(2)
+
+    // 后台异步扫描 CLI，只显示实际检测到的
+    if (providerScanned && providerCache) {
+      setScannedProviders(providerCache)
+      const firstCli = providerCache.find(p => p.adapter !== 'mock')
+      if (firstCli) setAgentSystem(firstCli.name)
+    } else {
+      setScanning(true)
+      fetch('/api/providers')
+        .then(r => r.json())
+        .then((list: ProviderInfo[]) => {
+          providerCache = list
+          providerScanned = true
+          setScannedProviders(list)
+          const firstCli = list.find((p: ProviderInfo) => p.adapter !== 'mock')
+          if (firstCli) setAgentSystem(firstCli.name)
+        })
+        .catch(() => setScannedProviders(null))
+        .finally(() => setScanning(false))
+    }
   }
 
   const goBack = () => setStep(1)
 
-  // Step 3: create + connectivity test
+  // 连通性预检（创建前执行，失败不损失任何东西）
+  const doConnectivityTest = async () => {
+    if (agentSystem === 'mock') return
+    setTestStatus('testing')
+    setTestError('')
+    try {
+      const resp = await fetch('/api/providers/ping', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agent_system: agentSystem,
+          provider: providerId,
+          model: model.trim(),
+          api_key: apiKey,
+          base_url: baseUrl.trim() || undefined,
+        }),
+      })
+      const data = await resp.json()
+      if (data.ok) {
+        setTestStatus('ok')
+      } else {
+        setTestStatus('fail')
+        setTestError(data.error || '连通失败')
+      }
+    } catch (e) {
+      setTestStatus('fail')
+      setTestError(e instanceof Error ? e.message : '网络错误')
+    }
+  }
+
+  // Step 3: 创建（先连通测试，通过后再创建）
   const doCreate = async () => {
     if (!agentName.trim()) return
     setStep(3)
     setStatus('creating')
     setErrorMsg('')
+
+    // 1. 连通性预检（非 mock 时自动执行）
+    if (agentSystem !== 'mock' && apiKey) {
+      try {
+        const resp = await fetch('/api/providers/ping', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agent_system: agentSystem,
+            provider: providerId,
+            model: model.trim(),
+            api_key: apiKey,
+            base_url: baseUrl.trim() || undefined,
+          }),
+        })
+        const data = await resp.json()
+        if (!data.ok) {
+          setStatus('error')
+          setErrorMsg(`连通失败: ${data.error || '未知错误'}，请返回修改配置`)
+          return
+        }
+      } catch (e) {
+        setStatus('error')
+        setErrorMsg('连通测试网络错误，请检查后端是否运行')
+        return
+      }
+    }
+
+    // 2. 创建 Agent
     try {
-      // 1. 创建 Agent
       const id = await createAgent({
         name: agentName.trim(),
         role: agentName.trim(),
@@ -195,60 +331,9 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
         apiKey,
         skills: selectedSkills,
         systemPrompt: agentSystemPrompt,
+        settings: workDir.trim() ? { workspace_path: workDir.trim() } : undefined,
       })
 
-      // 2. 连通性测试：创建临时 Session 发一条测试消息
-      if ((agentSystem === 'claude_code' || agentSystem === 'pi_agent') && apiKey) {
-        try {
-          const session = await sessionsApi.createPrivate(id)
-          await new Promise<void>((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error('连通性测试超时（30s）')), 30000)
-            const ws = new WebSocket(`ws://${window.location.host}/ws/sessions/${session.id}`)
-            ws.onopen = () => {
-              ws.send(JSON.stringify({ type: 'message', content: 'ping' }))
-            }
-            let testBuffer = ''
-            ws.onmessage = (evt) => {
-              const d = JSON.parse(evt.data)
-              if (d.type === 'text') {
-                testBuffer += (d.content ?? '')
-              }
-              if (d.type === 'done') {
-                clearTimeout(timeout)
-                ws.close()
-                const meta = d.metadata ?? {}
-                if (meta.is_error) {
-                  const errs = meta.errors ?? []
-                  reject(new Error(errs[0] ?? testBuffer.trim() ?? '连通性测试失败'))
-                } else {
-                  resolve()
-                }
-              }
-              if (d.type === 'error') {
-                clearTimeout(timeout)
-                ws.close()
-                reject(new Error(d.content ?? '连通性测试失败'))
-              }
-            }
-            ws.onerror = () => {
-              clearTimeout(timeout)
-              ws.close()
-              reject(new Error('WebSocket 连接失败'))
-            }
-          })
-        } catch (pingErr) {
-          // 连通性失败 → 回滚：后端删除（仅 UUID）+ 前端移除
-          if (/^[0-9a-f]{8}-/.test(id)) {
-            try { await agentsApi.remove(id) } catch { /* ignore */ }
-          }
-          await removeAgent(id)
-          setStatus('error')
-          setErrorMsg(pingErr instanceof Error ? pingErr.message : '连通性验证失败，已回滚')
-          return
-        }
-      }
-
-      // 3. 成功：创建本地对话并打开
       const convId = addConversation(id)
       setStatus('success')
       setTimeout(() => {
@@ -259,7 +344,6 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
     } catch (e) {
       setStatus('error')
       const msg = e instanceof Error ? e.message : '创建失败'
-      // 提取 API 错误详情
       const detail = msg.replace(/^API \d+: /, '')
       setErrorMsg(detail.length < 200 ? detail : '创建失败，请检查配置')
     }
@@ -393,29 +477,68 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
                   <Icon name="chevronLeft" className="h-3.5 w-3.5" />
                 </Button>
                 <h3 className="text-[15px] font-medium">配置 "{agentName}"</h3>
+                <span className="text-[11px] text-muted-foreground ml-1">2/3</span>
               </div>
-              <Button variant="ghost" size="iconSm" onClick={handleClose}>
+              <Button variant="ghost" size="iconSm" onClick={() => { reset(); onClose() }}>
                 <Icon name="x" className="h-3.5 w-3.5" />
               </Button>
             </header>
 
-            <div className="flex flex-col gap-3 overflow-y-auto p-4" style={{ maxHeight: '60vh' }}>
-              <p className="text-[13px] text-muted-foreground">第二步：填写配置信息</p>
+            <div className="flex flex-col gap-3 overflow-y-auto p-4" style={{ maxHeight: '55vh' }}>
 
-              <label className="flex flex-col gap-1">
-                <Label>运行依赖</Label>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <Label>运行依赖</Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setScanning(true)
+                      providerScanned = false
+                      fetch('/api/providers')
+                        .then(r => r.json())
+                        .then((list: ProviderInfo[]) => {
+                          providerCache = list
+                          providerScanned = true
+                          setScannedProviders(list)
+                        })
+                        .catch(() => setScannedProviders(null))
+                        .finally(() => setScanning(false))
+                    }}
+                    disabled={scanning}
+                  >
+                    {scanning ? (
+                      <span className="flex items-center gap-1">
+                        <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        扫描中
+                      </span>
+                    ) : (
+                      '重新扫描'
+                    )}
+                  </Button>
+                </div>
                 <select
                   className={SELECT_CLS}
                   value={agentSystem}
                   onChange={(e) => setAgentSystem(e.target.value)}
                 >
-                  {RUNTIMES.map((r) => (
+                  {runtimes.map((r) => (
                     <option key={r.id} value={r.id}>
                       {r.label}
                     </option>
                   ))}
                 </select>
-              </label>
+                <span className="text-[11px] text-muted-foreground">
+                  {scanning
+                    ? '扫描中…'
+                    : providerScanned
+                      ? `扫描完成，${runtimes.filter(r => r.id !== 'mock').length} 个可用`
+                      : ''}
+                </span>
+              </div>
 
               {showProviderSection && (
                 <>
@@ -437,12 +560,20 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
                         onChange={(e) => {
                           const id = e.target.value
                           setSelectedKeyId(id)
+                          setTestStatus('idle')
                           const found = savedKeys.find((k) => k.id === id)
                           if (found) {
                             setApiKey(found.apiKey)
                             setProviderId(found.provider)
-                            setModel(found.model)
-                            setBaseUrl(found.baseUrl)
+                            // base_url 和 model 由 CLI×Provider 矩阵自动推导
+                            const derived = resolveProviderConfig(agentSystem, found.provider)
+                            if (derived) {
+                              setBaseUrl(derived.baseUrl)
+                              setModel(found.model && derived.models.includes(found.model) ? found.model : derived.models[0])
+                            } else {
+                              setBaseUrl(found.baseUrl)
+                              setModel(found.model)
+                            }
                           }
                         }}
                       >
@@ -462,29 +593,93 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
                     )}
                   </label>
 
-                  {/* 显示选中配置摘要 */}
-                  {selectedKeyId && savedKeys.find(k => k.id === selectedKeyId) && (
-                    <div className="rounded-md border bg-muted/50 p-2.5 text-[12px] text-muted-foreground space-y-0.5">
-                      {(() => {
-                        const cfg = savedKeys.find(k => k.id === selectedKeyId)!
-                        return (
-                          <>
-                            <div><span className="font-medium text-foreground">{cfg.name}</span></div>
-                            <div>提供商: {cfg.provider} · 模型: {cfg.model || '默认'}</div>
-                            {cfg.baseUrl && <div className="truncate">地址: {cfg.baseUrl}</div>}
-                          </>
-                        )
-                      })()}
+                  {/* 自动推导 + 可编辑的连接配置 */}
+                  {selectedKeyId && derivedConfig && (
+                    <div className="rounded-md border bg-muted/50 p-2.5 text-[12px] text-muted-foreground space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-foreground">连接配置</span>
+                        <span className="text-[10px]">{agentSystem} × {providerId} · {derivedProtocol}{derivedConfig.needsProxy ? ' (Proxy)' : ''}</span>
+                      </div>
+                      <label className="flex flex-col gap-0.5">
+                        <span>端点地址</span>
+                        <input
+                          className="h-7 w-full rounded border border-input bg-background px-2 text-[12px]"
+                          value={baseUrl}
+                          onChange={(e) => { setBaseUrl(e.target.value); setTestStatus('idle') }}
+                          placeholder={derivedBaseUrl}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-0.5">
+                        <span>模型</span>
+                        <div className="flex gap-1">
+                          <select
+                            className="h-7 flex-1 rounded border border-input bg-background px-2 text-[12px]"
+                            value={derivedModels.includes(model) ? model : '__custom__'}
+                            onChange={(e) => { if (e.target.value !== '__custom__') setModel(e.target.value); setTestStatus('idle') }}
+                          >
+                            {derivedModels.map(m => <option key={m} value={m}>{m}</option>)}
+                            <option value="__custom__">自定义…</option>
+                          </select>
+                          {!derivedModels.includes(model) && (
+                            <input
+                              className="h-7 w-40 rounded border border-input bg-background px-2 text-[12px]"
+                              value={model}
+                              onChange={(e) => { setModel(e.target.value); setTestStatus('idle') }}
+                              placeholder="手填模型名"
+                            />
+                          )}
+                        </div>
+                      </label>
+                      {derivedConfig.note && (
+                        <div className="text-[11px] text-amber-600">⚠ {derivedConfig.note}</div>
+                      )}
                     </div>
+                  )}
+
+                  {/* 工作目录 */}
+                  {showProviderSection && (
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[12px] font-medium text-muted-foreground">工作目录</span>
+                      <div className="flex gap-1">
+                        <input
+                          className="h-8 flex-1 rounded border border-input bg-background px-2 text-[12px]"
+                          value={workDir}
+                          onChange={(e) => setWorkDir(e.target.value)}
+                          placeholder="留空则默认后端目录"
+                        />
+                        <Button variant="outline" size="sm" onClick={() => setWsBrowserOpen(true)}>浏览</Button>
+                      </div>
+                    </label>
+                  )}
+                  {wsBrowserOpen && (
+                    <WorkspaceBrowser open={wsBrowserOpen} onClose={() => setWsBrowserOpen(false)}
+                      onSelect={(path) => { setWorkDir(path); setWsBrowserOpen(false) }} />
                   )}
                 </>
               )}
             </div>
 
-            <footer className="flex justify-end gap-2 border-t px-4 py-3">
-              <Button variant="outline" size="sm" onClick={goBack}>
-                上一步
-              </Button>
+            <footer className="flex items-center justify-between border-t px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={goBack}>
+                  上一步
+                </Button>
+                {showProviderSection && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={doConnectivityTest}
+                      disabled={testStatus === 'testing' || !apiKey}
+                    >
+                      {testStatus === 'testing' ? '测试中…' : testStatus === 'ok' ? '✅ 连通成功' : testStatus === 'fail' ? '❌ 重试' : '🔄 连通测试'}
+                    </Button>
+                    {testStatus === 'fail' && (
+                      <span className="text-[11px] text-red-500 max-w-[200px] truncate">{testError}</span>
+                    )}
+                  </>
+                )}
+              </div>
               <Button variant="brand" size="sm" onClick={doCreate}>
                 创建队友
               </Button>

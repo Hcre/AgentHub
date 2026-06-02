@@ -22,6 +22,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import uuid
 from collections.abc import AsyncIterator
 from functools import partial
@@ -45,6 +46,31 @@ logger = logging.getLogger(__name__)
 _DEFAULT_TIMEOUT = 300  # 秒
 _DEFAULT_MAX_TURNS = 10
 _DEFAULT_PERMISSION_MODE = "acceptEdits"
+
+
+def _resolve_cwd(workspace: str | None) -> str | None:
+    """将 workspace 转为可用 cwd。自动检测 Docker/宿主机。"""
+    if not workspace:
+        return None
+    path = workspace.strip()
+    if not path:
+        return None
+    m = re.match(r"^([A-Za-z]):[/\\](.*)", path)
+    if m:
+        rest = m.group(2).replace("\\", "/")
+        # 先试原始路径（宿主机）
+        if os.path.exists(path):
+            return path
+        # 再试 Docker mount 路径
+        container = f"/mnt/host_{m.group(1).lower()}/{rest}"
+        if os.path.exists(container):
+            return container
+        logger.warning("workspace 路径不存在: %s", workspace)
+        return None
+    if os.path.exists(path):
+        return path
+    return None
+
 
 # 进程级状态：哪些 session_key 已经至少 spawn 过一次。
 # 用于 V1 路径的崩溃恢复 — 重 spawn 时若 key 在此集合中，使用 --resume
@@ -109,18 +135,16 @@ class ClaudeCodeRuntime(AgentRuntime):
     async def stop(self) -> None:
         """终止运行中的 CLI 进程（仅 V0 短驻进程；V1 长驻进程由进程池管理）。"""
         if self._process and self._process.returncode is None:
-            self._process.terminate()
+            self._process.kill()
             try:
                 await asyncio.wait_for(self._process.wait(), timeout=5)
             except TimeoutError:
-                self._process.kill()
+                self._process.terminate()
             self._process = None
 
     # --- V1 长驻路径 ---
 
-    async def _stream_long_running(
-        self, request: AgentRequest
-    ) -> AsyncIterator[StreamEvent]:
+    async def _stream_long_running(self, request: AgentRequest) -> AsyncIterator[StreamEvent]:
         """长驻模式：复用进程池，stdin 写 JSONL，stdout 流式读取。
 
         system_prompt 守卫：handle 缓存 spawn 时的 sp 快照，本次请求 sp 不同时
@@ -172,16 +196,12 @@ class ClaudeCodeRuntime(AgentRuntime):
                     content=f"Claude CLI 长驻进程崩溃恢复失败: {exc2}",
                 )
 
-    async def _acquire_with_sp_guard(
-        self, pool, session_key: str, sp: str
-    ) -> ProcessHandle:
+    async def _acquire_with_sp_guard(self, pool, session_key: str, sp: str) -> ProcessHandle:
         """从池子取 handle，spawn-time sp 不匹配时 drop+重 spawn。"""
         spawn = partial(self._spawn_long, sp, session_key)
         handle = await pool.acquire(session_key, spawn)
         if handle.spawn_system_prompt and handle.spawn_system_prompt != sp:
-            logger.info(
-                "Claude CLI key=%s system_prompt 变化，drop 重 spawn", session_key
-            )
+            logger.info("Claude CLI key=%s system_prompt 变化，drop 重 spawn", session_key)
             await pool.drop(session_key)
             handle = await pool.acquire(session_key, spawn)
         handle.spawn_system_prompt = sp
@@ -196,9 +216,7 @@ class ClaudeCodeRuntime(AgentRuntime):
             async for evt in self._read_until_done(handle, start_seq):
                 yield evt
 
-    async def _spawn_long(
-        self, system_prompt: str, session_key: str
-    ) -> asyncio.subprocess.Process:
+    async def _spawn_long(self, system_prompt: str, session_key: str) -> asyncio.subprocess.Process:
         """长驻 spawn：--input-format stream-json，stdin 保留。
 
         首次见 session_key 用 --session-id 新建；后续（崩溃恢复）用 --resume
@@ -262,9 +280,7 @@ class ClaudeCodeRuntime(AgentRuntime):
                 raise TimeoutError
             raw = await asyncio.wait_for(handle.proc.stdout.readline(), timeout=remaining)
             if not raw:
-                raise RuntimeError(
-                    f"stdout 关闭 (returncode={handle.proc.returncode})"
-                )
+                raise RuntimeError(f"stdout 关闭 (returncode={handle.proc.returncode})")
             line = raw.decode(errors="replace").strip()
             if not line:
                 continue
@@ -289,13 +305,30 @@ class ClaudeCodeRuntime(AgentRuntime):
         cmd = self._build_cmd(request, session_key, resume=resume)
         env = self._build_env()
 
-        self._process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=env,
-        )
+        cwd = _resolve_cwd(request.working_directory)
+        if request.working_directory and not cwd:
+            yield StreamEvent(
+                type=StreamEventType.TEXT,
+                seq=0,
+                content=f"⚠️ 工作目录不可用: {request.working_directory}\n请检查路径是否存在。",
+            )
+
+        try:
+            self._process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env,
+                cwd=cwd,
+            )
+        except FileNotFoundError:
+            yield StreamEvent(
+                type=StreamEventType.ERROR,
+                seq=0,
+                content=f"⚠️ 路径不存在或 claude 未安装: {cwd or '当前目录'}",
+            )
+            return
 
         assert self._process.stdin is not None
         self._process.stdin.write(prompt.encode())
@@ -333,8 +366,11 @@ class ClaudeCodeRuntime(AgentRuntime):
         self._process = None
 
     def _build_cmd(self, request: AgentRequest, session_key: str, *, resume: bool) -> list[str]:
+        import shutil
+
+        binary = shutil.which("claude") or "claude"
         cmd = [
-            "claude",
+            binary,
             "--output-format",
             "stream-json",
             "--verbose",
@@ -382,12 +418,8 @@ class ClaudeCodeRuntime(AgentRuntime):
         """
         if not request.group_delta_text:
             return request
-        merged_sp = "\n\n".join(
-            filter(None, [request.system_prompt, request.group_delta_text])
-        )
-        return request.model_copy(
-            update={"system_prompt": merged_sp, "group_delta_text": None}
-        )
+        merged_sp = "\n\n".join(filter(None, [request.system_prompt, request.group_delta_text]))
+        return request.model_copy(update={"system_prompt": merged_sp, "group_delta_text": None})
 
     @staticmethod
     def _build_v1_user_prompt(request: AgentRequest) -> str:

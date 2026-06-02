@@ -45,16 +45,10 @@ async def test_group_first_touch_uses_seed_history(db_session) -> None:  # type:
 
     # 种几条历史
     for i in range(3):
-        await msg_repo.save(
-            Message(session_id=session.id, role=MessageRole.USER, content=f"u{i}")
-        )
+        await msg_repo.save(Message(session_id=session.id, role=MessageRole.USER, content=f"u{i}"))
 
-    trigger = Message(
-        session_id=session.id, role=MessageRole.USER, content="trigger"
-    )
-    req = await ctx.build_for_agent(
-        session=session, group=group, target_agent=a, trigger=trigger
-    )
+    trigger = Message(session_id=session.id, role=MessageRole.USER, content="trigger")
+    req = await ctx.build_for_agent(session=session, group=group, target_agent=a, trigger=trigger)
     assert req.is_group_chat is True
     assert req.agent_id == a.id
     assert req.group_id == group.id
@@ -80,12 +74,8 @@ async def test_group_delta_only_after_watermark(db_session) -> None:  # type: ig
         msgs.append(m)
     await wm.set(group.id, a.id, msgs[1].id)  # 看过到 m1
 
-    trigger = Message(
-        session_id=session.id, role=MessageRole.USER, content="new"
-    )
-    req = await ctx.build_for_agent(
-        session=session, group=group, target_agent=a, trigger=trigger
-    )
+    trigger = Message(session_id=session.id, role=MessageRole.USER, content="new")
+    req = await ctx.build_for_agent(session=session, group=group, target_agent=a, trigger=trigger)
 
     # delta 应只含 m2, m3，不含 m0, m1（拆 delta 后走 group_delta_text）
     assert req.group_delta_text is not None
@@ -102,17 +92,11 @@ async def test_watermark_dangling_falls_back_to_seed(db_session) -> None:  # typ
 
     ctx, _ar, msg_repo, _l1, wm, group, session, a, _b = await _setup(db_session)
 
-    await msg_repo.save(
-        Message(session_id=session.id, role=MessageRole.USER, content="alive")
-    )
+    await msg_repo.save(Message(session_id=session.id, role=MessageRole.USER, content="alive"))
     await wm.set(group.id, a.id, uuid.uuid4())  # 不存在的 message_id
 
-    trigger = Message(
-        session_id=session.id, role=MessageRole.USER, content="t"
-    )
-    req = await ctx.build_for_agent(
-        session=session, group=group, target_agent=a, trigger=trigger
-    )
+    trigger = Message(session_id=session.id, role=MessageRole.USER, content="t")
+    req = await ctx.build_for_agent(session=session, group=group, target_agent=a, trigger=trigger)
     # 应使用种子历史回退，而不是返回空 delta（走 group_delta_text）
     assert req.group_delta_text is not None
     assert "alive" in req.group_delta_text
@@ -133,12 +117,8 @@ async def test_private_chat_bypasses_group_contract(db_session) -> None:  # type
     session = Session(type=SessionType.PRIVATE, agent_id=a.id)
     await l1.append(session.id, {"role": "user", "content": "前情"})
 
-    trigger = Message(
-        session_id=session.id, role=MessageRole.USER, content="now"
-    )
-    req = await ctx.build_for_agent(
-        session=session, group=None, target_agent=a, trigger=trigger
-    )
+    trigger = Message(session_id=session.id, role=MessageRole.USER, content="now")
+    req = await ctx.build_for_agent(session=session, group=None, target_agent=a, trigger=trigger)
     assert req.is_group_chat is False
     assert req.group_id is None
     assert req.system_prompt == "自身 prompt"

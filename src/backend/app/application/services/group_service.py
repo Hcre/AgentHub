@@ -130,8 +130,6 @@ class GroupService:
             name=group.name,
             description=group.description,
             coordinator=coord,
-            members=[
-                GroupMemberResponse(id=a.id, name=a.name, role=a.role) for a in members
-            ],
+            members=[GroupMemberResponse(id=a.id, name=a.name, role=a.role) for a in members],
             created_at=group.created_at,
         )

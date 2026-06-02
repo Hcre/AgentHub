@@ -34,16 +34,19 @@ async def main():
 
     # 1. 创建 claude_code Agent（带 api_key + base_url，代理模式用）
     async with httpx.AsyncClient() as c:
-        r = await c.post(f"{BASE}/api/agents", json={
-            "name": f"proxy-test-{uuid4().hex[:6]}",
-            "avatar": "🤖",
-            "role": "开发助手",
-            "agent_system": "claude_code",
-            "provider": "anthropic",
-            "model": "deepseek-v4-pro",
-            "base_url": "https://api.deepseek.com/anthropic",
-            "api_key": "sk-your-deepseek-key-here",  # 替换为真实 key
-        })
+        r = await c.post(
+            f"{BASE}/api/agents",
+            json={
+                "name": f"proxy-test-{uuid4().hex[:6]}",
+                "avatar": "🤖",
+                "role": "开发助手",
+                "agent_system": "claude_code",
+                "provider": "anthropic",
+                "model": "deepseek-v4-pro",
+                "base_url": "https://api.deepseek.com/anthropic",
+                "api_key": "sk-your-deepseek-key-here",  # 替换为真实 key
+            },
+        )
         if r.status_code != 201:
             print(f"创建 Agent 失败: {r.status_code} {r.text}")
             return
@@ -51,9 +54,14 @@ async def main():
         print(f"✓ Agent: {agent['id']}")
 
         # 2. 创建 session
-        r = await c.post(f"{BASE}/api/sessions", json={
-            "type": "private", "agent_id": agent["id"], "title": "代理模式测试",
-        })
+        r = await c.post(
+            f"{BASE}/api/sessions",
+            json={
+                "type": "private",
+                "agent_id": agent["id"],
+                "title": "代理模式测试",
+            },
+        )
         r.raise_for_status()
         session = r.json()
         print(f"✓ Session: {session['id']}\n")

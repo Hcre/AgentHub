@@ -40,6 +40,7 @@ class AgentService:
             base_url=cmd.base_url,
             skills=cmd.skills,
             system_prompt=cmd.system_prompt,
+            settings=cmd.settings or {},
         )
         await self._repo.save(agent)
         await self._bus.publish(
@@ -78,9 +79,7 @@ class AgentService:
         changed_fields = agent.update(**changes)
         if changed_fields:
             await self._repo.save(agent)
-            await self._bus.publish(
-                AgentUpdated(agent_id=agent.id, changed_fields=changed_fields)
-            )
+            await self._bus.publish(AgentUpdated(agent_id=agent.id, changed_fields=changed_fields))
         return AgentResponse.from_domain(agent)
 
     async def delete(self, cmd: DeleteAgentCommand) -> None:

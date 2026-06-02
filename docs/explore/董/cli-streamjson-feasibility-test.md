@@ -1,7 +1,7 @@
 # CLI 长驻 + stream-json 可行性验证
 
 > 日期：2026-05-29 | 状态：**已完成 — Go with caveat（V1-V5 全部验证）**
-> 上游：[group-chat-pipeline-proposal.md §四 Phase 0.5](./董/group-chat-pipeline-proposal.md)
+> 上游：[group-chat-pipeline-proposal.md §四 Phase 0.5](./group-chat-pipeline-proposal.md)
 > 目的：验证 Claude CLI 的 `--input-format stream-json --output-format stream-json` 模式能否支撑长驻多轮交互
 > 结论：V1/V2/V3/V5 通过，V4 部分通过。**长驻 + stream-json 方案 Go**，但 Phase 1 实施时必须解决 caveat（详见 §七）
 

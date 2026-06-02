@@ -8,8 +8,10 @@ const SELECT_CLS =
 
 const PROVIDERS = [
   { id: 'deepseek', label: 'DeepSeek' },
-  { id: 'openai', label: 'OpenAI' },
+  { id: 'xiaomi', label: 'Xiaomi MiMo' },
+  { id: 'minimax', label: 'MiniMax' },
   { id: 'anthropic', label: 'Anthropic' },
+  { id: 'openai', label: 'OpenAI' },
   { id: 'siliconflow', label: '硅基流动' },
   { id: 'other', label: '其他' },
 ]
@@ -25,14 +27,11 @@ function ApiKeyDialog({
   const [name, setName] = useState('')
   const [provider, setProvider] = useState('deepseek')
   const [apiKey, setApiKey] = useState('')
-  const [baseUrl, setBaseUrl] = useState('')
-  const [model, setModel] = useState('')
 
   const save = () => {
     if (!name.trim() || !apiKey.trim()) return
-    addKey({ name, provider, apiKey, baseUrl, model })
+    addKey({ name, provider, apiKey })
     setName(''); setProvider('deepseek'); setApiKey('')
-    setBaseUrl(''); setModel('')
     onClose()
   }
 
@@ -60,14 +59,7 @@ function ApiKeyDialog({
             <span className="text-[12px] font-medium text-muted-foreground">API Key *</span>
             <Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-..." type="password" />
           </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-[12px] font-medium text-muted-foreground">请求地址（Base URL）</span>
-            <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="如 https://api.deepseek.com/anthropic" />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-[12px] font-medium text-muted-foreground">首选模型</span>
-            <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="如 deepseek-chat" />
-          </label>
+          <p className="text-[11px] text-muted-foreground/60">端点地址和模型会在创建 Agent 时根据所选 CLI 自动适配</p>
         </div>
         <footer className="flex justify-end gap-2 border-t px-4 py-3">
           <Button variant="outline" size="sm" onClick={onClose}>取消</Button>
@@ -118,10 +110,8 @@ export function ApiKeyManager() {
                 <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-muted text-[13px]">🔑</div>
                 <div className="min-w-0 flex-1">
                   <div className="text-[13px] font-medium">{k.name}</div>
-                  <div className="mt-0.5 text-[11px] text-muted-foreground space-y-0.5">
-                    <div>{PROVIDER_LABELS[k.provider] ?? k.provider}{' · '}{k.keyPrefix}****</div>
-                    {k.model && <div>模型: {k.model}</div>}
-                    {k.baseUrl && <div className="truncate">地址: {k.baseUrl}</div>}
+                  <div className="mt-0.5 text-[11px] text-muted-foreground">
+                    {PROVIDER_LABELS[k.provider] ?? k.provider}{' · '}{k.keyPrefix}****
                   </div>
                 </div>
                 <Button variant="ghost" size="iconSm" onClick={() => removeKey(k.id)} className="text-muted-foreground hover:text-red-500 flex-shrink-0">

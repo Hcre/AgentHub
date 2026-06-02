@@ -226,7 +226,7 @@ done
 | `docs/plan/` | `{name}_{中文}.md` | `开发清单_roadmap.md`、`背景_PRD_AgentHub_统一方案.md` | `计划.md` |
 | `docs/specs/` | `NN-{name}_{中文}.md` | `03-data-model_数据模型.md`、`04c-adapter-interface_适配器接口规范.md` | `数据模型.md` |
 | `docs/explore/` | `EXP-{NN}_{中文}.md` | `EXP-01_架构模式对比矩阵.md` | `01_架构.md` |
-| `docs/explore/{黎,董,袁}/` | `{en-topic}.md` | `黎/group-chat-boundary-and-dependencies.md` | `cc-haha.md` |
+| `docs/explore/{黎,董,袁}/` | `{en-topic}.md` | `黎/EXP-12_group-chat-boundary-and-dependencies.md` | `cc-haha.md` |
 | `docs/archive/` | `DEPRECATED_{原名}.md` | `DEPRECATED_PRD_v3.md` | `old_PRD.md` |
 | `worklogs/{你}/` | `YYYY-MM-DD_{描述}.md` | `2026-05-28_修复一致性.md` | `修复一致性.md` |
 | `worklogs/decisions/` | `NNNN-{en-slug}.md`（ADR）| `0001-cli-first-pivot.md` | `ADR-01.md` |

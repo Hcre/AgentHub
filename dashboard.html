@@ -131,7 +131,17 @@
   .doc-pill.active { background: var(--clay); border-color: var(--clay); color: #fff; }
   .doc-pill code { background: rgba(255,255,255,.18); border: none; color: inherit; padding: 0 .2rem; }
   .doc-pill:not(.active) code { background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); }
-  .doc-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+
+  .doc-layout { display: flex; gap: 1.5rem; align-items: flex-start; }
+  .doc-toc { flex: 0 0 196px; position: sticky; top: 1.5rem; max-height: 86vh; overflow-y: auto;
+             font-size: .82rem; padding: .2rem .4rem .2rem 0; }
+  .doc-toc .toc-title { font-weight: 600; color: var(--muted); font-size: .72rem; letter-spacing: .04em;
+                        text-transform: uppercase; margin-bottom: .6rem; }
+  .toc-link { display: block; color: var(--ink-soft); padding: .22rem 0 .22rem .7rem; cursor: pointer;
+              border-left: 2px solid var(--border); line-height: 1.4; transition: all .12s; }
+  .toc-link:hover { color: var(--clay-deep); border-left-color: var(--clay); text-decoration: none; background: var(--surface-2); }
+  .toc-link.lvl3 { padding-left: 1.5rem; font-size: .96em; color: var(--muted); }
+  .doc-panel { flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
                padding: 2.25rem 2.5rem; box-shadow: var(--shadow); min-height: 12rem; }
   .doc-source { font-size: .76rem; color: var(--faint); margin-bottom: 1.25rem; padding-bottom: 1rem;
                 border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
@@ -142,7 +152,7 @@
   .md-body > :first-child { margin-top: 0; }
   .md-body h1, .md-body h2, .md-body h3, .md-body h4, .md-body h5, .md-body h6 {
     font-family: var(--serif); font-weight: 500; color: var(--ink); line-height: 1.3;
-    margin: 1.8rem 0 .8rem; letter-spacing: -.01em; }
+    margin: 1.8rem 0 .8rem; letter-spacing: -.01em; scroll-margin-top: 1rem; }
   .md-body h1 { font-size: 1.7rem; padding-bottom: .4rem; border-bottom: 1px solid var(--border); }
   .md-body h2 { font-size: 1.35rem; padding-bottom: .3rem; border-bottom: 1px solid var(--border); }
   .md-body h3 { font-size: 1.12rem; }
@@ -163,6 +173,8 @@
   .md-body pre { background: #2b2823; border: 1px solid var(--border-strong); border-radius: 10px;
                  padding: 1rem 1.2rem; overflow-x: auto; margin: 1rem 0; }
   .md-body pre code { background: none; border: none; padding: 0; color: #e9e4d8; font-size: .82rem; line-height: 1.6; }
+  .md-callout { background: var(--blue-tint); border: 1px solid #cdd9e6; border-left: 3px solid var(--blue);
+                border-radius: 0 8px 8px 0; padding: .8rem 1.1rem; margin: 1rem 0; font-size: .88rem; color: var(--ink-soft); }
   .md-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; margin: 1.1rem 0; }
   .md-body table.md-table { width: 100%; border-collapse: collapse; font-size: .85rem; min-width: 0; }
   .md-body table.md-table th, .md-body table.md-table td {
@@ -172,7 +184,18 @@
   .md-body table.md-table tr:last-child td { border-bottom: none; }
   .md-body table.md-table th:last-child, .md-body table.md-table td:last-child { border-right: none; }
   .md-body table.md-table tbody tr:hover { background: var(--surface-2); }
+
+  /* ---- graph view ---- */
+  #view-graph { margin-top: 2rem; }
+  .graph-frame { width: 100%; height: 80vh; border: 1px solid var(--border); border-radius: 16px;
+                 background: var(--surface); box-shadow: var(--shadow); }
+
   .hidden { display: none !important; }
+  @media (max-width: 760px) {
+    .doc-layout { flex-direction: column; }
+    .doc-toc { position: static; flex-basis: auto; max-height: none; width: 100%;
+               border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: .5rem; }
+  }
 </style>
 </head>
 <body>
@@ -182,6 +205,7 @@
     <nav class="tabs">
       <button class="tab active" data-view="board">📊 看板</button>
       <button class="tab" data-view="docs">📖 文档</button>
+      <button class="tab" data-view="graph">🗺️ 图谱</button>
     </nav>
   </div>
   <div class="controls">
@@ -215,13 +239,22 @@
 <!-- ===== 文档视图 ===== -->
 <main id="view-docs" class="hidden">
   <nav class="doc-nav" id="doc-nav"></nav>
-  <section class="doc-panel">
-    <div class="doc-source" id="doc-source"></div>
-    <article class="md-body" id="doc-body"><div class="empty">选择上方文档查看</div></article>
-  </section>
+  <div class="doc-layout">
+    <aside class="doc-toc hidden" id="doc-toc"></aside>
+    <section class="doc-panel">
+      <div class="doc-source" id="doc-source"></div>
+      <article class="md-body" id="doc-body"><div class="empty">选择上方文档查看</div></article>
+    </section>
+  </div>
 </main>
 
-<footer>数据源 <code>STATUS.md</code>（看板）+ 各 <code>README</code> / <code>CODE_MAP.md</code>（文档，实时渲染）· 看板每 60 秒原地刷新</footer>
+<!-- ===== 图谱视图 ===== -->
+<main id="view-graph" class="hidden">
+  <iframe id="graph-frame" class="graph-frame hidden" title="代码依赖图谱"></iframe>
+  <div class="empty error hidden" id="graph-fallback"></div>
+</main>
+
+<footer>看板源 <code>STATUS.md</code> · 文档实时渲染各 <code>README</code> / <code>docs/CODE-MAP_代码地图.md</code> · 图谱内嵌 <code>.understand-anything/graph.html</code> · 看板每 60 秒原地刷新</footer>
 
 <script>
 "use strict";
@@ -235,12 +268,13 @@ const DOCS = [
   { id: "conv",     label: "规范导航",      path: "docs/conventions/README.md", hint: "开发规范 01-08" },
   { id: "explore",  label: "Explore 索引",  path: "docs/explore/README.md",     hint: "技术探索文档" },
   { id: "frontend", label: "前端 README",   path: "src/frontend/README.md",     hint: "前端工程说明" },
-  { id: "codemap",  label: "CODE_MAP",      path: "CODE_MAP.md",                hint: "后端模块全景" },
+  { id: "codemap",  label: "CODE_MAP",      path: "docs/CODE-MAP_代码地图.md",           hint: "后端模块全景（Mermaid → 见图谱）" },
 ];
+const GRAPH_SRC = ".understand-anything/graph.html";
 
 // ======================================================================
 // 内置 mini-markdown 渲染器（无外部依赖）
-// 支持：标题 / 表格 / 代码块 / 行内代码 / 加粗 / 斜体 / 链接 / 列表(嵌套) / 引用 / 分割线
+// 支持：标题 / 表格 / 代码块(含 mermaid 转图谱提示) / 行内代码 / 加粗 / 斜体 / 链接 / 列表(嵌套) / 引用 / 分割线
 // ======================================================================
 const SENT = String.fromCharCode(0xE000);    // 行内代码占位哨兵（私有区字符：regex 安全且不会出现在正文）
 const PIPE_PH = String.fromCharCode(0xE001); // 转义管道 \| 的占位（NUL 在 RegExp 中不可靠，故用私有区）
@@ -312,13 +346,17 @@ function mdToHtml(md) {
   while (i < lines.length) {
     const line = lines[i];
 
-    // 代码块
-    const fence = line.match(/^\s*(```|~~~)/);
+    // 代码块（捕获语言：mermaid → 转为「见图谱」提示，避免一坨原始文本）
+    const fence = line.match(/^\s*(```|~~~)\s*([\w-]*)/);
     if (fence) {
-      const marker = fence[1], buf = []; i++;
+      const marker = fence[1], lang = (fence[2] || "").toLowerCase(), buf = []; i++;
       while (i < lines.length && !lines[i].trim().startsWith(marker)) { buf.push(lines[i]); i++; }
       i++;
-      out.push(`<pre><code>${esc(buf.join("\n"))}</code></pre>`);
+      if (lang === "mermaid") {
+        out.push(`<div class="md-callout">🗺️ <strong>Mermaid 依赖图</strong> —— 点 <a href="#" onclick="switchView('graph');return false;">「图谱」Tab</a> 看交互式可视化（点节点高亮上下游），或在 GitHub/VSCode 打开本文件渲染。</div>`);
+      } else {
+        out.push(`<pre><code>${esc(buf.join("\n"))}</code></pre>`);
+      }
       continue;
     }
 
@@ -373,6 +411,18 @@ function mdToHtml(md) {
     out.push(`<p>${inline(buf.join(" "))}</p>`);
   }
   return out.join("\n");
+}
+
+// 给 h2/h3 加锚点 id，并抽出目录 TOC（阅读友好导航）
+function buildToc(html) {
+  const toc = [];
+  let n = 0;
+  const out = html.replace(/<h([23])>([\s\S]*?)<\/h\1>/g, (_, lvl, inner) => {
+    const id = "sec-" + (n++);
+    toc.push({ id, lvl: +lvl, text: inner.replace(/<[^>]+>/g, "") });
+    return `<h${lvl} id="${id}">${inner}</h${lvl}>`;
+  });
+  return { html: out, toc };
 }
 
 // ======================================================================
@@ -516,7 +566,7 @@ async function load() {
 }
 
 // ======================================================================
-// 文档视图：fetch + 渲染
+// 文档视图：fetch + 渲染 + 目录
 // ======================================================================
 const docCache = {};
 let activeDoc = DOCS[0].id;
@@ -530,24 +580,66 @@ function renderDocNav() {
     b.onclick = () => loadDoc(b.dataset.id));
 }
 
+function renderToc(toc) {
+  const el = document.getElementById("doc-toc");
+  if (toc.length < 2) { el.innerHTML = ""; el.classList.add("hidden"); return; }
+  el.classList.remove("hidden");
+  el.innerHTML = `<div class="toc-title">目录</div>` +
+    toc.map(t => `<span class="toc-link lvl${t.lvl}" data-id="${t.id}">${esc(t.text)}</span>`).join("");
+  el.querySelectorAll(".toc-link").forEach(a => a.onclick = () => {
+    const h = document.getElementById(a.dataset.id);
+    if (h) h.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
+function showDoc(id) {
+  document.getElementById("doc-body").innerHTML = docCache[id].html;
+  renderToc(docCache[id].toc);
+}
+
 async function loadDoc(id, force) {
   activeDoc = id;
   renderDocNav();
   const doc = DOCS.find(d => d.id === id);
   const src = document.getElementById("doc-source");
-  const body = document.getElementById("doc-body");
   src.innerHTML = `<span>📄 <code>${esc(doc.path)}</code> · ${esc(doc.hint)}</span><a href="${esc(doc.path)}" target="_blank" rel="noopener">查看原文 ↗</a>`;
-  if (docCache[id] && !force) { body.innerHTML = docCache[id]; return; }
-  body.innerHTML = `<div class="empty">加载中 …</div>`;
+  if (docCache[id] && !force) { showDoc(id); return; }
+  document.getElementById("doc-body").innerHTML = `<div class="empty">加载中 …</div>`;
+  document.getElementById("doc-toc").classList.add("hidden");
   try {
     const res = await fetch(doc.path, { cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
-    docCache[id] = mdToHtml(await res.text());
-    body.innerHTML = docCache[id];
+    docCache[id] = buildToc(mdToHtml(await res.text()));
+    showDoc(id);
   } catch (e) {
-    body.innerHTML = `<div class="empty error"><b>⚠️ 无法加载 ${esc(doc.path)}</b><br><br>
+    document.getElementById("doc-body").innerHTML = `<div class="empty error"><b>⚠️ 无法加载 ${esc(doc.path)}</b><br><br>
       本页需通过 HTTP 服务访问（<code>python scripts/start_server.py</code>），不能用 <code>file://</code> 打开。<br>
       <small>(${esc(e.message)})</small></div>`;
+  }
+}
+
+// ======================================================================
+// 图谱视图：内嵌 .understand-anything/graph.html（生成产物，未入 git）
+// ======================================================================
+let graphLoaded = false;
+async function loadGraph(force) {
+  const frame = document.getElementById("graph-frame");
+  const fb = document.getElementById("graph-fallback");
+  if (graphLoaded && !force) return;
+  try {
+    const res = await fetch(GRAPH_SRC, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    frame.src = GRAPH_SRC + (force ? "?t=" + Date.now() : "");
+    frame.classList.remove("hidden");
+    fb.classList.add("hidden");
+    graphLoaded = true;
+  } catch (e) {
+    frame.classList.add("hidden");
+    fb.classList.remove("hidden");
+    fb.innerHTML = `<b>⚠️ 图谱尚未生成</b><br><br>
+      运行 <code>python scripts/gen_codegraph.py</code> 生成 <code>.understand-anything/graph.html</code>。<br>
+      该文件是生成产物（未入 git），克隆后需先重建。<br>
+      <small>(${esc(e.message)})</small>`;
   }
 }
 
@@ -559,13 +651,18 @@ function switchView(view) {
   document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === view));
   document.getElementById("view-board").classList.toggle("hidden", view !== "board");
   document.getElementById("view-docs").classList.toggle("hidden", view !== "docs");
+  document.getElementById("view-graph").classList.toggle("hidden", view !== "graph");
   if (view === "docs" && !docCache[activeDoc]) loadDoc(activeDoc);
+  if (view === "graph") loadGraph();
 }
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => switchView(t.dataset.view));
 
-// 刷新按钮：看板刷 STATUS，文档刷当前文档
-document.getElementById("refresh").onclick = () =>
-  state.view === "docs" ? loadDoc(activeDoc, true) : load();
+// 刷新按钮：按当前视图刷新对应内容
+document.getElementById("refresh").onclick = () => {
+  if (state.view === "docs") loadDoc(activeDoc, true);
+  else if (state.view === "graph") loadGraph(true);
+  else load();
+};
 
 setInterval(() => {
   if (state.view !== "board") return;

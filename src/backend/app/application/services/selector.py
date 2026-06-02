@@ -43,14 +43,10 @@ class SelectorDecision:
     def pick(
         cls, agent_id: UUID, reason: str = "", mention_queue: tuple[UUID, ...] = ()
     ) -> SelectorDecision:
-        return cls(
-            next_agent_id=agent_id, done=False, reason=reason, mention_queue=mention_queue
-        )
+        return cls(next_agent_id=agent_id, done=False, reason=reason, mention_queue=mention_queue)
 
     @classmethod
-    def pick_multi(
-        cls, agent_ids: tuple[UUID, ...], reason: str = ""
-    ) -> SelectorDecision:
+    def pick_multi(cls, agent_ids: tuple[UUID, ...], reason: str = "") -> SelectorDecision:
         return cls(next_agent_id=None, done=False, reason=reason, picks=agent_ids)
 
     @classmethod
@@ -124,9 +120,7 @@ class Selector:
     # --- Layer 1 ---
 
     @staticmethod
-    def _resolve_mention(
-        last: Message, members: list[Agent]
-    ) -> SelectorDecision | None:
+    def _resolve_mention(last: Message, members: list[Agent]) -> SelectorDecision | None:
         member_by_name = {a.name: a for a in members}
         collected: list[UUID] = []
 
@@ -140,27 +134,19 @@ class Selector:
         for match in _MENTION_PATTERN.finditer(content):
             name = match.group(1)
             hit = member_by_name.get(name)
-            if (
-                hit is not None
-                and hit.id != last.sender_agent_id
-                and hit.id not in collected
-            ):
+            if hit is not None and hit.id != last.sender_agent_id and hit.id not in collected:
                 collected.append(hit.id)
 
         if not collected:
             return None
 
         first, *rest = collected
-        return SelectorDecision.pick(
-            first, reason=f"@mention={first}", mention_queue=tuple(rest)
-        )
+        return SelectorDecision.pick(first, reason=f"@mention={first}", mention_queue=tuple(rest))
 
     # --- Layer 1.5: 全体意图硬编码 ---
 
     @staticmethod
-    def _resolve_broadcast(
-        last: Message, members: list[Agent]
-    ) -> SelectorDecision | None:
+    def _resolve_broadcast(last: Message, members: list[Agent]) -> SelectorDecision | None:
         """检测用户是否在呼叫全体成员。
 
         规则：消息含「大家/各位/所有人」等全体关键词 →
@@ -183,9 +169,7 @@ class Selector:
     # --- Layer 2 ---
 
     @staticmethod
-    def _resolve_keyword(
-        last: Message, members: list[Agent]
-    ) -> SelectorDecision | None:
+    def _resolve_keyword(last: Message, members: list[Agent]) -> SelectorDecision | None:
         content = (last.content or "").lower()
         if not content.strip():
             return None
@@ -193,15 +177,11 @@ class Selector:
         for agent in members:
             if agent.id == last.sender_agent_id:
                 continue
-            hit_count = sum(
-                1 for tag in agent.capability_tags if tag and tag.lower() in content
-            )
+            hit_count = sum(1 for tag in agent.capability_tags if tag and tag.lower() in content)
             if hit_count > 0 and (best is None or hit_count > best[1]):
                 best = (agent, hit_count)
         if best is not None:
-            return SelectorDecision.pick(
-                best[0].id, reason=f"capability hit={best[1]}"
-            )
+            return SelectorDecision.pick(best[0].id, reason=f"capability hit={best[1]}")
         return None
 
     # --- Layer 3 ---
@@ -255,9 +235,7 @@ class Selector:
         hist_lines: list[str] = []
         for msg in history[-15:]:
             speaker = (
-                name_by_id.get(msg.sender_agent_id, "未知 Agent")
-                if msg.sender_agent_id
-                else "用户"
+                name_by_id.get(msg.sender_agent_id, "未知 Agent") if msg.sender_agent_id else "用户"
             )
             content = msg.content or ""
             content = _CODE_BLOCK_PATTERN.sub("[代码片段已省略]", content)
@@ -331,9 +309,7 @@ class Selector:
         return Selector._parse_payload(tool_use.input or {}, candidates)
 
     @staticmethod
-    def _parse_payload(
-        payload: dict, candidates: list[Agent]
-    ) -> SelectorDecision:
+    def _parse_payload(payload: dict, candidates: list[Agent]) -> SelectorDecision:
         decision = payload.get("decision")
         reason: str = payload.get("reason", "")
 
@@ -456,17 +432,13 @@ class Selector:
                 max_tokens=512,
             )
         except Exception as exc:
-            logger.warning(
-                "Selector %s 调用失败，降级 DONE: %s", self._provider, exc
-            )
+            logger.warning("Selector %s 调用失败，降级 DONE: %s", self._provider, exc)
             return SelectorDecision.finish(f"llm error: {exc.__class__.__name__}")
 
         return self._parse_openai_response(resp, candidates)
 
     @staticmethod
-    def _parse_openai_response(
-        resp: object, candidates: list[Agent]
-    ) -> SelectorDecision:
+    def _parse_openai_response(resp: object, candidates: list[Agent]) -> SelectorDecision:
         import json as _json
 
         choice = resp.choices[0]  # type: ignore[union-attr]

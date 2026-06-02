@@ -14,25 +14,27 @@ from pydantic import BaseModel
 class MemoryContext(BaseModel):
     """域3 记忆系统打包，注入到每次 Agent 调用。"""
 
-    l1_working: list[dict] = []        # Redis 滑动窗口最近 N 条消息
-    l2_summary: str | None = None      # 超长历史摘要
-    l3_specs: str | None = None        # .agenthub/ 项目上下文
-    l4_rag: str | None = None          # pgvector Top-K 检索结果
+    l1_working: list[dict] = []  # Redis 滑动窗口最近 N 条消息
+    l2_summary: str | None = None  # 超长历史摘要
+    l3_specs: str | None = None  # .agenthub/ 项目上下文
+    l4_rag: str | None = None  # pgvector Top-K 检索结果
 
 
 class AgentRequest(BaseModel):
-    request_id: str                    # 全链路追踪
+    request_id: str  # 全链路追踪
     session_id: UUID
-    messages: list[dict]               # [{"role": "user/assistant", "content": "..."}]
+    messages: list[dict]  # [{"role": "user/assistant", "content": "..."}]
     system_prompt: str | None = None
     memory: MemoryContext | None = None
     available_tools: list[str] = []
     max_tokens: int = 16000
     temperature: float = 0.7
     # 群聊上下文（私聊场景留空，CLI session key 等据此分流）
-    agent_id: UUID | None = None       # 本次调用的目标 Agent（群聊必填）
-    group_id: UUID | None = None       # 所在群组（群聊必填）
-    is_group_chat: bool = False        # 群聊标识；True 时 CLI key = uuid5(session_id:agent_id)
+    agent_id: UUID | None = None  # 本次调用的目标 Agent（群聊必填）
+    group_id: UUID | None = None  # 所在群组（群聊必填）
+    is_group_chat: bool = False  # 群聊标识；True 时 CLI key = uuid5(session_id:agent_id)
+    # 工作空间（CLI 进程 cwd — 宿主机绝对路径或 WSL 映射路径）
+    working_directory: str | None = None
     # 群聊 delta 文本（自上次发言后的新消息渲染）。从 system_prompt 中独立出来，
     # 是为了让 V1 长驻进程能复用 spawn-time 的稳定 sp（persona + 契约 + 成员），
     # 把动态 delta 放到 user message 里逐轮注入。V0 路径会拼回 sp 保持兼容。
@@ -62,7 +64,7 @@ class ToolResult(BaseModel):
     success: bool
     content: str | None = None
     error: str | None = None
-    artifact: str | None = None        # Diff/Preview/Deploy URL
+    artifact: str | None = None  # Diff/Preview/Deploy URL
 
 
 class StreamEvent(BaseModel):
@@ -72,7 +74,7 @@ class StreamEvent(BaseModel):
     tool_call: ToolCall | None = None
     tool_result: ToolResult | None = None
     task_plan: dict | None = None
-    metadata: dict[str, Any] = {}      # token_usage / model / latency_ms
+    metadata: dict[str, Any] = {}  # token_usage / model / latency_ms
     # 群聊场景下标识发言人，前端按此给气泡分色（私聊为 None）
     sender_agent_id: UUID | None = None
 

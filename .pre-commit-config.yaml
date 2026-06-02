@@ -53,3 +53,19 @@ repos:
         always_run: true
         pass_filenames: false
         stages: [pre-push]
+
+      - id: secret-scan
+        name: 密钥泄露扫描
+        entry: python scripts/check_secrets.py
+        language: python
+        always_run: true
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: dead-links
+        name: 文档死链检查
+        entry: python scripts/check_dead_links.py
+        language: python
+        always_run: true
+        pass_filenames: false
+        stages: [pre-push]

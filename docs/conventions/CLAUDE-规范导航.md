@@ -18,8 +18,8 @@
 | 第二步 §2.3 审查 diff | [02 §五检查清单](02-coding_代码编写规范.md) | 审查清单 = 该篇检查清单 |
 | 第二步 §2.6 提交 | [03 Git](03-git_Git协作规范.md) | 分支 / 提交格式 / PR / 合并 / 多人协作 |
 | §2.5 记录 + 07-汇报 | [06 文档](06-documentation_文档规范.md) | docs/ 命名 / explore / ADR / worklog |
-| Agent 操作权限 / 边界 | [99 边界矩阵](99-boundaries_边界矩阵.md) | Always / Ask First / Never |
-| 流程合规校验 | [99 流程红线](99-process-rules_流程红线全集.md) | PR-01~09 完整流程红线 |
+| Agent 操作权限 / 边界 | [99 边界矩阵](09-boundaries_边界矩阵.md) | Always / Ask First / Never |
+| 流程合规校验 | [99 流程红线](10-process-rules_流程红线全集.md) | PR-01~09 完整流程红线 |
 | 中大型项目工具 | [08 图谱](08-code-understanding_代码理解与图谱规范.md) | CodeGraph + Understand-Anything 双图谱 |
 
 > AgentHub 是标准/团队档位，全规范都守。档位定义见 [第一步 §1.0](ai-workflow_AI协作开发流程/03-第一步_编写计划.md)。
@@ -54,7 +54,7 @@
 | CR-11 | 禁遗留 print/console.log/注释代码块 | ruff `ERA001` |
 | CR-12 | async 上下文禁同步阻塞 | ruff `ASYNC` |
 
-### 流程红线（PR-01 ~ PR-09，见 99-process-rules 全集 / 03 Git 摘要）
+### 流程红线（PR-01 ~ PR-09，见 10-process-rules 全集 / 03 Git 摘要）
 | # | 红线 | 自动检测 |
 |---|------|---------|
 | PR-01 | API 接口先冻结再实现；变更需 2 人 Review | 流程规则 + CR |
@@ -99,11 +99,11 @@
 |------|----------|-----------|
 | AR-01~06 架构红线 | 01 §一 | CLAUDE.md 速查表只引用 |
 | CR-01~12 代码红线 | 02 §一 | 同上 |
-| PR-01~09 流程红线全集 | 99-process-rules | 03 Git 摘 PR-02/03/06/07 |
+| PR-01~09 流程红线全集 | 10-process-rules | 03 Git 摘 PR-02/03/06/07 |
 | AP-01~07 API 红线 | 04 §一 | — |
 | T-01~06 测试红线 | 05 §一 | — |
 | D-01~12 文档红线 | 06 §一 | — |
-| Agent 权限矩阵 | 99-boundaries | 01/04 仅引用 |
+| Agent 权限矩阵 | 09-boundaries | 01/04 仅引用 |
 | 密钥 / 代码级安全 | 02 CR-10 | 01 配置管理引用 |
 | 跨层调用 / 循环依赖 / 分层 | 01 | 08 提供大型项目自动检测 |
 | 调用图 / 影响分析 / 代码地图 | 08（全部收拢） | 01/02/05/06 各留一句指向 08 |
@@ -125,7 +125,7 @@
 | "改数据库" | 01（AR-05 FSM）+ 02（CR-03 Alembic）+ `docs/specs/03-data-model_数据模型.md` | 05 测试（Migration 正反） |
 | "改 API endpoint" | 04 + PR-01（接口先行 2 人 Review） + PR-09（SPEC 同步） | — |
 | "写测试" | 05 测试 | 02 §四（异常路径） |
-| "提 PR / 合并" | 03 Git + 99-process-rules（PR-06/07） | — |
+| "提 PR / 合并" | 03 Git + 10-process-rules（PR-06/07） | — |
 | "新 Agent 系统" | 01 §4.2（AR-02 流程）+ `docs/specs/04c-adapter-interface_适配器接口规范.md` | — |
 | "写文档 / 移动文件" | 06 文档 + [meta/FILE_GRAPH.md](../../meta/FILE_GRAPH.md) | — |
 | "Agent 操作权限" | 99 边界矩阵 | — |

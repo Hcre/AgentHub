@@ -47,7 +47,7 @@ class Agent:
     def validate(self) -> None:
         if not self.name or not self.name.strip():
             raise DomainError("Agent name 不能为空")
-        # CLI 运行时和 mock 不需要 API key
+        # CLI 运行时（claude_code/pi_agent/opencode）和 mock 不需要 API key
         needs_api_key = self.agent_system in (
             AgentSystem.ANTHROPIC_API,
             AgentSystem.OPENAI_API,
@@ -58,9 +58,19 @@ class Agent:
     def update(self, **changed: object) -> list[str]:
         """部分更新，返回实际变更的字段名列表（用于 AgentUpdated 事件）。"""
         allowed = {
-            "name", "avatar", "role", "agent_system", "provider", "model",
-            "api_key_encrypted", "base_url", "skills", "capability_tags",
-            "system_prompt", "settings", "status",
+            "name",
+            "avatar",
+            "role",
+            "agent_system",
+            "provider",
+            "model",
+            "api_key_encrypted",
+            "base_url",
+            "skills",
+            "capability_tags",
+            "system_prompt",
+            "settings",
+            "status",
         }
         changed_fields: list[str] = []
         for key, value in changed.items():

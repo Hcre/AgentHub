@@ -6,7 +6,7 @@ import type { Agent, AgentColor, AgentProfile, ApiAgent, MemoryLevel } from '../
 export interface CreateAgentInput {
   name: string
   role: string
-  /** 运行时：claude_code / anthropic_api / mock */
+  /** 运行时：自动检测的 CLI (opencode/claude_code/pi_agent/codex/gemini/cursor_agent) 或 mock */
   agentSystem: string
   provider: string
   model: string
@@ -17,6 +17,7 @@ export interface CreateAgentInput {
   avatar?: string
   skills: string[]
   systemPrompt?: string
+  settings?: Record<string, unknown>
 }
 
 const COLOR_CYCLE: AgentColor[] = ['brand', 'sage', 'clay', 'rose', 'blue']
@@ -103,6 +104,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         api_key: input.apiKey,
         skills: input.skills,
         system_prompt: input.systemPrompt,
+        settings: input.settings,
       })
       const agent = toUiAgent(created, get().agents.length)
       set((s) => ({

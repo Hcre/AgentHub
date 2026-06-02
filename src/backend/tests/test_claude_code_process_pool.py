@@ -28,6 +28,7 @@ def _fake_proc(pid: int, alive: bool = True) -> MagicMock:
 def _spawn_factory(proc: MagicMock):
     async def _spawn():
         return proc
+
     return _spawn
 
 
@@ -49,9 +50,11 @@ class TestAcquireBasics:
 
         # 第二次 acquire 不应再 spawn
         called = []
+
         async def _other_spawn():
             called.append(1)
             return _fake_proc(200)
+
         h2 = await pool.acquire("k1", _other_spawn)
         assert h2 is h1
         assert called == []  # 没调 spawn
@@ -102,12 +105,8 @@ class TestLruEviction:
     @pytest.mark.asyncio
     async def test_lru_prefers_dead_handle(self) -> None:
         pool = ProcessPool()
-        pool._handles["alive"] = ProcessHandle(
-            proc=_fake_proc(100), session_key="alive"
-        )
-        pool._handles["dead"] = ProcessHandle(
-            proc=_fake_proc(200, alive=False), session_key="dead"
-        )
+        pool._handles["alive"] = ProcessHandle(proc=_fake_proc(100), session_key="alive")
+        pool._handles["dead"] = ProcessHandle(proc=_fake_proc(200, alive=False), session_key="dead")
         # alive 创建得晚但 dead 应优先
         assert pool._pick_lru_victim() == "dead"
 

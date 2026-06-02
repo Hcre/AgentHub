@@ -43,9 +43,7 @@ class InMemoryEventBus:
         if not handlers:
             logger.debug("event %s 无订阅者", type(event).__name__)
             return
-        results = await asyncio.gather(
-            *(h(event) for h in handlers), return_exceptions=True
-        )
+        results = await asyncio.gather(*(h(event) for h in handlers), return_exceptions=True)
         for r in results:
             if isinstance(r, Exception):
                 logger.exception("事件处理失败: %s", r)

@@ -1,7 +1,7 @@
 # CODE_MAP — AgentHub 后端代码地图
 
 > 由 `python scripts/gen_codegraph.py` 自动生成，请勿手改。
-> 规模：82 模块 / 129 类 / 294 函数 / 632 边。
+> 规模：83 模块 / 130 类 / 306 函数 / 646 边。
 
 ## 一、5 层洋葱模块全景（Mermaid）
 
@@ -150,6 +150,7 @@ graph TD
 - `app.infrastructure.llm.claude_code_runtime`
 - `app.infrastructure.llm.factory`
 - `app.infrastructure.llm.mock_adapter`
+- `app.infrastructure.llm.pi_agent_runtime`
 - `app.infrastructure.llm.proxy`
 - `app.infrastructure.llm.proxy.handler`
 - `app.infrastructure.queue`
@@ -200,5 +201,6 @@ graph TD
 
 - 跨层违规（AR-01）：**0**
 - 循环依赖：**0**
-- 无入边模块（疑似死代码，需人工确认）：**1**
+- 无入边模块（疑似死代码，需人工确认）：**2**
   - 🟡 `app.domain.task_engine.coordinator`
+  - 🟡 `app.infrastructure.llm.pi_agent_runtime`

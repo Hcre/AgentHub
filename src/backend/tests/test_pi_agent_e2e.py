@@ -98,9 +98,7 @@ async def test_subprocess_lifecycle():
     print(f"    Event types: {event_types}")
 
     # 无 API key 时应看到 ERROR 或 DONE 事件
-    has_error_or_done = any(
-        e.type.value in ("error", "done") for e in events
-    )
+    has_error_or_done = any(e.type.value in ("error", "done") for e in events)
     assert has_error_or_done, "Should have ERROR or DONE event"
     print("  [PASS] Pi subprocess handles no-API-key gracefully")
 

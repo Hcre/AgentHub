@@ -17,10 +17,18 @@ import { Avatar, Badge, Button, Icon } from '../ui'
 import type { Agent } from '../../types'
 
 /** 中心区 chat tab 内各子视图 */
-function TabContent({ tab, agent }: { tab: string; agent: Agent }) {
+function TabContent({
+  tab,
+  agent,
+  conversationId,
+}: {
+  tab: string
+  agent: Agent
+  conversationId: string | null
+}) {
   switch (tab) {
     case 'chat':
-      return <ChatView agent={agent} />
+      return <ChatView agent={agent} key={conversationId ?? agent.id} />
     case 'tasks':
       return <TasksTabView />
     case 'activity':
@@ -51,7 +59,7 @@ function Panel({ children }: { children: ReactNode }) {
 }
 
 export function CenterPanel() {
-  const { section, activeTab, activeAgentId, theme, setActiveTab, toggleTheme, toggleRight } =
+  const { section, activeTab, activeAgentId, activeConversationId, theme, setActiveTab, toggleTheme, toggleRight } =
     useUIStore()
   const agents = useAgentStore((s) => s.agents)
 
@@ -137,7 +145,7 @@ export function CenterPanel() {
       </div>
 
       <div className="min-h-0 flex-1">
-        <TabContent tab={activeTab} agent={agent} />
+        <TabContent tab={activeTab} agent={agent} conversationId={activeConversationId} />
       </div>
     </div>
   )

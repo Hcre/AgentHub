@@ -21,6 +21,7 @@ class Session:
     id: UUID = field(default_factory=uuid4)
     group_id: UUID | None = None  # 群聊时必填
     agent_id: UUID | None = None  # 私聊时必填
+    workspace_path: str = ""  # Agent 工作目录（宿主机绝对路径）
     created_at: datetime = field(default_factory=_now)
     updated_at: datetime = field(default_factory=_now)
 

@@ -2,7 +2,7 @@
 
 > 状态：设计阶段 | 日期：2026-05-25 | 基于 `docs/explore/group-chat-discussion-mode-options.md` 调研结论的抉择
 >
-> 前置：V1 @路由模式见 `docs/design/group-chat_群聊功能设计方案.md`；模块边界见 `docs/explore/group-chat-boundary-and-dependencies.md`
+> 前置：V1 @路由模式见 `docs/design/group-chat_群聊功能设计方案.md`；模块边界见 `docs/explore/EXP-12_group-chat-boundary-and-dependencies.md`
 
 ## 一、核心判断
 
@@ -322,5 +322,5 @@ SELECTOR_PROMPTS = {
 | `docs/design/group-chat_群聊功能设计方案.md` | V1 @路由模式（前置） |
 | `docs/explore/group-chat-discussion-mode-options.md` | 三问题方案对比（本抉择的输入） |
 | `docs/explore/group-chat-discussion-mode-research.md` | 业界调研（AutoGen/CrewAI/Slack/OpenClaw） |
-| `docs/explore/group-chat-boundary-and-dependencies.md` | 模块边界与接口契约 |
+| `docs/explore/EXP-12_group-chat-boundary-and-dependencies.md` | 模块边界与接口契约 |
 | `docs/specs/domains/domain2-orchestration_域2-Agent编排.md` | M3 编排任务清单 |

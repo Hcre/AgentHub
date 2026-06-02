@@ -1,0 +1,216 @@
+================================================================================
+  AgentHub MVP 阶段实现/未实现清单（补充稿）
+  编写日期: 2026-06-01
+  基于:    远程 main 5e34bea + 课题要求
+  状态标记: [+] 已实现  [~] 部分实现  [ ] 未实现  [-] P2/可选
+================================================================================
+
+
+一、总体对照（课题 6 大功能 vs 现状）
+--------------------------------------------------------------------------------
+  [1] IM 聊天式交互 ........... 75% 实现  (基础全有,内联卡片/操作待补)
+  [2] 主 Agent 协调器 .......... 90% 实现  (拆解+并行+UI 全有)
+  [3] 多 Agent 接入 ............ 95% 实现  (4 适配器+矩阵+扫描)
+  [4] 产物预览与编辑 ........... 35% 实现  (WorkspaceBrowser 有,内联卡片/Diff 缺)
+  [5] 部署发布 .................  0%       (课题标记 P2,MVP 可选)
+  [6] 多端支持 ................. 30%       (仅 Web,P2 桌面/移动未做)
+
+  MVP 覆盖度: 约 70%
+  课题考察 5 维度预估:
+    AI 协作能力(30%)  ★★★★★  SPEC/Skill/Rules/ADR 体系完整
+    功能完整度(25%)  ★★★★☆  IM + 多 Agent 跑通,产物卡片待补
+    生成效果(20%)    ★★★★☆  UI 完整,内联预览待加
+    代码理解度(15%)  ★★★★★  5 层洋葱 + CLI/SDK 双轨清晰
+    创新与产品感(10%) ★★★★☆  CLI×Provider 矩阵+自动扫描+工作目录
+
+
+二、已实现 — MVP 核心(必须保住)
+--------------------------------------------------------------------------------
+
+2.1 IM 聊天基础设施
+  [+] 对话列表(左栏)............. LeftPanel.tsx + sessionStore.ts
+  [+] 新建/置顶/归档/搜索/排序... sessions.py CRUD API
+  [+] 多会话并行(多 Tab)........ ConversationTabs.tsx
+  [+] 单聊模式(1v1)............. ChatView.tsx + Composer.tsx
+  [+] 群聊模式 .................. GroupChatView.tsx + GroupComposer.tsx
+  [+] WebSocket 双向流式 ......... api/ws/chat.py + useWebSocket.ts
+  [+] 心跳/重连 ................. ws/connection_manager.py
+  [+] 文本/代码块/图片渲染 ...... MessageBubble.tsx
+  [+] 上下文连续(历史自动传).... context_builder.py
+
+2.2 多 Agent 接入(核心亮点)
+  [+] 统一适配器层 .............. infrastructure/llm/factory.py
+  [+] 4 个适配器 ................ claude_code / opencode / pi_agent / mock
+  [+] CLI×Provider 矩阵(创新).... cliProviderMatrix.ts(Claude/OpenCode/Pi × DeepSeek/Xiaomi/MiniMax/...)
+  [+] Provider 自动扫描(创新).... provider_scanner.py(PATH 探测 + version)
+  [+] 自建 Agent(表单式)........ CreateAgentModal.tsx
+  [+] 自建 Agent(对话式)........ CustomAgentModal.tsx
+  [+] Agent 头像/名称/能力标签... AgentDetailPage.tsx(6 Tab)
+  [+] 8 张数据表 ................ Agent/Session/Message/Task/TaskEvent/Notification/Group/GroupMember
+
+2.3 Orchestrator 协调者
+  [+] 协调者 Agent(讨论型)....... discussion_orchestrator.py
+  [+] @mention 解析 + 路由 ...... selector.py(手动/自动模式)
+  [+] 任务拆解 + DAG 编译 ....... task_engine/harness.py + fsm.py
+  [+] 并行调度(asyncio.gather) .. coordinator.py
+  [+] Task FSM + 事件溯源 ....... task_engine/fsm.py
+  [+] 协调者计划可视化 UI ....... CoordinatorPlan.tsx
+
+2.4 工作流辅助
+  [+] Inbox 审批流 .............. inbox.py + InboxView.tsx
+  [+] 任务看板(列表/筛选)...... TasksTabView.tsx
+  [+] 工作目录浏览器(创新)...... WorkspaceBrowser.tsx + 0005 migration
+  [+] Skill 市场 ................ SkillMarketplacePage.tsx
+  [+] ApiKey 管理 ............... ApiKeyManager.tsx
+  [+] Provider ping 测活 ........ providers.py /ping
+  [+] Key 自动解析(创新)........ provider_scanner.py 内置
+
+2.5 AI 协作规范沉淀(30% 权重)
+  [+] 规范文档 8 大类 ........... docs/conventions/01-08 + 99 系列
+  [+] AI 工作流 7 步 ........... ai-workflow/01-07
+  [+] 项目级 Skill(10+)......... skills/ 根 + .agenthub/skills/xhs|dbs 系列
+  [+] Specs(00-05).............. docs/specs/(00-05 + domains/)
+  [+] 架构设计(分层+数据流)..... docs/specs/01b-architecture-design
+  [+] 适配器接口规范 ............ docs/specs/04c-adapter-interface
+  [+] ADR 决策记录 .............. worklogs/decisions/0001(CLI 优先)+ 0002(长驻 CLI)
+  [+] worklog 体系 .............. worklogs/{董,黎,袁}/YYYY-MM-DD_*.md
+
+2.6 工程化与质量
+  [+] Docker Compose 5 服务 ..... src/docker/docker-compose.yml(全 healthy)
+  [+] Alembic 5 版迁移 .......... src/backend/alembic/versions/0001-0005
+  [+] pre-commit hooks .......... .pre-commit-config.yaml(7+ 检查)
+  [+] E2E 冒烟测试 .............. src/backend/scripts/smoketest_e2e.py
+  [+] 单元测试 20+ 用例 ......... src/backend/tests/
+  [+] Dashboard 协作中心 ........ dashboard.html(看板/文档/图谱 三 Tab)
+  [+] 代码图谱 ................. docs/CODE-MAP.md + .codegraph/graph.json
+  [+] 离线 SVG 分层图谱 ........ gen_codegraph.py(自包含,无 d3 CDN)
+
+
+三、部分实现 — MVP 需补齐(必修)
+--------------------------------------------------------------------------------
+
+3.1 消息类型(课题 1,核心体验)
+  [~] 文件附件上传 .............. 0%  没有文件上传 API,需补 multipart endpoint
+  [~] 网页预览 iframe 卡片 ...... 0%  WorkspaceBrowser 只能在右栏,没内联到消息流
+  [~] Diff 视图卡片(diff2html).. 0%  没看到该依赖,UI 未做
+  [-] 部署状态卡片 .............. 0%  课题 P2
+
+3.2 消息操作(课题 1)
+  [+] 复制代码 .................. 0%  待确认(可能 MessageBubble 有)
+  [~] 重新生成 ................. 待查  流式结束后应可点重试
+  [~] 引用/回复 ............... 0%  UI 上未见 quote
+  [~] 一键应用 Diff ............ 0%  UI 缺
+
+3.3 上下文管理(课题 1)
+  [+] 聊天历史自动传 ........... context_builder.py(短期)
+  [~] Pin 关键消息 ............. 待查  文档提"三层体系",UI 落地状态需验
+  [~] 跨会话上下文 ............. 0%  未做
+
+3.4 产物预览(课题 4,加分项)
+  [~] iframe sandbox 卡片 ....... 0%  无内联卡片组件
+  [~] 全屏预览/代码编辑器 ..... 0%  仅有 WorkspaceBrowser 树形浏览
+
+3.5 创新扩展(课题 5 创新 10%)
+  [~] Diff 版本历史 ............ 0%  P2
+  [~] 工作目录持久化 ............ 50% migration 已有,功能 UI 待落地
+  [~] Token 消耗监控 ............ 0%  roadmap M5.3,未做
+
+
+四、未实现 / MVP 之后(降级或不做)
+--------------------------------------------------------------------------------
+
+4.1 部署发布(课题 5,P2)
+  [ ] 一键生成预览 URL
+  [ ] 静态站点部署
+  [ ] 容器化部署
+  [ ] 源码打包下载
+
+4.2 多端支持(课题 6,P2)
+  [ ] 桌面端(Electron / Tauri)
+  [ ] 移动端(轻量 H5)
+
+4.3 PPT 预览(课题 4,P2)
+  [ ] .pptx 渲染浏览
+
+4.4 进阶功能(P3)
+  [ ] 多 Provider 智能路由(成本/速度/质量)
+  [ ] Agent 工作记忆长期持久化
+  [ ] 跨项目 Skill 共享
+  [ ] 移动端推送通知
+
+
+五、MVP 收尾优先级与工时
+--------------------------------------------------------------------------------
+
+5.1 必修(答辩前 1-2 天必做)
+  P0-1  网页预览 iframe 卡片 ............ 8h  课题 4 刚需
+  P0-2  Diff 视图(diff2html 集成)....... 6h  评审最吸睛
+  P0-3  文件附件上传 + 预览 ............. 6h  Agent 产出传递通道
+  P0-4  Pin 消息 UI(若有后端).......... 3h  上下文管理可视化
+  P0-5  复制代码 / 重新生成按钮 ........ 2h  基础消息操作
+  P0-6  端到端 demo 数据集 .............. 3h  保证 3min Demo 流畅
+                                              合计: 约 28h(2 个工作日)
+
+5.2 加分(时间允许,半天-1天)
+  P1-1  工作目录 UI 落地(后端已有)..... 4h  展示创新点
+  P1-2  Token 消耗监控 ................ 3h  工程深度
+  P1-3  CLI PATH 扫描前端实时展示 .... 2h  创新点演示
+  P1-4  Playwright E2E 5 个 Story ..... 6h  稳定性
+                                              合计: 约 15h
+
+5.3 MVP 不做(超出时间盒)
+  ✗ 部署发布卡片
+  ✗ 桌面端 / 移动端
+  ✗ PPT 预览
+  ✗ Diff 版本历史
+
+
+六、3 分钟 Demo 视频脚本建议
+--------------------------------------------------------------------------------
+
+  开场(15s):
+    "我们做了 4 个主流 Agent CLI 适配器 + 1 套 CLI×Provider 矩阵,
+     解决"加新 Agent 系统要重写一遍"的问题。"
+
+  主体(150s,5 个 Core User Story):
+    S1 (30s)  新建会话 → 选 Agent → 1v1 流式对话 → 看代码块
+    S2 (30s)  群聊 → @协调者 → 看多 Agent 并行执行 → 产物汇聚
+    S3 (30s)  产物内联预览(网页/Diff 卡片)— 必装 P0-1/P0-2
+    S4 (30s)  自建 Agent:对话式 + 表单式 + CLI×Provider 矩阵
+    S5 (30s)  Inbox 审批 + 任务看板
+
+  收尾(15s):
+    SPEC/Skill/Rules 全套沉淀 + ADR + 22 单元 + 5 服务 E2E
+    + 创新点:CLI 自动扫描 + Provider 矩阵 + 工作目录
+
+
+七、风险与降级策略
+--------------------------------------------------------------------------------
+
+  R1 必修项(P0)延误 ................... 降级"新窗口打开预览"代替 iframe 卡片
+  R2 多 Agent 协调不稳定 .............. 降级"手动 @Agent"模式,不依赖 Orchestrator
+  R3 LLM Provider 不可用 .............. 自动 fallback 到 Mock 适配器,UI 保持完整
+  R4 答辩前 CLI×Provider 矩阵没接好 ... 用 mock 数据演示矩阵逻辑
+
+
+八、文件位置索引
+--------------------------------------------------------------------------------
+
+  后端核心 ............... src/backend/app/{api,application,core,domain,infrastructure,schemas}/
+  适配器 .................. src/backend/app/infrastructure/llm/{factory,provider_scanner,*_runtime}.py
+  前端组件 ................ src/frontend/src/components/{chat,group,inbox,layout,settings,skills,tasks,...}/
+  规范 .................... docs/conventions/01-08 + 99 系列
+  Specs ................... docs/specs/00-05 + domains/
+  Skills .................. skills/ 根 + .agenthub/skills/
+  ADR ..................... worklogs/decisions/0001-cli-first-pivot.md
+                         + worklogs/decisions/0002-phase1-long-running-cli.md
+  状态 .................... STATUS.md(各人进度) + dashboard.html(可视化)
+  路线图 .................. docs/plan/开发清单_roadmap.md
+  架构全景 ................ docs/CODE-MAP.md(已收归 docs/)
+
+
+================================================================================
+  建议行动: 1) 评审组确认 P0-1~P0-6 工时合理 → 排进 6/2-5
+            2) P1-1~P1-4 视答辩时间倒推
+            3) 不在 MVP 范围内的(P2/P3)在答辩时明确"超纲项"
+================================================================================

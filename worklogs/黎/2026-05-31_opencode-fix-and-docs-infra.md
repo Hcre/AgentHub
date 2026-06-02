@@ -1,0 +1,36 @@
+# 2026-05-31 OpenCode 修复 + 文档基础设施
+
+## 做了什么
+
+1. **修复 opencode JSON 解析 bug** — opencode v1.15+ 将内容嵌套在 `data.part` 内，`_parse_line()` 只查顶层 `data.text`，导致所有 Agent 回复丢失（根因分析见 `docs/explore/黎/opencode-json-parsing-fix.md`）
+
+2. **文档基础设施改进** — CLAUDE.md 新增「AI 产出文件写入规则」section，渐进式披露到 `06-documentation.md` §三（Git→人名映射 + 产出→位置决策表 + 写文件前自检）
+
+3. **调研报告** — M4 产物预览与编辑调研（open-design / open-codesign / AIO Hub 的实现方式分析）
+
+## 关键决策
+
+- opencode JSON 解析采用 `part` 优先 + 顶层 fallback 策略，兼容新旧版本
+- 文档产出规范通过 CLAUDE.md 渐进式披露，避免上下文膨胀
+
+## 文件变更
+
+| 文件 | 动作 |
+|------|------|
+| `opencode_runtime.py` | 修复 `_parse_line` 数据提取层级 |
+| `CLAUDE.md` | 新增 AI 产出文件写入规则引用 |
+| `06-documentation_文档规范.md` | 新增 Git→人名映射 + AI 产出→位置速查 |
+| `docs/explore/黎/artifact-preview-research.md` | M4 产物预览调研 |
+| `docs/explore/黎/opencode-json-parsing-fix.md` | opencode 集成审查报告 |
+
+### 补充修复 (21:30)
+
+- **step_finish 误触发 DONE** — opencode 多步流程 `step_start → tool_use → step_finish → step_start → text`，step_finish 被映射为 DONE 导致循环提前 break，丢失后续 text 事件。修复：step_finish 静默处理，循环靠进程自然退出。
+- **流式哨兵碰撞导致消息替换** — chatStore 全局 `__streaming__` 导致多轮并发时 findIndex 跨轮匹配，第二轮 text 追加到第一轮消息。修复：哨兵改为 per-key scoped `__streaming__:convKey`，ChatView key 统一用 convKey()。
+- **addUserMessage 不关闭旧哨兵** — 同一会话内旧哨兵残留，新回复仍追加到旧消息。修复：addUserMessage 中先将 m.streaming 封闭再创建新哨兵。
+
+## 给下一位的交接
+
+- 后端重启后 opencode 对话应该能正常工作
+- 需确认 `gitignore` 中的 `backend/` 规则是否正确（当前会忽略 `src/backend/` 下的 tracked 文件）
+- pre-push 的 dead-links hook 有 29 个预存死链（非本次变更引入）

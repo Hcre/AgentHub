@@ -13,8 +13,8 @@ import type {
 /** 会话键：agentId:conversationId */
 export const convKey = (agentId: string, conversationId: string) => `${agentId}:${conversationId}`
 
-/** 流式增量哨兵消息 id；done 时替换为正式 id。 */
-const STREAMING_ID = '__streaming__'
+/** 按会话键生成流式哨兵 id，防止多轮并发时哨兵碰撞（群聊已采用同名空间隔离模式） */
+const streamingId = (key: string) => `__streaming__:${key}`
 
 const REPLIES = [
   'Got it. Reading through now — I’ll come back with a structured pass.',
@@ -66,10 +66,17 @@ export const useChatStore = create<ChatState>()(
 
   addUserMessage: (key, text) => {
     const userMsg: ChatMessage = { id: uid('u'), from: 'user', time: nowStamp(), text }
-    set((s) => ({
-      messages: { ...s.messages, [key]: [...(s.messages[key] ?? []), userMsg] },
-      typing: { ...s.typing, [key]: true },
-    }))
+    set((s) => {
+      const prev = s.messages[key] ?? []
+      // 关闭还在流式的旧哨兵（防止新回复追加到旧消息上）
+      const list = prev.map((m) =>
+        m.streaming ? { ...m, id: uid('a'), streaming: false } : m,
+      )
+      return {
+        messages: { ...s.messages, [key]: [...list, userMsg] },
+        typing: { ...s.typing, [key]: true },
+      }
+    })
   },
 
   applyStreamEvent: (key, event) => {
@@ -77,7 +84,7 @@ export const useChatStore = create<ChatState>()(
       const list = s.messages[key] ?? []
       if (event.type === 'text') {
         const chunk = event.content ?? ''
-        const idx = list.findIndex((m) => m.id === STREAMING_ID)
+        const idx = list.findIndex((m) => m.id === streamingId(key))
         if (idx >= 0) {
           const cur = list[idx]!
           const next = [...list]
@@ -88,7 +95,7 @@ export const useChatStore = create<ChatState>()(
           }
         }
         const seeded: ChatMessage = {
-          id: STREAMING_ID,
+          id: streamingId(key),
           from: 'agent',
           time: nowStamp(),
           text: chunk,
@@ -101,7 +108,7 @@ export const useChatStore = create<ChatState>()(
       }
       if (event.type === 'done') {
         const next = list.map((m) =>
-          m.id === STREAMING_ID ? { ...m, id: uid('a'), streaming: false } : m,
+          m.id === streamingId(key) ? { ...m, id: uid('a'), streaming: false } : m,
         )
         return {
           messages: { ...s.messages, [key]: next },
@@ -115,7 +122,7 @@ export const useChatStore = create<ChatState>()(
           time: nowStamp(),
           text: `⚠️ ${event.content ?? '执行出错'}`,
         }
-        const next = list.filter((m) => m.id !== STREAMING_ID).concat(errMsg)
+        const next = list.filter((m) => m.id !== streamingId(key)).concat(errMsg)
         return {
           messages: { ...s.messages, [key]: next },
           typing: { ...s.typing, [key]: false },

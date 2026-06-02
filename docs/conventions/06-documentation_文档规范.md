@@ -61,7 +61,7 @@ async def dispatch_message(
 
     Raises:
         AgentNotFoundError: target_id 对应的 Agent 不存在
-        BoundaryViolation: 触发 99-boundaries 权限矩阵的拦截
+        BoundaryViolation: 触发 09-boundaries 权限矩阵的拦截
     """
 ```
 
@@ -107,6 +107,45 @@ python scripts/check_docs.py
 | ADR（新位置）| `NNNN-<slug>.md` | `0001-cli-first-pivot.md` |
 
 > 禁空格 / 特殊字符 / 版本后缀。
+
+### Git → 人名映射（AI Agent 用）
+
+> AI Agent 产出文件前先用 `git config user.name` 查自己的 Git 用户名，对下表找到个人目录。
+
+| Git 用户名 | 人名 | 个人目录 |
+|-----------|------|---------|
+| `oldmanpushbike` | 黎 | `worklogs/黎/` `docs/explore/黎/` |
+| （待补充） | 董 | `worklogs/董/` `docs/explore/董/` |
+| `xiangbianpangde` | 袁 | `worklogs/袁/` `docs/explore/袁/` |
+
+### AI 产出 → 文件位置速查
+
+> 上表「文档放哪」是人向分类；下表是 AI 向——按「做了什么」直接映射到写入位置。
+
+| AI 做了什么 | 写入位置 | 命名格式 |
+|------------|---------|---------|
+| **调研/技术探索**（学习外部项目、对比方案、可行性分析） | `docs/explore/{你}/` | 自由命名 `.md`，建议描述性 |
+| **设计文档**（复杂功能，≥3 模块或跨域） | `docs/design/` | `{English}_{中文}.md` |
+| **工作日志**（每次工作后） | `worklogs/{你}/` | `YYYY-MM-DD_<简短描述>.md` |
+| **ADR 架构决策**（收束节点，影响项目方向） | `worklogs/decisions/` | `NNNN-<slug>.md` |
+| **功能规格**（新增/修改功能的行为定义） | `docs/specs/` | `NN-{English}_{中文}.md` |
+| **汇报/报告** | `docs/reports/` | 自由命名 |
+| **项目计划/PRD/路线图** | `docs/plan/` | 自由命名 |
+| **代码实现**（非文档） | 直接改 `src/` | — |
+
+### 不需要写文件的场景
+
+| 场景 | 处理方式 |
+|------|---------|
+| 简单问答、代码解释 | 对话内联回复即可 |
+| 临时调试、一次性脚本 | 不需要落盘 |
+
+### 写文件前自检
+
+- [ ] 我是什么类型的产出？（对照上表）
+- [ ] 我知道自己是谁吗？（`git config user.name` → 映射表）
+- [ ] 文件名符合命名规范吗？（D-05 ~ D-09）
+- [ ] 写完需要同步更新 STATUS.md / roadmap 吗？
 
 ### 何时写设计文档
 

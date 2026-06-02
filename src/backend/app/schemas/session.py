@@ -15,6 +15,7 @@ class SessionCreateRequest(BaseModel):
     group_id: UUID | None = None
     agent_id: UUID | None = None
     title: str = ""
+    workspace_path: str = ""
 
     @model_validator(mode="after")
     def _check_target(self) -> SessionCreateRequest:
@@ -31,6 +32,7 @@ class SessionOut(BaseModel):
     title: str
     group_id: UUID | None
     agent_id: UUID | None
+    workspace_path: str
     created_at: datetime
 
 

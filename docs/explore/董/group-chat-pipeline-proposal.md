@@ -18,7 +18,7 @@
 | V5 resume + stream-json 兼容 | ✅ | `--resume` + stream-json 可恢复历史；crash recovery 方案明确：spawn_resume() 不带 `--session-id`，直接用 `--resume <key>` |
 | 附带发现 | ⚠️ | 全局 `~/.claude/CLAUDE.md` 污染 Agent 身份 → 需 `--bare` |
 
-详见 [cli-streamjson-feasibility-test.md](../cli-streamjson-feasibility-test.md)。
+详见 [cli-streamjson-feasibility-test.md](./cli-streamjson-feasibility-test.md)。
 
 ## 一、问题（Problem）
 
@@ -77,11 +77,11 @@ CLI 路径在「短驻 + resume」模式下无干净解法。
 
 新路线：**ClaudeCodeRuntime 改造为长驻子进程，通过 `--input-format stream-json` 持续推送 JSONL user message，让 CLI 自己累积对话历史**。
 
-参考实现：cc-haha 项目（`SessionRunner` + `replBridge`，详见 [cc-haha 上下文管理分析](../../../../mnt/d/Edge_files/cc-haha_context_management_analysis.md)，不在仓库内）。
+参考实现：cc-haha 项目（`SessionRunner` + `replBridge`，详见 [cc-haha 上下文管理分析](./cc-haha_context_management_analysis.md)）。
 
 ### 决策 4：Phase 1 启动门槛 = Phase 0.5 验证通过 + Phase 0 量化基线达标
 
-- **Phase 0.5（实测验证）**：4 个 CLI 行为假设，任一失败则 Phase 1 重新设计或弃用。详见 [cli-streamjson-feasibility-test.md](../cli-streamjson-feasibility-test.md)
+- **Phase 0.5（实测验证）**：4 个 CLI 行为假设，任一失败则 Phase 1 重新设计或弃用。详见 [cli-streamjson-feasibility-test.md](./cli-streamjson-feasibility-test.md)
 - **Phase 0 量化基线**：如果 Phase 0 后身份互串率 <5%，Phase 1 推迟到下一阶段（避免过度工程）
 
 ### 决策 5：进程池分阶段渐进
@@ -129,7 +129,7 @@ cc-haha 的 frontmatter + AI 检索 + 团队记忆设计，记入 [memory-system
 
 ### Phase 0.5：CLI 长驻可行性实测（**Phase 1 的 go/no-go 门槛**）
 
-详见 [cli-streamjson-feasibility-test.md](../cli-streamjson-feasibility-test.md)。5 个验证项（V5 为场景推理后新增）：
+详见 [cli-streamjson-feasibility-test.md](./cli-streamjson-feasibility-test.md)。5 个验证项（V5 为场景推理后新增）：
 
 | # | 验证 | 失败后果 |
 |---|------|---------|
@@ -290,13 +290,13 @@ async def fanout_to_listeners(self, message, group, exclude_agent_id, pool):
 
 | # | 待办 | 状态 / 责任 |
 |---|------|------------|
-| Q1 | 跑 Phase 0.5 的验证脚本 | ✅ V1/V2/V3/V5 PASS, V4 Partial，见 [feasibility-test 文档](../cli-streamjson-feasibility-test.md) |
+| Q1 | 跑 Phase 0.5 的验证脚本 | ✅ V1/V2/V3/V5 PASS, V4 Partial，见 [feasibility-test 文档](./cli-streamjson-feasibility-test.md) |
 | Q2 | Phase 0 量化基线脚本（固定 fixture × N=20）| ⏳ 待做（Phase 0 验收的前置） |
 | Q3 | `--system-prompt` 在长驻进程中是否每次推送都重申？还是仅首次有效？ | ✅ V3 已回答：首次注入即可，5/5 全部生效 |
 | Q4 | 长驻 CLI 进程的 stderr/异常退出如何被 IM 层感知？ | ✅ V4 已回答：写入时抛 ConnectionResetError，但需 write 前主动检查 returncode |
 | Q10 | 隔离用户全局 `~/.claude/CLAUDE.md` 污染（V3 附带发现） | ⏳ Phase 1 决策：`--bare` vs 工作目录隔离 vs prompt 覆盖（推荐 `--bare`） |
 | Q11 | JSONL 序列化层的类型化保证（V4 caveat） | ⏳ Phase 1 实施时落实（Pydantic / dataclass） |
-| Q12 | V5：`--resume` + `--input-format stream-json` 崩溃恢复兼容性 | ✅ 已通过 — `--resume <key>` 不带 `--session-id` 即可恢复历史（见 [V5 脚本](../../scripts/feasibility/v5_resume_recovery.py)） |
+| Q12 | V5：`--resume` + `--input-format stream-json` 崩溃恢复兼容性 | ✅ 已通过 — `--resume <key>` 不带 `--session-id` 即可恢复历史（见 [V5 脚本](../../../scripts/feasibility/v5_resume_recovery.py)） |
 
 ### 设计期待解
 

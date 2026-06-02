@@ -24,9 +24,7 @@ engine = create_async_engine(
     pool_pre_ping=True,
 )
 
-session_factory = async_sessionmaker(
-    engine, class_=AsyncSession, expire_on_commit=False
-)
+session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:

@@ -1,6 +1,6 @@
 # 群聊功能设计方案 — @路由模式
 
-> 状态：设计阶段 | 日期：2026-05-25（2026-05-26 增量注入方案更新） | 基于 `docs/explore/group-chat-boundary-and-dependencies.md` 讨论结论
+> 状态：设计阶段 | 日期：2026-05-25（2026-05-26 增量注入方案更新） | 基于 `docs/explore/EXP-12_group-chat-boundary-and-dependencies.md` 讨论结论
 >
 > **2026-05-25 代码核验修订**：对照实际代码（`chat_service.py` / `memory_l1.py` / `protocol.py` / `claude_code_runtime.py`）发现多处设计与适配器实现不符，已修正 C1/C2/C3/H1/H2/M2。
 >
@@ -385,7 +385,7 @@ async def resolve(self, mentions, content, group):
 
 | 文档 | 内容 |
 |------|------|
-| `docs/explore/group-chat-boundary-and-dependencies.md` | 群聊依赖分析与模块边界 |
+| `docs/explore/EXP-12_group-chat-boundary-and-dependencies.md` | 群聊依赖分析与模块边界 |
 | `docs/design/group-creation_群组创建功能设计方案.md` | 群组创建（前置功能，已实现） |
 | `docs/specs/01-architecture_架构定义.md` | 五层架构 |
 | `docs/specs/04-commands_命令接口.md` | Session 创建与消息发送 API |

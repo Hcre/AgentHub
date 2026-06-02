@@ -9,9 +9,9 @@ export default defineConfig({
     port: 5173,
     proxy: {
       // 开发时前端请求自动转发到后端，规避 CORS
-      '/api': 'http://localhost:8000',
+      '/api': 'http://localhost:9000',
       '/ws': {
-        target: 'ws://localhost:8000',
+        target: 'ws://localhost:9000',
         ws: true,
       },
     },

@@ -20,9 +20,9 @@ from app.infrastructure.llm.claude_code_runtime import ClaudeCodeRuntime
 
 async def send(runtime: ClaudeCodeRuntime, session_id, prompt: str) -> None:
     """发送一条消息并打印响应。"""
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f">>> USER: {prompt}")
-    print(f"{'='*50}")
+    print(f"{'=' * 50}")
 
     request = AgentRequest(
         request_id=str(uuid4()),

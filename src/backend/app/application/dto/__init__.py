@@ -25,6 +25,7 @@ class AgentResponse:
     capability_tags: list[str]
     is_system: bool
     created_at: datetime
+    settings: dict
     # 注意：绝不返回 api_key
 
     @classmethod
@@ -42,6 +43,7 @@ class AgentResponse:
             capability_tags=a.capability_tags,
             is_system=a.is_system,
             created_at=a.created_at,
+            settings=a.settings,
         )
 
 
@@ -52,6 +54,7 @@ class SessionResponse:
     title: str
     group_id: UUID | None
     agent_id: UUID | None
+    workspace_path: str
     created_at: datetime
 
     @classmethod
@@ -62,6 +65,7 @@ class SessionResponse:
             title=s.title,
             group_id=s.group_id,
             agent_id=s.agent_id,
+            workspace_path=s.workspace_path or "",
             created_at=s.created_at,
         )
 

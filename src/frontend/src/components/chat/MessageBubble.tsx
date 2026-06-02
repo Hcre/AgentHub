@@ -36,17 +36,14 @@ export function MessageBubble({
               rehypePlugins={[rehypeHighlight]}
               components={{
                 pre: ({ children }: any) => (
-                  <pre className="my-2 overflow-x-auto rounded-lg border border-slate-700/50 bg-slate-800 p-3 text-[12px] leading-[1.5] text-slate-100">
+                  <pre className="overflow-x-auto whitespace-pre-wrap rounded-lg border bg-muted/50 p-3 text-[13px] font-mono text-foreground/80">
                     {children}
                   </pre>
                 ),
                 code: ({ className, children, ...props }: any) => {
-                  const text = String(children ?? '')
-                  const isBlock =
-                    text.includes('\n') ||
-                    (typeof className === 'string' && className.includes('language-'))
-                  return isBlock ? (
-                    <code className={className} {...props}>
+                  const isInline = !className
+                  return isInline ? (
+                    <code className="text-[13px] font-mono text-foreground" {...props}>
                       {children}
                     </code>
                   ) : (
@@ -62,6 +59,26 @@ export function MessageBubble({
                   <a href={href} target="_blank" rel="noopener" className="text-brand underline">
                     {children}
                   </a>
+                ),
+                table: ({ children }: any) => (
+                  <div className="overflow-x-auto my-2">
+                    <table className="min-w-full border-separate border-spacing-0 rounded-lg border text-[13px]">
+                      {children}
+                    </table>
+                  </div>
+                ),
+                th: ({ children }: any) => (
+                  <th className="border-b bg-muted/50 px-3 py-1.5 text-left font-medium text-muted-foreground">
+                    {children}
+                  </th>
+                ),
+                td: ({ children }: any) => (
+                  <td className="border-b px-3 py-1.5">{children}</td>
+                ),
+                blockquote: ({ children }: any) => (
+                  <blockquote className="my-2 border-l-2 border-brand/40 pl-3 italic text-muted-foreground">
+                    {children}
+                  </blockquote>
                 ),
               }}
             >

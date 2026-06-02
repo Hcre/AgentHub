@@ -57,6 +57,7 @@ _assets/
 
 # === 代码图谱（conventions/08）===
 # 生成产物可由 scripts/gen_codegraph.py 重建，不入库；
-# 仅 graph_schema.json（节点/边定义）入 git。CODE_MAP.md 在根，照常入库。
+# 仅 graph_schema.json（节点/边定义）入 git。docs/CODE_MAP.md 照常入库。
 .codegraph/graph.json
 .understand-anything/
+backend/

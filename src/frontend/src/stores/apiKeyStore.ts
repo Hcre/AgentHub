@@ -15,12 +15,14 @@ export interface ApiKeyEntry {
 
 interface ApiKeyState {
   keys: ApiKeyEntry[]
-  addKey: (data: { name: string; provider: string; apiKey: string; baseUrl: string; model: string }) => void
+  addKey: (data: { name: string; provider: string; apiKey: string; baseUrl?: string; model?: string }) => void
   removeKey: (id: string) => void
 }
 
 export const PROVIDER_LABELS: Record<string, string> = {
   deepseek: 'DeepSeek',
+  xiaomi: 'Xiaomi MiMo',
+  minimax: 'MiniMax',
   openai: 'OpenAI',
   anthropic: 'Anthropic',
   siliconflow: '硅基流动',
@@ -39,8 +41,8 @@ export const useApiKeyStore = create<ApiKeyState>()(
           provider: data.provider,
           keyPrefix: data.apiKey.slice(0, 4),
           apiKey: data.apiKey,
-          baseUrl: data.baseUrl.trim(),
-          model: data.model.trim(),
+          baseUrl: (data.baseUrl || '').trim(),
+          model: (data.model || '').trim(),
           createdAt: Date.now(),
         }
         set({ keys: [...get().keys, entry] })

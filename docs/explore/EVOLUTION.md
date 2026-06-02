@@ -42,12 +42,12 @@
 
 - **决策**: 摘除 Celery，用 `asyncio.gather` 替代任务编排；数据库从 12 表精简为 6 表
 - **原因**: MVP 阶段无需分布式任务队列，单进程异步足够；12 表过度设计，6 表覆盖核心场景
-- **影响文件**: `docs/specs/01-architecture_架构定义.md`、`docs/specs/03-data-model_数据模型.md`、`docs/conventions/99-boundaries_边界矩阵.md`、`docs/plan/开发清单_roadmap.md`
+- **影响文件**: `docs/specs/01-architecture_架构定义.md`、`docs/specs/03-data-model_数据模型.md`、`docs/conventions/09-boundaries_边界矩阵.md`、`docs/plan/开发清单_roadmap.md`
 - **参考**: PRD v4 统一方案
 
 ## 2026-05-23 — CLI-first 双轨架构确立
 
-- **决策**: [ADR-01](ADR-01-cli-first-pivot.md) — Agent 接入从纯 API 模式转向 CLI 优先的双轨架构（LLMAdapter + AgentRuntime）
+- **决策**: [ADR-01](../../worklogs/decisions/0001-cli-first-pivot.md) — Agent 接入从纯 API 模式转向 CLI 优先的双轨架构（LLMAdapter + AgentRuntime）
 - **原因**: Claude Code CLI 子进程模式在工具链完整性、代码生成质量上优于纯 API；保留 SDK 路径供轻量调用
 - **影响文件**: `claude_adapter.py` 重写、新增 `claude_code_runtime.py`、`domain/llm/protocol.py` 扩展
 
