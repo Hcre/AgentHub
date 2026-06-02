@@ -34,6 +34,11 @@ class MessageRepository(ABC):
         ...
 
     @abstractmethod
+    async def has_assistant_messages(self, session_id: UUID) -> bool:
+        """session 内是否已有 assistant 消息（用于判断 CLI --resume vs --session-id）。"""
+        ...
+
+    @abstractmethod
     async def set_pinned(self, message_id: UUID, pinned: bool) -> None: ...
 
     @abstractmethod

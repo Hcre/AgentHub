@@ -132,6 +132,7 @@ class ContextBuilder:
         # 6. L1 窗口仅作为辅助记忆传递（CLI Runtime 实际只用 system_prompt + 最后一条 user）
         window = await self._l1.get_window(session.id)
 
+        has_history = await self._messages.has_assistant_messages(session.id)
         return AgentRequest(
             request_id=str(uuid.uuid4()),
             session_id=session.id,
@@ -144,6 +145,7 @@ class ContextBuilder:
             is_group_chat=True,
             working_directory=session.workspace_path or None,
             group_delta_text=group_delta_text,
+            has_history=has_history,
         )
 
     # --- 私聊路径（向后兼容 MVP 行为） ---
@@ -166,6 +168,7 @@ class ContextBuilder:
         if memory_block:
             sp = sp + "\n\n" + memory_block
 
+        has_history = await self._messages.has_assistant_messages(session.id)
         return AgentRequest(
             request_id=str(uuid.uuid4()),
             session_id=session.id,
@@ -176,6 +179,7 @@ class ContextBuilder:
             agent_id=target_agent.id,
             is_group_chat=False,
             working_directory=session.workspace_path or None,
+            has_history=has_history,
         )
 
     # --- 记忆注入 ---

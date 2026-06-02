@@ -6,8 +6,6 @@ import { useChatStore } from '../../stores/chatStore'
 import { useUIStore } from '../../stores/uiStore'
 import { Button, Dialog, DialogContent, Icon, Input, Textarea } from '../ui'
 import { WorkspaceBrowser } from '../ui/WorkspaceBrowser'
-import { agentsApi } from '../../api/agents'
-import { sessionsApi } from '../../api/sessions'
 import { useApiKeyStore } from '../../stores/apiKeyStore'
 
 const SELECT_CLS =
@@ -107,7 +105,6 @@ function buildRuntimes(scanned: ProviderInfo[] | null, scanning: boolean): {id:s
 
 export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const createAgent = useAgentStore((s) => s.createAgent)
-  const removeAgent = useAgentStore((s) => s.removeAgent)
   const addConversation = useChatStore((s) => s.addConversation)
   const openConversation = useUIStore((s) => s.openConversation)
   const setSection = useUIStore((s) => s.setSection)
@@ -569,10 +566,10 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
                             const derived = resolveProviderConfig(agentSystem, found.provider)
                             if (derived) {
                               setBaseUrl(derived.baseUrl)
-                              setModel(found.model && derived.models.includes(found.model) ? found.model : derived.models[0])
+                              setModel(found.model && derived.models.includes(found.model) ? found.model : (derived.models[0] ?? ''))
                             } else {
                               setBaseUrl(found.baseUrl)
-                              setModel(found.model)
+                              setModel(found.model ?? '')
                             }
                           }
                         }}

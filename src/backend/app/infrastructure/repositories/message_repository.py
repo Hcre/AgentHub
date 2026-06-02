@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities.message import Message
@@ -102,6 +102,14 @@ class PostgresMessageRepository(MessageRepository):
         if m is not None:
             m.pinned = pinned
             await self._s.flush()
+
+    async def has_assistant_messages(self, session_id: UUID) -> bool:
+        stmt = select(exists().where(
+            MessageModel.session_id == session_id,
+            MessageModel.role == "assistant",
+        ))
+        result = await self._s.execute(stmt)
+        return bool(result.scalar())
 
     async def delete(self, message_id: UUID) -> None:
         m = await self._s.get(MessageModel, message_id)

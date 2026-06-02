@@ -116,17 +116,23 @@ class ClaudeCodeRuntime(AgentRuntime):
                 yield evt
             return
 
-        # V0 短驻：先 resume，找不到 session fallback 新建
-        # V0 历史行为：delta 与 persona 拼在 system_prompt 里 → 拼回保持 bit-for-bit 兼容
+        # V0 短驻：根据 DB 查询结果决定 --resume 还是 --session-id
+        # has_history=True → DB 有 assistant 消息 → CLI 磁盘必有记录 → --resume
+        # has_history=False → 首次对话 → --session-id 直接新建，省掉空跑
         request = self._merge_delta_into_system_prompt_v0(request)
         prompt = self._extract_prompt(request)
         session_key = self._compute_session_key(request)
-        async for event in self._run_cli(prompt, request, session_key, resume=True):
-            if "No conversation found" in (event.content or "") or (
-                event.type == StreamEventType.DONE
-                and "No conversation found" in str(event.metadata)
+        resume = request.has_history
+        logger.info("Session %s has_history=%s → %s", session_key, resume, "resume" if resume else "new")
+        async for event in self._run_cli(prompt, request, session_key, resume=resume):
+            if resume and (
+                "No conversation found" in (event.content or "") or (
+                    event.type == StreamEventType.DONE
+                    and "No conversation found" in str(event.metadata)
+                )
             ):
-                logger.info("Session %s 不存在，新建 CLI 会话", session_key)
+                # 极端情况：CLI 磁盘数据丢失（清缓存/迁移环境），fallback 新建
+                logger.warning("Session %s resume 失败（磁盘数据丢失），fallback 新建", session_key)
                 async for fallback_event in self._run_cli(
                     prompt, request, session_key, resume=False
                 ):

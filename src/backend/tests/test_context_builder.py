@@ -121,6 +121,9 @@ async def test_private_chat_bypasses_group_contract(db_session) -> None:  # type
     req = await ctx.build_for_agent(session=session, group=None, target_agent=a, trigger=trigger)
     assert req.is_group_chat is False
     assert req.group_id is None
-    assert req.system_prompt == "自身 prompt"
+    # 私聊不含群聊契约，但含记忆工具契约
+    assert "GROUP_CHAT_CONTRACT" not in (req.system_prompt or "")
+    assert req.system_prompt is not None and req.system_prompt.startswith("自身 prompt")
+    assert "save_memory" in (req.system_prompt or "")
     # 私聊：messages 用 L1 全窗口
     assert any(m["content"] == "前情" for m in req.messages)

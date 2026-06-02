@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { cn } from '../../lib/cn'
 import { useMemoryStore } from '../../stores/memoryStore'
-import { Badge, Button, Icon } from '../ui'
+import { Button, Icon } from '../ui'
 import type { ApiMemory, MemoryType } from '../../types'
 
 const TYPE_LABEL: Record<MemoryType, string> = {
