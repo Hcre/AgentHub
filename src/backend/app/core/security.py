@@ -36,7 +36,9 @@ def encrypt_secret(plaintext: str) -> str:
 
 
 def decrypt_secret(token: str) -> str:
-    """解密 encrypt_secret 的产物。"""
+    """解密 encrypt_secret 的产物。token 为空时返回空字符串。"""
+    if not token:
+        return ""
     key = _load_key()
     blob = base64.b64decode(token)
     nonce, ct = blob[:_NONCE_BYTES], blob[_NONCE_BYTES:]

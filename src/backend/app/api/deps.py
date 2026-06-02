@@ -17,10 +17,12 @@ from app.application.services import (
     AgentService,
     ChatService,
     GroupService,
+    MemoryService,
     SessionService,
 )
 from app.application.services.context_builder import ContextBuilder
 from app.application.services.discussion_orchestrator import DiscussionOrchestrator
+from app.application.services.memory_selector import MemorySelector
 from app.application.services.selector import Selector
 from app.core.events import EventBus, get_event_bus
 from app.domain.llm.protocol import UnifiedAgent
@@ -32,6 +34,7 @@ from app.infrastructure.llm.factory import build_adapter
 from app.infrastructure.repositories import (
     PostgresAgentRepository,
     PostgresGroupRepository,
+    PostgresMemoryRepository,
     PostgresMessageRepository,
     PostgresSessionRepository,
 )
@@ -78,6 +81,16 @@ def get_message_repo(session: DbSession) -> PostgresMessageRepository:
     return PostgresMessageRepository(session)
 
 
+def get_memory_repo(session: DbSession) -> PostgresMemoryRepository:
+    return PostgresMemoryRepository(session)
+
+
+def get_memory_service(
+    repo: Annotated[PostgresMemoryRepository, Depends(get_memory_repo)],
+) -> MemoryService:
+    return MemoryService(repo)
+
+
 # --- Service ---
 
 
@@ -109,11 +122,13 @@ def get_chat_service(
     message_repo: Annotated[PostgresMessageRepository, Depends(get_message_repo)],
     agent_repo: Annotated[PostgresAgentRepository, Depends(get_agent_repo)],
     group_repo: Annotated[PostgresGroupRepository, Depends(get_group_repo)],
+    memory_repo: Annotated[PostgresMemoryRepository, Depends(get_memory_repo)],
     bus: Annotated[EventBus, Depends(get_bus)],
 ) -> ChatService:
     l1 = get_l1_memory()
     wm = get_watermark_store()
-    ctx = ContextBuilder(message_repo, agent_repo, l1, wm)
+    mem_selector = MemorySelector(memory_repo)
+    ctx = ContextBuilder(message_repo, agent_repo, l1, wm, memory_selector=mem_selector)
     discussion = DiscussionOrchestrator(
         message_repo=message_repo,
         agent_repo=agent_repo,
@@ -143,9 +158,11 @@ async def build_chat_service_for_ws() -> AsyncIterator[ChatService]:
         msg_repo = PostgresMessageRepository(session)
         agent_repo = PostgresAgentRepository(session)
         group_repo = PostgresGroupRepository(session)
+        mem_repo = PostgresMemoryRepository(session)
         l1 = get_l1_memory()
         wm = get_watermark_store()
-        ctx = ContextBuilder(msg_repo, agent_repo, l1, wm)
+        mem_selector = MemorySelector(mem_repo)
+        ctx = ContextBuilder(msg_repo, agent_repo, l1, wm, memory_selector=mem_selector)
         bus = get_event_bus()
         discussion = DiscussionOrchestrator(
             message_repo=msg_repo,

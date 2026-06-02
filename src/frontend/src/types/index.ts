@@ -353,3 +353,34 @@ export interface StreamEvent {
   /** 群聊场景下标识发言人；私聊为 null。前端按此分色气泡 / 路由到 messagesByGroup。 */
   sender_agent_id?: string | null
 }
+
+// ─── 记忆系统 V3 ──────────────────────────────────────────────────────────────
+
+export type MemoryType = 'facts' | 'preferences' | 'procedures' | 'context'
+
+/** 对应 backend `MemoryOut`（schemas/memory.py）。 */
+export interface ApiMemory {
+  id: string
+  agent_id: string
+  group_id: string | null
+  user_id: string
+  scope: 'agent' | 'group'
+  name: string
+  description: string
+  memory_type: MemoryType
+  content: string
+  source: 'manual' | 'chat' | 'system'
+  pinned: boolean
+  hits: number
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+/** 对应 backend `MemoryStatsOut`。 */
+export interface ApiMemoryStats {
+  total: number
+  by_type: Record<string, number>
+  oldest: string | null
+  newest: string | null
+}

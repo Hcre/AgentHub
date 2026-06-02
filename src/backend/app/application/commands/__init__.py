@@ -68,6 +68,28 @@ class DeleteGroupCommand:
     group_id: UUID
 
 
+# === Memory Commands ===
+
+
+@dataclass
+class CreateMemoryCommand:
+    name: str
+    description: str
+    memory_type: str       # facts | preferences | procedures | context
+    content: str
+    source: str = "manual" # manual | chat | system
+    group_id: UUID | None = None
+    metadata: dict = field(default_factory=dict)
+
+
+@dataclass
+class UpdateMemoryCommand:
+    content: str | None = None
+    memory_type: str | None = None
+    pinned: bool | None = None
+    metadata: dict | None = None
+
+
 # === Session / Chat Commands ===
 
 

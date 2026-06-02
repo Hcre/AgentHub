@@ -18,10 +18,12 @@ session_key 规则（V0/V1 一致）：
 
 from __future__ import annotations
 
+import atexit
 import asyncio
 import json
 import logging
 import os
+import tempfile
 import uuid
 from collections.abc import AsyncIterator
 from functools import partial
@@ -350,6 +352,14 @@ class ClaudeCodeRuntime(AgentRuntime):
             cmd.extend(["--session-id", session_key])
         if request.system_prompt:
             cmd.extend(["--system-prompt", request.system_prompt])
+        # MCP 记忆工具：settings.mcp_memory_url 非空时注入
+        # ⚠️ --mcp-config flag 需在实际 CLI 版本中验证（claude --help | grep mcp）
+        if settings.mcp_memory_url and request.agent_id:
+            mcp_path = _write_mcp_config(
+                str(request.agent_id), settings.mcp_memory_url
+            )
+            if mcp_path:
+                cmd.extend(["--mcp-config", mcp_path])
         return cmd
 
     def _build_env(self) -> dict[str, str]:
@@ -536,3 +546,33 @@ class ClaudeCodeRuntime(AgentRuntime):
             )
 
         return events
+
+
+def _write_mcp_config(agent_id: str, mcp_url: str) -> str | None:
+    """写临时 MCP 配置文件，返回路径。atexit 注册删除，崩溃时也清理。"""
+    # agent_id 通过 query param 传给服务端 ASGI wrapper；
+    # env 字段对 SSE 类型的 MCP 服务端无效（仅对 subprocess 类型有效）。
+    config = {
+        "mcpServers": {
+            "agenthub-memory": {
+                "type": "sse",
+                "url": f"{mcp_url}?agent_id={agent_id}",
+            }
+        }
+    }
+    try:
+        f = tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".json",
+            prefix="agenthub_mcp_",
+            delete=False,
+            dir=tempfile.gettempdir(),
+        )
+        json.dump(config, f)
+        f.close()
+        atexit.register(lambda p: os.unlink(p) if os.path.exists(p) else None, f.name)
+        return f.name
+    except Exception as exc:
+        logger.warning("写 MCP 配置失败，跳过 MCP 注入: %s", exc)
+        return None
+
