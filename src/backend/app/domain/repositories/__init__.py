@@ -2,6 +2,7 @@
 
 from app.domain.repositories.agent_repository import AgentRepository
 from app.domain.repositories.group_repository import GroupRepository
+from app.domain.repositories.memory_repository import MemoryRepository
 from app.domain.repositories.message_repository import MessageRepository
 from app.domain.repositories.session_repository import SessionRepository
 from app.domain.repositories.task_repository import TaskRepository
@@ -9,6 +10,7 @@ from app.domain.repositories.task_repository import TaskRepository
 __all__ = [
     "AgentRepository",
     "GroupRepository",
+    "MemoryRepository",
     "MessageRepository",
     "SessionRepository",
     "TaskRepository",

@@ -4,6 +4,7 @@
 
 核心：Watermark 跟踪每 Agent「上次接触到第几条消息」，每次只注入 delta。
 私聊场景退化为「最近 L1 窗口全量注入」，保持向后兼容。
+记忆注入：MemorySelector 选中的记忆拼入 <agenthub-reminder>（V3 记忆系统）。
 """
 
 from __future__ import annotations
@@ -14,8 +15,10 @@ from dataclasses import dataclass
 
 from app.application.services.prompt_templates import (
     GROUP_CHAT_CONTRACT,
+    MEMORY_TOOL_CONTRACT,
     format_delta,
     format_members,
+    render_agenthub_reminder,
 )
 from app.core.config import settings
 from app.domain.entities.agent import Agent
@@ -45,11 +48,13 @@ class ContextBuilder:
         agent_repo: AgentRepository,
         l1_memory: L1MemoryStore,
         watermarks: WatermarkStore,
+        memory_selector=None,  # MemorySelector | None，避免循环导入
     ) -> None:
         self._messages = message_repo
         self._agents = agent_repo
         self._l1 = l1_memory
         self._wm = watermarks
+        self._mem = memory_selector
 
     async def build_for_agent(
         self,
@@ -61,8 +66,8 @@ class ContextBuilder:
     ) -> AgentRequest:
         """组装 Agent 的 AgentRequest。
 
-        - 群聊：注入 GROUP_CHAT_CONTRACT + 成员列表 + delta 增量
-        - 私聊：注入 Agent 自身 system_prompt + 完整 L1 窗口（向后兼容）
+        - 群聊：注入 GROUP_CHAT_CONTRACT + 成员列表 + delta 增量 + <agenthub-reminder>
+        - 私聊：注入 Agent 自身 system_prompt + 完整 L1 窗口 + <agenthub-reminder>
         """
         if group is not None:
             return await self._build_group(
@@ -101,9 +106,20 @@ class ContextBuilder:
             f"你是 {target_agent.name}，本群成员之一。"
             f"你只代表你自己发言，不要替其他成员说话，不要模仿他人的口癖或说话风格。"
         )
-        system_prompt = "\n\n".join(filter(None, [persona, GROUP_CHAT_CONTRACT, members_block]))
+        system_prompt = "\n\n".join(
+            filter(None, [persona, GROUP_CHAT_CONTRACT, members_block, MEMORY_TOOL_CONTRACT])
+        )
 
-        # 4. 渲染 delta（动态部分）
+        # 4. 记忆注入
+        memory_block = await self._build_memory_block(
+            agent_id=target_agent.id,
+            group_id=group.id,
+            raw_messages=[{"role": m.role, "content": m.content} for m in delta.messages],
+        )
+        if memory_block:
+            system_prompt = system_prompt + "\n\n" + memory_block
+
+        # 5. 渲染 delta（动态部分）
         agent_name_by_id = {m.id: m.name for m in members}
         delta_block = format_delta(delta.messages, agent_name_by_id)
         truncated_hint = (
@@ -113,7 +129,7 @@ class ContextBuilder:
         )
         group_delta_text = (truncated_hint + delta_block) if delta_block else None
 
-        # 5. L1 窗口仅作为辅助记忆传递（CLI Runtime 实际只用 system_prompt + 最后一条 user）
+        # 6. L1 窗口仅作为辅助记忆传递（CLI Runtime 实际只用 system_prompt + 最后一条 user）
         window = await self._l1.get_window(session.id)
 
         return AgentRequest(
@@ -140,17 +156,47 @@ class ContextBuilder:
         trigger: Message,
     ) -> AgentRequest:
         window = await self._l1.get_window(session.id)
+
+        memory_block = await self._build_memory_block(
+            agent_id=target_agent.id,
+            group_id=None,
+            raw_messages=window,
+        )
+        sp = "\n\n".join(filter(None, [target_agent.system_prompt, MEMORY_TOOL_CONTRACT]))
+        if memory_block:
+            sp = sp + "\n\n" + memory_block
+
         return AgentRequest(
             request_id=str(uuid.uuid4()),
             session_id=session.id,
             messages=window,
-            system_prompt=target_agent.system_prompt,
+            system_prompt=sp or None,
             memory=MemoryContext(l1_working=window),
             max_tokens=settings.max_tokens,
             agent_id=target_agent.id,
             is_group_chat=False,
             working_directory=session.workspace_path or None,
         )
+
+    # --- 记忆注入 ---
+
+    async def _build_memory_block(
+        self,
+        *,
+        agent_id: uuid.UUID,
+        group_id: uuid.UUID | None,
+        raw_messages: list[dict],
+    ) -> str:
+        if self._mem is None:
+            return ""
+        from app.application.services.memory_selector import MemorySelector  # 避免循环导入
+        ctx = MemorySelector.build_dialogue_context(raw_messages)
+        memories = await self._mem.select_for_agent(
+            agent_id=agent_id,
+            group_id=group_id,
+            dialogue_context=ctx,
+        )
+        return render_agenthub_reminder(memories)
 
     # --- delta 计算 ---
 

@@ -170,3 +170,30 @@ class GroupMemberModel(Base):
         Uuid, ForeignKey("agents.id", ondelete="CASCADE"), index=True
     )
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class MemoryModel(Base):
+    __tablename__ = "memories"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    agent_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("agents.id", ondelete="CASCADE"), index=True
+    )
+    group_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("groups.id", ondelete="CASCADE"), nullable=True
+    )
+    user_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    scope: Mapped[str] = mapped_column(String(10))              # agent | group
+    name: Mapped[str] = mapped_column(String(150))
+    description: Mapped[str] = mapped_column(String(300))
+    memory_type: Mapped[str] = mapped_column(String(20))        # facts|preferences|procedures|context
+    content: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String(20), default="manual")  # manual|chat|system
+    pinned: Mapped[bool] = mapped_column(Boolean, default=False)
+    hits: Mapped[int] = mapped_column(Integer, default=0)
+    # "metadata" 是 SQLAlchemy 保留属性名，列名保留，属性名用 metadata_
+    metadata_: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )

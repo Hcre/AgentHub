@@ -17,6 +17,7 @@ from app.application.commands import SendMessageCommand
 from app.application.services import ChatService
 from app.application.services.context_builder import ContextBuilder
 from app.application.services.discussion_orchestrator import DiscussionOrchestrator
+from app.application.services.memory_selector import MemorySelector
 from app.application.services.selector import Selector
 from app.core.events import get_event_bus
 from app.core.exceptions import AgentHubError
@@ -29,6 +30,7 @@ from app.infrastructure.llm.factory import build_adapter
 from app.infrastructure.repositories import (
     PostgresAgentRepository,
     PostgresGroupRepository,
+    PostgresMemoryRepository,
     PostgresMessageRepository,
     PostgresSessionRepository,
 )
@@ -73,7 +75,9 @@ async def _handle_message(ws: WebSocket, session_id: UUID, data: dict) -> None:
         redis = get_redis()
         l1 = RedisL1Store(redis)
         wm = RedisWatermarkStore(redis)
-        ctx = ContextBuilder(msg_repo, agent_repo, l1, wm)
+        mem_repo = PostgresMemoryRepository(db)
+        mem_selector = MemorySelector(mem_repo)
+        ctx = ContextBuilder(msg_repo, agent_repo, l1, wm, memory_selector=mem_selector)
         bus = get_event_bus()
         discussion = DiscussionOrchestrator(
             message_repo=msg_repo,

@@ -3,15 +3,24 @@
 设计依据：
 - docs/design/group-chat-discussion-mode_群聊讨论模式设计方案.md §6.4 Selector Bypass
 - docs/design/group-chat-implementation-plan_群聊实施计划.md §四 GROUP_CHAT_CONTRACT
+- docs/explore/董/记忆/memory-system-design-v3.md §六 注入格式
 """
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from app.domain.entities.agent import Agent
+from app.domain.entities.memory import Memory
 from app.domain.entities.message import Message
 
 # 群聊行为契约：注入到每个群聊 Agent 的 system_prompt。
 # 私聊场景不注入。
+MEMORY_TOOL_CONTRACT = """# Memory
+使用 save_memory 工具保存用户主动要求记住的内容（用户说「记住」「记一下」时调用）。
+已有记忆会自动注入到对话中，无需主动查找。
+不要用 Write 工具写本地 memory 目录，记忆由系统统一管理。"""
+
 GROUP_CHAT_CONTRACT = """你正在多 Agent 群聊中协作。请遵守以下行为约定：
 
 1. 身份确认：每条消息前缀标注了发言人身份。你只代表你自己发言，
@@ -69,3 +78,90 @@ def _render_speaker(msg: Message, agent_name_by_id: dict) -> str:
     if msg.mentions:
         return f"用户 (@{' @'.join(msg.mentions)})"
     return "用户"
+
+
+# --- 记忆注入渲染（V3 <agenthub-reminder>）---
+
+_TYPE_LABEL = {
+    "facts": "事实",
+    "preferences": "偏好",
+    "procedures": "流程",
+    "context": "上下文",
+}
+
+_DRIFT_GUARD = """\
+⚠️ 记忆反映保存时的状态，可能已过时。采纳前必须主动验证：
+- 文件路径 → 先检查文件是否存在
+- 函数名或配置项 → 先 grep 确认
+- 项目状态（「正在做 X」）→ 先检查当前代码/文档
+- 记忆说「X 存在」≠「X 现在还存在」
+如果用户要求忽略记忆中的内容，以用户指令为准，不要引用记忆来反驳。"""
+
+
+def render_agenthub_reminder(memories: list[Memory]) -> str:
+    """渲染 <agenthub-reminder> 块，含漂移防御和时间警告。"""
+    if not memories:
+        return ""
+
+    pinned = [m for m in memories if m.pinned]
+    others = [m for m in memories if not m.pinned]
+
+    lines = [
+        "<agenthub-reminder>",
+        "以下是与当前对话相关的记忆。",
+        "",
+        _DRIFT_GUARD,
+    ]
+
+    if pinned:
+        lines += ["", "━━━ PINNED ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]
+        for m in pinned:
+            lines += [
+                f"📌 [{m.name}] — {_TYPE_LABEL.get(m.memory_type, m.memory_type)}，{_age_label(m.created_at)}保存",
+                f"**摘要**: {m.description}",
+                f"**内容**: {m.content}",
+                "",
+            ]
+
+    if others:
+        lines += ["━━━ 相关记忆 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]
+        for m in others:
+            warn = _age_warning(m.created_at)
+            lines.append(
+                f"📄 [{m.name}] — {_age_label(m.created_at)}保存"
+            )
+            if warn:
+                lines.append(warn)
+            lines += [
+                f"**类型**: {_TYPE_LABEL.get(m.memory_type, m.memory_type)}",
+                f"**摘要**: {m.description}",
+                f"**内容**: {m.content}",
+                "",
+            ]
+
+    lines.append("</agenthub-reminder>")
+    return "\n".join(lines)
+
+
+def _age_label(dt: datetime) -> str:
+    delta = _days_ago(dt)
+    if delta == 0:
+        return "今天"
+    if delta == 1:
+        return "昨天"
+    return f"{delta} 天前"
+
+
+def _age_warning(dt: datetime) -> str:
+    days = _days_ago(dt)
+    if days >= 30:
+        return "⚠️ 已保存超过 30 天，强烈建议验证。"
+    if days >= 2:
+        return "⚠️ 已保存超过 2 天，可能已过时。"
+    return ""
+
+
+def _days_ago(dt: datetime) -> int:
+    now = datetime.now(UTC)
+    aware = dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
+    return (now - aware).days

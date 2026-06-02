@@ -1,17 +1,19 @@
 import { create } from 'zustand'
 import { memoriesApi } from '../api/memories'
 import type { CreateMemoryInput, UpdateMemoryInput } from '../api/memories'
-import type { ApiMemory, ApiMemoryStats } from '../types'
+import type { ApiMemory, ApiMemoryStats, MemoryType } from '../types'
 
 interface MemoryState {
   memories: ApiMemory[]
   stats: ApiMemoryStats | null
+  filterType: MemoryType | null
   editingId: string | null
   deletingId: string | null
   loading: boolean
 
   load: (agentId: string) => Promise<void>
   loadStats: (agentId: string) => Promise<void>
+  setFilter: (type: MemoryType | null) => void
   setEditing: (id: string | null) => void
   setDeleting: (id: string | null) => void
   createMemory: (agentId: string, input: CreateMemoryInput) => Promise<void>
@@ -23,6 +25,7 @@ interface MemoryState {
 export const useMemoryStore = create<MemoryState>((set, get) => ({
   memories: [],
   stats: null,
+  filterType: null,
   editingId: null,
   deletingId: null,
   loading: false,
@@ -30,7 +33,8 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   load: async (agentId) => {
     set({ loading: true })
     try {
-      const memories = await memoriesApi.list(agentId)
+      const filter = get().filterType
+      const memories = await memoriesApi.list(agentId, filter ?? undefined)
       set({ memories, loading: false })
     } catch {
       set({ loading: false })
@@ -46,8 +50,8 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     }
   },
 
+  setFilter: (type) => set({ filterType: type }),
   setEditing: (id) => set({ editingId: id, deletingId: null }),
-
   setDeleting: (id) => set({ deletingId: id, editingId: null }),
 
   createMemory: async (agentId, input) => {

@@ -1,26 +1,28 @@
 import { api } from './client'
-import type { ApiMemory, ApiMemoryStats } from '../types'
+import type { ApiMemory, ApiMemoryStats, MemoryType } from '../types'
 
 export interface CreateMemoryInput {
   name: string
   description: string
+  memory_type: MemoryType
   content: string
-  group_id?: string | null
   scope?: 'agent' | 'group'
+  group_id?: string | null
   metadata?: Record<string, unknown>
 }
 
 export interface UpdateMemoryInput {
-  name?: string
-  description?: string
   content?: string
+  memory_type?: MemoryType
   pinned?: boolean
   metadata?: Record<string, unknown>
 }
 
 export const memoriesApi = {
-  list: (agentId: string) =>
-    api.get<ApiMemory[]>(`/api/agents/${agentId}/memories`),
+  list: (agentId: string, type?: string) => {
+    const params = type ? `?memory_type=${type}` : ''
+    return api.get<ApiMemory[]>(`/api/agents/${agentId}/memories${params}`)
+  },
   stats: (agentId: string) =>
     api.get<ApiMemoryStats>(`/api/agents/${agentId}/memories/stats`),
   get: (agentId: string, memoryId: string) =>

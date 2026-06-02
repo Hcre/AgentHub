@@ -355,21 +355,25 @@ export interface StreamEvent {
   sender_agent_id?: string | null
 }
 
-// ── Memory API DTO ──
+// ─── 记忆系统 V3 ──────────────────────────────────────────────────────────────
 
-/** 对应 backend `MemoryOut`。 */
+export type MemoryType = 'facts' | 'preferences' | 'procedures' | 'context'
+
+/** 对应 backend `MemoryOut`（schemas/memory.py）。 */
 export interface ApiMemory {
   id: string
   agent_id: string
   group_id: string | null
+  user_id: string
   scope: 'agent' | 'group'
   name: string
   description: string
+  memory_type: MemoryType
   content: string
-  metadata: Record<string, unknown>
-  hits: number
-  pinned: boolean
   source: 'manual' | 'chat' | 'system'
+  pinned: boolean
+  hits: number
+  metadata: Record<string, unknown>
   created_at: string
   updated_at: string
 }
@@ -377,6 +381,7 @@ export interface ApiMemory {
 /** 对应 backend `MemoryStatsOut`。 */
 export interface ApiMemoryStats {
   total: number
+  by_type: Record<string, number>
   oldest: string | null
   newest: string | null
 }

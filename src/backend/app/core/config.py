@@ -62,6 +62,10 @@ class Settings(BaseSettings):
     deepseek_api_key: str = ""  # DeepSeek API Key
     selector_max_prompt_chars: int = 4000  # Selector prompt 总字符上限
 
+    # --- 记忆系统 MCP ---
+    # MCP_MEMORY_URL 非空时，CLI spawn 注入 --mcp-config，Agent 可调用 save_memory tool
+    mcp_memory_url: str = ""   # 例：http://127.0.0.1:8000/api/mcp/sse
+
     # --- CORS ---
     cors_origins: str = "http://localhost:5173"
 
