@@ -354,3 +354,29 @@ export interface StreamEvent {
   /** 群聊场景下标识发言人；私聊为 null。前端按此分色气泡 / 路由到 messagesByGroup。 */
   sender_agent_id?: string | null
 }
+
+// ── Memory API DTO ──
+
+/** 对应 backend `MemoryOut`。 */
+export interface ApiMemory {
+  id: string
+  agent_id: string
+  group_id: string | null
+  scope: 'agent' | 'group'
+  name: string
+  description: string
+  content: string
+  metadata: Record<string, unknown>
+  hits: number
+  pinned: boolean
+  source: 'manual' | 'chat' | 'system'
+  created_at: string
+  updated_at: string
+}
+
+/** 对应 backend `MemoryStatsOut`。 */
+export interface ApiMemoryStats {
+  total: number
+  oldest: string | null
+  newest: string | null
+}

@@ -35,7 +35,15 @@
       "Bash(echo \"EXIT=$?\")",
       "Bash(./node_modules/.bin/eslint src/stores/groupStore.ts src/hooks/useGroupWebSocket.ts src/components/group/ src/api/groups.ts src/api/sessions.ts src/types/index.ts)",
       "Bash(python3 *)",
-      "Bash(python3.12 ../scripts/feasibility/phase1_smoke.py)"
+      "Bash(python3.12 ../scripts/feasibility/phase1_smoke.py)",
+      "Bash(find /home/huishuohuademao/workspace/AgentHub-memory -path */tests/* -name *.py)",
+      "Bash(python3.12 -m pytest tests/test_group_context.py tests/test_system_prompt_builder.py tests/test_agent_file_manager.py -v)",
+      "Bash(git worktree:*)",
+      "Bash(/usr/local/bin/python3.12 -m pytest tests/ -q --tb=short --override-ini=\"addopts=\" --ignore=tests/test_pi_agent_e2e.py)",
+      "Bash(find /home/huishuohuademao/workspace/AgentHub-memory/src/backend -name python* -type f)",
+      "Bash(find /home/huishuohuademao/workspace/AgentHub/src/backend -name activate -path *venv*)",
+      "Bash(ls /home/huishuohuademao/workspace/AgentHub/src/backend/.venv/bin/python*)",
+      "Bash(PYTHONPATH=. /home/huishuohuademao/workspace/AgentHub/src/backend/.venv/bin/python -m pytest tests/test_memory_search_accuracy.py -v -s --no-header --tb=long)"
     ]
   }
 }

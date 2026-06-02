@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memory Panel — UI Mockup (AgentHub Design System)</title>
+<style>
+/* ── Reset ── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* ── Design Tokens (mirroring src/frontend/src/styles/index.css) ── */
+:root {
+  /* Light theme (warm cream + coral) */
+  --background: 36 36% 87%;
+  --background-2: 38 42% 93%;
+  --foreground: 30 24% 9%;
+  --muted: 36 24% 92%;
+  --muted-foreground: 30 10% 38%;
+  --card: 36 50% 98%;
+  --card-foreground: 30 24% 9%;
+  --border: 30 22% 84%;
+  --input: 30 22% 84%;
+  --primary: 30 24% 9%;
+  --primary-foreground: 36 50% 98%;
+  --secondary: 36 24% 92%;
+  --secondary-foreground: 30 24% 9%;
+  --accent: 36 28% 90%;
+  --accent-foreground: 30 24% 9%;
+  --destructive: 14 70% 42%;
+  --destructive-foreground: 36 50% 98%;
+  --ring: 17 60% 53%;
+  --brand: 17 56% 53%;
+  --brand-foreground: 36 50% 98%;
+  --brand-soft: 22 60% 91%;
+  --brand-deep: 16 60% 33%;
+  --glass: 38 60% 97%;
+  --glass-alpha: 0.66;
+  --glass-strong-alpha: 0.82;
+  --wash-1: 17 56% 53% / 0.25;
+  --wash-2: 36 60% 60% / 0.22;
+  --wash-3: 150 14% 49% / 0.18;
+  --radius: 0.875rem;
+}
+
+.dark {
+  --background: 28 14% 10%;
+  --background-2: 28 16% 14%;
+  --foreground: 36 38% 92%;
+  --muted: 28 8% 16%;
+  --muted-foreground: 36 12% 60%;
+  --card: 28 12% 12%;
+  --card-foreground: 36 38% 92%;
+  --border: 28 8% 22%;
+  --input: 28 8% 22%;
+  --primary: 36 38% 92%;
+  --primary-foreground: 28 14% 10%;
+  --secondary: 28 8% 16%;
+  --secondary-foreground: 36 38% 92%;
+  --accent: 28 8% 16%;
+  --accent-foreground: 36 38% 92%;
+  --destructive: 14 60% 36%;
+  --destructive-foreground: 36 38% 92%;
+  --ring: 17 60% 60%;
+  --brand: 17 70% 60%;
+  --brand-foreground: 28 14% 10%;
+  --brand-soft: 17 28% 18%;
+  --brand-deep: 22 65% 80%;
+  --glass: 28 14% 14%;
+  --glass-alpha: 0.66;
+  --glass-strong-alpha: 0.84;
+  --wash-1: 17 56% 53% / 0.18;
+  --wash-2: 36 60% 60% / 0.13;
+  --wash-3: 150 14% 49% / 0.11;
+}
+
+.dim {
+  --background: 30 10% 18%;
+  --background-2: 30 10% 22%;
+  --foreground: 36 24% 90%;
+  --muted: 30 8% 24%;
+  --muted-foreground: 36 10% 66%;
+  --card: 30 9% 22%;
+  --card-foreground: 36 24% 90%;
+  --border: 30 8% 30%;
+  --input: 30 8% 30%;
+  --primary: 36 24% 90%;
+  --primary-foreground: 30 10% 18%;
+  --secondary: 30 8% 26%;
+  --secondary-foreground: 36 24% 90%;
+  --accent: 30 8% 28%;
+  --accent-foreground: 36 24% 90%;
+  --destructive: 14 60% 46%;
+  --destructive-foreground: 36 30% 92%;
+  --ring: 17 60% 58%;
+  --brand: 17 56% 53%;
+  --brand-foreground: 36 50% 98%;
+  --brand-soft: 17 20% 26%;
+  --brand-deep: 22 50% 72%;
+  --glass: 30 10% 22%;
+  --glass-alpha: 0.7;
+  --glass-strong-alpha: 0.86;
+  --wash-1: 17 56% 53% / 0.2;
+  --wash-2: 36 60% 60% / 0.15;
+  --wash-3: 150 14% 49% / 0.12;
+}
+
+/* ── Base ── */
+body {
+  font-family: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  color: hsl(var(--foreground));
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.005em;
+  background:
+    radial-gradient(60% 50% at 14% 8%, hsl(var(--wash-1)), transparent 70%),
+    radial-gradient(46% 40% at 92% 18%, hsl(var(--wash-2)), transparent 70%),
+    radial-gradient(60% 50% at 82% 96%, hsl(var(--wash-3)), transparent 72%),
+    radial-gradient(50% 60% at 4% 88%, hsl(var(--wash-2)), transparent 70%),
+    linear-gradient(180deg, hsl(var(--background-2)), hsl(var(--background)));
+  background-attachment: fixed;
+  min-height: 100vh;
+  padding: 40px 20px 80px;
+}
+
+/* ── Theme Switcher ── */
+.theme-switcher {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 4px;
+  background: hsl(var(--glass) / var(--glass-strong-alpha));
+  backdrop-filter: saturate(160%) blur(22px);
+  -webkit-backdrop-filter: saturate(160%) blur(22px);
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  padding: 4px;
+  z-index: 100;
+}
+.theme-btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.theme-btn:hover {
+  color: hsl(var(--foreground));
+  background: hsl(var(--accent));
+}
+.theme-btn.active {
+  background: hsl(var(--brand));
+  color: hsl(var(--brand-foreground));
+}
+
+/* ── Layout ── */
+.panels {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+}
+.panel-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.state-label {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Glass Panel Container ── */
+.container {
+  width: 380px;
+  background: hsl(var(--glass) / var(--glass-alpha));
+  backdrop-filter: saturate(160%) blur(22px);
+  -webkit-backdrop-filter: saturate(160%) blur(22px);
+  border-radius: 1rem;
+  border: 1px solid hsl(var(--border));
+  overflow: hidden;
+}
+
+/* ── Header ── */
+.panel-header {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.panel-header h2 {
+  font-size: 15px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  margin-bottom: 3px;
+}
+.panel-header .agent-name {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Stats Bar ── */
+.stats-bar {
+  display: flex;
+  gap: 6px;
+  padding: 10px 20px;
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--glass) / var(--glass-strong-alpha));
+}
+.stat-chip {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
+  letter-spacing: 0.02em;
+}
+.stat-chip .num {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+  margin-left: 3px;
+}
+.stat-chip.total {
+  background: hsl(var(--brand-soft));
+  color: hsl(var(--brand));
+}
+.stat-chip.total .num {
+  color: hsl(var(--brand));
+}
+
+/* ── Filter Tabs ── */
+.filter-tabs {
+  display: flex;
+  padding: 0 20px;
+  gap: 0;
+  border-bottom: 1px solid hsl(var(--border));
+  overflow-x: auto;
+}
+.filter-tab {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.filter-tab:hover { color: hsl(var(--foreground)); }
+.filter-tab.active {
+  color: hsl(var(--brand));
+  border-bottom-color: hsl(var(--brand));
+}
+
+/* ── Memory List ── */
+.memory-list {
+  padding: 8px 12px;
+  max-height: 520px;
+  overflow-y: auto;
+}
+.memory-list::-webkit-scrollbar { width: 4px; }
+.memory-list::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 2px; }
+
+/* ── Memory Card ── */
+.memory-card {
+  padding: 12px 14px;
+  margin-bottom: 6px;
+  border-radius: 0.625rem;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  position: relative;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.memory-card:hover {
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 1px hsl(var(--ring) / 0.15);
+}
+.memory-card.pinned {
+  border-color: hsl(var(--brand) / 0.4);
+  background: hsl(var(--brand-soft) / 0.5);
+}
+
+.card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+/* ── Type Badges (monospace, 10.5px, uppercase) ── */
+.type-badge {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.type-badge.facts       { background: hsl(210 50% 92%); color: hsl(210 60% 40%); }
+.type-badge.preferences { background: hsl(270 40% 92%); color: hsl(270 50% 45%); }
+.type-badge.procedures  { background: hsl(40 50% 90%);  color: hsl(40 60% 35%); }
+.type-badge.context     { background: hsl(160 30% 90%); color: hsl(160 40% 35%); }
+
+.dark .type-badge.facts       { background: hsl(210 30% 18%); color: hsl(210 50% 65%); }
+.dark .type-badge.preferences { background: hsl(270 25% 18%); color: hsl(270 40% 65%); }
+.dark .type-badge.procedures  { background: hsl(40 25% 18%);  color: hsl(40 45% 65%); }
+.dark .type-badge.context     { background: hsl(160 20% 18%); color: hsl(160 35% 60%); }
+
+.dim .type-badge.facts       { background: hsl(210 20% 24%); color: hsl(210 40% 62%); }
+.dim .type-badge.preferences { background: hsl(270 18% 24%); color: hsl(270 35% 62%); }
+.dim .type-badge.procedures  { background: hsl(40 18% 24%);  color: hsl(40 40% 62%); }
+.dim .type-badge.context     { background: hsl(160 15% 24%); color: hsl(160 30% 58%); }
+
+.source-tag {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 9.5px;
+  color: hsl(var(--muted-foreground));
+  margin-left: auto;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pin-icon { font-size: 12px; }
+
+.card-content {
+  font-size: 13px;
+  line-height: 1.55;
+  color: hsl(var(--card-foreground));
+  margin-bottom: 8px;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 10px;
+  color: hsl(var(--muted-foreground));
+}
+.card-meta .hits { color: hsl(var(--brand)); }
+
+/* ── Hover Actions ── */
+.card-actions {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  display: none;
+  gap: 4px;
+}
+.memory-card:hover .card-actions { display: flex; }
+.action-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s ease;
+}
+.action-btn:hover {
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--ring));
+}
+.action-btn.pin-btn:hover {
+  background: hsl(var(--brand-soft));
+  color: hsl(var(--brand));
+  border-color: hsl(var(--brand) / 0.4);
+}
+.action-btn.del-btn:hover {
+  background: hsl(var(--destructive) / 0.12);
+  color: hsl(var(--destructive));
+  border-color: hsl(var(--destructive) / 0.4);
+}
+
+/* ── Score Bar ── */
+.score-bar {
+  width: 40px;
+  height: 3px;
+  border-radius: 2px;
+  background: hsl(var(--border));
+  margin-top: 2px;
+}
+.score-fill { height: 100%; border-radius: 2px; }
+.score-high { background: hsl(150 50% 45%); width: 90%; }
+.score-mid  { background: hsl(var(--brand)); width: 55%; }
+.score-low  { background: hsl(var(--destructive)); width: 15%; }
+
+/* ── Add Button ── */
+.add-btn-wrap { padding: 12px 16px; border-top: 1px solid hsl(var(--border)); }
+.add-btn {
+  width: 100%;
+  padding: 10px;
+  border: 1px dashed hsl(var(--border));
+  border-radius: 0.625rem;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.add-btn:hover {
+  border-color: hsl(var(--brand));
+  color: hsl(var(--brand));
+  background: hsl(var(--brand-soft) / 0.4);
+}
+
+/* ── Inline Edit ── */
+.edit-textarea {
+  width: 100%;
+  min-height: 60px;
+  background: hsl(var(--secondary));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  color: hsl(var(--foreground));
+  font-size: 13px;
+  font-family: inherit;
+  padding: 8px;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.edit-textarea:focus { border-color: hsl(var(--brand)); }
+.edit-btns { display: flex; gap: 6px; margin-top: 6px; justify-content: flex-end; }
+.edit-save, .edit-cancel {
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: 1px solid hsl(var(--border));
+  font-size: 11.5px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+.edit-save {
+  background: hsl(var(--brand));
+  color: hsl(var(--brand-foreground));
+  border-color: hsl(var(--brand));
+}
+.edit-save:hover { filter: brightness(1.1); }
+.edit-cancel {
+  background: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+}
+.edit-cancel:hover { background: hsl(var(--accent)); }
+
+/* ── Eviction Warning ── */
+.eviction-tag {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 9px;
+  color: hsl(var(--destructive));
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Delete Confirm ── */
+.delete-confirm {
+  background: hsl(var(--destructive) / 0.08);
+  border: 1px solid hsl(var(--destructive) / 0.2);
+  border-radius: 0.5rem;
+  padding: 10px;
+  margin-top: 8px;
+}
+.delete-confirm .msg {
+  font-size: 12px;
+  color: hsl(var(--destructive));
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.delete-btn {
+  background: hsl(var(--destructive));
+  color: hsl(var(--destructive-foreground));
+  border-color: hsl(var(--destructive));
+}
+
+/* ── Footer ── */
+.footer-bar {
+  position: fixed;
+  bottom: 20px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  z-index: 50;
+}
+.footer-bar span {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 10.5px;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--glass) / var(--glass-strong-alpha));
+  backdrop-filter: saturate(160%) blur(22px);
+  display: inline-block;
+  padding: 8px 18px;
+  border-radius: 10px;
+  border: 1px solid hsl(var(--border));
+  letter-spacing: 0.02em;
+}
+</style>
+</head>
+
+<body>
+
+<!-- Theme Switcher -->
+<div class="theme-switcher">
+  <button class="theme-btn active" onclick="setTheme('')">Light</button>
+  <button class="theme-btn" onclick="setTheme('dim')">Dim</button>
+  <button class="theme-btn" onclick="setTheme('dark')">Dark</button>
+</div>
+
+<div class="panels">
+
+<!-- ===== State 1: Browse ===== -->
+<div class="panel-col">
+  <span class="state-label">State 1: Browse</span>
+  <div class="container">
+    <div class="panel-header">
+      <h2>Agent Memory</h2>
+      <div class="agent-name">Backend Engineer &middot; 12 memories</div>
+    </div>
+
+    <div class="stats-bar">
+      <span class="stat-chip total">Total<span class="num">12</span></span>
+      <span class="stat-chip">Facts<span class="num">5</span></span>
+      <span class="stat-chip">Prefs<span class="num">3</span></span>
+      <span class="stat-chip">Proc<span class="num">2</span></span>
+      <span class="stat-chip">Ctx<span class="num">2</span></span>
+    </div>
+
+    <div class="filter-tabs">
+      <div class="filter-tab active">All</div>
+      <div class="filter-tab">Facts</div>
+      <div class="filter-tab">Preferences</div>
+      <div class="filter-tab">Procedures</div>
+      <div class="filter-tab">Context</div>
+    </div>
+
+    <div class="memory-list">
+      <!-- Pinned -->
+      <div class="memory-card pinned">
+        <div class="card-actions">
+          <button class="action-btn pin-btn" title="Unpin">&#128204;</button>
+          <button class="action-btn" title="Edit">&#9998;</button>
+          <button class="action-btn del-btn" title="Delete">&#128465;</button>
+        </div>
+        <div class="card-top">
+          <span class="type-badge preferences">Preferences</span>
+          <span class="pin-icon">&#128204;</span>
+          <span class="source-tag">marker</span>
+        </div>
+        <div class="card-content">User prefers concise replies, no verbose explanations</div>
+        <div class="card-meta">
+          <span>90d ago</span>
+          <span class="hits">25 hits</span>
+          <span><span class="score-bar"><span class="score-fill score-high"></span></span></span>
+        </div>
+      </div>
+
+      <!-- Facts -->
+      <div class="memory-card">
+        <div class="card-actions">
+          <button class="action-btn pin-btn" title="Pin">&#128204;</button>
+          <button class="action-btn" title="Edit">&#9998;</button>
+          <button class="action-btn del-btn" title="Delete">&#128465;</button>
+        </div>
+        <div class="card-top">
+          <span class="type-badge facts">Facts</span>
+          <span class="source-tag">marker</span>
+        </div>
+        <div class="card-content">JWT token expires in 7 days, refresh token 14 days</div>
+        <div class="card-meta">
+          <span>60d ago</span>
+          <span class="hits">12 hits</span>
+          <span><span class="score-bar"><span class="score-fill score-high"></span></span></span>
+        </div>
+      </div>
+
+      <!-- Facts LLM -->
+      <div class="memory-card">
+        <div class="card-actions">
+          <button class="action-btn pin-btn" title="Pin">&#128204;</button>
+          <button class="action-btn" title="Edit">&#9998;</button>
+          <button class="action-btn del-btn" title="Delete">&#128465;</button>
+        </div>
+        <div class="card-top">
+          <span class="type-badge facts">Facts</span>
+          <span class="source-tag">llm</span>
+        </div>
+        <div class="card-content">PostgreSQL 15 with connection pool limit 20</div>
+        <div class="card-meta">
+          <span>45d ago</span>
+          <span class="hits">8 hits</span>
+          <span><span class="score-bar"><span class="score-fill score-high"></span></span></span>
+        </div>
+      </div>
+
+      <!-- Procedures -->
+      <div class="memory-card">
+        <div class="card-actions">
+          <button class="action-btn pin-btn" title="Pin">&#128204;</button>
+          <button class="action-btn" title="Edit">&#9998;</button>
+          <button class="action-btn del-btn" title="Delete">&#128465;</button>
+        </div>
+        <div class="card-top">
+          <span class="type-badge procedures">Procedures</span>
+          <span class="source-tag">manual</span>
+        </div>
+        <div class="card-content">Deploy: migration -> docker build -> health check -> traffic switch</div>
+        <div class="card-meta">
+          <span>30d ago</span>
+          <span class="hits">3 hits</span>
+          <span><span class="score-bar"><span class="score-fill score-mid"></span></span></span>
+        </div>
+      </div>
+
+      <!-- Context low score -->
+      <div class="memory-card" style="opacity: 0.55;">
+        <div class="card-actions">
+          <button class="action-btn pin-btn" title="Pin">&#128204;</button>
+          <button class="action-btn" title="Edit">&#9998;</button>
+          <button class="action-btn del-btn" title="Delete">&#128465;</button>
+        </div>
+        <div class="card-top">
+          <span class="type-badge context">Context</span>
+          <span class="source-tag">marker</span>
+        </div>
+        <div class="card-content">API refactoring to L3 layer discussion context</div>
+        <div class="card-meta">
+          <span>25d ago</span>
+          <span class="hits">0 hits</span>
+          <span><span class="score-bar"><span class="score-fill score-low"></span></span></span>
+          <span class="eviction-tag">Expiring</span>
+        </div>
+      </div>
+
+      <!-- Context low score 2 -->
+      <div class="memory-card" style="opacity: 0.45;">
+        <div class="card-actions">
+          <button class="action-btn pin-btn" title="Pin">&#128204;</button>
+          <button class="action-btn" title="Edit">&#9998;</button>
+          <button class="action-btn del-btn" title="Delete">&#128465;</button>
+        </div>
+        <div class="card-top">
+          <span class="type-badge context">Context</span>
+          <span class="source-tag">marker</span>
+        </div>
+        <div class="card-content">Redis caching strategy discussion yesterday</div>
+        <div class="card-meta">
+          <span>20d ago</span>
+          <span class="hits">0 hits</span>
+          <span><span class="score-bar"><span class="score-fill score-low"></span></span></span>
+          <span class="eviction-tag">Expiring</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="add-btn-wrap">
+      <button class="add-btn">+ Add Memory</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== State 2: Inline Edit ===== -->
+<div class="panel-col">
+  <span class="state-label">State 2: Inline Edit</span>
+  <div class="container">
+    <div class="panel-header">
+      <h2>Agent Memory</h2>
+      <div class="agent-name">Backend Engineer &middot; 12 memories</div>
+    </div>
+
+    <div class="stats-bar">
+      <span class="stat-chip total">Total<span class="num">12</span></span>
+      <span class="stat-chip">Facts<span class="num">5</span></span>
+      <span class="stat-chip">Prefs<span class="num">3</span></span>
+      <span class="stat-chip">Proc<span class="num">2</span></span>
+      <span class="stat-chip">Ctx<span class="num">2</span></span>
+    </div>
+
+    <div class="filter-tabs">
+      <div class="filter-tab active">All</div>
+      <div class="filter-tab">Facts</div>
+      <div class="filter-tab">Preferences</div>
+      <div class="filter-tab">Procedures</div>
+      <div class="filter-tab">Context</div>
+    </div>
+
+    <div class="memory-list">
+      <div class="memory-card pinned">
+        <div class="card-top">
+          <span class="type-badge preferences">Preferences</span>
+          <span class="pin-icon">&#128204;</span>
+          <span class="source-tag">marker</span>
+        </div>
+        <div class="card-content">User prefers concise replies, no verbose explanations</div>
+        <div class="card-meta">
+          <span>90d ago</span>
+          <span class="hits">25 hits</span>
+        </div>
+      </div>
+
+      <!-- Editing -->
+      <div class="memory-card" style="border-color: hsl(var(--brand)); box-shadow: 0 0 0 1px hsl(var(--brand) / 0.2);">
+        <div class="card-top">
+          <span class="type-badge facts">Facts</span>
+          <span class="source-tag">marker</span>
+        </div>
+        <textarea class="edit-textarea">JWT token expires in 14 days, refresh token 30 days</textarea>
+        <div class="edit-btns">
+          <button class="edit-cancel">Cancel</button>
+          <button class="edit-save">Save</button>
+        </div>
+        <div class="card-meta" style="margin-top: 8px;">
+          <span>60d ago</span>
+          <span class="hits">12 hits</span>
+        </div>
+      </div>
+
+      <div class="memory-card">
+        <div class="card-top">
+          <span class="type-badge facts">Facts</span>
+          <span class="source-tag">llm</span>
+        </div>
+        <div class="card-content">PostgreSQL 15 with connection pool limit 20</div>
+        <div class="card-meta">
+          <span>45d ago</span>
+          <span class="hits">8 hits</span>
+        </div>
+      </div>
+
+      <div class="memory-card">
+        <div class="card-top">
+          <span class="type-badge procedures">Procedures</span>
+          <span class="source-tag">manual</span>
+        </div>
+        <div class="card-content">Deploy: migration -> docker build -> health check -> traffic switch</div>
+        <div class="card-meta">
+          <span>30d ago</span>
+          <span class="hits">3 hits</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="add-btn-wrap">
+      <button class="add-btn">+ Add Memory</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== State 3: Filtered + Delete ===== -->
+<div class="panel-col">
+  <span class="state-label">State 3: Filter + Delete</span>
+  <div class="container">
+    <div class="panel-header">
+      <h2>Agent Memory</h2>
+      <div class="agent-name">Backend Engineer &middot; 5 facts</div>
+    </div>
+
+    <div class="stats-bar">
+      <span class="stat-chip total">Total<span class="num">12</span></span>
+      <span class="stat-chip" style="background: hsl(var(--brand-soft)); color: hsl(var(--brand));">Facts<span class="num" style="color: hsl(var(--brand));">5</span></span>
+      <span class="stat-chip">Prefs<span class="num">3</span></span>
+      <span class="stat-chip">Proc<span class="num">2</span></span>
+      <span class="stat-chip">Ctx<span class="num">2</span></span>
+    </div>
+
+    <div class="filter-tabs">
+      <div class="filter-tab">All</div>
+      <div class="filter-tab active">Facts</div>
+      <div class="filter-tab">Preferences</div>
+      <div class="filter-tab">Procedures</div>
+      <div class="filter-tab">Context</div>
+    </div>
+
+    <div class="memory-list">
+      <div class="memory-card">
+        <div class="card-top">
+          <span class="type-badge facts">Facts</span>
+          <span class="source-tag">marker</span>
+        </div>
+        <div class="card-content">JWT token expires in 7 days, refresh token 14 days</div>
+        <div class="card-meta">
+          <span>60d ago</span>
+          <span class="hits">12 hits</span>
+        </div>
+      </div>
+
+      <!-- Delete confirm -->
+      <div class="memory-card" style="border-color: hsl(var(--destructive) / 0.4);">
+        <div class="card-top">
+          <span class="type-badge facts">Facts</span>
+          <span class="source-tag">llm</span>
+        </div>
+        <div class="card-content" style="opacity: 0.4;">PostgreSQL 15 with connection pool limit 20</div>
+        <div class="delete-confirm">
+          <div class="msg">Delete this memory?</div>
+          <div style="display: flex; gap: 6px; justify-content: flex-end;">
+            <button class="edit-cancel">Cancel</button>
+            <button class="edit-save delete-btn">Delete</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="memory-card">
+        <div class="card-top">
+          <span class="type-badge facts">Facts</span>
+          <span class="source-tag">marker</span>
+        </div>
+        <div class="card-content">Redis cache TTL default 3600 seconds</div>
+        <div class="card-meta">
+          <span>15d ago</span>
+          <span class="hits">5 hits</span>
+        </div>
+      </div>
+
+      <div class="memory-card">
+        <div class="card-top">
+          <span class="type-badge facts">Facts</span>
+          <span class="source-tag">manual</span>
+        </div>
+        <div class="card-content">Frontend uses Vite + React 18 + TypeScript strict</div>
+        <div class="card-meta">
+          <span>10d ago</span>
+          <span class="hits">2 hits</span>
+        </div>
+      </div>
+
+      <div class="memory-card">
+        <div class="card-top">
+          <span class="type-badge facts">Facts</span>
+          <span class="source-tag">marker</span>
+        </div>
+        <div class="card-content">API version prefix /api/v1, currently no version</div>
+        <div class="card-meta">
+          <span>5d ago</span>
+          <span class="hits">1 hit</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="add-btn-wrap">
+      <button class="add-btn">+ Add Memory</button>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- Footer -->
+<div class="footer-bar">
+  <span>Memory Panel Mockup &mdash; AgentHub Design System &mdash; Glassmorphism + HSL Tokens + 3 Themes</span>
+</div>
+
+<script>
+function setTheme(theme) {
+  document.body.className = theme;
+  document.querySelectorAll('.theme-btn').forEach(btn => {
+    btn.classList.toggle('active',
+      (theme === '' && btn.textContent === 'Light') ||
+      (theme === 'dim' && btn.textContent === 'Dim') ||
+      (theme === 'dark' && btn.textContent === 'Dark')
+    );
+  });
+}
+</script>
+
+</body>
+</html>

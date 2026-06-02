@@ -3,6 +3,39 @@
 > 记录每次重大方向变更：做了什么决定、为什么、影响了哪些文件。
 > 倒序排列（最新在上）。
 
+## 2026-05-30 — 实验 6/6b/7/8 完成：CLAUDE.md 缓存行为确认 + 退路 A 验证通过
+
+- **实验 6**: V1 长驻 spawn 时缓存 CLAUDE.md，同进程不重读。Turn 2 仍读旧版本
+- **实验 6b（对照）**: 去掉 `--print`，纯 stream-json 重跑，结论一致
+- **实验 7**: Agent 可按绝对路径写 memory（文件确实创建），但同 session 不可见（CLI 缓存 MEMORY.md）
+- **实验 8（关键）**: kill + `--resume` 后新进程读到最新 CLAUDE.md ✅，对话历史完整恢复 ✅
+- **结论**:
+  - "SP 永不变 + CLAUDE.md 热更新"不成立 → 改用 SP 版本 hash 触发重 spawn
+  - 退路 A 完整假设链通过：更新文件 → SP hash 变 → kill → `--resume` → 新进程读新文件 + 历史恢复
+  - 重 spawn 成本 ~1-2s，仅在上下文确实变化时触发
+- **设计文档修正**: `memory-system-design-v1.md` 全面移除"每轮重读""热更新通道""SP 永不变"等被证伪的假设，替换为"spawn 时读取，变更时 kill + --resume 刷新"
+- **影响文件**: `cli-memory-boundary-experiments.md` 重写 §八-§十一（3 个新实验 + 9 项结论汇总）；`memory-system-design-v1.md` 待修正
+
+## 2026-05-30 — 记忆系统本地文件方案初版设计
+
+- **决策**: 记忆系统采用本地文件方案（对标 `.claude/` + `/root/.brain/`），明确 DB/文件/Redis 三层存储边界和群聊/CLI 记忆边界
+- **原因**:
+  - `/root/.brain/` 实践案例验证了文件型 Agent 记忆的可行性
+  - Letta 实验证明 grep + markdown（74%）优于专用向量库（68.5%）
+  - cc-haha 记忆分析 + 黎 30+ 项目调研 + 本次设计讨论三条线索收敛到同一结论
+  - 不需要引入 pgvector/Neo4j/Chroma 等新基础设施
+- **核心设计决策**:
+  1. Agent CWD 下的 CLAUDE.md + memory/（CLI 自动注入），替代 `.brain/` 设计
+  2. CLI System Prompt 三层模型：L1 `<system-reminder>` 自动注入 / L2 `--system-prompt` AgentHub 构建 / L3 Harness 动态
+  3. PG 是权威源，CLAUDE.md 是 AgentHub 渲染的运行时副本，memory/ 由 CLI 自管
+  4. 群聊记忆（Layer 2 SP 注入）vs CLI 记忆（Layer 1 自动注入 + memory/ 文件）泾渭分明
+  5. Phase A 只需 SystemPromptBuilder + AgentFileManager，成本从"完整记忆系统"缩减为"SP 模板 + CWD 管理"
+- **影响文件**:
+  - `docs/explore/董/记忆/cli-memory-boundary-experiments.md` 新增：5 个实验确认 CLI 三层注入结构和记忆路径隔离
+  - `docs/explore/董/记忆/memory-system-design-v1.md` 重构 v2：对齐实验结论，新增 §二 CLI 三层模型、§六 SP 构建模板、附录 B 修正清单
+  - `docs/explore/董/记忆/memory-feature-evaluation.md` 更新：新增第 9 项「记忆写入指令」，钩子从 8→4 个，全部对齐实验结论
+- **关联**: `ref-cc-haha-memory-arch.md`、`ref-memory-comparison.md`、`../黎/群聊记忆系统高效组织方案.md`
+
 ## 2026-05-29 — CLI-only + 长驻 stream-json 方向
 
 - **决策**:

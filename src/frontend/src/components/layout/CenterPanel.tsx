@@ -12,7 +12,8 @@ import { InboxView } from '../inbox/InboxView'
 import { TasksTabView } from '../tasks/TasksTabView'
 import { ApiKeyManager } from '../settings/ApiKeyManager'
 import { SkillMarketplacePage } from '../skills/SkillMarketplacePage'
-import { MemoryView, SettingsView, SkillsView } from '../views/TabViews'
+import { MemoryPanel } from '../memory/MemoryPanel'
+import { SettingsView, SkillsView } from '../views/TabViews'
 import { Avatar, Badge, Button, Icon } from '../ui'
 import type { Agent } from '../../types'
 
@@ -38,7 +39,7 @@ function TabContent({
     case 'skills':
       return <SkillsView />
     case 'memory':
-      return <MemoryView />
+      return <MemoryPanel agentId={agent.id} agentName={agent.name} />
     case 'settings':
       return <SettingsView />
     default:
