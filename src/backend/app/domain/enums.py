@@ -100,3 +100,35 @@ class DispatchMode(StrEnum):
     DISCUSSION = "discussion"  # M3：Selector 回合循环
     ROLEPLAY = "roleplay"  # 预留：角色扮演（非本期）
     FREE_BROADCAST = "free_broadcast"  # 预留：自治广播（非本期）
+
+
+class McpTransport(StrEnum):
+    """MCP server 传输方式（MD-MCP §1.1，协议 2025-06-18）。"""
+
+    STDIO = "stdio"
+    SSE = "sse"
+    STREAMABLE_HTTP = "streamable_http"
+
+
+class McpServerStatus(StrEnum):
+    """MCP server 审核/生命周期状态（MD-MCP §1.1）。"""
+
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    DEPRECATED = "deprecated"
+
+
+class McpInstallStatus(StrEnum):
+    """workspace 安装状态（MD-MCP §1.2）。"""
+
+    INSTALLING = "installing"
+    READY = "ready"
+    FAILED = "failed"
+
+
+class McpBindingStatus(StrEnum):
+    """Agent 绑定状态（MD-MCP §1.3，removed=软删）。"""
+
+    ACTIVE = "active"
+    PAUSED = "paused"
+    REMOVED = "removed"

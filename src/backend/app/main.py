@@ -10,7 +10,17 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routers import agents, groups, inbox, providers, proxy, sessions, skills, tasks
+from app.api.routers import (
+    agents,
+    groups,
+    inbox,
+    mcp,
+    providers,
+    proxy,
+    sessions,
+    skills,
+    tasks,
+)
 from app.api.routers.skills import FS_ROUTER
 from app.api.ws import router as ws_router
 from app.core.config import settings
@@ -98,6 +108,7 @@ app.include_router(tasks.router)
 app.include_router(skills.router)
 app.include_router(FS_ROUTER)
 app.include_router(inbox.router)
+app.include_router(mcp.router)
 app.include_router(ws_router)
 
 
