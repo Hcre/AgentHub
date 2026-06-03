@@ -232,7 +232,7 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 - **进度**：见根 `STATUS.md`（dashboard.html 解析此文件可视化）
 - **架构**：5 层洋葱（src/backend/app/{api,application,core,domain,infrastructure,schemas}）+ CLI/SDK 双轨适配器
 - **规范**：v3.0（按通用开发规范模板对齐 + AgentHub 特化红线）
-- **ADR**：`worklogs/decisions/`（0001 CLI 优先 / 0002 长驻 CLI / 0003 MCP URL+AP-05 暂缓）
+- **ADR**：`worklogs/decisions/`（0001 CLI 优先 / 0002 长驻 CLI / 0003 MCP URL+AP-05 暂缓 / 0004 MCP F1 落地口径+安装探针）
 - **协作**：董 / 黎 / 袁 三人 + Claude Agent，按业务域分支
 - **🚧 MCP 接入（进行中，下一会话做代码开发）**：计划已整理冻结草案（2026-06-03，docs-only，分支 `feature/mcp/pr01-freeze-and-plan-cleanup`，未 push）。**接手起点 + 落地约定 → `docs/plan/开发清单_roadmap.md` §十「▶ 接手指引」**。前置红线：`docs/specs/04-commands` §2.6 需 2 人 Review Approve（PR-01）后才能写代码。
 
