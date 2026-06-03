@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.api.deps import (
     CurrentUser,
@@ -24,6 +24,8 @@ from app.schemas.mcp import (
     McpMarketItemOut,
     McpMarketListOut,
     McpServerDetailOut,
+    McpTemplateListOut,
+    McpTemplateOut,
 )
 
 router = APIRouter(prefix="/api/mcp", tags=["mcp"])
@@ -62,6 +64,16 @@ async def list_market(
     )
 
 
+@router.get("/market/templates", response_model=McpTemplateListOut)
+async def list_templates(
+    svc: MarketSvc,
+    _user: CurrentUser,
+    workspace_id: Annotated[UUID, Query(description="session_id（workspace 维度 stand-in，R1）")],
+) -> McpTemplateListOut:
+    templates = await svc.list_templates()
+    return McpTemplateListOut(templates=[McpTemplateOut.from_domain(s) for s in templates])
+
+
 @router.get("/market/{mcp_id}", response_model=McpServerDetailOut)
 async def get_market_detail(
     mcp_id: UUID,
@@ -89,3 +101,14 @@ async def install_mcp(
         installed_by=user,
     )
     return McpInstallationOut.from_domain(installation)
+
+
+@router.delete("/installations/{installation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def uninstall_mcp(
+    installation_id: UUID,
+    svc: InstallSvc,
+    _user: CurrentUser,
+    workspace_id: Annotated[UUID, Query(description="session_id（workspace 维度 stand-in，R1）")],
+) -> Response:
+    await svc.uninstall(installation_id=installation_id, workspace_id=workspace_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

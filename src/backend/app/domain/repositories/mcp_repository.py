@@ -39,6 +39,11 @@ class McpServerRepository(ABC):
         """返回 (当前页条目, 总数)。仅列出 status=published（市场可见）。"""
         ...
 
+    @abstractmethod
+    async def list_templates(self) -> list[McpServer]:
+        """官方模板 = status=published 且 official=True（F-022 本期官方模板库）。"""
+        ...
+
 
 class McpInstallationRepository(ABC):
     @abstractmethod
@@ -57,4 +62,14 @@ class McpInstallationRepository(ABC):
     @abstractmethod
     async def exists_instance_name(self, *, workspace_id: UUID, instance_name: str) -> bool:
         """同 workspace 内 instance_name 是否已占用（唯一约束前置校验）。"""
+        ...
+
+    @abstractmethod
+    async def has_active_bindings(self, installation_id: UUID) -> bool:
+        """是否仍有 active 绑定（卸载前置：有则 409，需先解绑，F-011）。"""
+        ...
+
+    @abstractmethod
+    async def delete(self, installation_id: UUID) -> None:
+        """删除安装记录（卸载）。"""
         ...

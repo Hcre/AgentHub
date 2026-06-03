@@ -37,3 +37,7 @@ class McpMarketService:
         if server is None:
             raise NotFoundError(f"MCP 不存在: {mcp_id}")
         return server
+
+    async def list_templates(self) -> list[McpServer]:
+        """官方模板库（F-022）：published 且 official。"""
+        return await self._repo.list_templates()

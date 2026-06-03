@@ -14,7 +14,8 @@
 - **MCP P1（核心链路已落地，未 push）**：分支 `feature/mcp/pr01-freeze-and-plan-cleanup`，未 commit/push（袁惯例：等确认）。
   - **已完成**：二次对账 R1-R10（README-REVISION §9）+ 数据层（domain/mcp 4 实体 + repo 接口/实现 + models 4 表 + alembic 0006-0009）+ market/install 2 service + `api/routers/mcp.py` 3 端点（list/detail/install）+ schemas/mcp.py + `get_current_user`（JWT 仅解析）+ 12 单测绿。
   - **落地口径**（二次对账后）：`workspace_id` 暂存 `session_id` 裸 Uuid 无 FK · `created_by/installed_by` 裸 Uuid 存 JWT sub · 可移植类型（JSON/String/BigInteger.with_variant）· 错误体沿用 `{detail}`（R9）。
-  - **P1 剩余**：DELETE 卸载端点 · 真实安装进程/健康检查（当前骨架直接 ready）· `market/templates` 端点 · `attach_mcp` 扩展点（P2）。
+  - **F1 端点面已齐**（5 端点）：market list/detail/templates + install/uninstall（16 单测绿）。
+  - **P1 剩余**：真实安装进程/健康检查（当前骨架直接 ready）· 收束 1 + ADR 0004 · `attach_mcp` 扩展点（P2）。
   - **本机环境**：tests 需 `pip install aiosqlite fakeredis pytest-cov anthropic`（已装）；权威跑测在 Docker。后端 95/98 通过（3 失败为环境无关：pi-agent CLI 未装 + selector LLM 兜底，非本次改动）。
   - ⚠️ **已修 `.gitignore` 阻断 bug**：裸 `backend/` 误伤 `src/backend/` 致新增后端文件全被忽略 → 锚定为 `/backend/`。push 前确认此修正在内。
 

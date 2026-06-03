@@ -64,3 +64,14 @@ class McpInstallService:
         installation.mark_ready()
         await self._install_repo.save(installation)
         return installation
+
+    async def uninstall(self, *, installation_id: UUID, workspace_id: UUID) -> None:
+        """卸载。404 不存在/跨 workspace；409 仍有 active 绑定（需先解绑，F-011）。"""
+        installation = await self._install_repo.get_by_id(installation_id)
+        if installation is None or installation.workspace_id != workspace_id:
+            raise NotFoundError(f"MCP 安装不存在: {installation_id}")
+        if await self._install_repo.has_active_bindings(installation_id):
+            raise DomainError(
+                f"E_MCP_INSTALL_IN_USE: 仍有 active 绑定，需先解绑: {installation_id}"
+            )
+        await self._install_repo.delete(installation_id)

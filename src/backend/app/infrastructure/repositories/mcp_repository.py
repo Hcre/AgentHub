@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.enums import (
+    McpBindingStatus,
     McpInstallStatus,
     McpServerStatus,
     McpTransport,
@@ -19,7 +20,11 @@ from app.domain.enums import (
 from app.domain.mcp.mcp_installation import WorkspaceMcpInstallation
 from app.domain.mcp.mcp_server import McpServer
 from app.domain.repositories import McpInstallationRepository, McpServerRepository
-from app.infrastructure.db.models import McpServerModel, WorkspaceMcpInstallationModel
+from app.infrastructure.db.models import (
+    AgentMcpBindingModel,
+    McpServerModel,
+    WorkspaceMcpInstallationModel,
+)
 
 
 def _server_to_domain(m: McpServerModel) -> McpServer:
@@ -172,6 +177,18 @@ class PostgresMcpServerRepository(McpServerRepository):
         start = max(page - 1, 0) * page_size
         return servers[start : start + page_size], total
 
+    async def list_templates(self) -> list[McpServer]:
+        stmt = (
+            select(McpServerModel)
+            .where(
+                McpServerModel.status == str(McpServerStatus.PUBLISHED),
+                McpServerModel.official.is_(True),
+            )
+            .order_by(McpServerModel.name.asc())
+        )
+        rows = (await self._s.execute(stmt)).scalars().all()
+        return [_server_to_domain(m) for m in rows]
+
 
 class PostgresMcpInstallationRepository(McpInstallationRepository):
     def __init__(self, session: AsyncSession) -> None:
@@ -212,3 +229,16 @@ class PostgresMcpInstallationRepository(McpInstallationRepository):
             WorkspaceMcpInstallationModel.instance_name == instance_name,
         )
         return (await self._s.execute(stmt)).first() is not None
+
+    async def has_active_bindings(self, installation_id: UUID) -> bool:
+        stmt = select(AgentMcpBindingModel.id).where(
+            AgentMcpBindingModel.installation_id == installation_id,
+            AgentMcpBindingModel.status == str(McpBindingStatus.ACTIVE),
+        )
+        return (await self._s.execute(stmt)).first() is not None
+
+    async def delete(self, installation_id: UUID) -> None:
+        m = await self._s.get(WorkspaceMcpInstallationModel, installation_id)
+        if m is not None:
+            await self._s.delete(m)
+            await self._s.flush()

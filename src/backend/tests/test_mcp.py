@@ -14,6 +14,7 @@ from app.core.exceptions import DomainError, NotFoundError, ValidationError
 from app.domain.enums import McpInstallStatus, McpServerStatus, McpTransport
 from app.domain.mcp.mcp_server import McpServer
 from app.domain.mcp.rules import compute_args_hash, validate_batch_size, validate_version
+from app.infrastructure.db.models import AgentMcpBindingModel
 from app.infrastructure.repositories import (
     PostgresMcpInstallationRepository,
     PostgresMcpServerRepository,
@@ -185,6 +186,65 @@ async def test_install_mcp_not_found(db_session) -> None:  # type: ignore[no-unt
         await svc.install(workspace_id=uuid4(), mcp_id=uuid4(), instance_name="x")
 
 
+# --- templates + uninstall ---
+
+
+@pytest.mark.asyncio
+async def test_templates_lists_official_published_only(db_session) -> None:  # type: ignore[no-untyped-def]
+    repo = PostgresMcpServerRepository(db_session)
+    await _seed_server(repo, name="Off", slug="off", official=True)
+    await _seed_server(repo, name="Community", slug="comm", official=False)
+    await _seed_server(
+        repo, name="OffDraft", slug="offdraft", official=True, status=McpServerStatus.DRAFT
+    )
+    svc = McpMarketService(repo)
+
+    templates = await svc.list_templates()
+    assert [t.name for t in templates] == ["Off"]
+
+
+@pytest.mark.asyncio
+async def test_uninstall_removes(db_session) -> None:  # type: ignore[no-untyped-def]
+    server = await _seed_server(PostgresMcpServerRepository(db_session), name="S", slug="s")
+    svc = _install_service(db_session)
+    ws = uuid4()
+    inst = await svc.install(workspace_id=ws, mcp_id=server.id, instance_name="fs")
+
+    await svc.uninstall(installation_id=inst.id, workspace_id=ws)
+    assert await PostgresMcpInstallationRepository(db_session).get_by_id(inst.id) is None
+
+
+@pytest.mark.asyncio
+async def test_uninstall_missing_or_cross_workspace_raises(db_session) -> None:  # type: ignore[no-untyped-def]
+    server = await _seed_server(PostgresMcpServerRepository(db_session), name="S", slug="s")
+    svc = _install_service(db_session)
+    inst = await svc.install(workspace_id=uuid4(), mcp_id=server.id, instance_name="fs")
+
+    with pytest.raises(NotFoundError):
+        await svc.uninstall(installation_id=uuid4(), workspace_id=uuid4())
+    # 跨 workspace 视为不存在
+    with pytest.raises(NotFoundError):
+        await svc.uninstall(installation_id=inst.id, workspace_id=uuid4())
+
+
+@pytest.mark.asyncio
+async def test_uninstall_blocked_by_active_binding(db_session) -> None:  # type: ignore[no-untyped-def]
+    server = await _seed_server(PostgresMcpServerRepository(db_session), name="S", slug="s")
+    svc = _install_service(db_session)
+    ws = uuid4()
+    inst = await svc.install(workspace_id=ws, mcp_id=server.id, instance_name="fs")
+    # 直插一条 active 绑定（绑定服务 P2，SQLite 不强制 FK）
+    db_session.add(
+        AgentMcpBindingModel(
+            agent_id=uuid4(), installation_id=inst.id, status="active", tool_subset=[]
+        )
+    )
+    await db_session.flush()
+
+    with pytest.raises(DomainError):
+        await svc.uninstall(installation_id=inst.id, workspace_id=ws)
+
+
 # --- 路由注册（无 DB，验证 L4 装配）---
 
 
@@ -193,5 +253,7 @@ def test_mcp_routes_registered() -> None:
 
     paths = {getattr(r, "path", None) for r in app.routes}
     assert "/api/mcp/market" in paths
+    assert "/api/mcp/market/templates" in paths
     assert "/api/mcp/market/{mcp_id}" in paths
     assert "/api/mcp/installations" in paths
+    assert "/api/mcp/installations/{installation_id}" in paths

@@ -84,6 +84,30 @@ class McpServerDetailOut(BaseModel):
         )
 
 
+class McpTemplateOut(BaseModel):
+    template_id: UUID  # 本期 = official MCP 的 mcp_id
+    name: str
+    transport: str
+    version: str
+    tags: list[str]
+    mcp_config: dict
+
+    @classmethod
+    def from_domain(cls, s: McpServer) -> McpTemplateOut:
+        return cls(
+            template_id=s.id,
+            name=s.name,
+            transport=str(s.transport),
+            version=s.version,
+            tags=s.tags,
+            mcp_config=s.config_json,
+        )
+
+
+class McpTemplateListOut(BaseModel):
+    templates: list[McpTemplateOut]
+
+
 class McpInstallRequest(BaseModel):
     workspace_id: UUID  # R1：传 session_id
     mcp_id: UUID
