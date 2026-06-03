@@ -35,6 +35,7 @@ from app.infrastructure.cache.redis_client import get_redis
 from app.infrastructure.cache.watermark_store import RedisWatermarkStore, WatermarkStore
 from app.infrastructure.db.base import get_session
 from app.infrastructure.llm.factory import build_adapter
+from app.infrastructure.mcp import LocalMcpInstaller
 from app.infrastructure.repositories import (
     PostgresAgentRepository,
     PostgresGroupRepository,
@@ -62,7 +63,8 @@ def get_current_user(
         payload = decode_access_token(creds.credentials)
         sub = payload.get("sub")
         return UUID(str(sub)) if sub else None
-    except Exception:  # noqa: BLE001 — JWT 失效/格式错按未登录处理（R3 不强制）
+    except Exception:
+        # JWT 失效/格式错按未登录处理（R3：本期不强制鉴权）
         logger.debug("JWT 解析失败，按匿名处理")
         return None
 
@@ -123,11 +125,16 @@ def get_mcp_market_service(
     return McpMarketService(repo)
 
 
+@lru_cache
+def get_mcp_installer() -> LocalMcpInstaller:
+    return LocalMcpInstaller()  # 无状态，进程级单例
+
+
 def get_mcp_install_service(
     server_repo: Annotated[PostgresMcpServerRepository, Depends(get_mcp_server_repo)],
     install_repo: Annotated[PostgresMcpInstallationRepository, Depends(get_mcp_installation_repo)],
 ) -> McpInstallService:
-    return McpInstallService(server_repo, install_repo)
+    return McpInstallService(server_repo, install_repo, get_mcp_installer())
 
 
 # --- Service ---

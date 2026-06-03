@@ -13,8 +13,14 @@ from app.application.services import McpInstallService, McpMarketService
 from app.core.exceptions import DomainError, NotFoundError, ValidationError
 from app.domain.enums import McpInstallStatus, McpServerStatus, McpTransport
 from app.domain.mcp.mcp_server import McpServer
-from app.domain.mcp.rules import compute_args_hash, validate_batch_size, validate_version
+from app.domain.mcp.rules import (
+    compute_args_hash,
+    validate_batch_size,
+    validate_install_config,
+    validate_version,
+)
 from app.infrastructure.db.models import AgentMcpBindingModel
+from app.infrastructure.mcp import LocalMcpInstaller
 from app.infrastructure.repositories import (
     PostgresMcpInstallationRepository,
     PostgresMcpServerRepository,
@@ -49,7 +55,25 @@ def test_validate_batch_size_boundary() -> None:
         validate_batch_size(51)
 
 
+def test_validate_install_config_by_transport() -> None:
+    validate_install_config("stdio", {"command": "npx"})  # ok
+    validate_install_config("sse", {"url": "https://x/mcp"})  # ok
+    validate_install_config("streamable_http", {"url": "http://x/mcp"})  # ok
+    with pytest.raises(ValidationError):
+        validate_install_config("stdio", {})  # 缺 command
+    with pytest.raises(ValidationError):
+        validate_install_config("sse", {"url": "ftp://x"})  # 非 http(s)
+    with pytest.raises(ValidationError):
+        validate_install_config("bogus", {})  # 未知 transport
+
+
 # --- helpers ---
+
+
+def _default_config(transport: McpTransport) -> dict:
+    if transport == McpTransport.STDIO:
+        return {"command": "echo", "args": ["mcp"]}
+    return {"url": "https://example.com/mcp"}
 
 
 async def _seed_server(
@@ -62,6 +86,7 @@ async def _seed_server(
     official: bool = False,
     tags: list[str] | None = None,
     install_count: int = 0,
+    config_json: dict | None = None,
 ) -> McpServer:
     server = McpServer(
         name=name,
@@ -71,7 +96,7 @@ async def _seed_server(
         official=official,
         tags=tags or [],
         install_count=install_count,
-        config_json={"cmd": name},
+        config_json=config_json if config_json is not None else _default_config(transport),
     )
     await repo.save(server)
     return server
@@ -133,7 +158,11 @@ async def test_market_detail_found_and_missing(db_session) -> None:  # type: ign
 
 
 def _install_service(db) -> McpInstallService:  # type: ignore[no-untyped-def]
-    return McpInstallService(PostgresMcpServerRepository(db), PostgresMcpInstallationRepository(db))
+    return McpInstallService(
+        PostgresMcpServerRepository(db),
+        PostgresMcpInstallationRepository(db),
+        LocalMcpInstaller(),
+    )
 
 
 @pytest.mark.asyncio
@@ -184,6 +213,17 @@ async def test_install_mcp_not_found(db_session) -> None:  # type: ignore[no-unt
     svc = _install_service(db_session)
     with pytest.raises(NotFoundError):
         await svc.install(workspace_id=uuid4(), mcp_id=uuid4(), instance_name="x")
+
+
+@pytest.mark.asyncio
+async def test_install_rejects_invalid_server_config(db_session) -> None:  # type: ignore[no-untyped-def]
+    # stdio 但 config_json 无 command → 安装探针结构校验失败（422）
+    server = await _seed_server(
+        PostgresMcpServerRepository(db_session), name="Bad", slug="bad", config_json={}
+    )
+    svc = _install_service(db_session)
+    with pytest.raises(ValidationError):
+        await svc.install(workspace_id=uuid4(), mcp_id=server.id, instance_name="bad")
 
 
 # --- templates + uninstall ---

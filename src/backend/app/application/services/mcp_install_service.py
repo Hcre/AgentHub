@@ -9,6 +9,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from app.core.exceptions import DomainError, NotFoundError
+from app.domain.mcp.installer import McpInstaller
 from app.domain.mcp.mcp_installation import WorkspaceMcpInstallation
 from app.domain.mcp.rules import compute_args_hash
 from app.domain.repositories import McpInstallationRepository, McpServerRepository
@@ -19,9 +20,11 @@ class McpInstallService:
         self,
         server_repo: McpServerRepository,
         installation_repo: McpInstallationRepository,
+        installer: McpInstaller,
     ) -> None:
         self._server_repo = server_repo
         self._install_repo = installation_repo
+        self._installer = installer
 
     async def install(
         self,
@@ -52,6 +55,11 @@ class McpInstallService:
         ):
             raise DomainError(f"E_MCP_NAME_CONFLICT: instance_name 已存在: {instance_name}")
 
+        # 安装探针：结构校验（失败 → ValidationError → 422）。merged = server 配置叠加用户覆盖。
+        # 真实可达性/进程拉起为 P2/P3 扩展点（见 LocalMcpInstaller）。
+        merged_config = {**server.config_json, **overrides}
+        await self._installer.probe(transport=str(server.transport), merged_config=merged_config)
+
         installation = WorkspaceMcpInstallation(
             workspace_id=workspace_id,
             mcp_id=mcp_id,
@@ -60,7 +68,6 @@ class McpInstallService:
             config_overrides=overrides,
             args_hash=args_hash,
         )
-        # P1 骨架：无真实进程拉起，直接 ready（真实安装/健康检查 P2+）
         installation.mark_ready()
         await self._install_repo.save(installation)
         return installation

@@ -37,3 +37,22 @@ def validate_batch_size(count: int) -> None:
     """单 workspace 批量安装 ≤ 50（F-022）。"""
     if count > MAX_BATCH_INSTALL:
         raise ValidationError(f"单 workspace 批量安装超过 {MAX_BATCH_INSTALL} 上限")
+
+
+def validate_install_config(transport: str, merged_config: dict[str, Any]) -> None:
+    """安装前结构校验（F-004 / F-024）。
+
+    依 MCP 2025-06-18 约定：stdio 需 `command`；sse/streamable_http 需合法 `url`。
+    `merged_config` = config_json（server）叠加 config_overrides（安装请求）。
+    校验失败抛 ValidationError → 422 E_MCP_SCHEMA_INVALID。
+    """
+    if transport == "stdio":
+        command = merged_config.get("command")
+        if not isinstance(command, str) or not command.strip():
+            raise ValidationError("E_MCP_SCHEMA_INVALID: stdio MCP 缺少 command")
+    elif transport in ("sse", "streamable_http"):
+        url = merged_config.get("url")
+        if not isinstance(url, str) or not url.startswith(("http://", "https://")):
+            raise ValidationError("E_MCP_SCHEMA_INVALID: 远程 MCP 缺少合法 url")
+    else:
+        raise ValidationError(f"E_MCP_SCHEMA_INVALID: 未知 transport: {transport}")
