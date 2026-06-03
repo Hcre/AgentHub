@@ -15,6 +15,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -170,3 +171,138 @@ class GroupMemberModel(Base):
         Uuid, ForeignKey("agents.id", ondelete="CASCADE"), index=True
     )
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+# --- MCP 接入（4 表，二次对账口径：R1/R2 裸 Uuid 无 FK，R10 可移植类型）---
+# 权威：docs/specs/03-data-model §MCP；MD-MCP-V1.0 §1；README-REVISION §9。
+
+
+class McpServerModel(Base):
+    """MCP 市场元数据（mcp_servers）。args_hash 由 config_json 派生。"""
+
+    __tablename__ = "mcp_servers"
+    __table_args__ = (Index("idx_mcp_servers_status_latest", "status", "latest"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    slug: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    transport: Mapped[str] = mapped_column(String(32))
+    config_schema: Mapped[dict] = mapped_column(JSON, default=dict)
+    config_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    args_hash: Mapped[str] = mapped_column(String(64), index=True)
+    version: Mapped[str] = mapped_column(String(32), default="1.0.0")
+    latest: Mapped[bool] = mapped_column(Boolean, default=True)
+    official: Mapped[bool] = mapped_column(Boolean, default=False)
+    tags: Mapped[list] = mapped_column(JSON, default=list)  # R10: TEXT[]→JSON（无 GIN）
+    status: Mapped[str] = mapped_column(String(16), default="draft", index=True)
+    created_by: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)  # R2 裸 Uuid 无 FK
+    dry_run_result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    dry_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    install_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
+
+
+class WorkspaceMcpInstallationModel(Base):
+    """workspace 维度安装（workspace_mcp_installations）。
+
+    R1：workspace_id 暂存 session_id，裸 Uuid 无 FK。安装幂等键
+    (workspace_id + mcp_id + args_hash)。
+    """
+
+    __tablename__ = "workspace_mcp_installations"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "instance_name",
+            name="uq_workspace_mcp_installations_workspace_mcp_name",
+        ),
+        Index("idx_workspace_mcp_installations_workspace", "workspace_id", "status"),
+        Index("idx_workspace_mcp_installations_idempotent", "workspace_id", "mcp_id", "args_hash"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    workspace_id: Mapped[UUID] = mapped_column(Uuid)  # R1 session_id 裸 Uuid 无 FK
+    mcp_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("mcp_servers.id", ondelete="CASCADE"), index=True
+    )
+    installed_by: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)  # R2 裸 Uuid 无 FK
+    instance_name: Mapped[str] = mapped_column(String(128))
+    config_overrides: Mapped[dict] = mapped_column(JSON, default=dict)
+    args_hash: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(16), default="installing")
+    error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
+    last_health_check_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class AgentMcpBindingModel(Base):
+    """Agent 绑定（agent_mcp_bindings）。解绑软删（status=removed + unbound_at）。
+
+    NOTE(P2)：唯一约束 (agent_id, installation_id) 与软删并存时，解绑后无法再绑定同一
+    installation——P2 实现绑定端点时需改为 status=active 的部分唯一，或解绑改硬删。
+    """
+
+    __tablename__ = "agent_mcp_bindings"
+    __table_args__ = (
+        UniqueConstraint(
+            "agent_id", "installation_id", name="uq_agent_mcp_bindings_agent_installation"
+        ),
+        Index("idx_agent_mcp_bindings_agent", "agent_id", "status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    agent_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("agents.id", ondelete="CASCADE"))
+    installation_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("workspace_mcp_installations.id", ondelete="CASCADE"),
+        index=True,
+    )
+    tool_subset: Mapped[list] = mapped_column(JSON, default=list)  # 空=全选
+    status: Mapped[str] = mapped_column(String(16), default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
+    unbound_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class McpToolCallLogModel(Base):
+    """工具调用日志（mcp_tool_call_logs，F-014 + F-017）。
+
+    R1：workspace_id 暂存 session_id 裸 Uuid。R4：trace_id 为净新增（非既有设施）。
+    """
+
+    __tablename__ = "mcp_tool_call_logs"
+    __table_args__ = (
+        Index("idx_mcp_tool_call_logs_workspace_created", "workspace_id", "created_at"),
+        Index("idx_mcp_tool_call_logs_agent_created", "agent_id", "created_at"),
+        Index("idx_mcp_tool_call_logs_trace", "trace_id"),
+    )
+
+    # BigSerial（PG）；SQLite 测试退回 Integer 自增（同 GroupMemberModel）
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True
+    )
+    trace_id: Mapped[str] = mapped_column(String(32))  # R4 净新增，P4 生成
+    binding_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("agent_mcp_bindings.id", ondelete="CASCADE")
+    )
+    agent_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("agents.id", ondelete="CASCADE"))
+    workspace_id: Mapped[UUID] = mapped_column(Uuid)  # R1 session_id 裸 Uuid 无 FK
+    mcp_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("mcp_servers.id", ondelete="CASCADE"))
+    tool_name: Mapped[str] = mapped_column(String(128))
+    args_hash: Mapped[str] = mapped_column(String(64))
+    result_code: Mapped[str] = mapped_column(String(32))
+    duration_ms: Mapped[int] = mapped_column(Integer)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)

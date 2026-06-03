@@ -175,3 +175,67 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 |------|------|------|
 | 2026-05-XX | 初版 M1-M6 路线图 | PRD v4 |
 | 2026-06-01 | §八 新增 MVP 收尾冲刺（基于 `docs/plan/后续升级计划/后续计划.txt` v1.0）| 后续计划补充稿 |
+| 2026-06-02 | §十 新增 **MCP 功能 v1**（P1→P3→P2→P4，4 阶段 13 天 + 严格收束）| `docs/plan/MCP功能PRD.md` v1.0 + `MCP功能计划_v0.md` v0.2 |
+
+---
+
+## 十、MCP 功能 v1（6/2-6/15，4 阶段 13 天）
+
+> **单一权威入口**：[`docs/plan/后续升级计划/MCP接入/README-REVISION.md`](后续升级计划/MCP接入/README-REVISION.md)（**2026-06-03 修订版**，按可行性清单 12 项问题重写）
+>
+> 详情（已合并去重）：`README-REVISION.md` §0-3 速览 + 6 份关键文档（FS/SA/TA/MD/IC/MCP-UI-frontend）+ 08/closure-verdict 双口径
+> 范围: F1 MCP 市场 / F2 Agent 接入 / F3 创建 MCP / F5 工具调用展示（全量 + 工具展示）
+> 顺序: P1(6/2-6/5) → P3(6/6-6/8) → P2(6/9-6/11) → P4(6/12-6/15)
+> 收束: 严格 4 阶段硬闸门（整理/测试/审计/验证）+ ADR + 收束报告
+> 数据: 4 张表 = 3 实体（`mcp_servers` / `workspace_mcp_installations` / `agent_mcp_bindings`）+ 1 日志表（`mcp_tool_call_logs`）
+> API: 8 个 HTTP 端点 + 2 个 WS 事件 →（🔒 PR-01 冻结草案已落 `docs/specs/04-commands_命令接口.md` §2.6 + §三，**待 2 人 Review**；URL 前缀 `/api/mcp/`，AP-05 暂缓见 [ADR-0003](../../worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md)）
+> 前端: 3 个新页（`/mcp-market` 列表/详情 + `/mcp-create`）+ 1 个 Tab（Agent「MCP 接入」）+ 1 store + 6 组件
+> 工时: 159h 总（52 + 34 + 40 + 33）
+>
+> **修订版 4 项决策**（V1.3.1 errata）：
+> 1. 单一权威 = 修订版 `MCP接入/`（合并 §十 工程口径）
+> 2. 安装表名 = `workspace_mcp_installations`（E-01）
+> 3. dry-run = 单 Docker + compose 资源限额（E-03 简化版）
+> 4. SDK Adapter（F-013）= 移下期，CLI Adapter 预留 `attach_mcp(...)` 扩展点
+>
+> **代码空间状态**（2026-06-03 更新）：后端 P1 核心链路已落地（domain/mcp 4 文件 + repo 接口/实现 + models 4 表 + alembic 0006-0009 + 2 service + api/routers/mcp.py 3 端点 + schemas/mcp.py + get_current_user JWT 解析）；12 单测绿（rules/market/install 三路径）。前端 0/11 待 P3。
+>
+> **二次对账（2026-06-03，README-REVISION §9）**：P1 启动前逐文件复核 plan→code，发现首轮 review 漏掉的实体级不存在引用 R1-R10（无 workspaces/users 表、零 JWT 强制、trace_id 零设施、WS 信封不符、错误体 {detail} 非 AP-02、SQLite 强制可移植类型），并修复 `.gitignore` 裸 `backend/` 误伤源码树致新增文件被忽略的阻断 bug。落地口径：workspace_id 暂存 session_id 裸 Uuid；created_by/installed_by 裸 Uuid 存 JWT sub；可移植类型；错误体沿用 {detail}。
+>
+> **P0 计划整理 + PR-01 草案（2026-06-03 完成）**：核验修订版属实 + 校正 §3 路径漂移 + PR-01 端点冻结草案落 04-commands §2.6/§三 + 原计划残留归档（445+22+3 文件）+ ADR-0003。**P1 启动前置门：04-commands §2.6 经 2 人 Review Approve（PR-01/PR-06）→ 确认 PR-09 spec 同步 → 才能写 alembic 0006。**
+
+---
+
+### ▶ 接手指引（给下一个 AI 会话 / 代码开发起点）
+
+> 计划已整理完毕（2026-06-03，docs-only，commit `2025d42`，分支 `feature/mcp/pr01-freeze-and-plan-cleanup`，**未 push**）。下一会话做**代码开发**，从这里开始。
+
+**第 0 步——过 PR-01 闸门（写代码前的红线，不可跳）**
+- `docs/specs/04-commands_命令接口.md` §2.6（8 端点）+ §三（4 WS 事件）目前是 🔒 **冻结草案**，**需 2 人 Review Approve** 才算冻结（PR-01/PR-06）。未过闸禁止写后端实现。
+
+**落地权威三件套（照这三处写，次级文档正文有旧路径已加 ERRATA 横幅，勿照抄）**
+1. 文件结构 → `docs/plan/后续升级计划/MCP接入/06-详细设计/FS-MCP-V1.0-20260602.md` §1（真实落点树）
+2. 接口契约 → `docs/specs/04-commands_命令接口.md` §2.6 + §三
+3. 架构 / 数据 → `docs/specs/01-architecture_架构定义.md` §MCP + `docs/specs/03-data-model_数据模型.md` §MCP
+
+**关键落地约定（已校正为真实代码树）**
+- URL 前缀 `/api/mcp/`（**无 `/v1/`**，对齐现有 `/api/agents`，依据 [ADR-0003](../../worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md)）
+- 路由文件 `api/routers/mcp.py`，`APIRouter(prefix="/api/mcp")`；WS `api/ws/toolcall.py`
+- 4 张表**追加进单文件** `infrastructure/db/models.py`（不新建 `models/` 包）+ alembic `0006`（续 0001-0005）
+- 领域子包 `domain/mcp/{mcp_server,mcp_installation,mcp_binding,rules}.py`
+- 编排服务**扁平** `application/services/mcp_{market,install,binding,create}_service.py`（不建 `application/mcp/` 子包）
+- `attach_mcp(...)` 抽象方法加在 `domain/llm/protocol.py::AgentRuntime`，由 `infrastructure/llm/{claude_code,opencode,pi_agent}_runtime.py` 实现（AR-02：只扩展 Adapter，不另起运行时）
+- dry-run 简化版 → `infrastructure/mcp/dry_run.py`（单 Docker + compose 限额，非多 OS 沙箱）
+
+**P1 第一步动作**（闸门过后）：PR-09 确认 spec 同步 → 写 alembic 0006 + `infrastructure/db/models.py` 追加 4 表 → 3 端点（list/detail/install）。
+
+---
+
+| 阶段 | 日期 | 范围 | 工时 | 收束 | 状态 |
+|------|------|------|------|------|------|
+| P0 整理+PR-01草案 | 6/3 | 路径校正 + 端点冻结草案 + 归档 + ADR-0003 | — | — | ✅ 完成（§2.6 Reviewer Approve） |
+| P0.5 二次对账 | 6/3 | schema↔代码审计 R1-R10 + spec 修订 + .gitignore 修正 | — | — | ✅ 完成（见 README-REVISION §9） |
+| P1 F1 市场 | 6/2-6/5 | 数据层(4 表/迁移/实体)+ 5 端点 ✅；安装探针 McpInstaller 端口 + LocalMcpInstaller 结构校验(transport 必填项，422 拦截非法配置)✅；真实可达性/进程探针 ⬜（P2/P3 seam） | 52h | ✅ ADR-04 + [收束报告](../reports/收束报告-MCP-F1.md) | ✅ F1 齐+19 测试绿；收束-1 ✅ 闭合（双线签核）→ 并入 main |
+| P3 F3 创建 | 6/6-6/8 | stdio/sse 提交 + 模板 + dry-run 验证 | 34h | 收束 3 + ADR 0005 | ⬜ 待办 |
+| P2 F2 接入 | 6/9-6/11 | Agent 绑定 + CLI Adapter 动态挂载 | 40h | 收束 2 + ADR 0006 | ⬜ 待办 |
+| P4 F5 展示 | 6/12-6/15 | 工具调用内联卡片 + WebSocket 事件 | 33h | 收束 4 + ADR 0007 | ⬜ 待办 |

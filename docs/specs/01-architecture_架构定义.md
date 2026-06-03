@@ -274,3 +274,66 @@ agenthub/
 | 实时通信 | WebSocket | |
 | LLM 接入 | SDK/CLI 双轨（ClaudeAdapter + ClaudeCodeRuntime） | |
 | 部署 | Docker 24+ + Nginx 1.25+ | |
+
+---
+
+## §MCP 接入（2026-06-03 修订版）
+
+> 本节由 PR-09 同步 `docs/plan/后续升级计划/MCP接入/README-REVISION.md`（单一权威入口）而来，落地范围与代码空间现状以 README-REVISION §3 §5.1 为准。
+
+### §MCP.1 5 层映射（沿用 AR-01）
+
+| 层 | 本期 MCP 落点（已按真实代码树校正，2026-06-03） |
+|----|---------------|
+| L1 Infrastructure | `infrastructure/db/models.py`（**追加** 4 表 SQLAlchemy 模型，与现有 8 表同文件，**不新建 `models/` 包**）；`infrastructure/repositories/mcp_repository.py`（repo 实现）；MCP 注入实现落现有 `infrastructure/llm/{claude_code,opencode,pi_agent}_runtime.py`（CLI Adapter 实现 `attach_mcp`）；`infrastructure/mcp/dry_run.py`（dry-run 简化版：单 Docker 容器 + compose 限额） |
+| L2 Domain | `domain/mcp/{mcp_server,mcp_installation,mcp_binding,rules}.py`（3 实体 + 8 业务规则，子包与现有 `domain/llm/`、`domain/task_engine/` 先例一致）；`domain/repositories/mcp_repository.py`（repo 接口）；`attach_mcp(...)` 抽象方法加到 `domain/llm/protocol.py::AgentRuntime` |
+| L3 Application | `application/services/{mcp_market,mcp_install,mcp_binding,mcp_create,mcp_audit}_service.py`（5 编排服务，扁平 `*_service.py` 与现有 `application/services/` 命名一致；application 按类型分层，**不按特性建 `application/mcp/` 子包**） |
+| L4 API | `api/routers/mcp.py`（8 端点，与 `agents.py`/`groups.py` 同级，**无 `v1/` 目录**）+ `api/ws/toolcall.py`（2 WS 事件，复用既有 `api/ws/` 通道） |
+| L5 Presentation | `src/frontend/src/pages/McpMarket*` + `McpCreate*` + `components/mcp/*` + `components/agent/McpBindingPanel.tsx` + `stores/mcpStore.ts` + `routes.tsx` |
+
+### §MCP.2 AR-02 满足方式（关键）
+
+- 现有抽象基类 `AgentRuntime(ABC)`（`domain/llm/protocol.py`，契约为 `stream(request)` / `stop()`）**只新增** `attach_mcp(bindings: list[AgentMCPBinding]) -> None` 抽象方法（把 MCP config 注入下一次 `stream` 的 CLI 进程），**不另起**进程池/sandbox/eventbus（注：现有 `infrastructure/llm/claude_code_process_pool.py` 为既有进程复用，非本期新建）
+- 3 个 Runtime 实现（`infrastructure/llm/{claude_code_runtime,opencode_runtime,pi_agent_runtime}.py`）均实现 `attach_mcp`
+- 注入方式：把 `bindings` 序列化为 MCP 2025-06-18 `config` JSON，注入到 Runtime 进程的 stdio / env / CLI 参数
+- 注：`attach_mcp` 的精确签名（是否随 `AgentRequest` 透传 / 是否返回 handle）在 P2 实现前由 PR-09 + PR-01 冻结，本节只定扩展点位置
+- SDK Adapter（F-013）下期增量：沿 `attach_mcp(...)` 扩展点加 if 分支
+
+### §MCP.3 跨层依赖（依 AR-01）
+
+```
+L5 Presentation → L4 API → L3 Application → L2 Domain ◀── L1 Infrastructure
+   (React)        (FastAPI)  (编排)           (实体+规则)  (实现 L2 接口)
+```
+
+L1 实现 L2 接口（依赖倒置）；L2 不依赖 L1 具体实现；L3 不直接碰 L1；L4 只做协议层；L5 不直接访问 L1。
+
+### §MCP.4 不引入的层 / 栈
+
+- ❌ 独立「接入层」（合并到 L4）
+- ❌ 独立「数据层」（合并到 L1）
+- ❌ 独立 eventbus（用既有 Redis pub/sub + WS）
+- ❌ 进程池（违反 AR-02）
+- ❌ 多 OS 沙箱矩阵（dev/demon 本机不可运行）
+- ❌ gRPC / protobuf（现有只有 HTTP/JSON + WS）
+- ❌ Vault（用环境变量 + `core/config.py`）
+- ❌ OpenTelemetry（PRD B-11 明确不做，trace_id 字符串贯穿）
+- ❌ Poetry monorepo（用 `requirements.txt` + `pyproject.toml` pip）
+- ❌ Kubernetes（用 `src/docker/docker-compose.yml`）
+
+### §MCP.5 单一权威 + 引用关系
+
+- 单一权威：[`docs/plan/后续升级计划/MCP接入/README-REVISION.md`](../plan/后续升级计划/MCP接入/README-REVISION.md)
+- 数据模型：本文件 `03-data-model_数据模型.md` §MCP 子节
+- 接口契约（PR-01 冻结草案已落）：`docs/specs/04-commands_命令接口.md` §2.6 MCP API + §三 MCP WS 事件（🔒 待 2 人 Review，P1 启动前完成）
+- 不重复叙述：本节仅列**架构层映射**与**AR-02 满足方式**；详细模块/表/端点见上述权威文件
+
+### §MCP.6 修订决策
+
+| 项 | 决策 | 来源 |
+|----|------|------|
+| 落地包 | 真实 `src/backend/app/`（**不**引 `src/agenthub/`） | 可行性清单 I-01 |
+| 表名 | `workspace_mcp_installations`（E-01 修正） | 用户决策 |
+| dry-run | 单 Docker 容器 + compose 资源限额（E-03 简化版） | 用户决策 |
+| SDK Adapter | 移下期（NB-02），CLI Adapter 预留 `attach_mcp(...)` 扩展点 | 用户决策 |
+

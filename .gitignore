@@ -60,4 +60,6 @@ _assets/
 # 仅 graph_schema.json（节点/边定义）入 git。docs/CODE_MAP.md 照常入库。
 .codegraph/graph.json
 .understand-anything/
-backend/
+# 锚定到仓库根：原裸 `backend/` 会误伤源码树 src/backend/，
+# 导致所有新增后端文件被静默忽略（2026-06-03 修正）。仓库根无 backend/ 目录。
+/backend/

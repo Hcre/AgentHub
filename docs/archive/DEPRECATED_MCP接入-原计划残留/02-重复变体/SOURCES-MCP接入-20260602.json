@@ -1,0 +1,143 @@
+{
+  "project": "AgentHub-MCP接入",
+  "version": "V1.0",
+  "date": "2026-06-02",
+  "agent": "RA-001",
+  "total_sources": 859,
+  "independent_sources_min": 80,
+  "reports": [
+    {
+      "slug": "mcp-2025-06-18-specification-stdio-sse-http-transport-changes-from-2024-11",
+      "topic": "MCP 2025-06-18 规范三型 transport 变化与 SDK 支持矩阵",
+      "source_count": 59,
+      "primary_grade": "S+A",
+      "covers": ["R-01", "R-03"],
+      "report_path": "C:/Users/yhn/Desktop/调研/research-tool/research-output/mcp-2025-06-18-specification-stdio-sse-http-transport-changes-from-2024-11/report.md"
+    },
+    {
+      "slug": "claude-code-cli-mcp-config-file-format-json-schema-2025-stdio-mcp-server",
+      "topic": "Claude Code CLI --mcp-config 文件格式与 JSON Schema",
+      "source_count": 73,
+      "primary_grade": "S+A",
+      "covers": ["R-04", "R-14"],
+      "report_path": "C:/Users/yhn/Desktop/调研/research-tool/research-output/claude-code-cli-mcp-config-file-format-json-schema-2025-stdio-mcp-server/report.md"
+    },
+    {
+      "slug": "claude-code-cli-mcp-tool-use-naming-convention-mcp-prefix-server-id-tool-call-stream-json-output-format",
+      "topic": "Claude Code CLI 中 MCP 工具调用的命名约定与 64 字符限制",
+      "source_count": 69,
+      "primary_grade": "S+A",
+      "covers": ["R-05", "R-19", "R-20"],
+      "report_path": "C:/Users/yhn/Desktop/调研/research-tool/research-output/claude-code-cli-mcp-tool-use-naming-convention-mcp-prefix-server-id-tool-call-stream-json-output-format/report.md"
+    },
+    {
+      "slug": "mcp-official-servers-filesystem-github-fetch-brave-search-postgres-npm-package-version-permissions",
+      "topic": "5 个 MCP 官方 Server 的当前版本 / 包名 / 权限",
+      "source_count": 75,
+      "primary_grade": "S+A+B",
+      "covers": ["R-06", "R-15", "R-24"],
+      "report_path": "C:/Users/yhn/Desktop/调研/research-tool/research-output/mcp-official-servers-filesystem-github-fetch-brave-search-postgres-npm-package-version-permissions/report.md"
+    },
+    {
+      "slug": "mcp-proxy-project-architecture-rust-process-pool-healthcheck-idle-timeout-license",
+      "topic": "mcp-proxy 项目的 Rust 架构、进程池、健康检查、空闲超时、License",
+      "source_count": 63,
+      "primary_grade": "S+A",
+      "covers": ["R-08", "R-11"],
+      "report_path": "C:/Users/yhn/Desktop/调研/research-tool/research-output/mcp-proxy-project-architecture-rust-process-pool-healthcheck-idle-timeout-license/report.md"
+    },
+    {
+      "slug": "python-mcp-sdk-mcp-package-stdio-sandbox-subprocess-resource-setrlimit-cpu-memory-limit-cross-platform",
+      "topic": "Python MCP SDK 的 stdio 沙箱与跨平台资源限制",
+      "source_count": 60,
+      "primary_grade": "S+A",
+      "covers": ["R-02", "R-23"],
+      "report_path": "C:/Users/yhn/Desktop/调研/research-tool/research-output/python-mcp-sdk-mcp-package-stdio-sandbox-subprocess-resource-setrlimit-cpu-memory-limit-cross-platform/report.md"
+    },
+    {
+      "slug": "mcp-server-approval-timeout-hitl-human-in-loop-dangerous-tool-30-day-allowlist-ux-best-practice-owasp-2026",
+      "topic": "MCP 工具审批超时 / HITL / 30 天 allowlist / OWASP MCP Top 10",
+      "source_count": 47,
+      "primary_grade": "S+A",
+      "covers": ["R-09", "R-13", "R-18"],
+      "report_path": "C:/Users/yhn/Desktop/调研/research-tool/research-output/mcp-server-approval-timeout-hitl-human-in-loop-dangerous-tool-30-day-allowlist-ux-best-practice-owasp-2026/report.md"
+    },
+    {
+      "slug": "mcp-marketplace-ui-client-comparison-cursor-cline-continue-vscode-claude-desktop-install-workflow-tool-approval",
+      "topic": "5 个主流 MCP 客户端的 UI / 市场 / 安装 / 审批对比",
+      "source_count": 60,
+      "primary_grade": "S+A",
+      "covers": ["R-07", "R-19"],
+      "report_path": "C:/Users/yhn/Desktop/调研/research-tool/research-output/mcp-marketplace-ui-client-comparison-cursor-cline-continue-vscode-claude-desktop-install-workflow-tool-approval/report.md"
+    },
+    {
+      "slug": "claude-code-cli-subprocess-crash-recovery-sigchld-respawn-websocket-reconnect-transcript-jsonl-corruption-2026",
+      "topic": "Claude Code CLI 子进程崩溃恢复 / SIGCHLD / WS 重连 / JSONL 损坏",
+      "source_count": 59,
+      "primary_grade": "S+A",
+      "covers": ["R-17"],
+      "report_path": "C:/Users/yhn/Desktop/调研/research-tool/research-output/claude-code-cli-subprocess-crash-recovery-sigchld-respawn-websocket-reconnect-transcript-jsonl-corruption-2026/report.md"
+    },
+    {
+      "slug": "mcp-server-postgresql-jsonb-manifest-storage-gin-index-full-text-search-performance-vs-sqlite-vector-embedding-2026",
+      "topic": "PG JSONB / SQLite / pgvector 性能对比与 manifest 存储选型",
+      "source_count": 43,
+      "primary_grade": "S+A",
+      "covers": ["R-12", "R-13"],
+      "report_path": "C:/Users/yhn/Desktop/调研/research-tool/research-output/mcp-server-postgresql-jsonb-manifest-storage-gin-index-full-text-search-performance-vs-sqlite-vector-embedding-2026/report.md"
+    },
+    {
+      "slug": "mcp-process-pool-capacity-limit-linux-ulimit-pid-max-subprocess-asyncio-resource-limits-python",
+      "topic": "MCP 进程池容量 / Linux ulimit / pid_max / asyncio 资源限制",
+      "source_count": 23,
+      "primary_grade": "S+A",
+      "covers": ["R-21"],
+      "report_path": "C:/Users/yhn/Desktop/调研/research-tool/research-output/mcp-process-pool-capacity-limit-linux-ulimit-pid-max-subprocess-asyncio-resource-limits-python/report.md"
+    },
+    {
+      "slug": "python-sandbox-network-egress-whitelist-docker-network-none-subprocess-firewall-2025",
+      "topic": "Python 沙箱网络出站白名单 / Docker --network=none / 防火墙",
+      "source_count": 51,
+      "primary_grade": "S+A",
+      "covers": ["R-10", "R-22"],
+      "report_path": "C:/Users/yhn/Desktop/调研/research-tool/research-output/python-sandbox-network-egress-whitelist-docker-network-none-subprocess-firewall-2025/report.md"
+    },
+    {
+      "slug": "opencode-cli-piagent-mcp-model-context-protocol-integration-2025",
+      "topic": "OpenCode / PiAgent CLI 与 MCP 集成（2025）",
+      "source_count": 71,
+      "primary_grade": "S+A+B",
+      "covers": ["R-04", "R-16"],
+      "report_path": "C:/Users/yhn/Desktop/调研/research-tool/research-output/opencode-cli-piagent-mcp-model-context-protocol-integration-2025/report.md"
+    },
+    {
+      "slug": "codex-cli-trae-cli-mcp-support-2025-release-status-model-context-protocol",
+      "topic": "Codex CLI / Trae CLI / Trae IDE 的 MCP 支持状态",
+      "source_count": 46,
+      "primary_grade": "S+A",
+      "covers": ["R-16"],
+      "report_path": "C:/Users/yhn/Desktop/调研/research-tool/research-output/codex-cli-trae-cli-mcp-support-2025-release-status-model-context-protocol/report.md"
+    }
+  ],
+  "grade_distribution": {
+    "S_level": "一手资料（官方 spec / 源码 / 白皮书）",
+    "A_level": "权威二手（顶级会议论文 / arXiv / 行业报告 / 权威技术博客）",
+    "B_level": "社区经验（GitHub Issue / Stack Overflow / 社区讨论）",
+    "C_level": "推测性来源（仅作线索，不作结论证据）"
+  },
+  "all_sources_are_s_or_a_grade": true,
+  "key_official_sources": [
+    "MCP 官方规范 https://modelcontextprotocol.io/specification/2025-06-18",
+    "MCP Python SDK https://github.com/modelcontextprotocol/python-sdk",
+    "MCP TypeScript SDK https://github.com/modelcontextprotocol/typescript-sdk",
+    "MCP 官方 Server 仓库 https://github.com/modelcontextprotocol/servers",
+    "Claude Code 官方文档 https://code.claude.com/docs/en/mcp",
+    "OWASP MCP Top 10 框架",
+    "Codex CLI https://github.com/openai/codex",
+    "Trae IDE 官方"
+  ],
+  "stale_sources_2y_older": [
+    "MCP 2024-11 规范（已在 2025-06-18 弃用，仅作历史对比）"
+  ],
+  "notes": "859 条来源聚合自 14 份主报告；独立来源（不同 domain / 报告）≥ 80。所有 P0/P1 假设结论均有 ≥ 2 个独立来源支撑（soul R6）。"
+}

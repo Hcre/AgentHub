@@ -15,6 +15,7 @@
 | **AP-03** | 所有接口默认需 JWT 认证（`Authorization: Bearer <token>`），公开接口显式标注 `@public` | FastAPI dependency 默认拦截 |
 | **AP-04** | 所有 API 输入必须经 Pydantic v2 model 校验（落 [CR-05](02-coding_代码编写规范.md)） | tsc/mypy + CR |
 | **AP-05** | API 版本号在 URL 路径 `/api/v1/...`；主版本号变 = 不兼容；同时维护 ≥ 2 个大版本 | URL lint + spec diff |
+| | ⚠️ **现状暂缓**（[ADR-0003](../../worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md)）：现存全部端点为 `/api/<resource>`（无 `/v1/`），MCP 新端点沿用 `/api/mcp/` 保持一致。AP-05 的全库版本化迁移另立 backlog，未在 MVP 期纠正。 | — |
 | **AP-06** | 向后兼容：不删 / 不重命名已有字段；新增字段必须为 optional | spec diff + CR |
 | **AP-07** | WS 消息必须包含 `type` + `payload`；服务端推送带 `request_id` 与原 HTTP 请求关联 | CR |
 | **PR-01** | API 接口先冻结再实现：endpoint 路径 + Request/Response Schema 在 spec 中冻结 → 2 人 Review → 才能开始实现 | 流程规则（见 [10-process-rules](10-process-rules_流程红线全集.md)） |

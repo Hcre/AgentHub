@@ -387,3 +387,87 @@ class AgentActivity(BaseModel):
 
 # 获取: GET /api/agents/{id}/activities?page=1
 ```
+
+---
+
+## §MCP 数据模型（2026-06-03 修订版）
+
+> 本节由 PR-09 同步 `docs/plan/后续升级计划/MCP接入/MD-MCP-V1.0-20260602.md` 而来。落地范围与字段定义以 `MD-MCP-V1.0-20260602.md` §1 为准。
+>
+> **⚠️ 二次对账修订（2026-06-03，schema↔代码，已经 Reviewer 确认）**：原表设计引用了真实代码里**不存在的表/类型**，按以下口径落地（完整审计见 [`README-REVISION.md` §9](../plan/后续升级计划/MCP接入/README-REVISION.md)）：
+> - **R1** `workspace_id`（installations / tool_call_logs）：现库无 `workspaces` 表（workspace=`sessions.workspace_path` 字符串）→ **裸 UUID、不加 FK**，**暂存 `session_id`** 作 workspace 维度 stand-in。
+> - **R2** `created_by` / `installed_by`：现库无 `users` 表 → **裸 UUID、不加 FK**，存 JWT `sub`（对齐既有 `NotificationModel.user_id` 裸 Uuid 先例）。
+> - 仅对**真实存在的表**加 FK：`agent_id`→`agents`、`mcp_id`→`mcp_servers`、`installation_id`→`workspace_mcp_installations`、`binding_id`→`agent_mcp_bindings`。
+> - **R4** `trace_id`（tool_call_logs）：现库**无既有 trace_id 设施**（零出现）→ **净新增**字段，P4 工具调用时生成（非"既有格式"）。
+> - **R10 类型（强制）**：测试走 SQLite `Base.metadata.create_all`（`conftest.py`），下表 ENUM/JSONB/CHAR/TEXT[]/BIGSERIAL/GIN 均为**逻辑表述**；**实际列用可移植类型**——ENUM→`String`、JSONB→`JSON`、`TEXT[]`(tags/tool_subset)→`JSON` 列表、CHAR(64)→`String(64)`、BIGSERIAL→`BigInteger().with_variant(Integer,"sqlite")`、GIN→普通索引。PG 专属类型 deferred（NB-02）。
+
+### §MCP.1 4 张表
+
+| 表 | 角色 | 关键字段（精简） |
+|----|------|------------------|
+| `mcp_servers` | MCP 元数据 | `mcp_id` PK · `name` UNIQUE · `slug` UNIQUE · `transport` ENUM · `config_json` JSONB · `args_hash` CHAR(64) · `version` ≤50 · `tags` TEXT[] · `status` ENUM · `dry_run_result` JSONB |
+| `workspace_mcp_installations` | workspace 维度安装 | `installation_id` PK · `workspace_id` FK · `mcp_id` FK · `installed_by` FK · `instance_name` · `status` ENUM · `args_hash` (E-01 按 workspace 维度) |
+| `agent_mcp_bindings` | Agent 绑定 | `binding_id` PK · `agent_id` FK · `installation_id` FK · `tool_subset` TEXT[] · `status` ENUM · `unbound_at` (软删) |
+| `mcp_tool_call_logs` | 工具调用日志（F-014 + F-017） | `log_id` BIGSERIAL PK · `trace_id` · `binding_id` FK · `mcp_id` FK · `tool_name` · `args_hash` · `result_code` · `duration_ms` · `created_at` |
+
+### §MCP.2 关键关系
+
+```
+workspaces (既有)
+    │ 1:N
+    ↓
+workspace_mcp_installations ──→ mcp_servers
+    │ 1:N                          │ 1:N
+    ↓                              ↓
+agent_mcp_bindings ────────→ mcp_tool_call_logs
+    │ N:1
+    ↓
+agents (既有)
+```
+
+### §MCP.3 索引（摘要）
+
+- `idx_mcp_servers_status_latest` (status, latest)
+- `idx_mcp_servers_args_hash` (args_hash) — 幂等去重
+- `idx_mcp_servers_tags` GIN (tags) — 搜索
+- `idx_workspace_mcp_installations_workspace` (workspace_id, status)
+- `uq_workspace_mcp_installations_workspace_mcp_name` UNIQUE (workspace_id, instance_name)
+- `idx_agent_mcp_bindings_agent` (agent_id, status)
+- `uq_agent_mcp_bindings_agent_installation` UNIQUE (agent_id, installation_id)
+- `idx_mcp_tool_call_logs_workspace_created` (workspace_id, created_at DESC)
+- `idx_mcp_tool_call_logs_trace` (trace_id)
+
+### §MCP.4 业务规则（集中于 `domain/mcp/rules.py`）
+
+| 规则 | 出处 | 字段 |
+|------|------|------|
+| name 全局唯一 | F-001 | mcp_servers.name |
+| args_hash = SHA256(sorted_json) | F-024 | mcp_servers / logs |
+| 批量安装 ≤ 50 / workspace | F-022 | installations |
+| version 字符串 ≤ 50 字符 | F-020 | mcp_servers |
+| 安装幂等 (workspace_id + mcp_id + args_hash) | F-004 | installations |
+| 绑定唯一性 (agent + installation) | F-009 | bindings |
+| 工具调用异步落盘 + 90 天查询 | F-017 | logs |
+| dry-run 30s + CPU=1 + Mem=512MB + net=隔离 | F-021 | `infrastructure/mcp/dry_run` |
+
+### §MCP.5 迁移（CR-03）
+
+续在现有 alembic 链（0001-0005 之后）：
+
+```
+src/backend/alembic/versions/
+├── 0001_initial.py ... 0005_*.py   # 既有
+├── 0006_mcp_servers.py            # ← 本期新增
+├── 0007_workspace_mcp_installations.py
+├── 0008_agent_mcp_bindings.py
+└── 0009_mcp_tool_call_logs.py
+```
+
+每张表一个 alembic revision，独立 review；沿用 `src/backend/alembic/env.py`（不引新 env）；所有变更 forward-only。
+
+### §MCP.6 单一权威
+
+- 数据模型权威：[`docs/plan/后续升级计划/MCP接入/MD-MCP-V1.0-20260602.md`](../plan/后续升级计划/MCP接入/06-详细设计/MD-MCP-V1.0-20260602.md) §1
+- 修订版单一入口：[`docs/plan/后续升级计划/MCP接入/README-REVISION.md`](../plan/后续升级计划/MCP接入/README-REVISION.md)
+- 详细字段/约束/索引/枚举值以上述权威文件为准
+

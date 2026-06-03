@@ -1,0 +1,84 @@
+"""McpInstallService（L3）：workspace 维度安装用例（F-004/F-005）。
+
+幂等键 (workspace_id + mcp_id + args_hash)。P1 骨架：安装记录即置 ready
+（无真实进程拉起）；真实安装/健康检查留 P2+。R1：workspace_id 传 session_id。
+"""
+
+from __future__ import annotations
+
+from uuid import UUID
+
+from app.core.exceptions import DomainError, NotFoundError
+from app.domain.mcp.installer import McpInstaller
+from app.domain.mcp.mcp_installation import WorkspaceMcpInstallation
+from app.domain.mcp.rules import compute_args_hash
+from app.domain.repositories import McpInstallationRepository, McpServerRepository
+
+
+class McpInstallService:
+    def __init__(
+        self,
+        server_repo: McpServerRepository,
+        installation_repo: McpInstallationRepository,
+        installer: McpInstaller,
+    ) -> None:
+        self._server_repo = server_repo
+        self._install_repo = installation_repo
+        self._installer = installer
+
+    async def install(
+        self,
+        *,
+        workspace_id: UUID,
+        mcp_id: UUID,
+        instance_name: str,
+        config_overrides: dict | None = None,
+        installed_by: UUID | None = None,
+    ) -> WorkspaceMcpInstallation:
+        server = await self._server_repo.get_by_id(mcp_id)
+        if server is None:
+            raise NotFoundError(f"MCP 不存在: {mcp_id}")
+
+        overrides = config_overrides or {}
+        args_hash = compute_args_hash(overrides)
+
+        # 幂等：同 workspace + mcp + args_hash → 返回既有安装（F-004 ③）
+        existing = await self._install_repo.find_idempotent(
+            workspace_id=workspace_id, mcp_id=mcp_id, args_hash=args_hash
+        )
+        if existing is not None:
+            return existing
+
+        # 同 workspace 内 instance_name 唯一（uq 约束前置校验 → 409）
+        if await self._install_repo.exists_instance_name(
+            workspace_id=workspace_id, instance_name=instance_name
+        ):
+            raise DomainError(f"E_MCP_NAME_CONFLICT: instance_name 已存在: {instance_name}")
+
+        # 安装探针：结构校验（失败 → ValidationError → 422）。merged = server 配置叠加用户覆盖。
+        # 真实可达性/进程拉起为 P2/P3 扩展点（见 LocalMcpInstaller）。
+        merged_config = {**server.config_json, **overrides}
+        await self._installer.probe(transport=str(server.transport), merged_config=merged_config)
+
+        installation = WorkspaceMcpInstallation(
+            workspace_id=workspace_id,
+            mcp_id=mcp_id,
+            instance_name=instance_name,
+            installed_by=installed_by,
+            config_overrides=overrides,
+            args_hash=args_hash,
+        )
+        installation.mark_ready()
+        await self._install_repo.save(installation)
+        return installation
+
+    async def uninstall(self, *, installation_id: UUID, workspace_id: UUID) -> None:
+        """卸载。404 不存在/跨 workspace；409 仍有 active 绑定（需先解绑，F-011）。"""
+        installation = await self._install_repo.get_by_id(installation_id)
+        if installation is None or installation.workspace_id != workspace_id:
+            raise NotFoundError(f"MCP 安装不存在: {installation_id}")
+        if await self._install_repo.has_active_bindings(installation_id):
+            raise DomainError(
+                f"E_MCP_INSTALL_IN_USE: 仍有 active 绑定，需先解绑: {installation_id}"
+            )
+        await self._install_repo.delete(installation_id)
