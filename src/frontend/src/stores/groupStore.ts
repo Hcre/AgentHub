@@ -61,6 +61,8 @@ interface GroupState {
   ws: WebSocket | null
   /** WS 是否已建立连接。 */
   connected: boolean
+  /** WS 未 OPEN 时入队的 JSON payload，按 groupId 隔离；onopen 后 flushPending 回放。 */
+  pendingByGroup: Record<string, string[]>
 
   // CRUD
   fetchGroups: () => Promise<void>
@@ -74,6 +76,8 @@ interface GroupState {
   applyGroupStreamEvent: (groupId: string, event: StreamEvent) => void
   setWs: (ws: WebSocket | null) => void
   setConnected: (v: boolean) => void
+  /** WS 刚 OPEN 时调用，把某个 group 的待发队列冲到当前 ws。 */
+  flushPending: (groupId: string) => void
 
   // 发送
   sendGroup: (groupId: string, text: string, opts?: SendGroupOptions) => void
@@ -85,6 +89,7 @@ export const useGroupStore = create<GroupState>((set, get) => ({
   sessionIdsByGroup: {},
   ws: null,
   connected: false,
+  pendingByGroup: {},
 
   fetchGroups: async () => {
     try {
@@ -223,6 +228,23 @@ export const useGroupStore = create<GroupState>((set, get) => ({
   setWs: (ws) => set({ ws }),
   setConnected: (v) => set({ connected: v }),
 
+  flushPending: (groupId) => {
+    const ws = get().ws
+    if (!ws || ws.readyState !== WebSocket.OPEN) return
+    const queue = get().pendingByGroup[groupId] ?? []
+    if (queue.length === 0) return
+    for (const payload of queue) {
+      try {
+        ws.send(payload)
+      } catch {
+        // 单条发送失败：忽略，避免阻塞后续；用户可手动重发
+      }
+    }
+    set((s) => ({
+      pendingByGroup: { ...s.pendingByGroup, [groupId]: [] },
+    }))
+  },
+
   sendGroup: (groupId, text, opts) => {
     const mentions = parseMentions(text)
     const userMsg: GroupMessage = {
@@ -241,17 +263,23 @@ export const useGroupStore = create<GroupState>((set, get) => ({
       },
     }))
 
+    const payload = JSON.stringify({
+      type: 'message',
+      content: text,
+      mentions,
+      dispatch_mode: 'auto',
+    })
     const ws = get().ws
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(
-        JSON.stringify({
-          type: 'message',
-          content: text,
-          mentions,
-          dispatch_mode: 'auto',
-        }),
-      )
+      ws.send(payload)
+      return
     }
-    // WS 未连接 → 仅本地回显，等待用户重试或后端恢复
+    // WS 还在 CONNECTING / 切群瞬间 ws=null → 入队，等待 onopen flushPending
+    set((s) => ({
+      pendingByGroup: {
+        ...s.pendingByGroup,
+        [groupId]: [...(s.pendingByGroup[groupId] ?? []), payload],
+      },
+    }))
   },
 }))

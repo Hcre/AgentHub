@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAgentStore } from '../../stores/agentStore'
 import { useUIStore } from '../../stores/uiStore'
+import { MemoryPanel } from '../memory/MemoryPanel'
 import { Avatar, Badge, Button, Icon, Tabs, TabsList, TabsTrigger } from '../ui'
 
 const TABS = [
@@ -107,18 +108,8 @@ export function AgentDetailPage() {
         )}
 
         {tab === 'memory' && (
-          <div className="mx-auto max-w-2xl space-y-2">
-            {profile.memoryByLevel.map((m) => (
-              <div
-                key={m.level}
-                className="flex items-center gap-3 rounded-lg border bg-card px-4 py-2.5"
-              >
-                <Badge variant="outline">{m.level}</Badge>
-                <span className="text-[13px] font-medium">{m.name}</span>
-                <span className="flex-1 truncate text-[12px] text-muted-foreground">{m.hint}</span>
-                <span className="font-mono text-[12px] text-muted-foreground">{m.count} 条</span>
-              </div>
-            ))}
+          <div className="-m-5 h-[calc(100%+2.5rem)]">
+            <MemoryPanel agentId={agent.id} agentName={agent.name} />
           </div>
         )}
 

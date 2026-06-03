@@ -18,11 +18,13 @@ session_key 规则（V0/V1 一致）：
 
 from __future__ import annotations
 
+import atexit
 import asyncio
 import json
 import logging
 import os
 import re
+import tempfile
 import uuid
 from collections.abc import AsyncIterator
 from functools import partial
@@ -114,17 +116,23 @@ class ClaudeCodeRuntime(AgentRuntime):
                 yield evt
             return
 
-        # V0 短驻：先 resume，找不到 session fallback 新建
-        # V0 历史行为：delta 与 persona 拼在 system_prompt 里 → 拼回保持 bit-for-bit 兼容
+        # V0 短驻：根据 DB 查询结果决定 --resume 还是 --session-id
+        # has_history=True → DB 有 assistant 消息 → CLI 磁盘必有记录 → --resume
+        # has_history=False → 首次对话 → --session-id 直接新建，省掉空跑
         request = self._merge_delta_into_system_prompt_v0(request)
         prompt = self._extract_prompt(request)
         session_key = self._compute_session_key(request)
-        async for event in self._run_cli(prompt, request, session_key, resume=True):
-            if "No conversation found" in (event.content or "") or (
-                event.type == StreamEventType.DONE
-                and "No conversation found" in str(event.metadata)
+        resume = request.has_history
+        logger.info("Session %s has_history=%s → %s", session_key, resume, "resume" if resume else "new")
+        async for event in self._run_cli(prompt, request, session_key, resume=resume):
+            if resume and (
+                "No conversation found" in (event.content or "") or (
+                    event.type == StreamEventType.DONE
+                    and "No conversation found" in str(event.metadata)
+                )
             ):
-                logger.info("Session %s 不存在，新建 CLI 会话", session_key)
+                # 极端情况：CLI 磁盘数据丢失（清缓存/迁移环境），fallback 新建
+                logger.warning("Session %s resume 失败（磁盘数据丢失），fallback 新建", session_key)
                 async for fallback_event in self._run_cli(
                     prompt, request, session_key, resume=False
                 ):
@@ -386,6 +394,14 @@ class ClaudeCodeRuntime(AgentRuntime):
             cmd.extend(["--session-id", session_key])
         if request.system_prompt:
             cmd.extend(["--system-prompt", request.system_prompt])
+        # MCP 记忆工具：settings.mcp_memory_url 非空时注入
+        # ⚠️ --mcp-config flag 需在实际 CLI 版本中验证（claude --help | grep mcp）
+        if settings.mcp_memory_url and request.agent_id:
+            mcp_path = _write_mcp_config(
+                str(request.agent_id), settings.mcp_memory_url
+            )
+            if mcp_path:
+                cmd.extend(["--mcp-config", mcp_path])
         return cmd
 
     def _build_env(self) -> dict[str, str]:
@@ -568,3 +584,33 @@ class ClaudeCodeRuntime(AgentRuntime):
             )
 
         return events
+
+
+def _write_mcp_config(agent_id: str, mcp_url: str) -> str | None:
+    """写临时 MCP 配置文件，返回路径。atexit 注册删除，崩溃时也清理。"""
+    # agent_id 通过 query param 传给服务端 ASGI wrapper；
+    # env 字段对 SSE 类型的 MCP 服务端无效（仅对 subprocess 类型有效）。
+    config = {
+        "mcpServers": {
+            "agenthub-memory": {
+                "type": "sse",
+                "url": f"{mcp_url}?agent_id={agent_id}",
+            }
+        }
+    }
+    try:
+        f = tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".json",
+            prefix="agenthub_mcp_",
+            delete=False,
+            dir=tempfile.gettempdir(),
+        )
+        json.dump(config, f)
+        f.close()
+        atexit.register(lambda p: os.unlink(p) if os.path.exists(p) else None, f.name)
+        return f.name
+    except Exception as exc:
+        logger.warning("写 MCP 配置失败，跳过 MCP 注入: %s", exc)
+        return None
+

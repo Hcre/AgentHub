@@ -40,6 +40,8 @@ class AgentRequest(BaseModel):
     # 把动态 delta 放到 user message 里逐轮注入。V0 路径会拼回 sp 保持兼容。
     # 见 ADR-02 + ContextBuilder._build_group。
     group_delta_text: str | None = None
+    # DB 查询结果：session 是否已有 assistant 消息（决定 CLI --resume vs --session-id）
+    has_history: bool = False
 
 
 class StreamEventType(StrEnum):

@@ -10,11 +10,13 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api.mcp_memory import get_mcp_asgi
 from app.api.routers import (
     agents,
     groups,
     inbox,
     mcp,
+    memories,
     providers,
     proxy,
     sessions,
@@ -104,12 +106,16 @@ app.include_router(providers.router)
 app.include_router(agents.router)
 app.include_router(sessions.router)
 app.include_router(groups.router)
+app.include_router(memories.router)
 app.include_router(tasks.router)
 app.include_router(skills.router)
 app.include_router(FS_ROUTER)
 app.include_router(inbox.router)
 app.include_router(mcp.router)
 app.include_router(ws_router)
+_mcp_asgi = get_mcp_asgi()
+if _mcp_asgi is not None:
+    app.mount("/api/mcp", _mcp_asgi)
 
 
 @app.get("/health", tags=["health"])

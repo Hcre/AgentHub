@@ -47,7 +47,10 @@ export function MessageBubble({
                       {children}
                     </code>
                   ) : (
-                    <code className={className} {...props}>
+                    <code
+                      className="rounded bg-muted/50 px-1 py-0.5 font-mono text-[12px] text-foreground"
+                      {...props}
+                    >
                       {children}
                     </code>
                   )

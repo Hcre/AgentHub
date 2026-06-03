@@ -6,6 +6,7 @@ from app.domain.repositories.mcp_repository import (
     McpInstallationRepository,
     McpServerRepository,
 )
+from app.domain.repositories.memory_repository import MemoryRepository
 from app.domain.repositories.message_repository import MessageRepository
 from app.domain.repositories.session_repository import SessionRepository
 from app.domain.repositories.task_repository import TaskRepository
@@ -15,6 +16,7 @@ __all__ = [
     "GroupRepository",
     "McpInstallationRepository",
     "McpServerRepository",
+    "MemoryRepository",
     "MessageRepository",
     "SessionRepository",
     "TaskRepository",

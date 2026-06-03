@@ -6,6 +6,7 @@ from app.infrastructure.repositories.mcp_repository import (
     PostgresMcpInstallationRepository,
     PostgresMcpServerRepository,
 )
+from app.infrastructure.repositories.memory_repository import PostgresMemoryRepository
 from app.infrastructure.repositories.message_repository import (
     PostgresMessageRepository,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "PostgresGroupRepository",
     "PostgresMcpInstallationRepository",
     "PostgresMcpServerRepository",
+    "PostgresMemoryRepository",
     "PostgresMessageRepository",
     "PostgresSessionRepository",
 ]
