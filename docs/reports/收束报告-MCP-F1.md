@@ -84,14 +84,14 @@ MCP 19 用例每例独立 `db_session`（内存 SQLite），与 redis/watermark 
 
 **AI 审计结论：无 🔴 红线违规。** 2 项 🟡 为既有 defer（AP-02/AP-05），已立 ADR/backlog，非本批次新违规。
 
-### 3.2 人审计线（待袁复核签核）
+### 3.2 人审计线（袁签核 ✅ 2026-06-03）
 
-- [ ] AI 标记项复核：AP-02/AP-05 defer 是否接受（已有 ADR-03 + ADR-04 记录）
-- [ ] 业务逻辑：安装幂等键 `(workspace_id+mcp_id+args_hash)` + instance_name 唯一是否符合产品预期
-- [ ] 设计意图：`workspace_id=session_id` stand-in 是否为合理过渡（vs 偏离 E-01「workspace 维度」）
-- [ ] 主观质量：`McpInstaller` 端口 / 安装=校验（非进程拉起）的语义是否清晰可接手
+- [x] AI 标记项复核：AP-02/AP-05 defer **接受**（ADR-03 + ADR-04 记录）
+- [x] 业务逻辑：安装幂等键 `(workspace_id+mcp_id+args_hash)` + instance_name 唯一 **符合预期**
+- [x] 设计意图：`workspace_id=session_id` stand-in **认可为合理过渡**（前向兼容真实 workspaces）
+- [x] 主观质量：`McpInstaller` 端口 / 安装=校验语义 **清晰可接手**
 
-> 单人项目按「换时间换视角」自审：建议袁次日以「不认识这代码能否 2 小时看懂」复核 domain/mcp + install_service。
+> **袁签核结论：通过。** 收束-1（F1）AI 线 + 人线双线通过，**闭合**。
 
 ---
 
@@ -131,9 +131,10 @@ F1 让「workspace 浏览 MCP 市场 → 安装到工作区」闭环在后端可
 | 审计 | ✅ AI 线无红线；人线待袁签核 |
 | 验证 | ✅ §2.6 契约回演通过，方向未偏 |
 
-**收束-1（F1）：AI 线通过，待人线（袁）签核闭合。** 闭合后可进 P2（F2 Agent 绑定 + `attach_mcp`）。
+**收束-1（F1）：AI 线 + 人线双线通过，✅ 闭合（2026-06-03）。** 进入 P2（F2 Agent 绑定 + `attach_mcp`）。
 
-### 待办（关闭收束前）
-- [ ] 袁完成人审签核（§3.2）
-- [ ] 决定是否打 Git tag（如 `mcp-f1`）——tag 为共享 ref，需袁确认后再 push
-- [ ] 本报告 + ADR-04 提交（docs(mcp) commit）
+### 关闭动作（已完成）
+- [x] 袁完成人审签核（§3.2，通过）
+- [x] Git tag `mcp-f1` 打于闭合提交
+- [x] F1 + 收束并入 `main`（袁授予直接合并权）
+- [x] 本报告 + ADR-04 已提交
