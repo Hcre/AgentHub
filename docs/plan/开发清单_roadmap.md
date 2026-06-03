@@ -202,6 +202,33 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 >
 > **P0 计划整理 + PR-01 草案（2026-06-03 完成）**：核验修订版属实 + 校正 §3 路径漂移 + PR-01 端点冻结草案落 04-commands §2.6/§三 + 原计划残留归档（445+22+3 文件）+ ADR-0003。**P1 启动前置门：04-commands §2.6 经 2 人 Review Approve（PR-01/PR-06）→ 确认 PR-09 spec 同步 → 才能写 alembic 0006。**
 
+---
+
+### ▶ 接手指引（给下一个 AI 会话 / 代码开发起点）
+
+> 计划已整理完毕（2026-06-03，docs-only，commit `2025d42`，分支 `feature/mcp/pr01-freeze-and-plan-cleanup`，**未 push**）。下一会话做**代码开发**，从这里开始。
+
+**第 0 步——过 PR-01 闸门（写代码前的红线，不可跳）**
+- `docs/specs/04-commands_命令接口.md` §2.6（8 端点）+ §三（4 WS 事件）目前是 🔒 **冻结草案**，**需 2 人 Review Approve** 才算冻结（PR-01/PR-06）。未过闸禁止写后端实现。
+
+**落地权威三件套（照这三处写，次级文档正文有旧路径已加 ERRATA 横幅，勿照抄）**
+1. 文件结构 → `docs/plan/后续升级计划/MCP接入/06-详细设计/FS-MCP-V1.0-20260602.md` §1（真实落点树）
+2. 接口契约 → `docs/specs/04-commands_命令接口.md` §2.6 + §三
+3. 架构 / 数据 → `docs/specs/01-architecture_架构定义.md` §MCP + `docs/specs/03-data-model_数据模型.md` §MCP
+
+**关键落地约定（已校正为真实代码树）**
+- URL 前缀 `/api/mcp/`（**无 `/v1/`**，对齐现有 `/api/agents`，依据 [ADR-0003](../../worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md)）
+- 路由文件 `api/routers/mcp.py`，`APIRouter(prefix="/api/mcp")`；WS `api/ws/toolcall.py`
+- 4 张表**追加进单文件** `infrastructure/db/models.py`（不新建 `models/` 包）+ alembic `0006`（续 0001-0005）
+- 领域子包 `domain/mcp/{mcp_server,mcp_installation,mcp_binding,rules}.py`
+- 编排服务**扁平** `application/services/mcp_{market,install,binding,create}_service.py`（不建 `application/mcp/` 子包）
+- `attach_mcp(...)` 抽象方法加在 `domain/llm/protocol.py::AgentRuntime`，由 `infrastructure/llm/{claude_code,opencode,pi_agent}_runtime.py` 实现（AR-02：只扩展 Adapter，不另起运行时）
+- dry-run 简化版 → `infrastructure/mcp/dry_run.py`（单 Docker + compose 限额，非多 OS 沙箱）
+
+**P1 第一步动作**（闸门过后）：PR-09 确认 spec 同步 → 写 alembic 0006 + `infrastructure/db/models.py` 追加 4 表 → 3 端点（list/detail/install）。
+
+---
+
 | 阶段 | 日期 | 范围 | 工时 | 收束 | 状态 |
 |------|------|------|------|------|------|
 | P0 整理+PR-01草案 | 6/3 | 路径校正 + 端点冻结草案 + 归档 + ADR-0003 | — | — | ✅ 完成（§2.6 待 Review） |
