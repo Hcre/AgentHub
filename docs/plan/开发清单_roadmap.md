@@ -175,3 +175,37 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 |------|------|------|
 | 2026-05-XX | 初版 M1-M6 路线图 | PRD v4 |
 | 2026-06-01 | §八 新增 MVP 收尾冲刺（基于 `docs/plan/后续升级计划/后续计划.txt` v1.0）| 后续计划补充稿 |
+| 2026-06-02 | §十 新增 **MCP 功能 v1**（P1→P3→P2→P4，4 阶段 13 天 + 严格收束）| `docs/plan/MCP功能PRD.md` v1.0 + `MCP功能计划_v0.md` v0.2 |
+
+---
+
+## 十、MCP 功能 v1（6/2-6/15，4 阶段 13 天）
+
+> **单一权威入口**：[`docs/plan/后续升级计划/MCP接入/README-REVISION.md`](后续升级计划/MCP接入/README-REVISION.md)（**2026-06-03 修订版**，按可行性清单 12 项问题重写）
+>
+> 详情（已合并去重）：`README-REVISION.md` §0-3 速览 + 6 份关键文档（FS/SA/TA/MD/IC/MCP-UI-frontend）+ 08/closure-verdict 双口径
+> 范围: F1 MCP 市场 / F2 Agent 接入 / F3 创建 MCP / F5 工具调用展示（全量 + 工具展示）
+> 顺序: P1(6/2-6/5) → P3(6/6-6/8) → P2(6/9-6/11) → P4(6/12-6/15)
+> 收束: 严格 4 阶段硬闸门（整理/测试/审计/验证）+ ADR + 收束报告
+> 数据: 4 张表 = 3 实体（`mcp_servers` / `workspace_mcp_installations` / `agent_mcp_bindings`）+ 1 日志表（`mcp_tool_call_logs`）
+> API: 8 个 HTTP 端点 + 2 个 WS 事件 →（🔒 PR-01 冻结草案已落 `docs/specs/04-commands_命令接口.md` §2.6 + §三，**待 2 人 Review**；URL 前缀 `/api/mcp/`，AP-05 暂缓见 [ADR-0003](../../worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md)）
+> 前端: 3 个新页（`/mcp-market` 列表/详情 + `/mcp-create`）+ 1 个 Tab（Agent「MCP 接入」）+ 1 store + 6 组件
+> 工时: 159h 总（52 + 34 + 40 + 33）
+>
+> **修订版 4 项决策**（V1.3.1 errata）：
+> 1. 单一权威 = 修订版 `MCP接入/`（合并 §十 工程口径）
+> 2. 安装表名 = `workspace_mcp_installations`（E-01）
+> 3. dry-run = 单 Docker + compose 资源限额（E-03 简化版）
+> 4. SDK Adapter（F-013）= 移下期，CLI Adapter 预留 `attach_mcp(...)` 扩展点
+>
+> **代码空间状态**（2026-06-03 扫描）：后端 0/15 + 前端 0/11 落地；4 阶段实施后翻转。
+>
+> **P0 计划整理 + PR-01 草案（2026-06-03 完成）**：核验修订版属实 + 校正 §3 路径漂移 + PR-01 端点冻结草案落 04-commands §2.6/§三 + 原计划残留归档（445+22+3 文件）+ ADR-0003。**P1 启动前置门：04-commands §2.6 经 2 人 Review Approve（PR-01/PR-06）→ 确认 PR-09 spec 同步 → 才能写 alembic 0006。**
+
+| 阶段 | 日期 | 范围 | 工时 | 收束 | 状态 |
+|------|------|------|------|------|------|
+| P0 整理+PR-01草案 | 6/3 | 路径校正 + 端点冻结草案 + 归档 + ADR-0003 | — | — | ✅ 完成（§2.6 待 Review） |
+| P1 F1 市场 | 6/2-6/5 | 浏览/搜索/详情/安装 + 进程管理骨架 | 52h | 收束 1 + ADR 0004 | ⬜ 待办（阻塞于 §2.6 Review） |
+| P3 F3 创建 | 6/6-6/8 | stdio/sse 提交 + 模板 + dry-run 验证 | 34h | 收束 3 + ADR 0005 | ⬜ 待办 |
+| P2 F2 接入 | 6/9-6/11 | Agent 绑定 + CLI Adapter 动态挂载 | 40h | 收束 2 + ADR 0006 | ⬜ 待办 |
+| P4 F5 展示 | 6/12-6/15 | 工具调用内联卡片 + WebSocket 事件 | 33h | 收束 4 + ADR 0007 | ⬜ 待办 |

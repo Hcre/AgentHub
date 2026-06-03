@@ -34,6 +34,7 @@ AgentHub/
 │   ├── research/                     #   调研
 │   ├── explore/                      #   技术探索 + EVOLUTION 演进日志
 │   └── archive/                      #   历史快照（DEPRECATED_ 前缀）
+│   ├── plan/后续升级计划/MCP接入/    #   MCP 接入修订版（单一权威入口 README-REVISION.md）
 ├── worklogs/                         # 【工作日志】按人分子目录 + decisions/ ADR
 │   ├── {董,黎,袁}/
 │   └── decisions/

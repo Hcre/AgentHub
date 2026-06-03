@@ -198,6 +198,88 @@ POST   /api/approvals/{task_id}/respond  # { "payload": {"response": "更多信�
 GET    /api/inbox/calendar         ?from=2026-05-01&to=2026-06-30
 ```
 
+### 2.6 MCP API 〔🔒 PR-01 冻结草案 · 2026-06-03 · 待 2 人 Review〕
+
+> 单一权威需求：`docs/plan/后续升级计划/MCP接入/README-REVISION.md`；契约来源：`06-详细设计/IC-MCP-V1.0-20260602.md`。
+> **冻结时校正的口径漂移**（与全库现状对齐）：
+> ① URL 前缀 `/api/v1/mcp/...` → **`/api/mcp/...`**（全库无 `/v1/` 段，对齐 `/api/agents`）。
+> ② WS 事件 `{"event":...}` 扁平格式 → **`{"type":"...","payload":{...}}`** 信封（对齐 `message:stream`），并按 AP-07 带 `request_id`。
+> ③ 错误格式统一 `{ "error": { "code": "E_MCP_*", "message": "..." } }`（AP-02）。
+
+```
+# —— 市场类（3）——
+GET    /api/mcp/market
+  query: workspace_id(必填) & q? & tag? & transport?(stdio|sse|streamable_http)
+         & official_only?(bool) & page=1 & page_size=20(max 100)
+  returns: { "items":[{ "mcp_id","name","slug","description","transport",
+                        "version","tags":[],"official":bool,"install_count":int }],
+             "total":int, "page":int, "page_size":int }
+  errors: 401 E_MCP_UNAUTHORIZED / 403 E_MCP_PERMISSION_DENIED / 422
+
+GET    /api/mcp/market/{mcp_id}
+  returns: { "mcp_id","name","slug","description","transport","config_schema":{},
+             "version","tags":[],"created_by","created_at","updated_at","dry_run_result":{}|null }
+  errors: 401 / 404 E_MCP_NOT_FOUND
+
+GET    /api/mcp/market/templates
+  query: workspace_id(必填)
+  returns: { "templates":[{ "template_id","name","mcp_config":{}, ... }] }   # 本期官方 5 模板
+  errors: 401 / 403
+
+# —— 安装类（2）——
+POST   /api/mcp/installations
+  body: { "workspace_id","mcp_id","instance_name", "config_overrides":{} }
+  returns 201: { "installation_id","status":"installing"|"ready","mcp_id",
+                 "instance_name","created_at" }
+  幂等: 同 workspace_id+mcp_id+args_hash 重复调用 → 返回同一 installation_id（F-004 验收③）
+  errors: 400 / 401 / 403 / 404 / 409 E_MCP_NAME_CONFLICT / 422 / 500 E_MCP_INSTALL_TIMEOUT
+          | E_MCP_INSTALL_DEPENDENCY_MISSING | E_MCP_INSTALL_PERMISSION_DENIED(403)
+
+DELETE /api/mcp/installations/{installation_id}
+  query: workspace_id(必填, 鉴权)
+  returns 204
+  errors: 401 / 403 / 404 E_MCP_NOT_FOUND / 409（仍有 active binding，需先解绑） / 500
+
+# —— 绑定类（2）——
+POST   /api/mcp/bindings
+  body: { "agent_id","installation_id", "tool_subset":["read_file",...]? }   # 省略=全选
+  returns 201: { "binding_id","agent_id","installation_id","tool_subset":[],
+                 "status":"active","created_at" }
+  副作用: 调用 AgentRuntime.attach_mcp(bindings)（F-012），把 MCP config 注入 Agent Runtime 进程
+  errors: 400 / 401 / 403 / 404 / 409 E_MCP_BINDING_CONFLICT / 500
+
+DELETE /api/mcp/bindings/{binding_id}
+  returns 204
+  副作用: 经既有 WS 通道更新路由表（≤5s，F-011）
+  errors: 401 / 403 / 404 E_MCP_NOT_FOUND / 500
+
+# —— 创建类（1）——
+POST   /api/mcp/servers
+  body: { "name","slug"(^[a-z0-9-]+$),"description"?,"transport"(stdio|sse|streamable_http),
+          "config_json":{},"version"(≤50),"tags":[]?, "template_id"?:uuid|null, "dry_run":true }
+  returns 201: { "mcp_id","status":"draft","dry_run_result":{} }
+  干跑(dry_run=true): 单 Docker 容器 + compose 限额（30s 超时·CPU=1·Mem=512MB·net=none）
+  errors: 400 / 401 / 403 / 409 E_MCP_SLUG_CONFLICT
+          / 422 E_MCP_SCHEMA_INVALID | E_MCP_VERSION_TOO_LONG | E_MCP_DRY_RUN_TIMEOUT | E_MCP_DRY_RUN_FAILED / 500
+```
+
+**错误码清单（AP-02/03，`E_` 前缀，对齐 chat 端点风格）**
+
+| code | 含义 | HTTP |
+|------|------|------|
+| `E_MCP_NOT_FOUND` | mcp_id/installation_id/binding_id 不存在 | 404 |
+| `E_MCP_NAME_CONFLICT` | 同 workspace instance_name 冲突 | 409 |
+| `E_MCP_SLUG_CONFLICT` | 创建 slug 冲突 | 409 |
+| `E_MCP_BINDING_CONFLICT` | 重复绑定 | 409 |
+| `E_MCP_INSTALL_TIMEOUT` / `_DEPENDENCY_MISSING` | 安装超时 / 依赖缺失 | 500 |
+| `E_MCP_INSTALL_PERMISSION_DENIED` / `E_MCP_PERMISSION_DENIED` | 权限不足 | 403 |
+| `E_MCP_DRY_RUN_TIMEOUT` / `_FAILED` / `E_MCP_SCHEMA_INVALID` / `E_MCP_VERSION_TOO_LONG` / `E_MCP_BATCH_TOO_LARGE` | 干跑/校验类 | 422 |
+| `E_MCP_TOOL_CALL_TIMEOUT` / `_CANCELLED` / `_RUNTIME_ERROR` | 工具调用类 | 500 |
+| `E_MCP_UNAUTHORIZED` | 未登录/JWT 失效 | 401 |
+| `E_MCP_INTERNAL` | 内部错误 | 500 |
+
+> Pydantic schemas 落 `schemas/mcp.py`（字段见 IC-MCP §3）。鉴权 JWT（AP-04）+ workspace 成员校验（所有写操作）。
+
 ---
 
 ## 三、WebSocket 协议
@@ -238,6 +320,14 @@ GET    /api/inbox/calendar         ?from=2026-05-01&to=2026-06-30
 
 // Token 消耗
 {"type":"token:update", "payload":{"session_tokens":15000, "daily_tokens":250000, "daily_budget":1000000}}
+
+// 〔🔒 PR-01 冻结草案〕MCP 工具调用（F-014，复用既有会话 WS；信封对齐 + request_id 按 AP-07）
+{"type":"tool_call:request",  "payload":{"request_id":"uuid","trace_id":"trace-abc","agent_id":"uuid","binding_id":"uuid","tool_name":"read_file","args":{"path":"/data/x.txt"},"ts":"2026-06-03T12:34:56.789Z"}}
+{"type":"tool_call:progress", "payload":{"request_id":"uuid","trace_id":"trace-abc","binding_id":"uuid","tool_name":"read_file","progress":60,"message":"...","duration_ms":120}}
+{"type":"tool_call:response", "payload":{"request_id":"uuid","trace_id":"trace-abc","binding_id":"uuid","tool_name":"read_file","result":{}, "duration_ms":340}}
+{"type":"tool_call:error",    "payload":{"request_id":"uuid","trace_id":"trace-abc","binding_id":"uuid","tool_name":"read_file","error_code":"TIMEOUT|PERMISSION_DENIED|RUNTIME_ERROR","error_message":"...","duration_ms":30000}}
+// 取消（F-016，客户端→服务端）：{"type":"tool_call:cancel","payload":{"request_id":"uuid"}} → 后端转 Runtime（≤2s）
+// 后端动作：tool_call:request 落 mcp_tool_call_logs(status=pending) 并广播 IM；response/error 更新日志
 ```
 
 ---

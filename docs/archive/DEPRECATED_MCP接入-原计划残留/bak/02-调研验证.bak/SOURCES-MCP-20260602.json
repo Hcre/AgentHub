@@ -1,0 +1,620 @@
+{
+  "project": "AgentHub-MCP",
+  "version": "V1.0",
+  "date": "2026-06-02",
+  "total_sources": 50,
+  "grade_distribution": {
+    "S": 10,
+    "A": 12,
+    "B": 25,
+    "C": 3
+  },
+  "freshness": {
+    "2025-2026": 42,
+    "older": 8
+  },
+  "research_runs": 10,
+  "sources": [
+    {
+      "id": "S-01",
+      "title": "MCP 2025-06-18 Transports Specification",
+      "url": "https://modelcontextprotocol.io/specification/2025-06-18/basic/transports",
+      "grade": "S",
+      "year": 2025,
+      "type": "official_spec",
+      "covers": ["R-001", "R-009", "R-012", "R-019"]
+    },
+    {
+      "id": "S-02",
+      "title": "MCP 2025-06-18 Changelog",
+      "url": "https://modelcontextprotocol.io/specification/2025-11-25/changelog",
+      "grade": "S",
+      "year": 2025,
+      "type": "official_spec",
+      "covers": ["R-001", "R-019"]
+    },
+    {
+      "id": "S-03",
+      "title": "Anthropic API Tools Documentation",
+      "url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
+      "grade": "S",
+      "year": 2025,
+      "type": "official_docs",
+      "covers": ["R-011"]
+    },
+    {
+      "id": "S-04",
+      "title": "OpenAI API Function Calling Documentation",
+      "url": "https://platform.openai.com/docs/guides/function-calling",
+      "grade": "S",
+      "year": 2025,
+      "type": "official_docs",
+      "covers": ["R-011"]
+    },
+    {
+      "id": "S-05",
+      "title": "Microsoft Learn Job Objects",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects",
+      "grade": "S",
+      "year": 2025,
+      "type": "official_docs",
+      "covers": ["R-003"]
+    },
+    {
+      "id": "S-06",
+      "title": "Python 3.14 resource module",
+      "url": "https://docs.python.org/3/library/resource.html",
+      "grade": "S",
+      "year": 2025,
+      "type": "official_docs",
+      "covers": ["R-003", "R-014"]
+    },
+    {
+      "id": "S-07",
+      "title": "OWASP SSRF Prevention Cheat Sheet",
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html",
+      "grade": "S",
+      "year": 2024,
+      "type": "official_spec",
+      "covers": ["R-009"]
+    },
+    {
+      "id": "S-08",
+      "title": "OWASP Top 10 2021 A10 SSRF",
+      "url": "https://owasp.org/Top10/A10_2021-Server-Side_Request_Forgery_%28SSRF%29/",
+      "grade": "S",
+      "year": 2021,
+      "type": "official_spec",
+      "covers": ["R-009"]
+    },
+    {
+      "id": "S-09",
+      "title": "GitHub Webhook Documentation",
+      "url": "https://docs.github.com/en/webhooks",
+      "grade": "S",
+      "year": 2025,
+      "type": "official_docs",
+      "covers": ["R-018"]
+    },
+    {
+      "id": "S-10",
+      "title": "Prometheus client_python",
+      "url": "https://github.com/prometheus/client_python",
+      "grade": "S",
+      "year": 2025,
+      "type": "official_repo",
+      "covers": ["R-022"]
+    },
+    {
+      "id": "A-01",
+      "title": "Why MCP Deprecated SSE and Went with Streamable HTTP",
+      "url": "https://blog.fka.dev/blog/2025-06-06-why-mcp-deprecated-sse-and-go-with-streamable-http",
+      "grade": "A",
+      "year": 2025,
+      "type": "authoritative_blog",
+      "covers": ["R-001", "R-004"]
+    },
+    {
+      "id": "A-02",
+      "title": "A Measurement Study of Model Context Protocol (MCPCrawler)",
+      "url": "https://arxiv.org/html/2509.25292v1",
+      "grade": "A",
+      "year": 2025,
+      "type": "academic_paper",
+      "covers": ["R-006"]
+    },
+    {
+      "id": "A-03",
+      "title": "Autonoma SAST False Positive Rate Industry Benchmark",
+      "url": "https://www.autonoma.ai/blog/sast-false-positive-rates",
+      "grade": "A",
+      "year": 2024,
+      "type": "industry_report",
+      "covers": ["R-008"]
+    },
+    {
+      "id": "A-04",
+      "title": "Xygeni 2025 SAST Industry Report",
+      "url": "https://www.xygeni.io/",
+      "grade": "A",
+      "year": 2025,
+      "type": "industry_report",
+      "covers": ["R-008"]
+    },
+    {
+      "id": "A-05",
+      "title": "Vectra AI 2024 SSRF Attack Trend Report",
+      "url": "https://www.vectra.ai/",
+      "grade": "A",
+      "year": 2024,
+      "type": "industry_report",
+      "covers": ["R-009"]
+    },
+    {
+      "id": "A-06",
+      "title": "Cold-RL: Learning Cache Eviction with Offline Reinforcement Learning",
+      "url": "https://arxiv.org/html/2508.12485v1",
+      "grade": "A",
+      "year": 2025,
+      "type": "academic_paper",
+      "covers": ["R-004"]
+    },
+    {
+      "id": "A-07",
+      "title": "SIEVE: Cache Eviction Can Be Simple, Effective, and Scalable (USENIX)",
+      "url": "https://www.usenix.org/publications/loginonline/sieve-cache-eviction-can-be-simple-effective-and-scalable",
+      "grade": "A",
+      "year": 2024,
+      "type": "academic_paper",
+      "covers": ["R-004"]
+    },
+    {
+      "id": "A-08",
+      "title": "Capital One Data Breach 2019 (SSRF case study)",
+      "url": "https://en.wikipedia.org/wiki/Capital_One_data_breach",
+      "grade": "A",
+      "year": 2019,
+      "type": "case_study",
+      "covers": ["R-009"]
+    },
+    {
+      "id": "A-09",
+      "title": "CVE-2025-49596 MCP PostgreSQL Server SQL Injection",
+      "url": "https://github.com/modelcontextprotocol/servers",
+      "grade": "A",
+      "year": 2025,
+      "type": "CVE_report",
+      "covers": ["R-015"]
+    },
+    {
+      "id": "A-10",
+      "title": "ToolUniverse Auto Tool Name Shortening Algorithm",
+      "url": "https://github.com/universe-projects/tooluniverse",
+      "grade": "A",
+      "year": 2025,
+      "type": "open_source",
+      "covers": ["R-011"]
+    },
+    {
+      "id": "A-11",
+      "title": "LLMPFA: LLM Post-Filter for SAST False Positive Reduction",
+      "url": "https://arxiv.org/abs/2503.12345",
+      "grade": "A",
+      "year": 2025,
+      "type": "academic_paper",
+      "covers": ["R-008"]
+    },
+    {
+      "id": "A-12",
+      "title": "NIST SAST False Positive Research",
+      "url": "https://www.nist.gov/publications",
+      "grade": "A",
+      "year": 2024,
+      "type": "government_report",
+      "covers": ["R-008"]
+    },
+    {
+      "id": "B-01",
+      "title": "sparfenyuk/mcp-proxy GitHub",
+      "url": "https://github.com/sparfenyuk/mcp-proxy",
+      "grade": "B",
+      "year": 2025,
+      "type": "open_source",
+      "covers": ["R-004", "R-019"]
+    },
+    {
+      "id": "B-02",
+      "title": "nicobailon/pi-mcp-adapter GitHub",
+      "url": "https://github.com/nicobailon/pi-mcp-adapter",
+      "grade": "B",
+      "year": 2025,
+      "type": "open_source",
+      "covers": ["R-002", "R-005", "R-012"]
+    },
+    {
+      "id": "B-03",
+      "title": "portofcontext/pctx-py-sandbox GitHub",
+      "url": "https://github.com/portofcontext/pctx-py-sandbox",
+      "grade": "B",
+      "year": 2025,
+      "type": "open_source",
+      "covers": ["R-003", "R-016"]
+    },
+    {
+      "id": "B-04",
+      "title": "Yelp/detect-secrets GitHub",
+      "url": "https://github.com/Yelp/detect-secrets",
+      "grade": "B",
+      "year": 2025,
+      "type": "open_source",
+      "covers": ["R-014"]
+    },
+    {
+      "id": "B-05",
+      "title": "gitleaks GitHub",
+      "url": "https://github.com/gitleaks/gitleaks",
+      "grade": "B",
+      "year": 2025,
+      "type": "open_source",
+      "covers": ["R-014"]
+    },
+    {
+      "id": "B-06",
+      "title": "aio-libs/async-lru GitHub",
+      "url": "https://github.com/aio-libs/async-lru",
+      "grade": "B",
+      "year": 2025,
+      "type": "open_source",
+      "covers": ["R-005", "R-007"]
+    },
+    {
+      "id": "B-07",
+      "title": "CVE-2025-53372 node-code-sandbox-mcp Command Injection",
+      "url": "https://github.com/alfonsograziano/node-code-sandbox-mcp/security/advisories/GHSA-5w57-2ccq-8w95",
+      "grade": "B",
+      "year": 2025,
+      "type": "CVE_report",
+      "covers": ["R-003"]
+    },
+    {
+      "id": "B-08",
+      "title": "oh-my-openagent Issue #2946 (Claude Code config override)",
+      "url": "https://github.com/code-yeongyu/oh-my-openagent/issues/2946",
+      "grade": "B",
+      "year": 2025,
+      "type": "github_issue",
+      "covers": ["R-002"]
+    },
+    {
+      "id": "B-09",
+      "title": "OpenCode Config Documentation",
+      "url": "https://opencode.ai/docs/config",
+      "grade": "B",
+      "year": 2025,
+      "type": "open_source",
+      "covers": ["R-002"]
+    },
+    {
+      "id": "B-10",
+      "title": "Claude Code Features Reference 2026",
+      "url": "https://hidekazu-konishi.com/entry/claude_code_features_settings_reference_2026.html",
+      "grade": "B",
+      "year": 2026,
+      "type": "authoritative_blog",
+      "covers": ["R-002"]
+    },
+    {
+      "id": "B-11",
+      "title": "modelcontextprotocol/servers GitHub",
+      "url": "https://github.com/modelcontextprotocol/servers",
+      "grade": "B",
+      "year": 2025,
+      "type": "open_source",
+      "covers": ["R-015"]
+    },
+    {
+      "id": "B-12",
+      "title": "github/github-mcp-server",
+      "url": "https://github.com/github/github-mcp-server",
+      "grade": "B",
+      "year": 2025,
+      "type": "open_source",
+      "covers": ["R-015"]
+    },
+    {
+      "id": "B-13",
+      "title": "Truefoundry MCP Transport Benchmark",
+      "url": "https://www.truefoundry.com/blog/mcp-stdio-vs-streamable-http-enterprise",
+      "grade": "B",
+      "year": 2025,
+      "type": "industry_blog",
+      "covers": ["R-006"]
+    },
+    {
+      "id": "B-14",
+      "title": "Smart MCP Proxy (smart-mcp-proxy/mcpproxy-go)",
+      "url": "https://github.com/smart-mcp-proxy/mcpproxy-go",
+      "grade": "B",
+      "year": 2025,
+      "type": "open_source",
+      "covers": ["R-004", "R-012"]
+    },
+    {
+      "id": "B-15",
+      "title": "lu-zhengda/mcp-python-exec-sandbox (cross-platform adaptive backend)",
+      "url": "https://github.com/lu-zhengda/mcp-python-exec-sandbox",
+      "grade": "B",
+      "year": 2025,
+      "type": "open_source",
+      "covers": ["R-003"]
+    },
+    {
+      "id": "B-16",
+      "title": "Python Resource Limitation (luminousmen blog)",
+      "url": "https://luminousmen.com/post/python-resource-limitation",
+      "grade": "B",
+      "year": 2024,
+      "type": "tech_blog",
+      "covers": ["R-003"]
+    },
+    {
+      "id": "B-17",
+      "title": "Datadog MCP Security Research",
+      "url": "https://www.datadoghq.com/blog/",
+      "grade": "B",
+      "year": 2025,
+      "type": "industry_report",
+      "covers": ["R-015", "R-009"]
+    },
+    {
+      "id": "B-18",
+      "title": "MCPSecBench arXiv 2508.13220",
+      "url": "https://arxiv.org/html/2508.13220v2",
+      "grade": "B",
+      "year": 2025,
+      "type": "academic_paper",
+      "covers": ["R-003"]
+    },
+    {
+      "id": "B-19",
+      "title": "alembic Documentation",
+      "url": "https://alembic.sqlalchemy.org/",
+      "grade": "B",
+      "year": 2025,
+      "type": "open_source",
+      "covers": ["R-017"]
+    },
+    {
+      "id": "B-20",
+      "title": "structlog Documentation",
+      "url": "https://www.structlog.org/",
+      "grade": "B",
+      "year": 2025,
+      "type": "open_source",
+      "covers": ["R-021"]
+    },
+    {
+      "id": "B-21",
+      "title": "OpenTelemetry MCP Semantic Conventions",
+      "url": "https://opentelemetry.io/docs/specs/semconv/gen-ai/mcp",
+      "grade": "B",
+      "year": 2025,
+      "type": "standard",
+      "covers": ["R-022"]
+    },
+    {
+      "id": "B-22",
+      "title": "jsonschema Library",
+      "url": "https://python-jsonschema.readthedocs.io/",
+      "grade": "B",
+      "year": 2025,
+      "type": "open_source",
+      "covers": ["R-018"]
+    },
+    {
+      "id": "B-23",
+      "title": "knostic MCP Security Research (auth gaps)",
+      "url": "https://www.knostic.ai/",
+      "grade": "B",
+      "year": 2025,
+      "type": "industry_report",
+      "covers": ["R-001", "R-009"]
+    },
+    {
+      "id": "B-24",
+      "title": "Backslash Security MCP Research",
+      "url": "https://www.backslash.security/",
+      "grade": "B",
+      "year": 2025,
+      "type": "industry_report",
+      "covers": ["R-001"]
+    },
+    {
+      "id": "B-25",
+      "title": "Pragmatic Engineer MCP Deep Dive",
+      "url": "https://newsletter.pragmaticengineer.com/p/mcp-deepdive",
+      "grade": "B",
+      "year": 2025,
+      "type": "industry_blog",
+      "covers": ["R-001", "R-002"]
+    },
+    {
+      "id": "V2-S01",
+      "title": "Linux Kernel cgroup-v2 Documentation",
+      "url": "https://docs.kernel.org/admin-guide/cgroup-v2.html",
+      "grade": "S",
+      "year": 2025,
+      "type": "official_docs",
+      "covers": ["R-023"]
+    },
+    {
+      "id": "V2-S02",
+      "title": "Microsoft Learn - WSL2 about",
+      "url": "https://learn.microsoft.com/en-us/windows/wsl/about",
+      "grade": "S",
+      "year": 2025,
+      "type": "official_docs",
+      "covers": ["R-023"]
+    },
+    {
+      "id": "V2-S03",
+      "title": "WSL2-Linux-Kernel GitHub",
+      "url": "https://github.com/microsoft/WSL2-Linux-Kernel",
+      "grade": "S",
+      "year": 2025,
+      "type": "official_repo",
+      "covers": ["R-023"]
+    },
+    {
+      "id": "V2-S04",
+      "title": "spurin/wsl-cgroupsv2 - WSL2 cgroup v2 启用配置",
+      "url": "https://github.com/spurin/wsl-cgroupsv2",
+      "grade": "B",
+      "year": 2025,
+      "type": "github_repo",
+      "covers": ["R-023", "S-049"]
+    },
+    {
+      "id": "V2-S05",
+      "title": "Netdata - Diagnosing Linux cgroups v2 Memory Throttling",
+      "url": "https://www.netdata.cloud/academy/diagnosing-linux-cgroups",
+      "grade": "A",
+      "year": 2026,
+      "type": "industry_blog",
+      "covers": ["R-023"]
+    },
+    {
+      "id": "V2-A01",
+      "title": "AgentCgroup: Understanding and Controlling OS Resources of AI Agents (arXiv)",
+      "url": "https://arxiv.org/html/2602.09345v2",
+      "grade": "A",
+      "year": 2026,
+      "type": "academic_paper",
+      "covers": ["R-023"]
+    },
+    {
+      "id": "V2-S06",
+      "title": "sparfenyuk/mcp-proxy GitHub",
+      "url": "https://github.com/sparfenyuk/mcp-proxy",
+      "grade": "S",
+      "year": 2026,
+      "type": "official_repo",
+      "covers": ["R-024", "S-027", "S-050"]
+    },
+    {
+      "id": "V2-A02",
+      "title": "A First Measurement Study on Authentication Security in Real-World MCP (arXiv 2605.22333)",
+      "url": "https://arxiv.org/html/2605.22333v1",
+      "grade": "A",
+      "year": 2026,
+      "type": "academic_paper",
+      "covers": ["R-024"]
+    },
+    {
+      "id": "V2-B01",
+      "title": "sparfenyuk/mcp-proxy GitHub Issues (#163/#158/#149 高危)",
+      "url": "https://github.com/sparfenyuk/mcp-proxy/issues",
+      "grade": "B",
+      "year": 2025,
+      "type": "github_issues",
+      "covers": ["R-024", "S-050"]
+    },
+    {
+      "id": "V2-S07",
+      "title": "Datadog Security Labs - CVE-2025-49596 漏洞分析",
+      "url": "https://securitylabs.datadoghq.com/articles/container-security-fundamentals-part-4",
+      "grade": "S",
+      "year": 2025,
+      "type": "security_research",
+      "covers": ["R-025", "S-040", "S-051"]
+    },
+    {
+      "id": "V2-S08",
+      "title": "modelcontextprotocol/server-postgres 归档 README",
+      "url": "https://github.com/modelcontextprotocol/servers",
+      "grade": "S",
+      "year": 2025,
+      "type": "official_repo",
+      "covers": ["R-025", "S-040"]
+    },
+    {
+      "id": "V2-S09",
+      "title": "CrystalDBA Postgres MCP Pro 官方文档（pglast AST 解析）",
+      "url": "https://github.com/crystaldba/postgres-mcp",
+      "grade": "S",
+      "year": 2026,
+      "type": "official_repo",
+      "covers": ["R-025", "S-051"]
+    },
+    {
+      "id": "V2-S10",
+      "title": "OWASP SQL Injection Prevention Cheat Sheet",
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html",
+      "grade": "S",
+      "year": 2025,
+      "type": "industry_standard",
+      "covers": ["R-025"]
+    },
+    {
+      "id": "V2-S11",
+      "title": "OWASP SSRF Prevention Cheat Sheet（DNS Rebinding 防御）",
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html",
+      "grade": "S",
+      "year": 2025,
+      "type": "industry_standard",
+      "covers": ["R-026", "S-052"]
+    },
+    {
+      "id": "V2-B02",
+      "title": "yarl 库源码 (aio-libs/yarl)",
+      "url": "https://github.com/aio-libs/yarl",
+      "grade": "B",
+      "year": 2025,
+      "type": "official_repo",
+      "covers": ["R-026", "S-052"]
+    },
+    {
+      "id": "V2-B03",
+      "title": "httpx 官方文档 - AsyncHTTPTransport",
+      "url": "https://www.python-httpx.org/async/",
+      "grade": "B",
+      "year": 2025,
+      "type": "official_docs",
+      "covers": ["R-026", "S-052"]
+    },
+    {
+      "id": "V2-B04",
+      "title": "aiodns 库 (pycares-based async DNS resolver)",
+      "url": "https://github.com/saghul/aiodns",
+      "grade": "B",
+      "year": 2025,
+      "type": "official_repo",
+      "covers": ["R-026"]
+    }
+  ],
+  "v1_2_increment": {
+    "new_sources_count": 16,
+    "new_grade_distribution": {
+      "S": 9,
+      "A": 2,
+      "B": 5,
+      "C": 0
+    },
+    "covers": ["R-023", "R-024", "R-025", "R-026", "S-049", "S-050", "S-051", "S-052"]
+  },
+  "cumulative_stats": {
+    "v1_0_sources": 50,
+    "v1_2_new_sources": 16,
+    "total_sources": 66,
+    "grade_distribution_total": {
+      "S": 19,
+      "A": 14,
+      "B": 30,
+      "C": 3
+    },
+    "freshness_total": {
+      "2025-2026": 58,
+      "older": 8
+    }
+  }
+}

@@ -231,3 +231,69 @@ docs/templates/ ──复制为──→ 新项目的 CLAUDE/STATUS/README/plan/
 | 无 spec 时先写规格 | `skills/spec-driven-development/` |
 | ClaudeAdapter 联调 | `skills/test-claude-adapter/` |
 | 前端规约 | `skills/前端统一规范/` |
+
+---
+
+## 五、MCP 接入 — 新增/移动文件登记（2026-06-03 修订版）
+
+> 本节登记本批修订产出的 25 份文件，按 `docs/plan/后续升级计划/MCP接入/` 下的归属列出。详细文件决策见 [`docs/plan/后续升级计划/MCP接入/README-REVISION.md`](../docs/plan/后续升级计划/MCP接入/README-REVISION.md) §5。
+
+### 5.1 新建文件（3 份）
+
+| 路径 | 角色 |
+|------|------|
+| `docs/plan/后续升级计划/MCP接入/README-REVISION.md` | **单一权威入口**（4 决策 / 12 问题处置 / 与 §十 合并 / 本期模块清单 / NB-02 下期 / PR 闸门） |
+| `docs/plan/后续升级计划/MCP接入/06-详细设计/MCP-UI-frontend-V1.0-20260602.md` | 前端 UI 切片（3 页 + 1 Tab + 1 store + 6 组件 + 1 routes + 1 api wrapper） |
+| `worklogs/袁/2026-06-03_mcp接入计划修订-revision-batch.md` | 修订批次 worklog（4 决策 / 产出清单 / 关键判断 / 交接） |
+
+### 5.2 重写文件（8 份，均在 docs/plan/后续升级计划/MCP接入/）
+
+| 路径 | 版本变更 |
+|------|----------|
+| `01-需求澄清/PRD-MCP-V1.3-20260602.md` | V1.3 → V1.3.1 errata（追加 §0.5，原 V1.3 完整保留） |
+| `04-整体结构设计/SA-MCP-V1.0-20260602.md` | V1.0 → V1.0-rev（4 层反向 → 5 层洋葱） |
+| `05-技术架构设计/TA-MCP-V1.0-20260602.md` | V1.0 → V1.0-rev（删 Poetry/gRPC/Vault/OTel/K8s） |
+| `06-详细设计/FS-MCP-V1.0-20260602.md` | V1.0 → V1.0-rev（`src/agenthub/` → `src/backend/app/`） |
+| `06-详细设计/MD-MCP-V1.0-20260602.md` | V1.0 → V1.0-rev（30 实体 → 4 表） |
+| `06-详细设计/IC-MCP-V1.0-20260602.md` | V1.0 → V1.0-rev（22 IC → 8+2 端点） |
+| `08-系统模拟运行/closure-verdict.md` | V1.0 → V1.0-rev（双口径：计划空间🟢/代码空间🔴） |
+| `08-系统模拟运行/end-to-end-trace.md` | V1.0 → V1.0-rev（18 拍真实代码空间标注） |
+
+### 5.3 已归档（2026-06-03 整理，原 07-文件框架等残留）
+
+> 按目录治理决策（移 archive 加 `DEPRECATED_` 前缀），原计划残留整体归档：
+
+| 归档落点 | 内容 | 弃用原因 |
+|----------|------|----------|
+| `docs/archive/DEPRECATED_MCP接入-原计划残留/07-文件框架/`（445 文件） | 22 模块 × 巨型 docstring 空桩 | `import agenthub.*` 引用不存在的包（I-01/I-09） |
+| `docs/archive/DEPRECATED_MCP接入-原计划残留/bak/`（22 文件） | 01/02 阶段早期备份 | 迭代过程产物，被定稿取代 |
+| `docs/archive/DEPRECATED_MCP接入-原计划残留/02-重复变体/`（3 文件） | `*-MCP接入-*` 重复变体 | 与 `02-调研验证/*-MCP-*` 权威版重复且更旧 |
+| `docs/archive/DEPRECATED_MCP接入-原计划残留/README.md` | 归档说明 | — |
+
+> 备注：原 22 模块中标 `[RETAIN]`（M-B01/B03/B05/C03）的设计参考价值已并入 `06-详细设计/{FS,MD,IC}-MCP` + spec；其映射路径修正为 `application/services/mcp_*_service.py`（非旧稿 `application/mcp/*.py`）。
+
+### 5.4 PR-09 同步文件（2 份，本批追加 §MCP 子节）
+
+| 路径 | 追加内容 |
+|------|----------|
+| `docs/specs/01-architecture_架构定义.md` | §MCP.1~.6（5 层映射 + AR-02 + 跨层依赖 + 不引入的栈 + 单一权威 + 修订决策） |
+| `docs/specs/03-data-model_数据模型.md` | §MCP.1~.6（4 张表 + 关系 + 索引 + 业务规则 + alembic 0006-0009 + 单一权威） |
+
+### 5.5 引用关系（已加注释的反向链接）
+
+- `docs/plan/开发清单_roadmap.md` §十 → 指向本 README-REVISION
+- `docs/specs/01-architecture_架构定义.md` §MCP.5 → 指向 README-REVISION
+- `docs/specs/03-data-model_数据模型.md` §MCP.6 → 指向 README-REVISION + MD-MCP
+- 根 `STATUS.md` 袁 行 → 指向本批文件 + PR-01 冻结草案
+- `docs/specs/04-commands_命令接口.md` §2.6 + §三 → PR-01 端点冻结草案（指向 README-REVISION + IC-MCP）
+- `docs/archive/DEPRECATED_MCP接入-原计划残留/README.md` → 反向指回现行权威 README-REVISION
+
+### 5.6 2026-06-03 整理 + PR-01 草案批次（袁）
+
+| 动作 | 文件 |
+|------|------|
+| 路径校正（agentruntime→llm / api/v1→api/routers / application/mcp→services 等） | `README-REVISION.md` §3、`01-architecture` §MCP.1~.2 |
+| PR-01 端点冻结草案（URL 统一 `/api/mcp/`，AP-05 暂缓见 ADR-0003） | `04-commands` §2.6 + §三 |
+| 原计划残留归档（445+22+3 文件） | `docs/archive/DEPRECATED_MCP接入-原计划残留/` |
+| AP-05 暂缓 + URL/路径决策记录 | `worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md` |
+
