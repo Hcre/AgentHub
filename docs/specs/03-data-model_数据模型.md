@@ -393,6 +393,13 @@ class AgentActivity(BaseModel):
 ## §MCP 数据模型（2026-06-03 修订版）
 
 > 本节由 PR-09 同步 `docs/plan/后续升级计划/MCP接入/MD-MCP-V1.0-20260602.md` 而来。落地范围与字段定义以 `MD-MCP-V1.0-20260602.md` §1 为准。
+>
+> **⚠️ 二次对账修订（2026-06-03，schema↔代码，已经 Reviewer 确认）**：原表设计引用了真实代码里**不存在的表/类型**，按以下口径落地（完整审计见 [`README-REVISION.md` §9](../plan/后续升级计划/MCP接入/README-REVISION.md)）：
+> - **R1** `workspace_id`（installations / tool_call_logs）：现库无 `workspaces` 表（workspace=`sessions.workspace_path` 字符串）→ **裸 UUID、不加 FK**，**暂存 `session_id`** 作 workspace 维度 stand-in。
+> - **R2** `created_by` / `installed_by`：现库无 `users` 表 → **裸 UUID、不加 FK**，存 JWT `sub`（对齐既有 `NotificationModel.user_id` 裸 Uuid 先例）。
+> - 仅对**真实存在的表**加 FK：`agent_id`→`agents`、`mcp_id`→`mcp_servers`、`installation_id`→`workspace_mcp_installations`、`binding_id`→`agent_mcp_bindings`。
+> - **R4** `trace_id`（tool_call_logs）：现库**无既有 trace_id 设施**（零出现）→ **净新增**字段，P4 工具调用时生成（非"既有格式"）。
+> - **R10 类型（强制）**：测试走 SQLite `Base.metadata.create_all`（`conftest.py`），下表 ENUM/JSONB/CHAR/TEXT[]/BIGSERIAL/GIN 均为**逻辑表述**；**实际列用可移植类型**——ENUM→`String`、JSONB→`JSON`、`TEXT[]`(tags/tool_subset)→`JSON` 列表、CHAR(64)→`String(64)`、BIGSERIAL→`BigInteger().with_variant(Integer,"sqlite")`、GIN→普通索引。PG 专属类型 deferred（NB-02）。
 
 ### §MCP.1 4 张表
 

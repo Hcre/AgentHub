@@ -278,7 +278,12 @@ POST   /api/mcp/servers
 | `E_MCP_UNAUTHORIZED` | 未登录/JWT 失效 | 401 |
 | `E_MCP_INTERNAL` | 内部错误 | 500 |
 
-> Pydantic schemas 落 `schemas/mcp.py`（字段见 IC-MCP §3）。鉴权 JWT（AP-04）+ workspace 成员校验（所有写操作）。
+> Pydantic schemas 落 `schemas/mcp.py`（字段见 IC-MCP §3）。
+>
+> **二次对账修订（2026-06-03，schema↔代码）**——以下三点把契约改为与真实代码一致，已经 Reviewer 确认：
+> - **鉴权（R3）**：现库**所有端点零 JWT 强制**（`decode_access_token` 未被任何路由调用）。MCP 写操作**只做 JWT 解析**（新增 `get_current_user` 依赖，取 `sub` 充 `created_by`/`installed_by`），**不做 workspace 成员校验**（无 membership 模型，随全局鉴权一起上，列 P4+ TODO）。`E_MCP_PERMISSION_DENIED(403)` 本期不触发，保留占位。
+> - **workspace_id 语义（R1）**：现库无 `workspaces` 实体，workspace=`sessions.workspace_path` 字符串。`workspace_id` 字段**暂存 `session_id`** 作为 workspace 维度 stand-in；**裸 UUID、不加 FK**（前向兼容未来真实 workspaces 表）。
+> - **WS 信封（R5，P4 范围）**：既有会话 WS 实为扁平 `{"type","seq","content"}`，**不含 `payload`/`request_id`**。§三 的 `tool_call:*` 事件采用**新** `{type,payload,request_id}` 信封（符合 AP-07），与既有消息**在同通道并存两种信封**；是否统一既有 WS 留 P4 决策。
 
 ---
 

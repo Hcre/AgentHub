@@ -211,4 +211,29 @@ class AgentRuntime(ABC):
 
 ---
 
-*本 README 是 MCP 接入修订版的单一权威入口。后续以本文档 + §5.1 已重写文件 为准；其余文件作参考或 DEPRECATED。*
+---
+
+## 9. 二次对账（schema↔代码，2026-06-03）
+
+> **触发**：P1 启动前按 "plan→code 实体存在性" 逐文件复核，发现首轮可行性 review（宏观路径审计）**漏掉了实体/依赖/协议/类型级的不存在引用**。本节是补漏审计 + 处置，已经 Reviewer 确认。
+>
+> **方法固化**：凡计划写 `FK→X` / "既有 X" / "复用现有 X"，必须落到具体文件求证一次——表查 `infrastructure/db/models.py`、依赖查 `api/deps.py`、协议查 `api/ws/`、类型约束查 `tests/conftest.py`。这是 PR-09 应覆盖但首轮被跳过的粒度。
+
+| # | 计划声称 | 真实代码（已核实文件） | 处置 |
+|---|---|---|---|
+| R1 | `workspace_id FK→workspaces` | 无 `workspaces` 表；workspace=`sessions.workspace_path` 字符串 | 裸 UUID 无 FK，暂存 `session_id` |
+| R2 | `created_by/installed_by FK→users` | 无 `users` 表（`models.py`；`NotificationModel.user_id` 亦裸 Uuid） | 裸 UUID 无 FK，存 JWT `sub` |
+| R3 | JWT + workspace 成员校验 | 全端点零 JWT 强制（`decode_access_token` 未被调用）；无 membership | 仅加 `get_current_user` JWT 解析，不做成员校验 |
+| R4 | "既有 `trace_id` 格式" | 全后端 `trace_id` 零出现 | 净新增字段，P4 生成 |
+| R5 | WS "信封对齐既有 AP-07" | 既有 WS 扁平 `{type,seq,content}`，无 `payload/request_id`（`ws/chat.py`） | 新信封与旧并存，P4 决策 |
+| R6 | "异步落盘（消息队列）" | 无 MQ/worker | Redis/后台任务，P4 |
+| R7 | 复用 Redis | `infrastructure/cache/redis_client.py` 真实存在（含 fakeredis 测试回退） | ✅ 通过 |
+| R8 | `AgentRuntime` / alembic 链 / 扁平 router | `domain/llm/protocol.py`、`alembic/versions/0001-0005`、`api/routers/` 均在 | ✅ 通过 |
+| R9 | 错误体 `{error:{code,message}}`+`E_MCP_*` | `main.py` 异常处理实际发 `{"detail": str}`；全库违反 AP-02 | 对齐现状 `{detail}`，`E_MCP_*` 暂作逻辑码（errata） |
+| R10 | `JSONB/TEXT[]/ENUM/BIGSERIAL/CHAR/GIN` | 测试走 SQLite `create_all`（`conftest.py`），模型必须可移植 | 强制 `JSON/String/BigInteger.with_variant`，PG 专属类型 deferred |
+
+**结论**：R1/R2/R3/R9 由 Reviewer 拍板（裸 Uuid / JWT-only / `{detail}`）；R4/R5/R6 属 P4 范围记 errata；R10 是 SQLite 测试强制约束。spec 已同步：`docs/specs/03-data-model` §MCP + `docs/specs/04-commands` §2.6 均加二次对账横幅。
+
+---
+
+*本 README 是 MCP 接入修订版的单一权威入口。后续以本文档 + §5.1 已重写文件 + §9 二次对账 为准；其余文件作参考或 DEPRECATED。*

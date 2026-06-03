@@ -24,6 +24,8 @@
 ## 1. 4 张表（沿用 §十 + 工具调用日志）
 
 > 同步在 `docs/specs/03-data-model` 增补（PR-09），本节为本期权威。
+>
+> **⚠️ 二次对账 errata（2026-06-03，见 [`../README-REVISION.md` §9](../README-REVISION.md)）**：下表 FK 与类型为**逻辑表述**。落地时：`workspace_id`/`created_by`/`installed_by` 现库无对应表 → **裸 UUID 无 FK**（`workspace_id` 暂存 `session_id`，R1/R2）；ENUM/JSONB/TEXT[]/CHAR/BIGSERIAL/GIN → **可移植类型**（`String/JSON/BigInteger.with_variant`，SQLite 测试强制，R10）；`trace_id` 为净新增非"既有"（R4）。
 
 ### 1.1 `mcp_servers` — MCP 元数据
 

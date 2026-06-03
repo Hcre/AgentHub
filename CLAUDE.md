@@ -48,10 +48,10 @@ AgentHub/
 | 文档 | 何时读 |
 |------|--------|
 | `meta/FILE_GRAPH.md` | 新增/移动文件前（决策树） |
-| `docs/conventions/CLAUDE.md` | 任务 → 规范定位 + 红线总表（AR/CR/PR/AP/T/D）|
+| `docs/conventions/CLAUDE-规范导航.md` | 任务 → 规范定位 + 红线总表（AR/CR/PR/AP/T/D）|
 | docs/conventions/0X-*.md | 写代码/接口/测试前对应查（01 架构 / 02 代码 / 03 Git / 04 API / 05 测试 / 06 文档 / 08 图谱） |
-| `docs/conventions/99-boundaries_边界矩阵.md` | 写 Agent 权限/审批前 |
-| `docs/conventions/99-process-rules_流程红线全集.md` | PR-01~09 全集 |
+| `docs/conventions/09-boundaries_边界矩阵.md` | 写 Agent 权限/审批前 |
+| `docs/conventions/10-process-rules_流程红线全集.md` | PR-01~09 全集 |
 | `docs/conventions/ai-workflow_AI协作开发流程/` | 流程方法论（调研→计划→开发→收束→汇报） |
 | `docs/specs/00-overview_项目主规格.md` | 首次接触，了解全貌 |
 | `docs/specs/01-architecture_架构定义.md` | 做架构决策前 |
@@ -110,7 +110,7 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 - 技术决策前横向对比 2-3 个选项
 - 质疑与 `docs/conventions/01-architecture` 或 AR-01~06 矛盾的方案
 - 增量交付，每步验证
-- 自行补充边界条件（参考 `docs/conventions/99-boundaries_边界矩阵.md`）
+- 自行补充边界条件（参考 `docs/conventions/09-boundaries_边界矩阵.md`）
 
 ### 技术约束
 - **Python**: FastAPI async + Pydantic v2 + SQLAlchemy ORM + ruff。禁同步阻塞（CR-12）
@@ -125,14 +125,14 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 | 维度 | 红线 | 详见 |
 |------|------|------|
 | 架构 | AR-01 5 层洋葱 / AR-02 新 Agent 只加 Adapter / AR-03 Harness 无 LLM / AR-04 Agent 不直通 / AR-05 FSM 事件溯源 / AR-06 system-model 解耦 | [01-architecture](docs/conventions/01-architecture_架构设计规范.md) |
-| 代码 | CR-01~12（Python 7 + TS 3 + 通用 2，详见 [CLAUDE.md §2](docs/conventions/CLAUDE.md)） | [02-coding](docs/conventions/02-coding_代码编写规范.md) |
+| 代码 | CR-01~12（Python 7 + TS 3 + 通用 2，详见 [CLAUDE.md §2](docs/conventions/CLAUDE-规范导航.md)） | [02-coding](docs/conventions/02-coding_代码编写规范.md) |
 | Git | PR-02 分支命名 / PR-03 Conventional / PR-06 ≥1 Approve / PR-07 verify | [03-git](docs/conventions/03-git_Git协作规范.md) |
 | API | AP-01~07（kebab + `{error:{code,message}}` + JWT + Pydantic + 版本 + 兼容 + WS request_id） | [04-api](docs/conventions/04-api_API设计规范.md) |
 | 测试 | T-01~06（独立 / Mock 边界 / 三路径 / 无 flaky / Adapter & FSM 必测） | [05-testing](docs/conventions/05-testing_测试规范.md) |
 | 文档 | D-01~12（命名 + 自动校验，详见 `check_docs.py`） | [06-documentation](docs/conventions/06-documentation_文档规范.md) |
-| 流程 | PR-01~09 完整流程红线 | [99-process-rules](docs/conventions/99-process-rules_流程红线全集.md) |
+| 流程 | PR-01~09 完整流程红线 | [99-process-rules](docs/conventions/10-process-rules_流程红线全集.md) |
 
-任务定位、单一权威、改动同步规则全在 [`docs/conventions/CLAUDE.md`](docs/conventions/CLAUDE.md)。
+任务定位、单一权威、改动同步规则全在 [`docs/conventions/CLAUDE-规范导航.md`](docs/conventions/CLAUDE-规范导航.md)。
 
 ---
 
