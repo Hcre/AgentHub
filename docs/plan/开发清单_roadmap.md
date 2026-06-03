@@ -237,5 +237,5 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 | P0.5 二次对账 | 6/3 | schema↔代码审计 R1-R10 + spec 修订 + .gitignore 修正 | — | — | ✅ 完成（见 README-REVISION §9） |
 | P1 F1 市场 | 6/2-6/5 | 数据层(4 表/迁移/实体)+ 5 端点 ✅；安装探针 McpInstaller 端口 + LocalMcpInstaller 结构校验(transport 必填项，422 拦截非法配置)✅；真实可达性/进程探针 ⬜（P2/P3 seam） | 52h | ✅ ADR-04 + [收束报告](../reports/收束报告-MCP-F1.md) | ✅ F1 齐+19 测试绿；收束-1 ✅ 闭合（双线签核）→ 并入 main |
 | P3 F3 创建 | 6/6-6/8 | stdio/sse 提交 + 模板 + dry-run 验证 | 34h | 收束 3 + ADR 0005 | ⬜ 待办 |
-| P2 F2 接入 | 6/9-6/11 | Agent 绑定 + CLI Adapter 动态挂载 | 40h | 收束 2 + ADR 0006 | ⬜ 待办 |
+| P2 F2 接入 | 6/9-6/11 | bind/unbind 端点 + 请求携带 attach（ADR-05）+ claude_code 注入 + rebind 修复(0010) ✅；opencode/pi_agent 注入增量 ⬜ | 40h | 收束 2 + ADR-05/06 | 🔄 进行中（核心 attach 通 + 26 测试绿） |
 | P4 F5 展示 | 6/12-6/15 | 工具调用内联卡片 + WebSocket 事件 | 33h | 收束 4 + ADR 0007 | ⬜ 待办 |

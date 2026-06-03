@@ -3,6 +3,7 @@
 from app.infrastructure.repositories.agent_repository import PostgresAgentRepository
 from app.infrastructure.repositories.group_repository import PostgresGroupRepository
 from app.infrastructure.repositories.mcp_repository import (
+    PostgresMcpBindingRepository,
     PostgresMcpInstallationRepository,
     PostgresMcpServerRepository,
 )
@@ -17,6 +18,7 @@ from app.infrastructure.repositories.session_repository import (
 __all__ = [
     "PostgresAgentRepository",
     "PostgresGroupRepository",
+    "PostgresMcpBindingRepository",
     "PostgresMcpInstallationRepository",
     "PostgresMcpServerRepository",
     "PostgresMemoryRepository",

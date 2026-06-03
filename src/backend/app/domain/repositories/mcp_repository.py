@@ -8,6 +8,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from uuid import UUID
 
+from app.domain.mcp.mcp_binding import AgentMcpBinding
 from app.domain.mcp.mcp_installation import WorkspaceMcpInstallation
 from app.domain.mcp.mcp_server import McpServer
 
@@ -72,4 +73,24 @@ class McpInstallationRepository(ABC):
     @abstractmethod
     async def delete(self, installation_id: UUID) -> None:
         """删除安装记录（卸载）。"""
+        ...
+
+
+class McpBindingRepository(ABC):
+    @abstractmethod
+    async def save(self, binding: AgentMcpBinding) -> None: ...
+
+    @abstractmethod
+    async def get_by_id(self, binding_id: UUID) -> AgentMcpBinding | None: ...
+
+    @abstractmethod
+    async def find_active(
+        self, *, agent_id: UUID, installation_id: UUID
+    ) -> AgentMcpBinding | None:
+        """同 (agent, installation) 的 active 绑定（重复绑定 → 409）。"""
+        ...
+
+    @abstractmethod
+    async def list_active_by_agent(self, agent_id: UUID) -> list[AgentMcpBinding]:
+        """agent 的全部 active 绑定（请求携带 config 构建用）。"""
         ...

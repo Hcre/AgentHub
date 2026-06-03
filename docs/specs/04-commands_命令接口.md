@@ -245,7 +245,9 @@ POST   /api/mcp/bindings
   body: { "agent_id","installation_id", "tool_subset":["read_file",...]? }   # 省略=全选
   returns 201: { "binding_id","agent_id","installation_id","tool_subset":[],
                  "status":"active","created_at" }
-  副作用: 调用 AgentRuntime.attach_mcp(bindings)（F-012），把 MCP config 注入 Agent Runtime 进程
+  副作用: 无运行时有状态 attach（P2/ADR-05 请求携带）——下次该 agent 的 stream 由
+          ContextBuilder 经 McpBindingService.build_request_mcp_servers 解析 active 绑定
+          → AgentRequest.mcp_servers → Runtime 写 .mcp.json 注入
   errors: 400 / 401 / 403 / 404 / 409 E_MCP_BINDING_CONFLICT / 500
 
 DELETE /api/mcp/bindings/{binding_id}

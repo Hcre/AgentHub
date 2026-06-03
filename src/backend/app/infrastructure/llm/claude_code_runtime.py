@@ -18,8 +18,8 @@ session_key 规则（V0/V1 一致）：
 
 from __future__ import annotations
 
-import atexit
 import asyncio
+import atexit
 import json
 import logging
 import os
@@ -123,10 +123,13 @@ class ClaudeCodeRuntime(AgentRuntime):
         prompt = self._extract_prompt(request)
         session_key = self._compute_session_key(request)
         resume = request.has_history
-        logger.info("Session %s has_history=%s → %s", session_key, resume, "resume" if resume else "new")
+        logger.info(
+            "Session %s has_history=%s → %s", session_key, resume, "resume" if resume else "new"
+        )
         async for event in self._run_cli(prompt, request, session_key, resume=resume):
             if resume and (
-                "No conversation found" in (event.content or "") or (
+                "No conversation found" in (event.content or "")
+                or (
                     event.type == StreamEventType.DONE
                     and "No conversation found" in str(event.metadata)
                 )
@@ -394,14 +397,15 @@ class ClaudeCodeRuntime(AgentRuntime):
             cmd.extend(["--session-id", session_key])
         if request.system_prompt:
             cmd.extend(["--system-prompt", request.system_prompt])
-        # MCP 记忆工具：settings.mcp_memory_url 非空时注入
+        # MCP 注入：记忆工具（settings.mcp_memory_url）+ P2 绑定的 MCP servers（请求携带）
         # ⚠️ --mcp-config flag 需在实际 CLI 版本中验证（claude --help | grep mcp）
-        if settings.mcp_memory_url and request.agent_id:
-            mcp_path = _write_mcp_config(
-                str(request.agent_id), settings.mcp_memory_url
-            )
-            if mcp_path:
-                cmd.extend(["--mcp-config", mcp_path])
+        mcp_path = _write_mcp_config(
+            str(request.agent_id) if request.agent_id else "",
+            settings.mcp_memory_url,
+            request.mcp_servers,
+        )
+        if mcp_path:
+            cmd.extend(["--mcp-config", mcp_path])
         return cmd
 
     def _build_env(self) -> dict[str, str]:
@@ -586,20 +590,33 @@ class ClaudeCodeRuntime(AgentRuntime):
         return events
 
 
-def _write_mcp_config(agent_id: str, mcp_url: str) -> str | None:
-    """写临时 MCP 配置文件，返回路径。atexit 注册删除，崩溃时也清理。"""
+def _entry_to_claude(entry: dict) -> dict:
+    """build_mcp_config_entry 的条目 → Claude mcpServers 值（去掉 name 键）。"""
+    return {k: v for k, v in entry.items() if k != "name"}
+
+
+def _write_mcp_config(
+    agent_id: str, mcp_url: str, bound_servers: list[dict] | None = None
+) -> str | None:
+    """写临时 MCP 配置文件，返回路径。atexit 注册删除，崩溃时也清理。
+
+    合并：记忆工具（agenthub-memory，settings.mcp_memory_url）+ P2 绑定的 MCP servers
+    （请求携带 request.mcp_servers）。无任何 server 时返回 None（不传 --mcp-config）。
+    """
     # agent_id 通过 query param 传给服务端 ASGI wrapper；
     # env 字段对 SSE 类型的 MCP 服务端无效（仅对 subprocess 类型有效）。
-    config = {
-        "mcpServers": {
-            "agenthub-memory": {
-                "type": "sse",
-                "url": f"{mcp_url}?agent_id={agent_id}",
-            }
-        }
-    }
+    servers: dict[str, dict] = {}
+    if mcp_url and agent_id:
+        servers["agenthub-memory"] = {"type": "sse", "url": f"{mcp_url}?agent_id={agent_id}"}
+    for entry in bound_servers or []:
+        name = entry.get("name")
+        if name:
+            servers[name] = _entry_to_claude(entry)
+    if not servers:
+        return None
+    config = {"mcpServers": servers}
     try:
-        f = tempfile.NamedTemporaryFile(
+        f = tempfile.NamedTemporaryFile(  # noqa: SIM115 — 故意 delete=False 持久化供 CLI 读取，atexit 清理
             mode="w",
             suffix=".json",
             prefix="agenthub_mcp_",
@@ -613,4 +630,3 @@ def _write_mcp_config(agent_id: str, mcp_url: str) -> str | None:
     except Exception as exc:
         logger.warning("写 MCP 配置失败，跳过 MCP 注入: %s", exc)
         return None
-

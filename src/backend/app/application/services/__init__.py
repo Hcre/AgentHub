@@ -3,6 +3,7 @@
 from app.application.services.agent_service import AgentService
 from app.application.services.chat_service import ChatService
 from app.application.services.group_service import GroupService
+from app.application.services.mcp_binding_service import McpBindingService
 from app.application.services.mcp_install_service import McpInstallService
 from app.application.services.mcp_market_service import McpMarketService
 from app.application.services.memory_service import MemoryService
@@ -12,6 +13,7 @@ __all__ = [
     "AgentService",
     "ChatService",
     "GroupService",
+    "McpBindingService",
     "McpInstallService",
     "McpMarketService",
     "MemoryService",

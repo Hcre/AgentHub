@@ -13,12 +13,16 @@ from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.api.deps import (
     CurrentUser,
+    get_mcp_binding_service,
     get_mcp_install_service,
     get_mcp_market_service,
 )
+from app.application.services.mcp_binding_service import McpBindingService
 from app.application.services.mcp_install_service import McpInstallService
 from app.application.services.mcp_market_service import McpMarketService
 from app.schemas.mcp import (
+    McpBindingOut,
+    McpBindRequest,
     McpInstallationOut,
     McpInstallRequest,
     McpMarketItemOut,
@@ -32,6 +36,7 @@ router = APIRouter(prefix="/api/mcp", tags=["mcp"])
 
 MarketSvc = Annotated[McpMarketService, Depends(get_mcp_market_service)]
 InstallSvc = Annotated[McpInstallService, Depends(get_mcp_install_service)]
+BindingSvc = Annotated[McpBindingService, Depends(get_mcp_binding_service)]
 
 _MAX_PAGE_SIZE = 100
 
@@ -111,4 +116,29 @@ async def uninstall_mcp(
     workspace_id: Annotated[UUID, Query(description="session_id（workspace 维度 stand-in，R1）")],
 ) -> Response:
     await svc.uninstall(installation_id=installation_id, workspace_id=workspace_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/bindings", response_model=McpBindingOut, status_code=status.HTTP_201_CREATED)
+async def bind_mcp(
+    body: McpBindRequest,
+    svc: BindingSvc,
+    _user: CurrentUser,
+) -> McpBindingOut:
+    # 副作用（请求携带）：下次该 agent 的 stream 自动挂载，无需运行时有状态 attach（ADR-05）
+    binding = await svc.bind(
+        agent_id=body.agent_id,
+        installation_id=body.installation_id,
+        tool_subset=body.tool_subset,
+    )
+    return McpBindingOut.from_domain(binding)
+
+
+@router.delete("/bindings/{binding_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def unbind_mcp(
+    binding_id: UUID,
+    svc: BindingSvc,
+    _user: CurrentUser,
+) -> Response:
+    await svc.unbind(binding_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

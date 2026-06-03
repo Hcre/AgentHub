@@ -42,6 +42,10 @@ class AgentRequest(BaseModel):
     group_delta_text: str | None = None
     # DB 查询结果：session 是否已有 assistant 消息（决定 CLI --resume vs --session-id）
     has_history: bool = False
+    # MCP 绑定（P2 请求携带）：L3 binding service 解析 agent active bindings →
+    # 序列化为 MCP 2025-06-18 config 条目，runtime 在 build_cmd 时合并写入 .mcp.json。
+    # 每条形如 {"name","type":"stdio|sse|http","command"/"url",...}。见 ADR-05 / §MCP.2。
+    mcp_servers: list[dict] = []
 
 
 class StreamEventType(StrEnum):
