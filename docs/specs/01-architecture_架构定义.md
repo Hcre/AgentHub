@@ -291,13 +291,15 @@ agenthub/
 | L4 API | `api/routers/mcp.py`（8 端点，与 `agents.py`/`groups.py` 同级，**无 `v1/` 目录**）+ `api/ws/toolcall.py`（2 WS 事件，复用既有 `api/ws/` 通道） |
 | L5 Presentation | `src/frontend/src/pages/McpMarket*` + `McpCreate*` + `components/mcp/*` + `components/agent/McpBindingPanel.tsx` + `stores/mcpStore.ts` + `routes.tsx` |
 
-### §MCP.2 AR-02 满足方式（关键）
+### §MCP.2 AR-02 满足方式（关键，P2 冻结：请求携带）
 
-- 现有抽象基类 `AgentRuntime(ABC)`（`domain/llm/protocol.py`，契约为 `stream(request)` / `stop()`）**只新增** `attach_mcp(bindings: list[AgentMCPBinding]) -> None` 抽象方法（把 MCP config 注入下一次 `stream` 的 CLI 进程），**不另起**进程池/sandbox/eventbus（注：现有 `infrastructure/llm/claude_code_process_pool.py` 为既有进程复用，非本期新建）
-- 3 个 Runtime 实现（`infrastructure/llm/{claude_code_runtime,opencode_runtime,pi_agent_runtime}.py`）均实现 `attach_mcp`
-- 注入方式：把 `bindings` 序列化为 MCP 2025-06-18 `config` JSON，注入到 Runtime 进程的 stdio / env / CLI 参数
-- 注：`attach_mcp` 的精确签名（是否随 `AgentRequest` 透传 / 是否返回 handle）在 P2 实现前由 PR-09 + PR-01 冻结，本节只定扩展点位置
-- SDK Adapter（F-013）下期增量：沿 `attach_mcp(...)` 扩展点加 if 分支
+> **P2 决策（2026-06-03，[ADR-05](../../worklogs/decisions/0005-mcp-attach-request-carried.md)）**：`attach_mcp` 机制定为**请求携带**而非运行时有状态方法——因 Runtime 池化/进程级共享，跨 agent 持有绑定状态会串号。
+
+- 现有抽象基类 `AgentRuntime(ABC)`（`domain/llm/protocol.py`，契约 `stream(request)` / `stop()`）**不新增有状态方法**；改在 `AgentRequest` 上加 `mcp_servers: list[dict]` 字段（请求携带 MCP config 条目）
+- L3 `McpBindingService.build_request_mcp_servers(agent_id)` 解析 agent 的 active 绑定 → installation → server → 序列化为 MCP 2025-06-18 条目；`ContextBuilder` 装配 `AgentRequest` 时经可选 `mcp_resolver` 注入（私聊 + 群聊两路径）
+- 3 个 Runtime（`infrastructure/llm/{claude_code,opencode,pi_agent}_runtime.py`）在 build_cmd 时读 `request.mcp_servers` 写 `.mcp.json` 注入（claude_code 复用董记忆工具的 `_write_mcp_config`，合并记忆 server + 绑定 servers）；opencode/pi_agent 注入按各自 CLI config 机制（增量）
+- 不另起进程池/sandbox/eventbus（现有 `claude_code_process_pool.py` 为既有进程复用）
+- SDK Adapter（F-013）下期增量：在 build_cmd 等价位置读 `request.mcp_servers`
 
 ### §MCP.3 跨层依赖（依 AR-01）
 

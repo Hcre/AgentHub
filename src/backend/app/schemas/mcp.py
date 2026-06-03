@@ -11,6 +11,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.domain.mcp.mcp_binding import AgentMcpBinding
 from app.domain.mcp.mcp_installation import WorkspaceMcpInstallation
 from app.domain.mcp.mcp_server import McpServer
 
@@ -130,4 +131,30 @@ class McpInstallationOut(BaseModel):
             mcp_id=i.mcp_id,
             instance_name=i.instance_name,
             created_at=i.created_at,
+        )
+
+
+class McpBindRequest(BaseModel):
+    agent_id: UUID
+    installation_id: UUID
+    tool_subset: list[str] | None = None  # 省略=暴露全部 tool
+
+
+class McpBindingOut(BaseModel):
+    binding_id: UUID
+    agent_id: UUID
+    installation_id: UUID
+    tool_subset: list[str]
+    status: str
+    created_at: datetime
+
+    @classmethod
+    def from_domain(cls, b: AgentMcpBinding) -> McpBindingOut:
+        return cls(
+            binding_id=b.id,
+            agent_id=b.agent_id,
+            installation_id=b.installation_id,
+            tool_subset=b.tool_subset,
+            status=str(b.status),
+            created_at=b.created_at,
         )

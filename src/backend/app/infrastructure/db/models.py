@@ -21,6 +21,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -278,14 +279,19 @@ class WorkspaceMcpInstallationModel(Base):
 class AgentMcpBindingModel(Base):
     """Agent 绑定（agent_mcp_bindings）。解绑软删（status=removed + unbound_at）。
 
-    NOTE(P2)：唯一约束 (agent_id, installation_id) 与软删并存时，解绑后无法再绑定同一
-    installation——P2 实现绑定端点时需改为 status=active 的部分唯一，或解绑改硬删。
+    P2：唯一性改为 status='active' 的**部分唯一**——同 (agent, installation) 至多 1 条
+    active，但解绑（removed）后可再次绑定（解决 F1 rebind 冲突，见 alembic 0010）。
     """
 
     __tablename__ = "agent_mcp_bindings"
     __table_args__ = (
-        UniqueConstraint(
-            "agent_id", "installation_id", name="uq_agent_mcp_bindings_agent_installation"
+        Index(
+            "uq_agent_mcp_bindings_active",
+            "agent_id",
+            "installation_id",
+            unique=True,
+            sqlite_where=text("status = 'active'"),
+            postgresql_where=text("status = 'active'"),
         ),
         Index("idx_agent_mcp_bindings_agent", "agent_id", "status"),
     )

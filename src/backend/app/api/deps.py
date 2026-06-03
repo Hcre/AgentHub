@@ -20,6 +20,7 @@ from app.application.services import (
     AgentService,
     ChatService,
     GroupService,
+    McpBindingService,
     McpInstallService,
     McpMarketService,
     MemoryService,
@@ -41,6 +42,7 @@ from app.infrastructure.mcp import LocalMcpInstaller
 from app.infrastructure.repositories import (
     PostgresAgentRepository,
     PostgresGroupRepository,
+    PostgresMcpBindingRepository,
     PostgresMcpInstallationRepository,
     PostgresMcpServerRepository,
     PostgresMemoryRepository,
@@ -140,6 +142,18 @@ def get_mcp_install_service(
     return McpInstallService(server_repo, install_repo, get_mcp_installer())
 
 
+def get_mcp_binding_repo(session: DbSession) -> PostgresMcpBindingRepository:
+    return PostgresMcpBindingRepository(session)
+
+
+def get_mcp_binding_service(
+    binding_repo: Annotated[PostgresMcpBindingRepository, Depends(get_mcp_binding_repo)],
+    install_repo: Annotated[PostgresMcpInstallationRepository, Depends(get_mcp_installation_repo)],
+    server_repo: Annotated[PostgresMcpServerRepository, Depends(get_mcp_server_repo)],
+) -> McpBindingService:
+    return McpBindingService(binding_repo, install_repo, server_repo)
+
+
 def get_memory_repo(session: DbSession) -> PostgresMemoryRepository:
     return PostgresMemoryRepository(session)
 
@@ -182,12 +196,20 @@ def get_chat_service(
     agent_repo: Annotated[PostgresAgentRepository, Depends(get_agent_repo)],
     group_repo: Annotated[PostgresGroupRepository, Depends(get_group_repo)],
     memory_repo: Annotated[PostgresMemoryRepository, Depends(get_memory_repo)],
+    binding_svc: Annotated[McpBindingService, Depends(get_mcp_binding_service)],
     bus: Annotated[EventBus, Depends(get_bus)],
 ) -> ChatService:
     l1 = get_l1_memory()
     wm = get_watermark_store()
     mem_selector = MemorySelector(memory_repo)
-    ctx = ContextBuilder(message_repo, agent_repo, l1, wm, memory_selector=mem_selector)
+    ctx = ContextBuilder(
+        message_repo,
+        agent_repo,
+        l1,
+        wm,
+        memory_selector=mem_selector,
+        mcp_resolver=binding_svc.build_request_mcp_servers,
+    )
     discussion = DiscussionOrchestrator(
         message_repo=message_repo,
         agent_repo=agent_repo,
@@ -221,7 +243,19 @@ async def build_chat_service_for_ws() -> AsyncIterator[ChatService]:
         l1 = get_l1_memory()
         wm = get_watermark_store()
         mem_selector = MemorySelector(mem_repo)
-        ctx = ContextBuilder(msg_repo, agent_repo, l1, wm, memory_selector=mem_selector)
+        binding_svc = McpBindingService(
+            PostgresMcpBindingRepository(session),
+            PostgresMcpInstallationRepository(session),
+            PostgresMcpServerRepository(session),
+        )
+        ctx = ContextBuilder(
+            msg_repo,
+            agent_repo,
+            l1,
+            wm,
+            memory_selector=mem_selector,
+            mcp_resolver=binding_svc.build_request_mcp_servers,
+        )
         bus = get_event_bus()
         discussion = DiscussionOrchestrator(
             message_repo=msg_repo,

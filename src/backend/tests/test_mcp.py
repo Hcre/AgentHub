@@ -9,11 +9,21 @@ from uuid import uuid4
 
 import pytest
 
-from app.application.services import McpInstallService, McpMarketService
+from app.application.services import (
+    McpBindingService,
+    McpInstallService,
+    McpMarketService,
+)
 from app.core.exceptions import DomainError, NotFoundError, ValidationError
-from app.domain.enums import McpInstallStatus, McpServerStatus, McpTransport
+from app.domain.enums import (
+    McpBindingStatus,
+    McpInstallStatus,
+    McpServerStatus,
+    McpTransport,
+)
 from app.domain.mcp.mcp_server import McpServer
 from app.domain.mcp.rules import (
+    build_mcp_config_entry,
     compute_args_hash,
     validate_batch_size,
     validate_install_config,
@@ -22,6 +32,7 @@ from app.domain.mcp.rules import (
 from app.infrastructure.db.models import AgentMcpBindingModel
 from app.infrastructure.mcp import LocalMcpInstaller
 from app.infrastructure.repositories import (
+    PostgresMcpBindingRepository,
     PostgresMcpInstallationRepository,
     PostgresMcpServerRepository,
 )
@@ -285,6 +296,121 @@ async def test_uninstall_blocked_by_active_binding(db_session) -> None:  # type:
         await svc.uninstall(installation_id=inst.id, workspace_id=ws)
 
 
+# --- P2: 绑定 + 请求携带 config ---
+
+
+def _binding_service(db) -> McpBindingService:  # type: ignore[no-untyped-def]
+    return McpBindingService(
+        PostgresMcpBindingRepository(db),
+        PostgresMcpInstallationRepository(db),
+        PostgresMcpServerRepository(db),
+    )
+
+
+async def _seed_installation(db, *, transport=McpTransport.STDIO):  # type: ignore[no-untyped-def]
+    server = await _seed_server(
+        PostgresMcpServerRepository(db), name="S", slug="s", transport=transport
+    )
+    inst = await _install_service(db).install(
+        workspace_id=uuid4(), mcp_id=server.id, instance_name="inst"
+    )
+    return server, inst
+
+
+def test_build_mcp_config_entry_by_transport() -> None:
+    stdio = build_mcp_config_entry(
+        "fs", "stdio", {"command": "npx", "args": ["x"], "env": {"K": "v"}}
+    )
+    assert stdio == {
+        "name": "fs",
+        "type": "stdio",
+        "command": "npx",
+        "args": ["x"],
+        "env": {"K": "v"},
+    }
+    sse = build_mcp_config_entry("web", "sse", {"url": "https://x/mcp"})
+    assert sse == {"name": "web", "type": "sse", "url": "https://x/mcp"}
+    http = build_mcp_config_entry("h", "streamable_http", {"url": "http://x/mcp"})
+    assert http["type"] == "http"
+
+
+@pytest.mark.asyncio
+async def test_bind_creates_binding(db_session) -> None:  # type: ignore[no-untyped-def]
+    _server, inst = await _seed_installation(db_session)
+    agent_id = uuid4()
+    binding = await _binding_service(db_session).bind(agent_id=agent_id, installation_id=inst.id)
+    assert binding.status == McpBindingStatus.ACTIVE
+    assert binding.agent_id == agent_id
+
+
+@pytest.mark.asyncio
+async def test_bind_duplicate_active_conflict(db_session) -> None:  # type: ignore[no-untyped-def]
+    _server, inst = await _seed_installation(db_session)
+    svc = _binding_service(db_session)
+    agent_id = uuid4()
+    await svc.bind(agent_id=agent_id, installation_id=inst.id)
+    with pytest.raises(DomainError):
+        await svc.bind(agent_id=agent_id, installation_id=inst.id)
+
+
+@pytest.mark.asyncio
+async def test_bind_installation_not_found(db_session) -> None:  # type: ignore[no-untyped-def]
+    with pytest.raises(NotFoundError):
+        await _binding_service(db_session).bind(agent_id=uuid4(), installation_id=uuid4())
+
+
+@pytest.mark.asyncio
+async def test_unbind_then_rebind_allowed(db_session) -> None:  # type: ignore[no-untyped-def]
+    _server, inst = await _seed_installation(db_session)
+    svc = _binding_service(db_session)
+    agent_id = uuid4()
+    b1 = await svc.bind(agent_id=agent_id, installation_id=inst.id)
+    await svc.unbind(b1.id)
+    # 部分唯一（status=active）→ 解绑后可再次绑定（F1 rebind 冲突已修）
+    b2 = await svc.bind(agent_id=agent_id, installation_id=inst.id)
+    assert b2.id != b1.id
+    assert b2.status == McpBindingStatus.ACTIVE
+
+
+@pytest.mark.asyncio
+async def test_unbind_missing_404(db_session) -> None:  # type: ignore[no-untyped-def]
+    with pytest.raises(NotFoundError):
+        await _binding_service(db_session).unbind(uuid4())
+
+
+@pytest.mark.asyncio
+async def test_build_request_mcp_servers(db_session) -> None:  # type: ignore[no-untyped-def]
+    _server, inst = await _seed_installation(db_session, transport=McpTransport.STDIO)
+    svc = _binding_service(db_session)
+    agent_id = uuid4()
+    await svc.bind(agent_id=agent_id, installation_id=inst.id)
+
+    entries = await svc.build_request_mcp_servers(agent_id)
+    assert len(entries) == 1
+    assert entries[0]["type"] == "stdio"
+    assert entries[0]["command"] == "echo"  # _default_config(stdio)
+    # 解绑后不再携带
+    binding = await PostgresMcpBindingRepository(db_session).list_active_by_agent(agent_id)
+    await svc.unbind(binding[0].id)
+    assert await svc.build_request_mcp_servers(agent_id) == []
+
+
+def test_write_mcp_config_merges_memory_and_bound() -> None:
+    import json
+
+    from app.infrastructure.llm.claude_code_runtime import _write_mcp_config
+
+    bound = [{"name": "fs", "type": "stdio", "command": "npx"}]
+    path = _write_mcp_config("agent-1", "https://mem/sse", bound)
+    assert path is not None
+    with open(path, encoding="utf-8") as f:
+        cfg = json.load(f)
+    assert "agenthub-memory" in cfg["mcpServers"]  # 记忆工具
+    assert cfg["mcpServers"]["fs"] == {"type": "stdio", "command": "npx"}  # 绑定（去 name）
+    # 无任何 server → None
+    assert _write_mcp_config("", "", []) is None
+
+
 # --- 路由注册（无 DB，验证 L4 装配）---
 
 
@@ -297,3 +423,5 @@ def test_mcp_routes_registered() -> None:
     assert "/api/mcp/market/{mcp_id}" in paths
     assert "/api/mcp/installations" in paths
     assert "/api/mcp/installations/{installation_id}" in paths
+    assert "/api/mcp/bindings" in paths
+    assert "/api/mcp/bindings/{binding_id}" in paths

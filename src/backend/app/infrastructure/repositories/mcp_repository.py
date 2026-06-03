@@ -17,9 +17,14 @@ from app.domain.enums import (
     McpServerStatus,
     McpTransport,
 )
+from app.domain.mcp.mcp_binding import AgentMcpBinding
 from app.domain.mcp.mcp_installation import WorkspaceMcpInstallation
 from app.domain.mcp.mcp_server import McpServer
-from app.domain.repositories import McpInstallationRepository, McpServerRepository
+from app.domain.repositories import (
+    McpBindingRepository,
+    McpInstallationRepository,
+    McpServerRepository,
+)
 from app.infrastructure.db.models import (
     AgentMcpBindingModel,
     McpServerModel,
@@ -242,3 +247,61 @@ class PostgresMcpInstallationRepository(McpInstallationRepository):
         if m is not None:
             await self._s.delete(m)
             await self._s.flush()
+
+
+def _binding_to_domain(m: AgentMcpBindingModel) -> AgentMcpBinding:
+    return AgentMcpBinding(
+        id=m.id,
+        agent_id=m.agent_id,
+        installation_id=m.installation_id,
+        tool_subset=list(m.tool_subset or []),
+        status=McpBindingStatus(m.status),
+        created_at=m.created_at,
+        updated_at=m.updated_at,
+        unbound_at=m.unbound_at,
+    )
+
+
+class PostgresMcpBindingRepository(McpBindingRepository):
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def save(self, binding: AgentMcpBinding) -> None:
+        existing = await self._s.get(AgentMcpBindingModel, binding.id)
+        if existing is None:
+            self._s.add(
+                AgentMcpBindingModel(
+                    id=binding.id,
+                    agent_id=binding.agent_id,
+                    installation_id=binding.installation_id,
+                    tool_subset=binding.tool_subset,
+                    status=str(binding.status),
+                    unbound_at=binding.unbound_at,
+                )
+            )
+        else:
+            existing.tool_subset = binding.tool_subset
+            existing.status = str(binding.status)
+            existing.unbound_at = binding.unbound_at
+        await self._s.flush()
+
+    async def get_by_id(self, binding_id: UUID) -> AgentMcpBinding | None:
+        m = await self._s.get(AgentMcpBindingModel, binding_id)
+        return _binding_to_domain(m) if m else None
+
+    async def find_active(self, *, agent_id: UUID, installation_id: UUID) -> AgentMcpBinding | None:
+        stmt = select(AgentMcpBindingModel).where(
+            AgentMcpBindingModel.agent_id == agent_id,
+            AgentMcpBindingModel.installation_id == installation_id,
+            AgentMcpBindingModel.status == str(McpBindingStatus.ACTIVE),
+        )
+        m = (await self._s.execute(stmt)).scalars().first()
+        return _binding_to_domain(m) if m else None
+
+    async def list_active_by_agent(self, agent_id: UUID) -> list[AgentMcpBinding]:
+        stmt = select(AgentMcpBindingModel).where(
+            AgentMcpBindingModel.agent_id == agent_id,
+            AgentMcpBindingModel.status == str(McpBindingStatus.ACTIVE),
+        )
+        rows = (await self._s.execute(stmt)).scalars().all()
+        return [_binding_to_domain(m) for m in rows]

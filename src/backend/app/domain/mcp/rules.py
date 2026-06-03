@@ -56,3 +56,31 @@ def validate_install_config(transport: str, merged_config: dict[str, Any]) -> No
             raise ValidationError("E_MCP_SCHEMA_INVALID: 远程 MCP 缺少合法 url")
     else:
         raise ValidationError(f"E_MCP_SCHEMA_INVALID: 未知 transport: {transport}")
+
+
+def build_mcp_config_entry(
+    name: str, transport: str, merged_config: dict[str, Any]
+) -> dict[str, Any]:
+    """把单个 MCP 安装序列化为 MCP 2025-06-18 config 条目（请求携带 → .mcp.json）。
+
+    merged_config = server.config_json 叠加 installation.config_overrides。
+    """
+    if transport == "stdio":
+        entry: dict[str, Any] = {
+            "name": name,
+            "type": "stdio",
+            "command": merged_config.get("command", ""),
+        }
+        if merged_config.get("args"):
+            entry["args"] = merged_config["args"]
+        if merged_config.get("env"):
+            entry["env"] = merged_config["env"]
+        return entry
+    entry = {
+        "name": name,
+        "type": "http" if transport == "streamable_http" else "sse",
+        "url": merged_config.get("url", ""),
+    }
+    if merged_config.get("headers"):
+        entry["headers"] = merged_config["headers"]
+    return entry

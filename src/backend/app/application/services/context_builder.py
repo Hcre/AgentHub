@@ -49,12 +49,24 @@ class ContextBuilder:
         l1_memory: L1MemoryStore,
         watermarks: WatermarkStore,
         memory_selector=None,  # MemorySelector | None，避免循环导入
+        mcp_resolver=None,  # Callable[[UUID], Awaitable[list[dict]]] | None — agent MCP 绑定→config
     ) -> None:
         self._messages = message_repo
         self._agents = agent_repo
         self._l1 = l1_memory
         self._wm = watermarks
         self._mem = memory_selector
+        self._mcp_resolver = mcp_resolver
+
+    async def _resolve_mcp(self, agent_id) -> list[dict]:
+        """解析 agent 的 active MCP 绑定 → 请求携带 config（P2）。失败不阻塞对话。"""
+        if self._mcp_resolver is None:
+            return []
+        try:
+            return await self._mcp_resolver(agent_id)
+        except Exception:
+            logger.warning("MCP 绑定解析失败，本次不注入", exc_info=True)
+            return []
 
     async def build_for_agent(
         self,
@@ -146,6 +158,7 @@ class ContextBuilder:
             working_directory=session.workspace_path or None,
             group_delta_text=group_delta_text,
             has_history=has_history,
+            mcp_servers=await self._resolve_mcp(target_agent.id),
         )
 
     # --- 私聊路径（向后兼容 MVP 行为） ---
@@ -180,6 +193,7 @@ class ContextBuilder:
             is_group_chat=False,
             working_directory=session.workspace_path or None,
             has_history=has_history,
+            mcp_servers=await self._resolve_mcp(target_agent.id),
         )
 
     # --- 记忆注入 ---
@@ -194,6 +208,7 @@ class ContextBuilder:
         if self._mem is None:
             return ""
         from app.application.services.memory_selector import MemorySelector  # 避免循环导入
+
         ctx = MemorySelector.build_dialogue_context(raw_messages)
         memories = await self._mem.select_for_agent(
             agent_id=agent_id,
