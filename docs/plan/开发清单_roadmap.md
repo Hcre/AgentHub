@@ -198,7 +198,9 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 > 3. dry-run = 单 Docker + compose 资源限额（E-03 简化版）
 > 4. SDK Adapter（F-013）= 移下期，CLI Adapter 预留 `attach_mcp(...)` 扩展点
 >
-> **代码空间状态**（2026-06-03 扫描）：后端 0/15 + 前端 0/11 落地；4 阶段实施后翻转。
+> **代码空间状态**（2026-06-03 更新）：后端 P1 核心链路已落地（domain/mcp 4 文件 + repo 接口/实现 + models 4 表 + alembic 0006-0009 + 2 service + api/routers/mcp.py 3 端点 + schemas/mcp.py + get_current_user JWT 解析）；12 单测绿（rules/market/install 三路径）。前端 0/11 待 P3。
+>
+> **二次对账（2026-06-03，README-REVISION §9）**：P1 启动前逐文件复核 plan→code，发现首轮 review 漏掉的实体级不存在引用 R1-R10（无 workspaces/users 表、零 JWT 强制、trace_id 零设施、WS 信封不符、错误体 {detail} 非 AP-02、SQLite 强制可移植类型），并修复 `.gitignore` 裸 `backend/` 误伤源码树致新增文件被忽略的阻断 bug。落地口径：workspace_id 暂存 session_id 裸 Uuid；created_by/installed_by 裸 Uuid 存 JWT sub；可移植类型；错误体沿用 {detail}。
 >
 > **P0 计划整理 + PR-01 草案（2026-06-03 完成）**：核验修订版属实 + 校正 §3 路径漂移 + PR-01 端点冻结草案落 04-commands §2.6/§三 + 原计划残留归档（445+22+3 文件）+ ADR-0003。**P1 启动前置门：04-commands §2.6 经 2 人 Review Approve（PR-01/PR-06）→ 确认 PR-09 spec 同步 → 才能写 alembic 0006。**
 
@@ -231,8 +233,9 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 
 | 阶段 | 日期 | 范围 | 工时 | 收束 | 状态 |
 |------|------|------|------|------|------|
-| P0 整理+PR-01草案 | 6/3 | 路径校正 + 端点冻结草案 + 归档 + ADR-0003 | — | — | ✅ 完成（§2.6 待 Review） |
-| P1 F1 市场 | 6/2-6/5 | 浏览/搜索/详情/安装 + 进程管理骨架 | 52h | 收束 1 + ADR 0004 | ⬜ 待办（阻塞于 §2.6 Review） |
+| P0 整理+PR-01草案 | 6/3 | 路径校正 + 端点冻结草案 + 归档 + ADR-0003 | — | — | ✅ 完成（§2.6 Reviewer Approve） |
+| P0.5 二次对账 | 6/3 | schema↔代码审计 R1-R10 + spec 修订 + .gitignore 修正 | — | — | ✅ 完成（见 README-REVISION §9） |
+| P1 F1 市场 | 6/2-6/5 | 数据层(4 表/迁移/实体)+ 3 端点(list/detail/install) ✅；DELETE 卸载 / 真实安装进程 / market/templates ⬜ | 52h | 收束 1 + ADR 0004 | 🔄 进行中（核心链路落地+12 测试绿） |
 | P3 F3 创建 | 6/6-6/8 | stdio/sse 提交 + 模板 + dry-run 验证 | 34h | 收束 3 + ADR 0005 | ⬜ 待办 |
 | P2 F2 接入 | 6/9-6/11 | Agent 绑定 + CLI Adapter 动态挂载 | 40h | 收束 2 + ADR 0006 | ⬜ 待办 |
 | P4 F5 展示 | 6/12-6/15 | 工具调用内联卡片 + WebSocket 事件 | 33h | 收束 4 + ADR 0007 | ⬜ 待办 |
