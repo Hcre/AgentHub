@@ -297,8 +297,11 @@ agenthub/
 
 - 现有抽象基类 `AgentRuntime(ABC)`（`domain/llm/protocol.py`，契约 `stream(request)` / `stop()`）**不新增有状态方法**；改在 `AgentRequest` 上加 `mcp_servers: list[dict]` 字段（请求携带 MCP config 条目）
 - L3 `McpBindingService.build_request_mcp_servers(agent_id)` 解析 agent 的 active 绑定 → installation → server → 序列化为 MCP 2025-06-18 条目；`ContextBuilder` 装配 `AgentRequest` 时经可选 `mcp_resolver` 注入（私聊 + 群聊两路径）
-- **MCP 注入是 claude_code-only（2026-06-03 运行时审计校正）**：仅 `claude_code_runtime` 有 per-request 注入钩子 `--mcp-config <tempfile>`（董记忆工具 `_write_mcp_config`，已合并记忆 server + P2 绑定 servers）。**`opencode_runtime` / `pi_agent_runtime` 代码中 0 处 MCP**——`opencode` 读全局 `~/.config/opencode/opencode.jsonc`（无 per-request flag，写绑定会跨 agent 串号）；`pi_agent` CLI 无 MCP flag。故原"3 Runtime 均实现"不成立，连董记忆 MCP 也仅 claude_code 生效。
-- **opencode / pi_agent → NB-02 下期**：opencode 需 per-workspace 项目级 `<cwd>/opencode.json` 隔离设计（避全局串号）；pi_agent 需先确认 pi-agent CLI 是否支持 MCP。本期非 claude_code 的 agent 无 MCP（含记忆）。
+- **统一注入原则（2026-06-04，[ADR-06](../../worklogs/decisions/0006-mcp-injection-per-runtime-isolated-channel.md) 校正 R11）**：每个 Runtime 把 `request.mcp_servers` 翻译成该 CLI 原生 MCP schema，经该 CLI「隔离性最强的逐调用通道」注入；**永不改全局/共享配置**（串号根因）。通道优先级：逐调用 flag > env 指向临时文件 > 逐 workspace 项目配置 > ❌ 全局 mutation。
+- **claude_code**：`--mcp-config <tempfile>`（董记忆工具 `_write_mcp_config`，已合并记忆 server + P2 绑定 servers）。✅ 已通。
+- **opencode → 拉回本期**（NB-02 → 本期）：本机实测 `OPENCODE_CONFIG=<tmp>` 为逐进程隔离通道（非全局，零串号）。每次 `stream()` 写自包含临时配置（provider+`mcp` 块）经 env 注入；翻译层 `_entry_to_opencode()`（canonical→opencode：`command` 数组化 / env→`environment` / `enabled:true`）；顺带补齐 `agenthub-memory` 记忆。opencode 非长驻 spawn → 无需重 spawn 守卫。代码下一会话落地。
+- **pi_agent → 保持 NB-02**：本机无 `pi` 二进制 / 无可查源码 / CLI 无确认 MCP flag → 不可运行验证。`_build_cmd` 留 seam + NB-02 注释；解除前置门 = 确认上游 MCP 支持后按统一原则接入并实测。
+- **后续 CLI（codex/gemini，未实现）**：套统一原则——codex 经 `CODEX_HOME`/`-c`，gemini 经项目 `.gemini/settings.json`/env。
 - 不另起进程池/sandbox/eventbus（现有 `claude_code_process_pool.py` 为既有进程复用）
 - SDK Adapter（F-013）下期增量：在 build_cmd 等价位置读 `request.mcp_servers`
 
