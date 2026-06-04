@@ -29,8 +29,22 @@
 
 - 不触发 PR-01（不动数据模型/API）；PR-09 已同步（§MCP.2 / R11 / roadmap）；AR-02 满足（只扩展 Adapter）；T-05 满足（翻译/写入必测）。
 
+## 端到端冒烟（2026-06-04，已做）
+
+用**生产函数**（`build_mcp_config_entry`→`_build_opencode_mcp`→`_write_opencode_config`）生成 `OPENCODE_CONFIG`，同进程内 spawn `opencode mcp list`（复刻生产：server 进程存活时 CLI 子进程读临时配置）：
+
+```
+●  ✓ everything connected
+       npx -y @modelcontextprotocol/server-everything
+└  1 server(s)
+```
+
+→ opencode **不止解析配置，而是真的拉起 stdio MCP server 并完成 MCP initialize/tools 握手**（`✓ connected`）。验证对象全是生产代码（含运行时 `_find_binary` 二进制解析）。
+
+副产洞察：`atexit` 清理意味临时配置仅在写入进程存活期内有效——这正是生产语义（FastAPI server 存活时 opencode 子进程读取），同进程 spawn 成功即证。
+
 ## 给下一位的交接
 
-- opencode MCP 注入主链路已通。**未做的冒烟**：起真实 opencode agent 跑一次 `OPENCODE_CONFIG` 注入端到端（本机已验证 `opencode mcp list` 能读到，但未走完整 chat→tool_call）。建议 P4 工具展示时一并端到端验。
+- opencode MCP 注入主链路 + 连接级端到端冒烟均已通。**剩余**：完整 `chat→tool_call`（需真实 LLM provider key 跑 `opencode run`，超冒烟范围）建议 P4 工具展示时带 key 端到端验。
 - pi_agent 仍 deferred：解除前置门见 RT-MCP §3.3（装 pi → 查 MCP 通道 → 翻译+实测）。
 - 待裁：`/api/mcp` 路径与董记忆 MCP mount 重叠（ADR-05 遗留），P4 前定。

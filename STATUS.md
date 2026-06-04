@@ -18,7 +18,8 @@
   - **26 单测绿**（F1 18 + P2 8）；全量 110/112（2 失败 = pi-agent CLI 环境项）。
   - ⚠️ **运行时审计校正（2026-06-03）**：MCP 注入曾仅 claude_code 可行——opencode/pi_agent runtime 代码 0 处 MCP。**已部分解除（见下）**。
   - ✅ **统一注入原则 + opencode 拉回本期（2026-06-04，ADR-06 / RT-MCP）**：本机实测 opencode `OPENCODE_CONFIG=<tmp>` 为逐进程隔离通道（注入成功、非全局、零串号）→ R11「写全局串号」根因不成立。落码 `_entry_to_opencode`+`_build_opencode_mcp`+`_write_opencode_config`（自包含临时配置）+ `stream()` 设 `OPENCODE_CONFIG`，并补齐 opencode 记忆 MCP；8 单测绿。**pi_agent 仍 deferred**（本机无 pi 二进制可验证，`_build_cmd` 留 NB-02 seam 注释）。
-  - **P2 剩余**：收束-2 · opencode 端到端冒烟（P4 一并）· 工具级 tool_subset 过滤（P4）· pi_agent 待上游 MCP 支持。
+  - ✅ **opencode 连接级端到端冒烟通过（2026-06-04）**：生产函数生成 `OPENCODE_CONFIG` → `opencode mcp list` 显示 `✓ everything connected`（真拉起 stdio MCP server 完成 initialize/tools 握手，非仅解析配置）。
+  - **P2 剩余**：收束-2 · 完整 chat→tool_call（需 LLM key，P4 带 key 验）· 工具级 tool_subset 过滤（P4）· pi_agent 待上游 MCP 支持。
   - ✅ **`/api/mcp` 路径重叠已解决**：董记忆 MCP 协议端 mount 移到 `/api/mcp-memory`，`/api/mcp/*` 归市场 REST（§2.6 契约不变）；`settings.mcp_memory_url` 示例同步为 `.../api/mcp-memory/sse`；加路由分离回归测试。
 
 ## 🧾 技术债（收束盘点）
