@@ -248,6 +248,10 @@ class PiAgentRuntime(AgentRuntime):
         if self._api_key and not self._proxy_url:
             cmd.extend(["--api-key", self._api_key])
 
+        # NB-02: MCP 注入 seam — blocked on upstream pi CLI MCP support（见 ADR-06 §2.3 / RT-MCP §3）
+        # 解除条件：确认 pi CLI 的 MCP config 或 extension 通道存在 → 按 ADR-06 统一原则把
+        #   request.mcp_servers 经 _entry_to_pi 翻译 + 逐调用通道注入 + 实测（本机当前无 pi 二进制可验证）。
+
         return cmd
 
     def _build_env(self) -> dict[str, str]:

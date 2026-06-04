@@ -8,15 +8,18 @@
 from __future__ import annotations
 
 import asyncio
+import atexit
 import json
 import logging
 import os
 import re
+import tempfile
 from collections.abc import AsyncIterator
 from contextlib import suppress
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
+from app.core.config import settings
 from app.domain.llm.protocol import (
     AgentRequest,
     AgentRuntime,
@@ -86,6 +89,15 @@ class OpenCodeRuntime(AgentRuntime):
             env[env_key] = self._api_key
             # 动态写入 opencode.jsonc，注入 AgentHub 解密后的 key
             _write_provider_config(self._provider, self._api_key)
+
+        # MCP 注入（ADR-06 统一原则）：opencode 无 --mcp-config flag，改用逐进程隔离通道
+        # OPENCODE_CONFIG=<tmp>（本机实测可注入，非全局，零串号）。临时配置自包含
+        # （provider+mcp 块），规避 merge/replace 语义歧义。无绑定时返回 None → 退化为现状。
+        mcp_section = _build_opencode_mcp(request.mcp_servers, settings.mcp_memory_url, self._agent_id)
+        if mcp_section:
+            cfg_path = _write_opencode_config(self._provider, self._api_key, mcp_section)
+            if cfg_path:
+                env["OPENCODE_CONFIG"] = cfg_path
 
         # 多轮对话：首次创建 session，后续用 --session 继续
         ah_session = str(request.session_id)
@@ -358,3 +370,88 @@ def _write_provider_config(provider: str, api_key: str) -> None:
 
     config_path.write_text(content, encoding="utf-8")
     logger.info("OpenCode config written: %s (provider=%s)", config_path, provider)
+
+
+def _entry_to_opencode(entry: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    """canonical MCP 条目（build_mcp_config_entry）→ opencode mcp.<name> 值。
+
+    差异（RT-MCP §2.2）：command 合并为数组 / env→environment / 必带 enabled / 远程统一 remote。
+    返回 (name, opencode_value)。
+    """
+    name = entry.get("name", "")
+    if entry.get("type") == "stdio":
+        command = [entry.get("command", "")]
+        if entry.get("args"):
+            command.extend(entry["args"])
+        value: dict[str, Any] = {"type": "local", "command": command, "enabled": True}
+        if entry.get("env"):
+            value["environment"] = entry["env"]
+        return name, value
+    # sse / http → opencode remote
+    value = {"type": "remote", "url": entry.get("url", ""), "enabled": True}
+    if entry.get("headers"):
+        value["headers"] = entry["headers"]
+    return name, value
+
+
+def _build_opencode_mcp(
+    bound_servers: list[dict] | None, memory_url: str, agent_id: str
+) -> dict[str, Any]:
+    """构建 opencode `mcp` 块：记忆工具（agenthub-memory）+ P2 绑定的 MCP servers。
+
+    无任何 server 时返回 {}（调用方据此跳过 OPENCODE_CONFIG，退化为现状）。
+    """
+    mcp: dict[str, Any] = {}
+    if memory_url and agent_id:
+        mcp["agenthub-memory"] = {
+            "type": "remote",
+            "url": f"{memory_url}?agent_id={agent_id}",
+            "enabled": True,
+        }
+    for entry in bound_servers or []:
+        name, value = _entry_to_opencode(entry)
+        if name:
+            mcp[name] = value
+    return mcp
+
+
+def _build_provider_dict(provider: str, api_key: str) -> dict[str, Any]:
+    """返回 provider 配置 dict（复用 _write_provider_config 的模板，但产出 dict 供自包含临时配置）。"""
+    if provider == "deepseek":
+        parsed: dict[str, Any] = json.loads(_OPENCODE_CONFIG_TEMPLATE.replace("{api_key}", api_key))
+        return parsed
+    return {
+        "$schema": "https://opencode.ai/config.json",
+        "provider": {
+            provider: {
+                "npm": "@ai-sdk/openai-compatible",
+                "options": {"baseURL": "", "apiKey": api_key},
+            }
+        },
+    }
+
+
+def _write_opencode_config(
+    provider: str, api_key: str, mcp_section: dict[str, Any]
+) -> str | None:
+    """写自包含临时 opencode 配置（provider+mcp），返回路径供 OPENCODE_CONFIG。
+
+    delete=False 持久化供 CLI 读取，atexit 清理（对齐 claude_code _write_mcp_config）。
+    """
+    config = _build_provider_dict(provider, api_key)
+    config["mcp"] = mcp_section
+    try:
+        f = tempfile.NamedTemporaryFile(  # noqa: SIM115 — 故意 delete=False，atexit 清理
+            mode="w",
+            suffix=".json",
+            prefix="agenthub_oc_",
+            delete=False,
+            dir=tempfile.gettempdir(),
+        )
+        json.dump(config, f, ensure_ascii=False)
+        f.close()
+        atexit.register(lambda p: os.unlink(p) if os.path.exists(p) else None, f.name)
+        return f.name
+    except Exception as exc:
+        logger.warning("写 OpenCode MCP 配置失败，跳过 MCP 注入: %s", exc)
+        return None
