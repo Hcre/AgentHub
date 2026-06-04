@@ -16,7 +16,8 @@
   - **绑定**：`POST/DELETE /api/mcp/bindings` + `McpBindingService`（bind/unbind）+ binding repo；`agent_mcp_bindings` 改 status=active **部分唯一**（alembic 0010）→ 解绑后可 rebind。
   - **attach = 请求携带**（ADR-05）：`AgentRequest.mcp_servers` + `build_request_mcp_servers` + `ContextBuilder` 可选 `mcp_resolver` 注入（私聊/群聊）；claude_code runtime 扩展董 `_write_mcp_config` 合并记忆 server + 绑定 servers 写 `.mcp.json`。
   - **26 单测绿**（F1 18 + P2 8）；全量 110/112（2 失败 = pi-agent CLI 环境项）。
-  - **P2 剩余**：opencode / pi_agent runtime 的 `request.mcp_servers` 注入（各自 CLI config 机制）· 收束-2 · 工具级 tool_subset 过滤（P4）。
+  - ⚠️ **运行时审计校正（2026-06-03）**：MCP 注入**仅 claude_code 可行**——opencode/pi_agent runtime 代码 0 处 MCP，连董记忆 MCP 也只 claude_code 生效。opencode 全局 config 写绑定跨 agent 串号；pi_agent CLI 无 MCP flag。**opencode/pi_agent MCP 移 NB-02**（opencode 需 per-workspace 项目级 config 隔离；pi_agent 需确认上游 CLI MCP 支持）。非 claude_code 的 agent 本期无 MCP（含记忆）。
+  - **P2 剩余**：收束-2 · 工具级 tool_subset 过滤（P4）。
   - ⚠️ **`/api/mcp` 路径重叠**：董记忆 ASGI mount vs 本市场 router（现靠注册顺序消歧，P4 前裁）。
 
 ## 🧾 技术债（收束盘点）
@@ -28,6 +29,7 @@
 | 安装为结构校验骨架（无真实可达性/进程探针）| MCP F1 设计 | 🟢 低 | P2/P3（McpInstaller seam）|
 | NB-02 defer：AP-02 错误信封统一 / AP-05 URL 版本 / workspaces·users 实体+FK / 全局 JWT 鉴权 | 二次对账 | 🟢 低 | 平台化阶段 |
 | ⚠️ `/api/mcp` 路径重叠：董记忆 `app.mount("/api/mcp", mcp_memory ASGI)` 与本市场 router `prefix=/api/mcp` 同基路径（现靠注册顺序消歧）| F1↔记忆 merge | 🟡 中 | P2 前裁路径划分 |
+| MCP 注入 claude_code-only（R11）：opencode/pi_agent runtime 0 处 MCP，非 claude_code agent 无 MCP（含记忆）| P2 运行时审计 | 🟡 中 | NB-02（opencode per-workspace config / pi_agent 待确认上游） |
 
 ## Git ↔ 目录映射
 

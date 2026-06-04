@@ -32,6 +32,7 @@ POST `/api/mcp/bindings` 的「副作用」因此**不是主动调用**，而是
 
 - spec 同步（PR-09）：`01-architecture §MCP.2` + `04-commands §2.6` 已改为请求携带口径。
 - 绑定唯一性：`agent_mcp_bindings` 改 `status='active'` 部分唯一（alembic 0010），解绑后可 rebind（修 F1 遗留 NOTE）。
-- 已接线：claude_code runtime（主，含记忆工具合并）。**opencode / pi_agent runtime 的 `request.mcp_servers` 注入为增量**（各自 CLI config 机制：opencode.json mcp 字段 / pi-agent 待定）。
+- 已接线：claude_code runtime（主，含记忆工具合并）。
+- **运行时审计校正（2026-06-03，发起方：袁）**：MCP 注入**仅 claude_code 可行**——`opencode_runtime`/`pi_agent_runtime` 代码 0 处 MCP，连董记忆 MCP 也只 claude_code 生效。opencode 读全局 config（写绑定跨 agent 串号），pi_agent CLI 无 MCP flag。原"3 Runtime 均实现"为未经验证断言（与 R1-R10 同类盲区：只验 runtime 文件存在，未验各 CLI 注入机制存在）。opencode/pi_agent MCP 移 NB-02：opencode 需 per-workspace 项目级 config 隔离设计；pi_agent 需先确认上游 CLI MCP 支持。
 - `/api/mcp` 路径与董记忆 MCP ASGI mount 的重叠（见 STATUS 技术债）需在 P4 前裁定。
 - tool_subset 暂未进 .mcp.json（CLI 不一定支持工具级过滤）；工具级暴露/过滤留 P4。
