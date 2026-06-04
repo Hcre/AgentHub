@@ -64,7 +64,8 @@ class Settings(BaseSettings):
 
     # --- 记忆系统 MCP ---
     # MCP_MEMORY_URL 非空时，CLI spawn 注入 --mcp-config，Agent 可调用 save_memory tool
-    mcp_memory_url: str = ""   # 例：http://127.0.0.1:8000/api/mcp/sse
+    # 路径 = 记忆协议服务端 mount 点（main.py /api/mcp-memory）+ /sse（与 /api/mcp REST 分离）
+    mcp_memory_url: str = ""   # 例：http://127.0.0.1:8000/api/mcp-memory/sse
 
     # --- CORS ---
     cors_origins: str = "http://localhost:5173"

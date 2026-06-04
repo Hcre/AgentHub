@@ -111,11 +111,13 @@ app.include_router(tasks.router)
 app.include_router(skills.router)
 app.include_router(FS_ROUTER)
 app.include_router(inbox.router)
-app.include_router(mcp.router)
+app.include_router(mcp.router)  # MCP 市场/安装/绑定 REST（/api/mcp/*，§2.6 冻结契约）
 app.include_router(ws_router)
+# MCP 记忆协议服务端（SSE）独占 /api/mcp-memory，与上面 /api/mcp REST 分离，
+# 避免 mount 通配遮蔽 REST 子路径（原同挂 /api/mcp，靠注册顺序消歧，已分离）。
 _mcp_asgi = get_mcp_asgi()
 if _mcp_asgi is not None:
-    app.mount("/api/mcp", _mcp_asgi)
+    app.mount("/api/mcp-memory", _mcp_asgi)
 
 
 @app.get("/health", tags=["health"])

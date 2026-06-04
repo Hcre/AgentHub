@@ -44,3 +44,9 @@ MCP 新增 8 端点需在二者间取舍前缀。原 `IC-MCP` 稿写的是 `/api
 - 实现端：`api/routers/mcp.py` 用 `APIRouter(prefix="/api/mcp")`，与现有 routers 一致。
 - AP-05 的修订/迁移另立 backlog，不在 MCP 本期范围。
 - 若未来 review 推翻本决策（要求合规 v1），只需改 router prefix + §2.6 URL，端点设计不受影响。
+
+## 六、addendum：记忆 MCP 协议端路径分离（2026-06-03）
+
+F1+记忆系统 merge 后发现路径重叠：董记忆 MCP **协议服务端**（FastMCP SSE）`app.mount("/api/mcp", ...)` 与本 MCP **市场 REST** router（`prefix=/api/mcp`，§2.6 冻结）同基路径——mount 通配会遮蔽 REST 子路径（当时仅靠注册顺序消歧，脆弱）。
+
+**决策**：协议端（squatter）让路——mount 移到 **`/api/mcp-memory`**，`/api/mcp/*` 归市场 REST（§2.6 契约不动，无需 PR-01 重冻）。`settings.mcp_memory_url` 示例同步 `.../api/mcp-memory/sse`；`_AgentMCPWrapper` 的 `/sse`/`/messages/` 判断 mount 前缀无关，迁移透明。加 `test_mcp_routes_registered` 回归断言（`/api/mcp` 不得有裸 mount）。运维设 `MCP_MEMORY_URL` 时用新路径。

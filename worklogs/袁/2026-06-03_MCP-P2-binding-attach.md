@@ -38,3 +38,11 @@ F1 收束-1 闭合并入 main 后，启动 P2（F2 Agent 绑定 + attach_mcp）�
 
 ## 红线
 PR-02 ✅(分支) · PR-03 ✅(Conventional) · PR-09 ✅(§MCP.2+§2.6 同步+ADR-05) · CR-03 ✅(alembic 0010) · AR-01 ✅(domain/mcp 无 ORM) · AR-02 ✅(只扩展 runtime 注入，未另起运行时) · T-05 ✅(adapter config 生成必测)
+
+## 续：/api/mcp 路径分离（2026-06-03，分支 feature/mcp/split-api-mcp-paths）
+
+F1+记忆 merge 引入的 `/api/mcp` 重叠（董记忆 MCP SSE mount vs 市场 REST router 同基）已解决：
+- `main.py` mount `/api/mcp` → **`/api/mcp-memory`**；`config.py` `mcp_memory_url` 示例同步 `.../api/mcp-memory/sse`
+- §2.6 REST 契约不动（`/api/mcp/*` 归市场）；`_AgentMCPWrapper` 路径判断 mount 前缀无关，迁移透明
+- ADR-03 加 §六 addendum；`test_mcp_routes_registered` 加回归断言（`/api/mcp` 无裸 mount）；26 测试绿
+- **运维注意**：设 `MCP_MEMORY_URL` 环境变量时用新路径 `/api/mcp-memory/sse`

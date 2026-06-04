@@ -18,7 +18,7 @@
   - **26 单测绿**（F1 18 + P2 8）；全量 110/112（2 失败 = pi-agent CLI 环境项）。
   - ⚠️ **运行时审计校正（2026-06-03）**：MCP 注入**仅 claude_code 可行**——opencode/pi_agent runtime 代码 0 处 MCP，连董记忆 MCP 也只 claude_code 生效。opencode 全局 config 写绑定跨 agent 串号；pi_agent CLI 无 MCP flag。**opencode/pi_agent MCP 移 NB-02**（opencode 需 per-workspace 项目级 config 隔离；pi_agent 需确认上游 CLI MCP 支持）。非 claude_code 的 agent 本期无 MCP（含记忆）。
   - **P2 剩余**：收束-2 · 工具级 tool_subset 过滤（P4）。
-  - ⚠️ **`/api/mcp` 路径重叠**：董记忆 ASGI mount vs 本市场 router（现靠注册顺序消歧，P4 前裁）。
+  - ✅ **`/api/mcp` 路径重叠已解决**：董记忆 MCP 协议端 mount 移到 `/api/mcp-memory`，`/api/mcp/*` 归市场 REST（§2.6 契约不变）；`settings.mcp_memory_url` 示例同步为 `.../api/mcp-memory/sse`；加路由分离回归测试。
 
 ## 🧾 技术债（收束盘点）
 
@@ -28,7 +28,7 @@
 | `agent_mcp_bindings` UNIQUE(agent,installation) 与软删 rebind 冲突 | MCP F1 实现 | 🟡 中 | P2 绑定前（见 models.py NOTE）|
 | 安装为结构校验骨架（无真实可达性/进程探针）| MCP F1 设计 | 🟢 低 | P2/P3（McpInstaller seam）|
 | NB-02 defer：AP-02 错误信封统一 / AP-05 URL 版本 / workspaces·users 实体+FK / 全局 JWT 鉴权 | 二次对账 | 🟢 低 | 平台化阶段 |
-| ⚠️ `/api/mcp` 路径重叠：董记忆 `app.mount("/api/mcp", mcp_memory ASGI)` 与本市场 router `prefix=/api/mcp` 同基路径（现靠注册顺序消歧）| F1↔记忆 merge | 🟡 中 | P2 前裁路径划分 |
+| ~~`/api/mcp` 路径重叠~~ ✅ 已解决：记忆 MCP 协议端移 `/api/mcp-memory`，REST 独占 `/api/mcp/*` | F1↔记忆 merge | — | 已修（2026-06-03） |
 | MCP 注入 claude_code-only（R11）：opencode/pi_agent runtime 0 处 MCP，非 claude_code agent 无 MCP（含记忆）| P2 运行时审计 | 🟡 中 | NB-02（opencode per-workspace config / pi_agent 待确认上游） |
 
 ## Git ↔ 目录映射
