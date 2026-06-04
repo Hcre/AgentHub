@@ -231,8 +231,11 @@ class AgentRuntime(ABC):
 | R8 | `AgentRuntime` / alembic 链 / 扁平 router | `domain/llm/protocol.py`、`alembic/versions/0001-0005`、`api/routers/` 均在 | ✅ 通过 |
 | R9 | 错误体 `{error:{code,message}}`+`E_MCP_*` | `main.py` 异常处理实际发 `{"detail": str}`；全库违反 AP-02 | 对齐现状 `{detail}`，`E_MCP_*` 暂作逻辑码（errata） |
 | R10 | `JSONB/TEXT[]/ENUM/BIGSERIAL/CHAR/GIN` | 测试走 SQLite `create_all`（`conftest.py`），模型必须可移植 | 强制 `JSON/String/BigInteger.with_variant`，PG 专属类型 deferred |
+| **R11**（P2 运行时审计，2026-06-03） | §MCP.2「3 Runtime 均实现 attach_mcp」 | `opencode_runtime`/`pi_agent_runtime` **0 处 MCP**；仅 claude_code 有 `--mcp-config` 钩子（连董记忆 MCP 也只 claude_code 生效）。opencode 全局 config 写绑定跨 agent 串号；pi_agent 无 MCP flag | MCP 注入 **claude_code-only**；opencode/pi_agent 移 NB-02（opencode 需 per-workspace 项目级 config；pi_agent 需确认上游 CLI 支持）。§MCP.2/ADR-05 已校正 |
 
-**结论**：R1/R2/R3/R9 由 Reviewer 拍板（裸 Uuid / JWT-only / `{detail}`）；R4/R5/R6 属 P4 范围记 errata；R10 是 SQLite 测试强制约束。spec 已同步：`docs/specs/03-data-model` §MCP + `docs/specs/04-commands` §2.6 均加二次对账横幅。
+**方法固化（R8↔R11 同类盲区）**：R8 只验「runtime 文件/ABC 存在」，未验「各 CLI 注入机制存在」→ R11 暴露同一错误。**凡「N 个组件都能做 X」的断言，必须逐个打开验证 X 在每个组件里可行**，不可由 1 个推广到 N 个。
+
+**结论**：R1/R2/R3/R9 由 Reviewer 拍板（裸 Uuid / JWT-only / `{detail}`）；R4/R5/R6 属 P4 范围记 errata；R10 是 SQLite 测试强制约束；**R11 = MCP 注入 claude_code-only**。spec 已同步：`docs/specs/03-data-model` §MCP + `docs/specs/04-commands` §2.6 + `01-architecture` §MCP.2 均加对账横幅。
 
 ---
 

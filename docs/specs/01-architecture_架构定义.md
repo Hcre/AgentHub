@@ -297,7 +297,8 @@ agenthub/
 
 - 现有抽象基类 `AgentRuntime(ABC)`（`domain/llm/protocol.py`，契约 `stream(request)` / `stop()`）**不新增有状态方法**；改在 `AgentRequest` 上加 `mcp_servers: list[dict]` 字段（请求携带 MCP config 条目）
 - L3 `McpBindingService.build_request_mcp_servers(agent_id)` 解析 agent 的 active 绑定 → installation → server → 序列化为 MCP 2025-06-18 条目；`ContextBuilder` 装配 `AgentRequest` 时经可选 `mcp_resolver` 注入（私聊 + 群聊两路径）
-- 3 个 Runtime（`infrastructure/llm/{claude_code,opencode,pi_agent}_runtime.py`）在 build_cmd 时读 `request.mcp_servers` 写 `.mcp.json` 注入（claude_code 复用董记忆工具的 `_write_mcp_config`，合并记忆 server + 绑定 servers）；opencode/pi_agent 注入按各自 CLI config 机制（增量）
+- **MCP 注入是 claude_code-only（2026-06-03 运行时审计校正）**：仅 `claude_code_runtime` 有 per-request 注入钩子 `--mcp-config <tempfile>`（董记忆工具 `_write_mcp_config`，已合并记忆 server + P2 绑定 servers）。**`opencode_runtime` / `pi_agent_runtime` 代码中 0 处 MCP**——`opencode` 读全局 `~/.config/opencode/opencode.jsonc`（无 per-request flag，写绑定会跨 agent 串号）；`pi_agent` CLI 无 MCP flag。故原"3 Runtime 均实现"不成立，连董记忆 MCP 也仅 claude_code 生效。
+- **opencode / pi_agent → NB-02 下期**：opencode 需 per-workspace 项目级 `<cwd>/opencode.json` 隔离设计（避全局串号）；pi_agent 需先确认 pi-agent CLI 是否支持 MCP。本期非 claude_code 的 agent 无 MCP（含记忆）。
 - 不另起进程池/sandbox/eventbus（现有 `claude_code_process_pool.py` 为既有进程复用）
 - SDK Adapter（F-013）下期增量：在 build_cmd 等价位置读 `request.mcp_servers`
 
