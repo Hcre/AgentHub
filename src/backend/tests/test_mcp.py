@@ -425,3 +425,6 @@ def test_mcp_routes_registered() -> None:
     assert "/api/mcp/installations/{installation_id}" in paths
     assert "/api/mcp/bindings" in paths
     assert "/api/mcp/bindings/{binding_id}" in paths
+    # 路径分离：记忆 MCP 协议端（SSE mount）不得与 /api/mcp REST 同基（避免通配遮蔽）。
+    # mcp 包装了才有 mount；装了必须在 /api/mcp-memory，不得回退裸 /api/mcp。
+    assert "/api/mcp" not in paths
