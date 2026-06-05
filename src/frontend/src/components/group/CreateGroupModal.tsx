@@ -27,6 +27,7 @@ export function CreateGroupModal({ open, onClose }: { open: boolean; onClose: ()
   const agents = useAgentStore((s) => s.agents)
   const createGroup = useGroupStore((s) => s.createGroup)
   const openGroup = useUIStore((s) => s.openGroup)
+  const setFileWorkdir = useUIStore((s) => s.setFileWorkdir)
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -103,6 +104,7 @@ export function CreateGroupModal({ open, onClose }: { open: boolean; onClose: ()
         member_ids: selected,
         workdir: workdir.trim(),
       })
+      if (workdir.trim()) setFileWorkdir(workdir.trim())
       reset()
       onClose()
       openGroup(id) // 创建后自动进入新群（设计 §5.4）

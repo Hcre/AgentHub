@@ -22,7 +22,7 @@ function Field({ label, value }: { label: string; value: string | number }) {
  * - ESC 或点击遮罩关闭
  */
 export function AgentDetailDrawer() {
-  const { agentDrawerAgentId, closeAgentDrawer, openConversation } = useUIStore()
+  const { agentDrawerAgentId, closeAgentDrawer, openConversation, setFileWorkdir } = useUIStore()
   const open = agentDrawerAgentId !== null
   const { agents, profiles, removeAgent } = useAgentStore()
   const conversations = useChatStore((s) => s.conversations)
@@ -51,6 +51,8 @@ export function AgentDetailDrawer() {
 
   const handleStartChatConfirm = (name: string, workdir?: string) => {
     const convId = addConversation(agent.id, { name, workdir })
+    // 把 workdir 同步到 uiStore 作为文件预览的全局兜底（即使切到别的会话也能用）
+    if (workdir?.trim()) setFileWorkdir(workdir.trim())
     openConversation(agent.id, convId)
     setShowStartChat(false)
     closeAgentDrawer()

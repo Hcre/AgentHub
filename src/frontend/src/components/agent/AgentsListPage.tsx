@@ -22,7 +22,7 @@ export function AgentsListPage() {
   const { agents, removeAgent } = useAgentStore()
   const conversations = useChatStore((s) => s.conversations)
   const addConversation = useChatStore((s) => s.addConversation)
-  const { openConversation, openAgentDrawer } = useUIStore()
+  const { openConversation, openAgentDrawer, setFileWorkdir } = useUIStore()
 
   const [batchMode, setBatchMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
@@ -62,6 +62,7 @@ export function AgentsListPage() {
   const handleStartChatConfirm = (name: string, workdir?: string) => {
     if (!pendingChat) return
     const convId = addConversation(pendingChat.agentId, { name, workdir })
+    if (workdir?.trim()) setFileWorkdir(workdir.trim())
     openConversation(pendingChat.agentId, convId)
     setPendingChat(null)
   }

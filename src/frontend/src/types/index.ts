@@ -288,6 +288,8 @@ export type IconName =
   | 'lock'
   | 'moreVertical'
   | 'panelLeftClose'
+  | 'globe'
+  | 'rocket'
 
 // ── 后端 API DTO（与 backend schema 对齐，字段为 snake_case）──
 

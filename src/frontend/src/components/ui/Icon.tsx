@@ -42,6 +42,8 @@ import {
   Lock,
   MoreVertical,
   PanelLeftClose,
+  Globe,
+  Rocket,
   X,
   Zap,
   type LucideIcon,
@@ -94,6 +96,8 @@ const MAP: Record<IconName, LucideIcon> = {
   lock: Lock,
   moreVertical: MoreVertical,
   panelLeftClose: PanelLeftClose,
+  globe: Globe,
+  rocket: Rocket,
 }
 
 export interface IconProps {
