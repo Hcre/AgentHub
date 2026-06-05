@@ -37,6 +37,7 @@ function toUiAgent(a: ApiAgent, idx: number): Agent {
     color: COLOR_CYCLE[idx % COLOR_CYCLE.length] ?? 'neutral',
     online: true,
     skillCount: a.skills.length,
+    agentSystem: a.agent_system,
   }
 }
 
@@ -125,6 +126,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         color,
         online: true,
         skillCount: input.skills.length,
+        agentSystem: input.agentSystem,
       }
       set((s) => ({
         agents: [...s.agents, agent],

@@ -39,6 +39,8 @@ export interface Agent {
   color: AgentColor
   online: boolean
   skillCount?: number
+  /** 运行时 CLI：claude_code / pi_agent / opencode / mock */
+  agentSystem?: string
 }
 
 export interface Conversation {

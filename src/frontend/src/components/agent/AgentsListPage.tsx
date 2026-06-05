@@ -4,6 +4,8 @@ import { useAgentStore } from '../../stores/agentStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useUIStore } from '../../stores/uiStore'
 import { StartChatModal } from '../chat/StartChatModal'
+import { CliIcon } from '../icons/cli/CliIcon'
+import { CLI_LABEL } from '../icons/cli/cliLabels'
 import { Avatar, Button, Icon } from '../ui'
 import type { IconName } from '../../types'
 import { CreateAgentModal } from './CreateAgentModal'
@@ -17,7 +19,7 @@ import { CreateAgentModal } from './CreateAgentModal'
  *   - 详细按钮 → 打开右侧 AgentDetailDrawer
  */
 export function AgentsListPage() {
-  const { agents, profiles, removeAgent } = useAgentStore()
+  const { agents, removeAgent } = useAgentStore()
   const conversations = useChatStore((s) => s.conversations)
   const addConversation = useChatStore((s) => s.addConversation)
   const { openConversation, openAgentDrawer } = useUIStore()
@@ -166,10 +168,9 @@ export function AgentsListPage() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
             {sortedAgents.map((agent) => {
               const selected = selectedIds.has(agent.id)
-              const profile = profiles[agent.id]
               return (
                 <article
                   key={agent.id}
@@ -186,10 +187,10 @@ export function AgentsListPage() {
                       : '',
                   )}
                 >
-                  {/* Row 1: 头像 + 名称/角色 + 弹性占位 + 按钮区
-                      - 弹性占位 flex-1 把按钮推到卡片右边（p-3 提供 12px 边距）
-                      - 占位 min-w-2（8px）保证名字再长也不会贴近按钮
-                      - 名字过长 truncate（占位压到 8px） */}
+                  {/* Row 1: 头像 + 名称/CLI 标/角色 + 按钮区
+                      - 名字区 min-w-[80px] + flex-1，保证名字至少有 80px 可用
+                      - CLI 标放名字后面（flex-shrink-0，名字不够时标不挤、名字 truncate）
+                      - 按钮区在父 flex 末尾（flex-shrink-0 贴右） */}
                   <div className="flex items-start gap-2">
                     <Avatar
                       initial={agent.name[0] ?? '?'}
@@ -198,17 +199,25 @@ export function AgentsListPage() {
                       online={agent.online}
                       className="flex-shrink-0"
                     />
-                    <div className="min-w-0">
-                      <div className="truncate text-[13.5px] font-semibold leading-tight">
-                        {agent.name}
+                    <div className="min-w-[80px] flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold leading-tight">
+                          {agent.name}
+                        </span>
+                        {agent.agentSystem && (
+                          <span
+                            className="flex flex-shrink-0 items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-1.5 py-0.5 font-mono text-[9.5px] text-muted-foreground"
+                            title={CLI_LABEL[agent.agentSystem] ?? agent.agentSystem}
+                          >
+                            <CliIcon agentSystem={agent.agentSystem} size={10} className="opacity-90" />
+                            {CLI_LABEL[agent.agentSystem] ?? agent.agentSystem}
+                          </span>
+                        )}
                       </div>
                       <div className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">
                         {agent.role}
                       </div>
                     </div>
-
-                    {/* 弹性占位（吃剩余空间 + 8px 最小） */}
-                    <div className="min-w-2 flex-1" aria-hidden />
 
                     {/* 右侧：批量模式=复选框；普通模式=3 个玻璃图标按钮（贴右） */}
                     {batchMode ? (
@@ -246,11 +255,6 @@ export function AgentsListPage() {
                       </div>
                     )}
                   </div>
-
-                  {/* Row 2: 至少 2 行 bio，min-h 锁高度让所有卡片同高 */}
-                  <p className="line-clamp-2 min-h-[2.6em] text-[12px] leading-snug text-foreground/75">
-                    {profile?.bio?.trim() ? profile.bio : '暂无简介'}
-                  </p>
                 </article>
               )
             })}
