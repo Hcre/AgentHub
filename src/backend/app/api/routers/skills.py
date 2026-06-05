@@ -240,3 +240,30 @@ async def browse_dir(path: str = ""):
     parent = str(Path(real).parent)
     parent_win = _to_win_path(parent) if parent != real else ""
     return {"path": path, "parent": parent_win, "items": items}
+
+
+from pydantic import BaseModel
+
+
+class MkdirIn(BaseModel):
+    parent: str  # 父目录（Windows 或 Unix 路径）
+    name: str  # 新建文件夹名
+
+
+@FS_ROUTER.post("/mkdir")
+async def mkdir_dir(body: MkdirIn):
+    """在指定目录下新建一个空文件夹。返回新建路径。"""
+    parent_real = _resolve_path(body.parent)
+    if not os.path.isdir(parent_real):
+        raise HTTPException(status_code=400, detail=f"父目录不存在: {body.parent}")
+    # 禁止路径穿越与危险字符
+    if not body.name or any(c in body.name for c in "/\\:*?\"<>|"):
+        raise HTTPException(status_code=400, detail="文件夹名不合法")
+    target = os.path.join(parent_real, body.name)
+    if os.path.exists(target):
+        raise HTTPException(status_code=409, detail=f"已存在: {body.name}")
+    try:
+        os.makedirs(target, exist_ok=False)
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"创建失败: {e}")
+    return {"path": _to_win_path(target), "name": body.name, "parent": body.parent}

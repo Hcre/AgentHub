@@ -178,7 +178,7 @@ export function TasksTabView() {
                     <td className="px-3 py-2.5">
                       {a ? (
                         <span className="inline-flex items-center gap-1.5">
-                          <Avatar initial={a.name[0] ?? '?'} color={a.color} size={18} />
+                          <Avatar initial={a.name[0] ?? '?'} color={a.color} size={32} />
                           {a.name}
                         </span>
                       ) : (

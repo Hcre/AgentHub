@@ -148,7 +148,8 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 | `skills/deploy/` | 部署项目：docker compose up → 验证 |
 | `skills/spec-driven-development/` | 新功能无 spec 时先写规格再写代码 |
 | `skills/test-claude-adapter/` | ClaudeAdapter 联调 |
-| `skills/前端统一规范/` | 前端规约 |
+| `skills/a社规范/` | a 社内部规范（含 Anthropic brand 参考） |
+| `skills/frontend-style-edit/` | 前端修改（截图+描述+布局 → 定位文件 + 保持风格） |
 
 每个 Skill 内置检查清单，按步执行。AgentHub 项目专有 Skill（xhs/dbs 系列）在 `.agenthub/skills/`。
 

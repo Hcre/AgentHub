@@ -44,7 +44,10 @@ interface ChatState {
   applyStreamEvent: (key: string, event: StreamEvent) => void
   /** mock 降级：本地假回复（WS 未连接时用） */
   send: (agentId: string, conversationId: string, text: string) => void
-  addConversation: (agentId: string) => string
+  addConversation: (
+    agentId: string,
+    opts?: { name?: string; workdir?: string },
+  ) => string
   toggleStage: (agentId: string, conversationId: string, taskId: string) => void
 }
 
@@ -151,10 +154,17 @@ export const useChatStore = create<ChatState>()(
     }, 1100)
   },
 
-  addConversation: (agentId) => {
+  addConversation: (agentId, opts) => {
     const id = uid('c')
     const existing = get().conversations[agentId] ?? []
-    const conv: Conversation = { id, name: `对话 ${existing.length + 1}`, subtitle: '刚刚开始' }
+    const trimmedName = opts?.name?.trim()
+    const trimmedWorkdir = opts?.workdir?.trim()
+    const conv: Conversation = {
+      id,
+      name: trimmedName || `对话 ${existing.length + 1}`,
+      subtitle: '刚刚开始',
+      workdir: trimmedWorkdir || undefined,
+    }
     set((s) => ({
       conversations: { ...s.conversations, [agentId]: [...existing, conv] },
     }))

@@ -31,7 +31,7 @@ export function CoordinatorPlan({ plan, group }: { plan: Plan; group?: Group }) 
                 {s.id}
               </span>
               <div className="flex w-[120px] flex-shrink-0 items-center gap-2">
-                <Avatar initial={a.initial} color={a.color} size={20} />
+                <Avatar initial={a.initial} color={a.color} size={32} />
                 <span className="truncate text-[12.5px] font-medium">{a.name}</span>
               </div>
               <span className="flex-1 truncate text-[13px]">{s.label}</span>

@@ -1,57 +1,12 @@
-import { type MouseEvent, useState } from 'react'
+import { type MouseEvent, useMemo, useState } from 'react'
 import { cn } from '../../lib/cn'
-import { nav, org, user } from '../../data/mock'
 import { useAgentStore } from '../../stores/agentStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useGroupStore } from '../../stores/groupStore'
-import { useUIStore, type Section } from '../../stores/uiStore'
-import { CreateAgentModal } from '../agent/CreateAgentModal'
+import { useUIStore } from '../../stores/uiStore'
 import { CreateGroupModal } from '../group/CreateGroupModal'
-import { Avatar, Button, ContextMenu, Icon, Kbd } from '../ui'
+import { Avatar, ContextMenu, Icon } from '../ui'
 import type { ContextMenuItem } from '../ui'
-import type { IconName } from '../../types'
-
-function NavRow({
-  icon,
-  label,
-  count,
-  active,
-  dotted,
-  badge,
-  onClick,
-  onContextMenu,
-}: {
-  icon?: IconName
-  label: string
-  count?: number
-  active?: boolean
-  dotted?: boolean
-  badge?: boolean
-  onClick: () => void
-  onContextMenu?: (e: MouseEvent) => void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      onContextMenu={onContextMenu}
-      data-active={active ? 'true' : undefined}
-      className={cn(
-        'group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
-        'data-[active=true]:bg-accent data-[active=true]:font-medium data-[active=true]:text-foreground',
-      )}
-    >
-      {icon && <Icon name={icon} className="h-4 w-4" />}
-      {dotted && (
-        <span className="w-4 text-center font-mono text-[13px] text-muted-foreground/70">#</span>
-      )}
-      <span className="flex-1 truncate text-left">{label}</span>
-      {count !== undefined && count > 0 && (
-        <span className="font-mono text-[10.5px] tabular-nums text-muted-foreground">{count}</span>
-      )}
-      {badge && <span className="h-1.5 w-1.5 rounded-full bg-brand" />}
-    </button>
-  )
-}
 
 function SectionHeader({
   label,
@@ -91,217 +46,168 @@ function SectionHeader({
   )
 }
 
+/**
+ * 左侧「会话入口」面板：
+ *   - 顶部 ⌘K 搜索
+ *   - 群组 section（带「+」创建群组）
+ *   - 私聊 section（扁平列表：所有 Agent 的会话平铺，按最近倒序；带 Agent 名前缀）
+ *
+ * 已被外迁的元素：
+ *   - 收件箱/任务/日历导航 → 由最左侧 NavRail 替代
+ *   - 顶部 workspace 标题 + 折叠按钮 → 用户头像已迁到 NavRail
+ *   - 底部用户组件（设置/在线状态） → 由 NavRail 底部 + TweaksPanel 替代
+ *   - AI 队友折叠列表 + 创建队友按钮 → 迁到 AI 队友主页（NavRail → 队友图标）
+ */
 export function LeftPanel() {
   const {
     section,
     activeAgentId,
     activeConversationId,
     activeGroupId,
-    setSection,
     openConversation,
     openGroup,
     toggleSidebar,
   } = useUIStore()
   const agents = useAgentStore((s) => s.agents)
   const groups = useGroupStore((s) => s.groups)
+  const messagesByGroup = useGroupStore((s) => s.messagesByGroup)
   const conversations = useChatStore((s) => s.conversations)
-  const addConversation = useChatStore((s) => s.addConversation)
-  const [openCh, setOpenCh] = useState(true)
-  const [openAI, setOpenAI] = useState(true)
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({ editor: true })
+  const [openGroup_, setOpenGroup] = useState(true)
+  const [openDM, setOpenDM] = useState(true)
   const renameGroup = useGroupStore((s) => s.renameGroup)
   const deleteGroup = useGroupStore((s) => s.deleteGroup)
-  const [createOpen, setCreateOpen] = useState(false)
   const [groupCreateOpen, setGroupCreateOpen] = useState(false)
   const [menu, setMenu] = useState<{ groupId: string; x: number; y: number } | null>(null)
 
+  // 扁平私聊列表：每 Agent 内会话倒序（最新在前），跨 Agent 保持 store 顺序
+  const dmList = useMemo(() => {
+    return agents.flatMap((a) =>
+      (conversations[a.id] ?? [])
+        .slice()
+        .reverse()
+        .map((c) => ({ agent: a, conv: c, key: `${a.id}:${c.id}` })),
+    )
+  }, [agents, conversations])
+
   return (
     <aside className="glass-panel flex h-full w-full flex-col overflow-hidden rounded-2xl border shadow-sm">
-      <header className="flex items-center gap-2 px-3 pb-2 pt-3">
-        <div className="grid h-7 w-7 place-items-center rounded-md bg-gradient-to-br from-brand to-brand-deep text-sm font-semibold text-brand-foreground shadow-sm">
-          {org.initial}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[14px] font-medium">{org.name}</div>
-          <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            workspace
-          </div>
-        </div>
-        <Button variant="ghost" size="iconSm" onClick={toggleSidebar} title="收起侧边栏">
-          <Icon name="panelLeft" className="h-3.5 w-3.5" />
-        </Button>
-      </header>
-
-      <div className="px-3 pb-2">
-        <div className="flex h-[30px] items-center gap-2 rounded-md border glass-soft px-2.5 text-muted-foreground transition-colors focus-within:border-brand/40">
+      {/* 顶部：搜索框 + 收起按钮 */}
+      <div className="flex items-center gap-1 px-3 pb-2 pt-3">
+        <div className="flex h-[30px] flex-1 items-center gap-2 rounded-md border glass-soft px-2.5 text-muted-foreground transition-colors focus-within:border-brand/40">
           <Icon name="search" className="h-3.5 w-3.5" />
           <input
             placeholder="跳转到…"
             className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground/70"
           />
-          <Kbd>⌘K</Kbd>
         </div>
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          title="收起会话列表"
+          aria-label="收起会话列表"
+          className="grid h-[30px] w-[30px] flex-shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Icon name="panelLeftClose" className="h-3.5 w-3.5" />
+        </button>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 pb-2">
-        <div className="space-y-px">
-          {nav.map((n) => (
-            <NavRow
-              key={n.id}
-              icon={n.icon}
-              label={n.label}
-              count={n.count}
-              active={section === n.id}
-              onClick={() => setSection(n.id as Section)}
-            />
-          ))}
-        </div>
-
+        {/* 群组 */}
         <SectionHeader
           label="群组"
-          collapsed={!openCh}
-          onToggle={() => setOpenCh((v) => !v)}
+          collapsed={!openGroup_}
+          onToggle={() => setOpenGroup((v) => !v)}
           onAdd={() => setGroupCreateOpen(true)}
           addTitle="创建群组"
         />
-        {openCh && (
+        {openGroup_ && (
           <div className="space-y-px">
-            {groups.map((g) => (
-              <NavRow
-                key={g.id}
-                label={g.name}
-                dotted
-                active={section === 'group' && activeGroupId === g.id}
-                onClick={() => openGroup(g.id)}
-                onContextMenu={(e) => {
-                  e.preventDefault()
-                  setMenu({ groupId: g.id, x: e.clientX, y: e.clientY })
-                }}
-              />
-            ))}
-          </div>
-        )}
-
-        <SectionHeader
-          label="AI 队友"
-          collapsed={!openAI}
-          onToggle={() => setOpenAI((v) => !v)}
-          onAdd={() => setCreateOpen(true)}
-          addTitle="创建助手"
-        />
-        {openAI && (
-          <div className="space-y-px">
-            {agents.map((a) => {
-              const convs = conversations[a.id] ?? []
-              const firstConv = convs[0]?.id ?? 'c1'
-              const isActive = section === 'chat' && activeAgentId === a.id
-              const isOpen = expanded[a.id] ?? false
+            {groups.map((g) => {
+              // 该群最新一条消息（与私聊的 conv.subtitle 对位）
+              const msgs = messagesByGroup[g.id] ?? []
+              const lastMsg = msgs[msgs.length - 1]
+              const lastText =
+                lastMsg?.kind === 'plan'
+                  ? '📋 分发方案'
+                  : lastMsg?.text?.trim() || '暂无消息'
               return (
-                <div key={a.id}>
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    data-active={isActive ? 'true' : undefined}
-                    onClick={() => openConversation(a.id, firstConv)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        openConversation(a.id, firstConv)
-                      }
-                    }}
-                    className={cn(
-                      'group/agent flex w-full cursor-pointer items-center gap-2 rounded-md py-1.5 pl-2 pr-1 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
-                      'data-[active=true]:bg-accent data-[active=true]:font-medium data-[active=true]:text-foreground',
-                    )}
-                  >
-                    <Avatar
-                      initial={a.name[0] ?? '?'}
-                      color={a.color}
-                      size={20}
-                      online={a.online}
-                    />
-                    <span className="flex-1 truncate text-left">{a.name}</span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        const id = addConversation(a.id)
-                        openConversation(a.id, id)
-                      }}
-                      title="新建对话"
-                      className="grid h-5 w-5 place-items-center rounded text-muted-foreground opacity-0 transition-all hover:bg-accent hover:text-foreground group-hover/agent:opacity-100"
-                    >
-                      <Icon name="plus" className="h-3 w-3" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setExpanded((m) => ({ ...m, [a.id]: !isOpen }))
-                      }}
-                      title={isOpen ? '收起历史会话' : '展开历史会话'}
-                      className="inline-flex items-center gap-1 rounded border border-transparent bg-brand/10 px-1.5 font-mono text-[9px] uppercase tracking-wider text-brand transition-colors hover:border-brand/30"
-                    >
-                      <span>AI</span>
-                      <Icon
-                        name="chevronDown"
-                        className={cn('h-2 w-2 transition-transform', !isOpen && '-rotate-90')}
-                      />
-                    </button>
-                  </div>
-                  {isOpen && (
-                    <div className="mb-1 ml-5 mt-0.5 space-y-px border-l border-border/60 pl-1">
-                      {convs.map((c) => {
-                        const on = isActive && activeConversationId === c.id
-                        return (
-                          <button
-                            key={c.id}
-                            onClick={() => openConversation(a.id, c.id)}
-                            data-active={on ? 'true' : undefined}
-                            className={cn(
-                              'flex w-full items-start gap-2 rounded-md px-2 py-1 text-left text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
-                              'data-[active=true]:bg-brand/10 data-[active=true]:text-foreground',
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                'mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full',
-                                on ? 'bg-brand' : 'bg-muted-foreground/40',
-                              )}
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate text-[12.5px]">{c.name}</div>
-                              <div className="truncate font-mono text-[10px] text-muted-foreground/80">
-                                {c.subtitle}
-                              </div>
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
+                <button
+                  key={g.id}
+                  onClick={() => openGroup(g.id)}
+                  onContextMenu={(e: MouseEvent) => {
+                    e.preventDefault()
+                    setMenu({ groupId: g.id, x: e.clientX, y: e.clientY })
+                  }}
+                  data-active={section === 'group' && activeGroupId === g.id ? 'true' : undefined}
+                  className={cn(
+                    'flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+                    'data-[active=true]:bg-accent data-[active=true]:font-medium data-[active=true]:text-foreground',
                   )}
-                </div>
+                >
+                  <Avatar initial={g.name[0] ?? '?'} color="brand" size={32} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[12.5px] font-medium leading-tight">{g.name}</div>
+                    <div className="truncate text-[10.5px] leading-tight text-muted-foreground/80">
+                      {lastText}
+                    </div>
+                  </div>
+                </button>
               )
             })}
           </div>
         )}
+
+        {/* 私聊（扁平） */}
+        <SectionHeader
+          label="私聊"
+          collapsed={!openDM}
+          onToggle={() => setOpenDM((v) => !v)}
+        />
+        {openDM && (
+          <div className="space-y-px">
+            {dmList.length === 0 ? (
+              <p className="px-2 py-1.5 text-[12px] text-muted-foreground/70">
+                还没有私聊 · 去 AI 队友里发起
+              </p>
+            ) : (
+              dmList.map(({ agent, conv, key }) => {
+                const isActive =
+                  section === 'chat' && activeAgentId === agent.id && activeConversationId === conv.id
+                return (
+                  <button
+                    key={key}
+                    onClick={() => openConversation(agent.id, conv.id)}
+                    data-active={isActive ? 'true' : undefined}
+                    className={cn(
+                      'flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+                      'data-[active=true]:bg-brand/10 data-[active=true]:text-foreground',
+                    )}
+                  >
+                    <Avatar
+                      initial={agent.name[0] ?? '?'}
+                      color={agent.color}
+                      size={32}
+                      online={agent.online}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-[12.5px] font-medium">{conv.name}</span>
+                        <span className="flex-shrink-0 truncate font-mono text-[9.5px] uppercase tracking-wider text-muted-foreground/60">
+                          {agent.name}
+                        </span>
+                      </div>
+                      <div className="truncate text-[10.5px] text-muted-foreground/80">
+                        {conv.subtitle}
+                      </div>
+                    </div>
+                  </button>
+                )
+              })
+            )}
+          </div>
+        )}
       </nav>
 
-      <footer className="border-t border-border/70 p-2">
-        <div className="flex items-center gap-2 rounded-md border border-border/50 p-2 glass-soft">
-          <Avatar initial={user.initial} color="neutral" size={28} online />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-medium">{user.handle}</div>
-            <div className="flex items-center gap-1 font-mono text-[10.5px] text-muted-foreground">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <span>在线</span>
-            </div>
-          </div>
-          <Button variant="ghost" size="iconSm" className="text-muted-foreground">
-            <Icon name="moreHorizontal" className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </footer>
-
-      <CreateAgentModal open={createOpen} onClose={() => setCreateOpen(false)} />
       <CreateGroupModal open={groupCreateOpen} onClose={() => setGroupCreateOpen(false)} />
       {menu && (
         <ContextMenu
@@ -324,7 +230,7 @@ export function LeftPanel() {
                 onClick: () => {
                   if (window.confirm('确定删除该群组？')) {
                     deleteGroup(menu.groupId)
-                    if (activeGroupId === menu.groupId) setSection('inbox')
+                    if (activeGroupId === menu.groupId) openConversation(activeAgentId, activeConversationId)
                   }
                 },
               },

@@ -38,7 +38,7 @@ export function TaskCard({
       <div className="text-[13px] font-medium leading-snug">{task.title}</div>
       <div className="flex items-center justify-between pt-1">
         <span className="font-mono text-[11px] text-muted-foreground">{task.due}</span>
-        {assignee && <Avatar initial={assignee.name[0] ?? '?'} color={assignee.color} size={20} />}
+        {assignee && <Avatar initial={assignee.name[0] ?? '?'} color={assignee.color} size={32} />}
       </div>
     </div>
   )

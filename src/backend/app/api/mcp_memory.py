@@ -10,9 +10,11 @@ agent_id 传递方式：
   1. SSE 连接时：解析响应体找到 session_id，写入 session→agent 映射。
   2. POST /messages/ 时：按 session_id 查映射，注入 ContextVar。
   save_memory 工具从 ContextVar 读 agent_id，而非 os.environ（env 字段对 SSE 无效）。
-"""
 
-from __future__ import annotations
+注：本文件 **不** 写 `from __future__ import annotations`——mcp 1.12.x 的 Tool.from_function
+用 `inspect.signature(fn)` 拿到的注解必须是真实类（issubclass 检查），
+未来注解会变成字符串，issubclass 抛 TypeError。其它文件正常用 future 注解。
+"""
 
 import logging
 from contextvars import ContextVar

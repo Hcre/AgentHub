@@ -1,4 +1,4 @@
-import { Avatar, Badge } from '../ui'
+import { Avatar } from '../ui'
 import type { Agent } from '../../types'
 
 export function TypingIndicator({ agent }: { agent: Agent }) {
@@ -8,7 +8,6 @@ export function TypingIndicator({ agent }: { agent: Agent }) {
       <div className="flex-1">
         <div className="mb-1 flex items-center gap-2">
           <span className="text-[13px] font-semibold">{agent.name}</span>
-          <Badge variant="brand">AI</Badge>
           <span className="font-mono text-[11px] text-muted-foreground">正在输入…</span>
         </div>
         <div className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-3 py-1.5">

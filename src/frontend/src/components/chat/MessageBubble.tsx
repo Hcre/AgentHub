@@ -1,7 +1,7 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
-import { Avatar, Badge, Button, Icon } from '../ui'
+import { Avatar, Button, Icon } from '../ui'
 import type { Agent, ChatMessage, UserInfo } from '../../types'
 
 export function MessageBubble({
@@ -26,7 +26,6 @@ export function MessageBubble({
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex items-center gap-2">
           <span className="text-[13px] font-semibold">{isAgent ? agent.name : user.handle}</span>
-          {isAgent && <Badge variant="brand">AI</Badge>}
           <span className="font-mono text-[11px] text-muted-foreground">{msg.time}</span>
         </div>
         <div className="prose text-[14px] leading-[1.6] text-foreground">

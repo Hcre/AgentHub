@@ -4,7 +4,7 @@ import { useDebounce } from '../../hooks/useDebounce'
 import { useAgentStore } from '../../stores/agentStore'
 import { useGroupStore } from '../../stores/groupStore'
 import { useUIStore } from '../../stores/uiStore'
-import { Avatar, Button, Dialog, DialogContent, Icon, Input, Textarea } from '../ui'
+import { Avatar, Button, Dialog, DialogContent, Icon, Input, Textarea, WorkspaceBrowser } from '../ui'
 
 function Label({ children }: { children: string }) {
   return <span className="text-[12px] font-medium text-muted-foreground">{children}</span>
@@ -30,6 +30,8 @@ export function CreateGroupModal({ open, onClose }: { open: boolean; onClose: ()
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [workdir, setWorkdir] = useState('')
+  const [wsBrowserOpen, setWsBrowserOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<string[]>([])
   // 服务端校验结果按名称缓存；'unknown' = 后端不可用，提交时由 409 兜底
@@ -75,6 +77,7 @@ export function CreateGroupModal({ open, onClose }: { open: boolean; onClose: ()
   const reset = () => {
     setName('')
     setDescription('')
+    setWorkdir('')
     setQuery('')
     setSelected([])
     setChecked({})
@@ -84,7 +87,11 @@ export function CreateGroupModal({ open, onClose }: { open: boolean; onClose: ()
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
 
   const canSubmit =
-    NAME_RE.test(name) && nameState !== 'taken' && nameState !== 'checking' && !submitting
+    NAME_RE.test(name) &&
+    nameState !== 'taken' &&
+    nameState !== 'checking' &&
+    workdir.trim().length > 0 &&
+    !submitting
 
   const submit = async () => {
     if (!canSubmit) return
@@ -94,6 +101,7 @@ export function CreateGroupModal({ open, onClose }: { open: boolean; onClose: ()
         name: name.trim(),
         description: description.trim() || undefined,
         member_ids: selected,
+        workdir: workdir.trim(),
       })
       reset()
       onClose()
@@ -138,6 +146,28 @@ export function CreateGroupModal({ open, onClose }: { open: boolean; onClose: ()
             />
           </label>
 
+          <label className="flex flex-col gap-1">
+            <Label>工作目录 *</Label>
+            <div className="flex gap-1">
+              <Input
+                value={workdir}
+                onChange={(e) => setWorkdir(e.target.value)}
+                placeholder="选择项目根目录（必填，用于群聊上下文）…"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setWsBrowserOpen(true)}
+                type="button"
+              >
+                浏览
+              </Button>
+            </div>
+            <p className="font-mono text-[11px] text-muted-foreground/70">
+              群聊将以该目录作为上下文根（可在 WorkspaceBrowser 里点 + 新建文件夹）
+            </p>
+          </label>
+
           <div className="flex flex-col gap-1">
             <div className="flex items-center justify-between">
               <Label>成员</Label>
@@ -167,7 +197,7 @@ export function CreateGroupModal({ open, onClose }: { open: boolean; onClose: ()
                         <span className="grid h-4 w-4 place-items-center rounded border">
                           {on && <Icon name="check" className="h-3 w-3 text-brand" />}
                         </span>
-                        <Avatar initial={a.name[0] ?? '?'} color={a.color} size={20} />
+                        <Avatar initial={a.name[0] ?? '?'} color={a.color} size={32} />
                         <span className="flex-1 truncate">{a.name}</span>
                       </button>
                     )
@@ -195,7 +225,7 @@ export function CreateGroupModal({ open, onClose }: { open: boolean; onClose: ()
                       if (!a) return null
                       return (
                         <div key={id} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm">
-                          <Avatar initial={a.name[0] ?? '?'} color={a.color} size={20} />
+                          <Avatar initial={a.name[0] ?? '?'} color={a.color} size={32} />
                           <span className="flex-1 truncate">{a.name}</span>
                           <button
                             onClick={() => toggle(id)}
@@ -222,6 +252,16 @@ export function CreateGroupModal({ open, onClose }: { open: boolean; onClose: ()
             创建
           </Button>
         </footer>
+
+        <WorkspaceBrowser
+          key={wsBrowserOpen ? 'open' : 'closed'}
+          open={wsBrowserOpen}
+          onClose={() => setWsBrowserOpen(false)}
+          onSelect={(path) => {
+            setWorkdir(path)
+            setWsBrowserOpen(false)
+          }}
+        />
       </DialogContent>
     </Dialog>
   )

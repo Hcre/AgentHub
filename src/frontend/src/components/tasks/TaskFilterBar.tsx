@@ -69,7 +69,7 @@ function Pill({
                 onClick={() => onSelect({ assignee: a.id })}
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12.5px] hover:bg-accent"
               >
-                <Avatar initial={a.name[0] ?? '?'} color={a.color} size={18} /> {a.name}
+                <Avatar initial={a.name[0] ?? '?'} color={a.color} size={32} /> {a.name}
               </button>
             ))}
         </div>

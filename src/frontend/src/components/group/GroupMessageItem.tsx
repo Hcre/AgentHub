@@ -51,12 +51,7 @@ export function GroupMessageItem({ msg, group }: { msg: GroupMessage; group?: Gr
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex items-center gap-2">
           <span className="text-[13px] font-semibold">{actor.name}</span>
-          {!isUser &&
-            (isCoordinator ? (
-              <Badge variant="brand">协调者</Badge>
-            ) : (
-              <Badge variant="brand">AI</Badge>
-            ))}
+          {!isUser && isCoordinator && <Badge variant="brand">协调者</Badge>}
           {msg.requiresApproval && (
             <Badge variant="warning" className="gap-1">
               <Icon name="shieldCheck" className="h-2.5 w-2.5" />

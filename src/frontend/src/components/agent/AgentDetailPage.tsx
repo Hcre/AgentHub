@@ -46,13 +46,12 @@ export function AgentDetailPage() {
         <Avatar
           initial={agent.name[0] ?? '?'}
           color={agent.color}
-          size={40}
+          size={32}
           online={agent.online}
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h1 className="text-[18px] font-medium">{agent.name}</h1>
-            <Badge variant="brand">AI</Badge>
           </div>
           <div className="text-[12.5px] text-muted-foreground">{agent.role}</div>
         </div>

@@ -21,7 +21,7 @@ export function GroupMembersStrip({
               title={a.name}
               className="rounded-full ring-2 ring-background transition-transform hover:-translate-y-0.5"
             >
-              <Avatar initial={a.initial} color={a.color} size={26} online={a.online} />
+              <Avatar initial={a.initial} color={a.color} size={32} online={a.online} />
             </button>
           )
         })}

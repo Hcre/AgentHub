@@ -4,17 +4,18 @@ import { centerTabs } from '../../data/mock'
 import { useAgentStore } from '../../stores/agentStore'
 import { useUIStore } from '../../stores/uiStore'
 import { ActivityFeed } from '../activity/ActivityFeed'
-import { AgentDetailPage } from '../agent/AgentDetailPage'
+import { AgentsListPage } from '../agent/AgentsListPage'
 import { CalendarView } from '../calendar/CalendarView'
 import { ChatView } from '../chat/ChatView'
 import { GroupChatView } from '../group/GroupChatView'
+import { GroupsListPage } from '../group/GroupsListPage'
 import { InboxView } from '../inbox/InboxView'
 import { TasksTabView } from '../tasks/TasksTabView'
 import { ApiKeyManager } from '../settings/ApiKeyManager'
 import { SkillMarketplacePage } from '../skills/SkillMarketplacePage'
 import { MemoryPanel } from '../memory/MemoryPanel'
 import { SettingsView, SkillsView } from '../views/TabViews'
-import { Avatar, Badge, Button, Icon } from '../ui'
+import { Avatar, Button, Icon } from '../ui'
 import type { Agent } from '../../types'
 
 /** 中心区 chat tab 内各子视图 */
@@ -60,12 +61,13 @@ function Panel({ children }: { children: ReactNode }) {
 }
 
 export function CenterPanel() {
-  const { section, activeTab, activeAgentId, activeConversationId, theme, setActiveTab, toggleTheme, toggleRight } =
+  const { section, activeTab, activeAgentId, activeConversationId, setActiveTab, toggleRight } =
     useUIStore()
   const agents = useAgentStore((s) => s.agents)
 
+  if (section === 'groups') return <GroupsListPage />
   if (section === 'group') return <GroupChatView />
-  if (section === 'agent-detail') return <AgentDetailPage />
+  if (section === 'agent-detail') return <AgentsListPage />
   if (section === 'skills-market') return <SkillMarketplacePage />
   if (section === 'api-keys') return <ApiKeyManager />
   if (section === 'tasks')
@@ -111,15 +113,11 @@ export function CenterPanel() {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h2 className="truncate text-[15px] font-medium">{agent.name}</h2>
-            <Badge variant="brand">AI</Badge>
           </div>
           <div className="truncate text-[11.5px] text-muted-foreground">
             {agent.role} · 私密 · 仅你可见
           </div>
         </div>
-        <Button variant="ghost" size="iconSm" onClick={toggleTheme} title="切换主题">
-          <Icon name={theme === 'light' ? 'moon' : 'sun'} className="h-3.5 w-3.5" />
-        </Button>
         <Button variant="ghost" size="iconSm" onClick={toggleRight} title="收起右侧面板">
           <Icon name="panelRight" className="h-3.5 w-3.5" />
         </Button>

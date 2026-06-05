@@ -43,7 +43,8 @@ AgentHub/                                # 仓库根：仅放顶层入口文件 
 ├── skills/                             # 【通用 Claude Code Skills】根目录（Claude Code 扫描此处）
 │   ├── code-review/ deploy/ doc-sync/ feat-complete/ feat-start/
 │   ├── git-workflow/ spec-driven-development/ test-claude-adapter/
-│   └── 前端统一规范/
+│   ├── a社规范/
+│   └── frontend-style-edit/
 │
 ├── .agenthub/                          # 【运行时配置 + 项目专有 Skill】根目录（docker 挂载 skills/）
 │   ├── config.json                      #   运行时配置
@@ -230,7 +231,8 @@ docs/templates/ ──复制为──→ 新项目的 CLAUDE/STATUS/README/plan/
 | 部署 | `skills/deploy/` |
 | 无 spec 时先写规格 | `skills/spec-driven-development/` |
 | ClaudeAdapter 联调 | `skills/test-claude-adapter/` |
-| 前端规约 | `skills/前端统一规范/` |
+| a 社内部规范 | `skills/a社规范/` |
+| 前端风格保持型修改 | `skills/frontend-style-edit/` |
 
 ---
 

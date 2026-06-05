@@ -38,6 +38,10 @@ import {
   Sparkles,
   Sun,
   Trash2,
+  Users,
+  Lock,
+  MoreVertical,
+  PanelLeftClose,
   X,
   Zap,
   type LucideIcon,
@@ -86,6 +90,10 @@ const MAP: Record<IconName, LucideIcon> = {
   sliders: SlidersHorizontal,
   pencil: Pencil,
   trash2: Trash2,
+  users: Users,
+  lock: Lock,
+  moreVertical: MoreVertical,
+  panelLeftClose: PanelLeftClose,
 }
 
 export interface IconProps {

@@ -7,6 +7,8 @@ export interface CreateGroupInput {
   description?: string
   /** 初始成员 Agent id 列表；协调者由后端自动加入，不在此列。 */
   member_ids?: string[]
+  /** 群组工作目录（必填）。 */
+  workdir: string
 }
 
 export interface NameCheckResult {

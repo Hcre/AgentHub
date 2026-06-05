@@ -107,7 +107,10 @@ export const useGroupStore = create<GroupState>((set, get) => ({
   createGroup: async (input) => {
     try {
       const created = await groupsApi.create(input)
-      const group = toUiGroup(created)
+      const group: Group = {
+        ...toUiGroup(created),
+        workdir: input.workdir,
+      }
       set((s) => ({ groups: [...s.groups, group] }))
       return group.id
     } catch {
@@ -117,6 +120,7 @@ export const useGroupStore = create<GroupState>((set, get) => ({
         name: input.name,
         description: input.description ?? '',
         members: input.member_ids ?? [],
+        workdir: input.workdir,
       }
       set((s) => ({ groups: [...s.groups, group] }))
       return id

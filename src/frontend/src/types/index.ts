@@ -45,6 +45,8 @@ export interface Conversation {
   id: string
   name: string
   subtitle: string
+  /** 「看看我的项目」模式下选的工作目录；空 = 随便聊聊。 */
+  workdir?: string
 }
 
 export interface CenterTab {
@@ -110,6 +112,8 @@ export interface Group {
   /** 协调者角色描述。 */
   coordinatorRole?: string
   pinnedTask?: string
+  /** 群组工作目录（必填），用作群聊上下文的根。 */
+  workdir?: string
 }
 
 /** 协调者分发方案中的单个子任务步骤。 */
@@ -278,6 +282,10 @@ export type IconName =
   | 'sliders'
   | 'pencil'
   | 'trash2'
+  | 'users'
+  | 'lock'
+  | 'moreVertical'
+  | 'panelLeftClose'
 
 // ── 后端 API DTO（与 backend schema 对齐，字段为 snake_case）──
 

@@ -5,7 +5,6 @@ import { useAgentStore } from '../../stores/agentStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useUIStore } from '../../stores/uiStore'
 import { Button, Dialog, DialogContent, Icon, Input, Textarea } from '../ui'
-import { WorkspaceBrowser } from '../ui/WorkspaceBrowser'
 import { useApiKeyStore } from '../../stores/apiKeyStore'
 
 const SELECT_CLS =
@@ -128,8 +127,6 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
   const [model, setModel] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
   const [apiKey, setApiKey] = useState('')
-  const [workDir, setWorkDir] = useState('')
-  const [wsBrowserOpen, setWsBrowserOpen] = useState(false)
   const [selectedKeyId, setSelectedKeyId] = useState('')
   // 连通性预检
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle')
@@ -198,8 +195,6 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
     setModel('')
     setBaseUrl('')
     setApiKey('')
-    setWorkDir('')
-    setWsBrowserOpen(false)
     setTestStatus('idle')
     setTestError('')
     setSelectedKeyId('')
@@ -328,7 +323,8 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
         apiKey,
         skills: selectedSkills,
         systemPrompt: agentSystemPrompt,
-        settings: workDir.trim() ? { workspace_path: workDir.trim() } : undefined,
+        // 工作目录不在创建时选择（走后端默认）；具体项目上下文在「发起私聊」时按需指定
+        settings: undefined,
       })
 
       const convId = addConversation(id)
@@ -633,25 +629,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
                     </div>
                   )}
 
-                  {/* 工作目录 */}
-                  {showProviderSection && (
-                    <label className="flex flex-col gap-1">
-                      <span className="text-[12px] font-medium text-muted-foreground">工作目录</span>
-                      <div className="flex gap-1">
-                        <input
-                          className="h-8 flex-1 rounded border border-input bg-background px-2 text-[12px]"
-                          value={workDir}
-                          onChange={(e) => setWorkDir(e.target.value)}
-                          placeholder="留空则默认后端目录"
-                        />
-                        <Button variant="outline" size="sm" onClick={() => setWsBrowserOpen(true)}>浏览</Button>
-                      </div>
-                    </label>
-                  )}
-                  {wsBrowserOpen && (
-                    <WorkspaceBrowser open={wsBrowserOpen} onClose={() => setWsBrowserOpen(false)}
-                      onSelect={(path) => { setWorkDir(path); setWsBrowserOpen(false) }} />
-                  )}
+                  {/* 工作目录已外迁到「发起私聊」弹窗 */}
                 </>
               )}
             </div>

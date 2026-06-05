@@ -43,7 +43,7 @@ export function ActivityFeed() {
           >
             <header className="flex items-center gap-2.5 border-b bg-muted/30 px-4 py-2.5">
               <Badge variant="brand">消息</Badge>
-              <Avatar initial={user.initial} color="neutral" size={20} />
+              <Avatar initial={user.initial} color="neutral" size={32} />
               <span className="text-[13px] font-medium">{user.handle}</span>
               <div className="flex-1" />
               {e.latest && <Badge variant="brand">最新</Badge>}

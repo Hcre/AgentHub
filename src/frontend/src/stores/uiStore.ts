@@ -5,8 +5,8 @@ export type AccentId = 'coral' | 'blue' | 'sage' | 'plum'
 export type Density = 'comfort' | 'compact'
 export type HeadingFont = 'Geist' | 'Source Serif 4' | 'Instrument Serif' | 'IBM Plex Sans'
 
-/** 中心区路由段：聊天 / 收件箱 / 任务 / 日历 / 群组 / 助手详情 */
-export type Section = 'chat' | 'inbox' | 'tasks' | 'calendar' | 'group' | 'agent-detail' | 'skills-market' | 'api-keys'
+/** 中心区路由段：聊天 / 收件箱 / 任务 / 日历 / 群组主页 / 群聊 / 助手详情 / Skill 市场 / 设置 */
+export type Section = 'chat' | 'inbox' | 'tasks' | 'calendar' | 'groups' | 'group' | 'agent-detail' | 'skills-market' | 'api-keys'
 
 interface UIState {
   theme: Theme
@@ -37,6 +37,10 @@ interface UIState {
   openGroup: (groupId: string) => void
   /** 查看某助手详情 */
   viewAgent: (agentId: string) => void
+  /** AI 队友「详细」抽屉：null = 关闭 */
+  agentDrawerAgentId: string | null
+  openAgentDrawer: (agentId: string) => void
+  closeAgentDrawer: () => void
 }
 
 /**
@@ -74,4 +78,8 @@ export const useUIStore = create<UIState>((set) => ({
     }),
   openGroup: (groupId) => set({ section: 'group', activeGroupId: groupId }),
   viewAgent: (agentId) => set({ section: 'agent-detail', activeAgentId: agentId }),
+
+  agentDrawerAgentId: null,
+  openAgentDrawer: (agentId) => set({ agentDrawerAgentId: agentId }),
+  closeAgentDrawer: () => set({ agentDrawerAgentId: null }),
 }))
