@@ -222,7 +222,7 @@ async def list_drives():
 
 @FS_ROUTER.get("/browse")
 async def browse_dir(path: str = ""):
-    """浏览指定目录，返回子目录列表。"""
+    """浏览指定目录，返回子项（文件夹 + 文件）。"""
     if not path:
         return await list_drives()
     real = _resolve_path(path)
@@ -231,10 +231,17 @@ async def browse_dir(path: str = ""):
     items = []
     try:
         for name in sorted(os.listdir(real)):
+            if name.startswith("."):
+                continue  # 隐藏文件 / .git / .vscode 之类一律跳过
             full = os.path.join(real, name)
-            if os.path.isdir(full) and not name.startswith("."):
-                win = _to_win_path(full)
-                items.append({"name": name, "path": win, "type": "dir"})
+            win = _to_win_path(full)
+            items.append(
+                {
+                    "name": name,
+                    "path": win,
+                    "type": "dir" if os.path.isdir(full) else "file",
+                }
+            )
     except PermissionError:
         pass
     parent = str(Path(real).parent)
@@ -267,3 +274,102 @@ async def mkdir_dir(body: MkdirIn):
     except OSError as e:
         raise HTTPException(status_code=500, detail=f"创建失败: {e}")
     return {"path": _to_win_path(target), "name": body.name, "parent": body.parent}
+
+
+# ── 读文件（限文本/代码类，限大小防 OOM） ──────────────────────────────
+# 单文件读取上限 2 MB；超过返回 413。binary 文件返回 415。
+READ_MAX_BYTES = 2 * 1024 * 1024
+
+
+class ReadIn(BaseModel):
+    path: str
+
+
+@FS_ROUTER.post("/read")
+async def read_file(body: ReadIn):
+    """读取一个文本/代码文件的内容（限文本类 + 限大小）。"""
+    real = _resolve_path(body.path)
+    if not os.path.isfile(real):
+        raise HTTPException(status_code=404, detail=f"文件不存在: {body.path}")
+    # 拒绝 binary：嗅探前 8KB 是否有 NUL 字节
+    try:
+        with open(real, "rb") as f:
+            head = f.read(8192)
+            if b"\x00" in head:
+                raise HTTPException(status_code=415, detail="binary 文件不支持在线预览")
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            if size > READ_MAX_BYTES:
+                raise HTTPException(status_code=413, detail=f"文件过大 ({size} bytes)，仅支持 ≤ {READ_MAX_BYTES} bytes")
+            f.seek(0)
+            content_bytes = f.read()
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"读取失败: {e}")
+    # 用 utf-8 解码；失败时退回 latin-1（保证一定可读）
+    try:
+        content = content_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        content = content_bytes.decode("latin-1", errors="replace")
+    return {
+        "path": _to_win_path(real),
+        "name": os.path.basename(real),
+        "size": len(content_bytes),
+        "content": content,
+    }
+
+
+# ── 递归搜索（限定深度/数量防 OOM） ──────────────────────────────
+
+SEARCH_MAX_DEPTH = 12
+SEARCH_MAX_RESULTS = 200
+SEARCH_DIR_SKIP = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build", ".next", ".cache"}
+
+
+@FS_ROUTER.get("/search")
+async def search_files(path: str, q: str = "", limit: int = 100):
+    """在 `path` 下递归按文件名模糊搜索（大小写不敏感）。
+
+    返回的文件路径按 `_to_win_path` 归一为客户端能用的形态。
+    """
+    if not q or not q.strip():
+        return {"results": [], "truncated": False}
+    real = _resolve_path(path)
+    if not os.path.isdir(real):
+        return {"results": [], "truncated": False, "error": f"目录不存在: {path}"}
+    needle = q.strip().lower()
+    cap = max(1, min(limit, SEARCH_MAX_RESULTS))
+
+    results: list[dict] = []
+    truncated = False
+
+    def walk(dir_path: str, depth: int) -> None:
+        nonlocal truncated
+        if depth > SEARCH_MAX_DEPTH or truncated:
+            return
+        try:
+            entries = sorted(os.listdir(dir_path))
+        except (PermissionError, OSError):
+            return
+        for name in entries:
+            if truncated:
+                return
+            if name in SEARCH_DIR_SKIP:
+                continue
+            full = os.path.join(dir_path, name)
+            is_dir = os.path.isdir(full)
+            if needle in name.lower():
+                results.append(
+                    {
+                        "name": name,
+                        "path": _to_win_path(full),
+                        "type": "dir" if is_dir else "file",
+                    }
+                )
+                if len(results) >= cap:
+                    truncated = True
+                    return
+            if is_dir:
+                walk(full, depth + 1)
+
+    walk(real, 0)
+    return {"results": results, "truncated": truncated, "query": q}
