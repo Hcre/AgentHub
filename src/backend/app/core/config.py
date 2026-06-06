@@ -1,6 +1,7 @@
 """应用配置：从环境变量加载，集中管理（pydantic-settings）。"""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -69,6 +70,15 @@ class Settings(BaseSettings):
 
     # --- CORS ---
     cors_origins: str = "http://localhost:5173"
+
+    # --- 技能市场 ---
+    # skill 安装根目录（zip 解到这里，已安装列表扫这里）
+    # 默认 .agenthub/skills（相对 cwd，可被环境变量 SKILLS_DIR 覆盖）
+    skills_dir: str = ".agenthub/skills"
+
+    @property
+    def skills_dir_path(self) -> Path:
+        return Path(self.skills_dir).resolve()
 
     @property
     def cors_origin_list(self) -> list[str]:
