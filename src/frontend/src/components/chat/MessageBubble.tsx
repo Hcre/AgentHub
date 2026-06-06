@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pin } from 'lucide-react'
+import { Copy, Pin, RefreshCw } from 'lucide-react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -97,6 +97,60 @@ export function MessageBubble({
   const [pinned, setPinned] = useState<boolean>(msg.pinned ?? false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // P0-5: 复制代码 / 重新生成 状态。copyStatus = null = idle, { kind: 'ok' | 'err', msg: string } = 显示中。
+  // 不引第三方 toast 库，直接在 actions 行旁 inline 显示（与 pin 错误同 pattern），简单可靠。
+  const [copyStatus, setCopyStatus] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null)
+
+  /**
+   * P0-5 复制代码按钮处理器：
+   *   - 用正则 /```[a-z]*\n([\s\S]*?)\n```/g 抓所有围栏内容
+   *   - 拼接后调 navigator.clipboard.writeText
+   *   - 成功：「已复制 N 段代码」（N=0 时仍显示「已复制 0 段代码」让用户知道按了有反应）
+   *   - 失败：「复制失败」（clipboard API 不可用 / 浏览器拒绝权限）
+   *   - 2.5s 后自动清空（避免占位）
+   */
+  const handleCopyCode = async () => {
+    const fences: string[] = []
+    const re = /```[a-z]*\n([\s\S]*?)\n```/g
+    let m: RegExpExecArray | null
+    while ((m = re.exec(msg.text)) !== null) {
+      fences.push(m[1] ?? '')
+    }
+    const payload = fences.join('\n\n')
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(payload)
+      } else {
+        // 退化：document.execCommand 已弃用但仍是 jsdom 唯一 fallback
+        const ta = document.createElement('textarea')
+        ta.value = payload
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.select()
+        const ok = document.execCommand('copy')
+        document.body.removeChild(ta)
+        if (!ok) throw new Error('execCommand copy failed')
+      }
+      setCopyStatus({ kind: 'ok', msg: `已复制 ${fences.length} 段代码` })
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : 'unknown'
+      console.error('[MessageBubble] copy code failed:', detail)
+      setCopyStatus({ kind: 'err', msg: '复制失败' })
+    } finally {
+      // 2.5s 后清空 inline 状态
+      setTimeout(() => setCopyStatus(null), 2500)
+    }
+  }
+
+  /**
+   * P0-5 重新生成按钮：当前后端无 regenerate 端点（grep sessions.py 无命中），
+   * 所以按钮 disabled + tooltip「即将支持」。后续后端落地后去掉 disabled
+   * 并接 fetch('/api/messages/{id}/regenerate?session_id=...')。
+   */
+  const handleRegenerate = () => {
+    // noop for now — 后端实现后再加 fetch
+  }
 
   const togglePin = async () => {
     if (pending) return
@@ -231,12 +285,61 @@ export function MessageBubble({
           </a>
         )}
         {msg.actions && (
-          <div className="mt-2 flex gap-2">
-            {msg.actions.map((a) => (
-              <Button key={a} variant="outline" size="sm">
-                {a}
-              </Button>
-            ))}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {msg.actions.map((a) => {
+              // P0-5: 「复制代码」绑 handleCopyCode + 左侧 Copy 图标
+              if (a === '复制代码') {
+                return (
+                  <Button
+                    key={a}
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopyCode}
+                    data-testid="copy-code-btn"
+                  >
+                    <Copy className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.75} />
+                    {a}
+                  </Button>
+                )
+              }
+              // P0-5: 「重新生成」— 后端无端点，disabled + tooltip「即将支持」
+              if (a === '重新生成') {
+                return (
+                  <Button
+                    key={a}
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRegenerate}
+                    disabled
+                    title="即将支持"
+                    data-testid="regenerate-btn"
+                    aria-label="重新生成（即将支持）"
+                  >
+                    <RefreshCw className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.75} />
+                    {a}
+                  </Button>
+                )
+              }
+              // 其他 action label 保持原行为（纯展示按钮）
+              return (
+                <Button key={a} variant="outline" size="sm">
+                  {a}
+                </Button>
+              )
+            })}
+            {copyStatus && (
+              <span
+                data-testid="copy-status"
+                role="status"
+                className={
+                  copyStatus.kind === 'ok'
+                    ? 'font-mono text-[10.5px] text-emerald-600'
+                    : 'font-mono text-[10.5px] text-destructive'
+                }
+              >
+                {copyStatus.msg}
+              </span>
+            )}
           </div>
         )}
       </div>
