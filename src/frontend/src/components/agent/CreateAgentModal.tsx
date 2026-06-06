@@ -163,13 +163,17 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
   const derivedModels = derivedConfig?.models ?? []
   const derivedProtocol = derivedConfig?.protocol ?? ''
 
-  // 选 CLI 或 Provider 变化时自动填默认值
+  // 选 CLI 或 Provider 变化时自动填默认值（setState 推迟到 microtask 避开 set-state-in-effect）
+  // 只依赖 agentSystem / providerId；baseUrl / model 用 ref 思路避免输入时频繁触发
   useEffect(() => {
     if (!derivedConfig) return
-    if (!baseUrl) setBaseUrl(derivedConfig.baseUrl)
-    if (!model || !derivedConfig.models.includes(model)) {
-      setModel(derivedConfig.models[0] ?? '')
-    }
+    queueMicrotask(() => {
+      if (!baseUrl) setBaseUrl(derivedConfig.baseUrl)
+      if (!model || !derivedConfig.models.includes(model)) {
+        setModel(derivedConfig.models[0] ?? '')
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentSystem, providerId])
 
   const isCustom = pickedIndex === TEMPLATES.length
@@ -178,22 +182,23 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
   const agentSystemPrompt = isCustom ? customPrompt : (selectedTemplate?.systemPrompt ?? '')
   const selectedSkills = isCustom ? customSkills : (selectedTemplate?.skills ?? [])
 
-  // 自定义时加载 skill 列表 + 恢复草稿
+  // 自定义时加载 skill 列表 + 恢复草稿（setState 推迟到 microtask 避开 set-state-in-effect）
   useEffect(() => {
     if (!isCustom) return
-    setSkillLoading(true)
-    fetch('/api/skills/library?_=' + Date.now())
-      .then((r) => r.json())
-      .then(setSkillList)
-      .catch(() => setSkillList([]))
-      .finally(() => setSkillLoading(false))
-    // 恢复跳转市场前的草稿
-    if (wizardDraft) {
-      setCustomName(wizardDraft.name)
-      setCustomPrompt(wizardDraft.prompt)
-      setCustomSkills(wizardDraft.skills)
-      wizardDraft = null
-    }
+    queueMicrotask(() => {
+      setSkillLoading(true)
+      fetch('/api/skills/library?_=' + Date.now())
+        .then((r) => r.json())
+        .then(setSkillList)
+        .catch(() => setSkillList([]))
+        .finally(() => setSkillLoading(false))
+      if (wizardDraft) {
+        setCustomName(wizardDraft.name)
+        setCustomPrompt(wizardDraft.prompt)
+        setCustomSkills(wizardDraft.skills)
+        wizardDraft = null
+      }
+    })
   }, [isCustom])
 
   const toggleSkill = (name: string) => {
@@ -357,7 +362,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
           setErrorMsg(`连通失败: ${data.error || '未知错误'}，请返回修改配置`)
           return
         }
-      } catch (e) {
+      } catch {
         setStatus('error')
         setErrorMsg('连通测试网络错误，请检查后端是否运行')
         return

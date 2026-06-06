@@ -1,4 +1,4 @@
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { Avatar, Button, Icon } from '../ui'
@@ -34,12 +34,12 @@ export function MessageBubble({
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeHighlight]}
               components={{
-                pre: ({ children }: any) => (
+                pre: ({ children }) => (
                   <pre className="overflow-x-auto whitespace-pre-wrap rounded-lg border bg-muted/50 p-3 text-[13px] font-mono text-foreground/80">
                     {children}
                   </pre>
                 ),
-                code: ({ className, children, ...props }: any) => {
+                code: ({ className, children, ...props }) => {
                   const isInline = !className
                   return isInline ? (
                     <code className="text-[13px] font-mono text-foreground" {...props}>
@@ -54,32 +54,32 @@ export function MessageBubble({
                     </code>
                   )
                 },
-                a: ({ href, children }: any) => (
+                a: ({ href, children }) => (
                   <a href={href} target="_blank" rel="noopener" className="text-brand underline">
                     {children}
                   </a>
                 ),
-                table: ({ children }: any) => (
+                table: ({ children }) => (
                   <div className="overflow-x-auto my-2">
                     <table className="min-w-full border-separate border-spacing-0 rounded-lg border text-[13px]">
                       {children}
                     </table>
                   </div>
                 ),
-                th: ({ children }: any) => (
+                th: ({ children }) => (
                   <th className="border-b bg-muted/50 px-3 py-1.5 text-left font-medium text-muted-foreground">
                     {children}
                   </th>
                 ),
-                td: ({ children }: any) => (
+                td: ({ children }) => (
                   <td className="border-b px-3 py-1.5">{children}</td>
                 ),
-                blockquote: ({ children }: any) => (
+                blockquote: ({ children }) => (
                   <blockquote className="my-2 border-l-2 border-brand/40 pl-3 italic text-muted-foreground">
                     {children}
                   </blockquote>
                 ),
-              }}
+              } satisfies Components}
             >
               {msg.text}
             </ReactMarkdown>

@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode } from 'react'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { Avatar, Badge, Icon } from '../ui'
@@ -66,16 +66,16 @@ export function GroupMessageItem({ msg, group }: { msg: GroupMessage; group?: Gr
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeHighlight]}
               components={{
-                p: ({ children }: any) => (
+                p: ({ children }) => (
                   <p className="mb-2 last:mb-0">{highlightMentions(children)}</p>
                 ),
-                li: ({ children }: any) => <li>{highlightMentions(children)}</li>,
-                pre: ({ children }: any) => (
+                li: ({ children }) => <li>{highlightMentions(children)}</li>,
+                pre: ({ children }) => (
                   <pre className="my-2 overflow-x-auto rounded-lg border border-slate-700/50 bg-slate-800 p-3 text-[12px] leading-[1.5] text-slate-100">
                     {children}
                   </pre>
                 ),
-                code: ({ className, children, ...props }: any) => {
+                code: ({ className, children, ...props }) => {
                   const text = String(children ?? '')
                   const isBlock =
                     text.includes('\n') ||
@@ -93,7 +93,7 @@ export function GroupMessageItem({ msg, group }: { msg: GroupMessage; group?: Gr
                     </code>
                   )
                 },
-                a: ({ href, children }: any) => (
+                a: ({ href, children }) => (
                   <a
                     href={href}
                     target="_blank"
@@ -103,7 +103,7 @@ export function GroupMessageItem({ msg, group }: { msg: GroupMessage; group?: Gr
                     {children}
                   </a>
                 ),
-              }}
+              } satisfies Components}
             >
               {msg.text}
             </ReactMarkdown>

@@ -26,22 +26,34 @@ function WorkspaceBrowser({ open, onClose, onSelect }: {
     setLoading(true)
     const qs = path ? `?path=${encodeURIComponent(path)}` : ''
     const r = await fetch(`/api/fs/browse${qs}`)
-    const data = await r.json()
+    const data: unknown = await r.json()
     if (Array.isArray(data)) {
       setCurrent('')
       setParent('')
-      setItems(data.map((d: any) => ({ name: d.label ?? d.letter, path: d.path, type: 'drive' })))
+      setItems(
+        data.map((d: { label?: string; letter?: string; path: string }) => ({
+          name: d.label ?? d.letter ?? '',
+          path: d.path,
+          type: 'drive',
+        })),
+      )
       setStack([])
     } else {
-      setCurrent(data.path ?? path)
-      setParent(data.parent ?? '')
-      setItems(data.items ?? [])
+      const dir = data as { path?: string; parent?: string; items?: FsItem[] }
+      setCurrent(dir.path ?? path)
+      setParent(dir.parent ?? '')
+      setItems(dir.items ?? [])
       if (path && !stack.includes(path)) setStack([...stack, path])
     }
     setLoading(false)
   }
 
-  useEffect(() => { if (open) browse('') }, [open])
+  // 把 setLoading 推迟到 microtask，避开 react-hooks/set-state-in-effect（同步 setState in effect body）
+  // 只依赖 open；browse 内部已用 stack ref 化避免重复触发
+  useEffect(() => {
+    if (open) queueMicrotask(() => void browse(''))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>

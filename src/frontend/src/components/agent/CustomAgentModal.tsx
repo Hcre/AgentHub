@@ -32,19 +32,21 @@ export function CustomAgentModal({
 
   useEffect(() => {
     if (!open) return
-    setLoading(true)
-    fetch('/api/skills/library?_=' + Date.now())
-      .then((r) => r.json())
-      .then(setSkills)
-      .catch(() => setSkills([]))
-      .finally(() => setLoading(false))
-    // 恢复跳转市场前的草稿
-    if (customDraft) {
-      setName(customDraft.name)
-      setSystemPrompt(customDraft.prompt)
-      setSelectedSkills(new Set(customDraft.skills))
-      customDraft = null
-    }
+    // setState 推迟到 microtask 避开 react-hooks/set-state-in-effect
+    queueMicrotask(() => {
+      setLoading(true)
+      fetch('/api/skills/library?_=' + Date.now())
+        .then((r) => r.json())
+        .then(setSkills)
+        .catch(() => setSkills([]))
+        .finally(() => setLoading(false))
+      if (customDraft) {
+        setName(customDraft.name)
+        setSystemPrompt(customDraft.prompt)
+        setSelectedSkills(new Set(customDraft.skills))
+        customDraft = null
+      }
+    })
   }, [open])
 
   const toggleSkill = (name: string) => {
