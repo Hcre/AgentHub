@@ -112,7 +112,11 @@ export function MessageBubble({
     setPinned(willPin)
     setError(null)
     setPending(true)
-    const url = `/api/sessions/${sessionId}/messages/${msg.id}/pin`
+    // 对齐后端实际路由：src/backend/app/api/routers/sessions.py:91-99
+    //   @router.post("/messages/{message_id}/pin", ...)
+    //   @router.delete("/messages/{message_id}/pin", ...)
+    // session_id 是 query 参数（不是 path）。前端 URL 必须跟后端一致，否则 404。
+    const url = `/api/messages/${msg.id}/pin?session_id=${encodeURIComponent(sessionId)}`
     try {
       const resp = await fetch(url, { method: willPin ? 'POST' : 'DELETE' })
       if (!resp.ok && resp.status !== 204) {
