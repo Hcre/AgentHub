@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { cn } from '../../lib/cn'
-import { useUIStore } from '../../stores/uiStore'
 import { Avatar, Button, Icon } from '../ui'
 
 interface MarketSkill {
@@ -61,7 +60,7 @@ function GlassIconBtn({
 }: {
   icon: 'plus' | 'check' | 'moreVertical' | 'globe' | 'files' | 'trash2'
   title: string
-  onClick: () => void
+  onClick: (e: ReactMouseEvent<HTMLButtonElement>) => void
   disabled?: boolean
   variant?: 'default' | 'brand'
 }) {
@@ -87,8 +86,6 @@ function GlassIconBtn({
 }
 
 export function SkillMarketplacePage() {
-  const setSection = useUIStore((s) => s.setSection)
-
   // ── 市场 tab 状态 ──
   const [q, setQ] = useState('')
   const [sortBy, setSortBy] = useState<SortBy>('downloads')
@@ -122,13 +119,14 @@ export function SkillMarketplacePage() {
   }, [])
 
   // 挂载时就加载（市场卡要预知哪些已装）
+  // loadInstalled 内部 setState 推迟到 microtask 避开 react-hooks/set-state-in-effect
   useEffect(() => {
-    loadInstalled()
+    queueMicrotask(() => loadInstalled())
   }, [loadInstalled])
 
   // tab 切到 installed 时**重新**加载（保险）
   useEffect(() => {
-    if (tab === 'installed') loadInstalled()
+    if (tab === 'installed') queueMicrotask(() => loadInstalled())
   }, [tab, loadInstalled])
 
   // 加载市场（统一走 /search，sort_by 后端客户端 sort）
@@ -150,8 +148,9 @@ export function SkillMarketplacePage() {
   }, [q, sortBy])
 
   // 市场 tab 默认加载；sortBy 切换 / q 变化都重新加载
+  // search 内部 setState 推迟到 microtask 避开 react-hooks/set-state-in-effect
   useEffect(() => {
-    if (tab === 'market') search()
+    if (tab === 'market') queueMicrotask(() => search())
   }, [tab, search])
 
   // 安装：POST /api/skills/marketplace/install（真下载 + 解压），成功后本地 installed 加名
@@ -169,7 +168,15 @@ export function SkillMarketplacePage() {
       // 安装成功 → 已安装列表加上 + 「市场」卡变「已安装」
       setInstalled((prev) => [
         ...prev,
-        { name: skill.name, path: data.path, source: data.source ?? 'skillhub' },
+        {
+          name: skill.name,
+          path: data.path,
+          source: data.source ?? 'skillhub',
+          description: skill.description,
+          author: skill.author,
+          version: skill.version,
+          installed_at: Date.now(),
+        },
       ])
     } catch (e) {
       setError(e instanceof Error ? e.message : '安装失败')
@@ -304,8 +311,8 @@ export function SkillMarketplacePage() {
                 >
                   <Icon name="sliders" className="h-3.5 w-3.5" />
                   <span className="font-medium">
-                    <span className="mr-0.5 opacity-70">{currentSort.icon}</span>
-                    {currentSort.label}
+                    <span className="mr-0.5 opacity-70">{currentSort!.icon}</span>
+                    {currentSort!.label}
                   </span>
                   <Icon
                     name="chevronDown"

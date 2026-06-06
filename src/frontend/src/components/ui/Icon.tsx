@@ -44,6 +44,7 @@ import {
   PanelLeftClose,
   Globe,
   Rocket,
+  FolderOpen,
   X,
   Zap,
   type LucideIcon,
@@ -98,6 +99,7 @@ const MAP: Record<IconName, LucideIcon> = {
   panelLeftClose: PanelLeftClose,
   globe: Globe,
   rocket: Rocket,
+  folderOpen: FolderOpen,
 }
 
 export interface IconProps {

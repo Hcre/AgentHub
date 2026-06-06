@@ -230,7 +230,9 @@ export function LeftPanel() {
                 onClick: () => {
                   if (window.confirm('确定删除该群组？')) {
                     deleteGroup(menu.groupId)
-                    if (activeGroupId === menu.groupId) openConversation(activeAgentId, activeConversationId)
+                    if (activeGroupId === menu.groupId && activeAgentId && activeConversationId) {
+                      openConversation(activeAgentId, activeConversationId)
+                    }
                   }
                 },
               },

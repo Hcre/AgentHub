@@ -18,7 +18,6 @@ export function GroupsListPage() {
   const groups = useGroupStore((s) => s.groups)
   const deleteGroup = useGroupStore((s) => s.deleteGroup)
   const agents = useAgentStore((s) => s.agents)
-  const { setSection } = useUIStore()
 
   const [batchMode, setBatchMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())

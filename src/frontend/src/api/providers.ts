@@ -31,7 +31,7 @@ export const providersApi = {
   /** 列出当前系统中所有自动检测到的 Agent CLI。 */
   list: () => api.get<ProviderInfo[]>('/api/providers'),
   /** 手动触发重新扫描 PATH，发现新增或移除的 CLI。 */
-  scan: () => api.post<ProviderInfo[]>('/api/providers/scan'),
+  scan: () => api.post<ProviderInfo[]>('/api/providers/scan', undefined),
   /** 取某个 CLI 的本地配置（model + base_url + api_key + provider），Step 2 选中卡片后回填用。 */
   getDefaultConfig: (agentSystem: string) =>
     api.get<DefaultConfig>(`/api/providers/${encodeURIComponent(agentSystem)}/default-config`),

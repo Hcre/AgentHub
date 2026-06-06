@@ -6,7 +6,7 @@ import { Icon } from '../ui'
 import { PREVIEW_MODES, type PreviewMode } from '../preview/previewModes'
 import { FilePreview } from '../preview/FilePreview'
 import { useCurrentWorkdir } from './previewContext'
-import { useUIStore } from '../../stores/uiStore'
+import { useUIStore, type PreviewTab } from '../../stores/uiStore'
 
 const TAB_LABEL: Record<PreviewMode, string> = {
   files: '文件',
@@ -100,7 +100,7 @@ export function RightPanel() {
       <TabBar
         tabs={tabs}
         activeId={activeTabId}
-        onTabClick={(id) => setActiveTabId(id)}
+        onTabClick={(id) => setActivePreviewTab(id)}
         onTabClose={closeTab}
         plusRef={plusRef}
         dropdownOpen={dropdownOpen}

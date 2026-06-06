@@ -290,6 +290,7 @@ export type IconName =
   | 'panelLeftClose'
   | 'globe'
   | 'rocket'
+  | 'folderOpen'
 
 // ── 后端 API DTO（与 backend schema 对齐，字段为 snake_case）──
 
