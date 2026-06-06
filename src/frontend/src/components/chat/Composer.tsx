@@ -1,10 +1,32 @@
-import { useRef, useState } from 'react'
+import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 import { Button, Icon } from '../ui'
 import type { Agent } from '../../types'
 
-export function Composer({ agent, onSend }: { agent: Agent; onSend: (text: string) => void }) {
+/** 父组件可调用 setText 从外部塞值（prompt 建议卡点击、@提及等） */
+export type ComposerHandle = {
+  setText: (text: string) => void
+  focus: () => void
+}
+
+export const Composer = forwardRef<ComposerHandle, { agent: Agent; onSend: (text: string) => void }>(
+  function Composer({ agent, onSend }, ref) {
   const [val, setVal] = useState('')
   const taRef = useRef<HTMLTextAreaElement>(null)
+
+  useImperativeHandle(ref, () => ({
+    setText: (text: string) => {
+      setVal(text)
+      // 触发 autosize
+      requestAnimationFrame(() => {
+        const ta = taRef.current
+        if (!ta) return
+        ta.style.height = 'auto'
+        ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`
+        ta.focus()
+      })
+    },
+    focus: () => taRef.current?.focus(),
+  }))
 
   const send = () => {
     const text = val.trim()
@@ -102,4 +124,5 @@ export function Composer({ agent, onSend }: { agent: Agent; onSend: (text: strin
       </div>
     </div>
   )
-}
+  },
+)

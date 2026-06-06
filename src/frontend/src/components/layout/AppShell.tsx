@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { cn } from '../../lib/cn'
 import { useUIStore } from '../../stores/uiStore'
 import { AgentDetailDrawer } from '../agent/AgentDetailDrawer'
@@ -10,24 +10,25 @@ import { NavRail } from './NavRail'
 import { RightPanel } from './RightPanel'
 
 /** 右栏宽度边界（px / 比例） */
-const RIGHT_PANEL_MIN = 240
+const RIGHT_PANEL_MIN = 120 // 拖到 120px 以下 → 整个右栏隐藏
 const RIGHT_PANEL_DEFAULT = 380
-const RIGHT_PANEL_MAX_RATIO = 0.7
+const RIGHT_PANEL_MAX_RATIO = 0.7 // 占 viewport 最大 70%
 
 export function AppShell() {
-  const { sidebarCollapsed, rightCollapsed, section, toggleSidebar } = useUIStore()
+  const { sidebarCollapsed, section, toggleSidebar } = useUIStore()
   const rightPanelCollapsed = useUIStore((s) => s.rightPanelCollapsed)
   const rightPanelWidth = useUIStore((s) => s.rightPanelWidth)
   const setRightPanelWidth = useUIStore((s) => s.setRightPanelWidth)
   const setRightPanelCollapsed = useUIStore((s) => s.setRightPanelCollapsed)
+  const shellRef = useRef<HTMLDivElement>(null)
 
   const inChat = section === 'chat'
-  const showRight = (inChat || section === 'group') && !rightCollapsed
+  const showRight = (inChat || section === 'group') && !rightPanelCollapsed
   const showLeftExpand = inChat && sidebarCollapsed
 
   return (
-    <div className="flex h-full">
-      {/* 最左侧导航栏（60px） */}
+    <div ref={shellRef} className="flex h-full">
+      {/* 最左侧导航栏（60px，固定显示） */}
       <div className="flex-shrink-0 p-2.5 pr-1.5">
         <NavRail />
       </div>
@@ -59,9 +60,10 @@ export function AppShell() {
         <CenterPanel />
       </div>
 
-      {/* 中心区 ↔ 右栏 之间的拖拽 handle —— flex 兄弟，不在右栏内 */}
-      {showRight && !rightPanelCollapsed && (
-        <ResizeHandle
+      {/* 中心区 ↔ 右栏之间的可拖拽分界线（仅未折叠时） */}
+      {showRight && (
+        <RightPanelResizeHandle
+          containerRef={shellRef}
           currentWidth={rightPanelWidth}
           onResize={(w) => {
             if (w < RIGHT_PANEL_MIN) {
@@ -74,14 +76,11 @@ export function AppShell() {
         />
       )}
 
-      {/* 右侧栏（预览面板）—— 不挤压内容，不加 outline，不加 marginLeft hack */}
+      {/* 右侧栏（折叠时不渲染） */}
       {showRight && (
         <div
-          style={{ width: rightPanelCollapsed ? 'auto' : rightPanelWidth }}
-          className={cn(
-            'flex-shrink-0 p-2.5 pl-1.5 transition-all duration-200',
-            rightPanelCollapsed && 'w-auto',
-          )}
+          style={{ width: rightPanelWidth }}
+          className="flex-shrink-0 p-2.5 pl-1.5 transition-all duration-200"
         >
           <RightPanel />
         </div>
@@ -93,58 +92,47 @@ export function AppShell() {
   )
 }
 
-/**
- * 全局三栏分界线（CenterPanel ↔ RightPanel 之间的 flex 兄弟）
- * - 不嵌在右栏内部，所以不挤压右栏内容
- * - 内联 style width:16 + flex 三件套保底，Tailwind 失效也不影响
- * - 视觉强行用红底+黄边，30 天后变淡
- */
-function ResizeHandle({
+// ── 全局三栏分界线（CenterPanel ↔ RightPanel） ─────────────────────
+
+function RightPanelResizeHandle({
+  containerRef,
   currentWidth,
   onResize,
   onReset,
 }: {
+  containerRef: React.RefObject<HTMLDivElement | null>
   currentWidth: number
   onResize: (w: number) => void
   onReset: () => void
 }) {
+  const [dragging, setDragging] = useState(false)
   const startXRef = useRef(0)
   const startWRef = useRef(currentWidth)
-  const draggingRef = useRef(false)
   const onResizeRef = useRef(onResize)
   const onResetRef = useRef(onReset)
   useEffect(() => {
     onResizeRef.current = onResize
     onResetRef.current = onReset
   }, [onResize, onReset])
-  useEffect(() => {
-    startWRef.current = currentWidth
-  }, [currentWidth])
 
-  // 挂载诊断
-  useEffect(() => {
-    console.log('[resize-handle] MOUNTED, currentWidth =', currentWidth, 'px')
-    return () => console.log('[resize-handle] UNMOUNTED')
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
     const target = e.currentTarget
     target.setPointerCapture(e.pointerId)
     startXRef.current = e.clientX
     startWRef.current = currentWidth
-    draggingRef.current = true
+    setDragging(true)
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
-    console.log('[resize-handle] pointerdown', e.clientX)
   }
 
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return
-    const shellEl = e.currentTarget.parentElement
-    if (!shellEl) return
-    const rect = shellEl.getBoundingClientRect()
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging) return
+    const container = containerRef.current
+    if (!container) return
+    const rect = container.getBoundingClientRect()
+    // 右栏在最右：向左拖 → 右栏变宽。所以 newWidth = startW + (startX - e.clientX)
     const delta = startXRef.current - e.clientX
     const raw = startWRef.current + delta
     const maxW = rect.width * RIGHT_PANEL_MAX_RATIO
@@ -152,67 +140,46 @@ function ResizeHandle({
     onResizeRef.current(next)
   }
 
-  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId)
-    } catch {
-      // ignore
-    }
-    draggingRef.current = false
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging) return
+    e.currentTarget.releasePointerCapture(e.pointerId)
+    setDragging(false)
     document.body.style.cursor = ''
     document.body.style.userSelect = ''
-    console.log('[resize-handle] pointerup')
   }
 
   return (
     <div
-      data-testid="resize-handle"
       role="separator"
       aria-orientation="vertical"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-      onDoubleClick={() => {
-        console.log('[resize-handle] doubleclick — RESET to 380px')
-        onResetRef.current()
-      }}
-      onClick={() => console.log('[resize-handle] click')}
-      title="⬌ 拖拽调整宽度 · 双击重置"
-      // 内联 style 三件套保底：width + minWidth + maxWidth + flex 0 0 16px
-      // 即便 Tailwind v4 的 w-3 / flex-shrink-0 出问题，元素也绝对是 16px 宽
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onDoubleClick={() => onResetRef.current()}
+      title="拖拽调整宽度 · 双击重置默认"
+      data-dragging={dragging ? 'true' : 'false'}
+      // 4px 命中区：默认完全透明，hover/drag 时浮出淡紫背景
       style={{
-        flex: '0 0 16px',
-        width: 16,
-        minWidth: 16,
-        maxWidth: 16,
-        alignSelf: 'stretch',
+        flex: '0 0 4px',
+        width: 4,
+        minWidth: 4,
+        maxWidth: 4,
+        height: '100%',
         cursor: 'col-resize',
-        background: '#dc2626',
-        border: '2px solid #fbbf24',
-        boxSizing: 'border-box',
-        color: '#fff',
-        fontSize: 11,
-        fontWeight: 700,
-        lineHeight: '12px',
-        textAlign: 'center',
-        userSelect: 'none',
+        position: 'relative',
+        background: dragging ? 'rgba(124,58,237,0.15)' : 'transparent',
+        transition: 'background 120ms',
         touchAction: 'none',
-        zIndex: 50,
+        userSelect: 'none',
       }}
-    >
-      <span
-        style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          pointerEvents: 'none',
-        }}
-      >
-        ⬌
-      </span>
-    </div>
+      onMouseEnter={(e) => {
+        // hover 时浮出极淡紫底
+        ;(e.currentTarget as HTMLDivElement).style.background = 'rgba(124,58,237,0.06)'
+      }}
+      onMouseLeave={(e) => {
+        if (!dragging) (e.currentTarget as HTMLDivElement).style.background = 'transparent'
+      }}
+    />
   )
 }

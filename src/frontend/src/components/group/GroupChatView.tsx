@@ -20,8 +20,8 @@ import { GroupMessageItem } from './GroupMessageItem'
  */
 export function GroupChatView() {
   const activeGroupId = useUIStore((s) => s.activeGroupId)
-  const rightCollapsed = useUIStore((s) => s.rightCollapsed)
-  const toggleRight = useUIStore((s) => s.toggleRight)
+  const rightPanelCollapsed = useUIStore((s) => s.rightPanelCollapsed)
+  const toggleRightPanel = useUIStore((s) => s.toggleRightPanel)
   const viewAgent = useUIStore((s) => s.viewAgent)
   const groups = useGroupStore((s) => s.groups)
   const messagesByGroup = useGroupStore((s) => s.messagesByGroup)
@@ -94,8 +94,8 @@ export function GroupChatView() {
         <div className="flex flex-shrink-0 items-center gap-1">
           <button
             type="button"
-            onClick={toggleRight}
-            title={rightCollapsed ? '展开右侧面板' : '收起右侧面板'}
+            onClick={toggleRightPanel}
+            title={rightPanelCollapsed ? '展开右侧面板' : '收起右侧面板'}
             className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Icon name="panelRight" className="h-3.5 w-3.5" />

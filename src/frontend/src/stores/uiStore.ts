@@ -15,7 +15,6 @@ interface UIState {
   density: Density
   headingFont: HeadingFont
   sidebarCollapsed: boolean
-  rightCollapsed: boolean
   section: Section
   /** 中心区当前 Tab（chat / tasks / activity / ...） */
   activeTab: string
@@ -39,7 +38,6 @@ interface UIState {
   setDensity: (density: Density) => void
   setHeadingFont: (font: HeadingFont) => void
   toggleSidebar: () => void
-  toggleRight: () => void
   setSection: (section: Section) => void
   setActiveTab: (tab: string) => void
   /** 打开某助手的某会话（默认进入聊天） */
@@ -88,7 +86,6 @@ export const useUIStore = create<UIState>()(
   density: 'comfort',
   headingFont: 'Source Serif 4',
   sidebarCollapsed: false,
-  rightCollapsed: false,
   section: 'chat',
   activeTab: 'chat',
   activeAgentId: 'editor',
@@ -106,7 +103,6 @@ export const useUIStore = create<UIState>()(
   setDensity: (density) => set({ density }),
   setHeadingFont: (headingFont) => set({ headingFont }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
-  toggleRight: () => set((s) => ({ rightCollapsed: !s.rightCollapsed })),
   setSection: (section) => set({ section }),
   setActiveTab: (activeTab) => set({ activeTab }),
   openConversation: (agentId, conversationId) =>

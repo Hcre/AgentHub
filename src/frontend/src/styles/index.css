@@ -257,3 +257,28 @@ a {
     border-color 0.15s ease,
     transform 0.15s ease;
 }
+
+/* ── 全局滚动条：默认极淡，hover 才显形（聊天/文件树/任何滚动区统一） ── */
+* {
+  /* Firefox：极细 + 极淡 thumb */
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.25) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.18);
+  border-radius: 999px;
+  transition: background 0.15s ease;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.4);
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}

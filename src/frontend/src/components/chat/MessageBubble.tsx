@@ -28,7 +28,7 @@ export function MessageBubble({
           <span className="text-[13px] font-semibold">{isAgent ? agent.name : user.handle}</span>
           <span className="font-mono text-[11px] text-muted-foreground">{msg.time}</span>
         </div>
-        <div className="prose text-[14px] leading-[1.6] text-foreground">
+        <div className="prose min-w-0 max-w-full break-words text-[14px] leading-[1.6] text-foreground">
           {isAgent ? (
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}

@@ -35,6 +35,8 @@ interface ChatState {
   sessionIds: Record<string, string>
   /** 当前 WS 是否已连接 */
   connected: boolean
+  /** convKey → 该会话未读消息数（用户切到该会话/回到底部时清零） */
+  unreadByConv: Record<string, number>
 
   setConnected: (v: boolean) => void
   setSessionId: (key: string, sessionId: string) => void
@@ -49,6 +51,10 @@ interface ChatState {
     opts?: { name?: string; workdir?: string },
   ) => string
   toggleStage: (agentId: string, conversationId: string, taskId: string) => void
+  /** 清掉某会话的未读数（用户切到该会话/回到消息流底部时调用） */
+  clearUnread: (key: string) => void
+  /** 整组合计未读（给 NavRail 红点用） */
+  totalUnread: () => number
 }
 
 export const useChatStore = create<ChatState>()(
@@ -61,6 +67,7 @@ export const useChatStore = create<ChatState>()(
   outputs: {},
   sessionIds: {},
   connected: false,
+  unreadByConv: {},
 
   setConnected: (v) => set({ connected: v }),
 
@@ -85,6 +92,10 @@ export const useChatStore = create<ChatState>()(
   applyStreamEvent: (key, event) => {
     set((s) => {
       const list = s.messages[key] ?? []
+      // 新流式 agent 消息到来 → 未读 +1（ChatView 切到该 conv 会 clearUnread）
+      const bumpUnread = () => ({
+        unreadByConv: { ...s.unreadByConv, [key]: (s.unreadByConv[key] ?? 0) + 1 },
+      })
       if (event.type === 'text') {
         const chunk = event.content ?? ''
         const idx = list.findIndex((m) => m.id === streamingId(key))
@@ -107,6 +118,7 @@ export const useChatStore = create<ChatState>()(
         return {
           messages: { ...s.messages, [key]: [...list, seeded] },
           typing: { ...s.typing, [key]: false },
+          ...bumpUnread(),
         }
       }
       if (event.type === 'done') {
@@ -129,6 +141,7 @@ export const useChatStore = create<ChatState>()(
         return {
           messages: { ...s.messages, [key]: next },
           typing: { ...s.typing, [key]: false },
+          ...bumpUnread(),
         }
       }
       // thinking / tool_* / task_plan / request_approval：MVP 暂不渲染
@@ -150,6 +163,8 @@ export const useChatStore = create<ChatState>()(
       set((s) => ({
         messages: { ...s.messages, [key]: [...(s.messages[key] ?? []), agentMsg] },
         typing: { ...s.typing, [key]: false },
+        // mock 假回复也算未读
+        unreadByConv: { ...s.unreadByConv, [key]: (s.unreadByConv[key] ?? 0) + 1 },
       }))
     }, 1100)
   },
@@ -181,6 +196,19 @@ export const useChatStore = create<ChatState>()(
         ),
       },
     }))
+  },
+
+  clearUnread: (key) =>
+    set((s) => {
+      if (!s.unreadByConv[key]) return s
+      const next = { ...s.unreadByConv }
+      delete next[key]
+      return { unreadByConv: next }
+    }),
+
+  totalUnread: () => {
+    const m = get().unreadByConv
+    return Object.values(m).reduce((a, b) => a + b, 0)
   },
 }),
     {
