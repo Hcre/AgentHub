@@ -10,11 +10,22 @@ from contextlib import suppress
 
 from fastapi import APIRouter
 
+from app.infrastructure.llm.cli_config_reader import read_default_config
 from app.infrastructure.llm.provider_scanner import scan_providers
-from app.schemas.provider import PingRequest, PingResponse, ProviderOut
+from app.schemas.provider import (
+    DefaultConfigOut,
+    PingRequest,
+    PingResponse,
+    ProviderOut,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/providers", tags=["providers"])
+
+
+# ── 不再有 _DEFAULT_CONFIG 硬编码表 ──
+# default-config 端点从用户机器 ~/.claude/ ~/.codex/ 等真实配置文件读，
+# 读不到返 None + note。详见 app.infrastructure.llm.cli_config_reader
 
 
 @router.get("", response_model=list[ProviderOut])
@@ -31,6 +42,34 @@ async def scan() -> list[ProviderOut]:
     return [ProviderOut(**p.__dict__) for p in detected]
 
 
+@router.get("/{agent_system}/default-config", response_model=DefaultConfigOut)
+async def default_config(agent_system: str) -> DefaultConfigOut:
+    """从 CLI 本地配置文件读取默认连接配置（model / base_url / api_key / provider）。
+
+    实现见 app.infrastructure.llm.cli_config_reader.read_default_config。
+    读不到时所有字段返 None，note 标注原因。
+    """
+    source, fields = read_default_config(agent_system)
+    if source is None:
+        if any(v is not None for v in fields.values()):
+            note = "已读到部分字段，其余缺失"
+        elif agent_system in {"mock", "gemini", "cursor_agent"}:
+            note = f"该 CLI 暂未实现配置文件读取（或不需要），请手动填写"
+        else:
+            note = f"未在 {os.environ.get('USERPROFILE') or os.environ.get('HOME') or '~'} 找到 {agent_system} 的配置文件"
+    else:
+        note = f"已从 {source} 读取"
+    return DefaultConfigOut(
+        agent_system=agent_system,
+        model=fields.get("model"),
+        base_url=fields.get("base_url"),
+        api_key=fields.get("api_key"),
+        provider=fields.get("provider"),
+        source=source,
+        note=note,
+    )
+
+
 @router.post("/ping", response_model=PingResponse)
 async def ping(req: PingRequest) -> PingResponse:
     """连通性预检：spawn CLI 发 ping 消息，验证配置是否可用。
@@ -43,6 +82,7 @@ async def ping(req: PingRequest) -> PingResponse:
         "claude_code": "claude",
         "pi_agent": "pi",
         "opencode": "opencode",
+        "codex": "codex",
     }
     binary = binary_map.get(req.agent_system)
     if not binary:
@@ -157,6 +197,26 @@ async def _ping_cli(system: str, binary: str, req: PingRequest) -> bool:
             stderr=asyncio.subprocess.PIPE,
             env=env,
         )
+
+    elif system == "codex":
+        # Codex 走 chatgpt OAuth（auth_mode="chatgpt"），不需 env 注入 API key。
+        # --version 输出纯文本（"codex-cli 0.43.0"）不是 JSONL，所以走"进程退出码 0 = 通"
+        # 这个分支：等 proc 退出，exit 0 返 True；其余返 False。
+        cmd = [binary, "--version"]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+            env=env,
+        )
+        try:
+            returncode = await asyncio.wait_for(proc.wait(), timeout=10)
+            return returncode == 0
+        except TimeoutError:
+            with suppress(Exception):
+                proc.kill()
+            return False
     else:
         return False
 

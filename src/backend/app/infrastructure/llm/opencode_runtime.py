@@ -84,15 +84,15 @@ class OpenCodeRuntime(AgentRuntime):
         # opencode Unix 风格，用 $HOME/.config 找配置文件
         if "HOME" not in env:
             env["HOME"] = os.environ.get("USERPROFILE", "")
-        env_key = self._PROVIDER_ENV.get(self._provider)
-        if env_key and self._api_key:
-            env[env_key] = self._api_key
-            # 动态写入 opencode.jsonc，注入 AgentHub 解密后的 key
-            _write_provider_config(self._provider, self._api_key)
+
+        # 不再注入 provider env（OPENAI_API_KEY 等）：CLI 启动时自己从
+        # ~/.config/opencode/opencode.json 读 model/api_key。AgentHub 这边只
+        # 注入 MCP 相关的 OPENCODE_CONFIG（与 provider 配置无关）。
 
         # MCP 注入（ADR-06 统一原则）：opencode 无 --mcp-config flag，改用逐进程隔离通道
         # OPENCODE_CONFIG=<tmp>（本机实测可注入，非全局，零串号）。临时配置自包含
-        # （provider+mcp 块），规避 merge/replace 语义歧义。无绑定时返回 None → 退化为现状。
+        # provider+mcp 块，但 mcp 块必须随每次 spawn 重写（provider 块如果用户本地
+        # 已有则保持不变 — 这就是"不传 model/apiKey"的设计意图）。
         mcp_section = _build_opencode_mcp(request.mcp_servers, settings.mcp_memory_url, self._agent_id)
         if mcp_section:
             cfg_path = _write_opencode_config(self._provider, self._api_key, mcp_section)
@@ -106,7 +106,8 @@ class OpenCodeRuntime(AgentRuntime):
         cmd = [binary, "run", "--format", "json", "--pure"]
         if oc_session:
             cmd.extend(["--session", oc_session])
-        cmd.extend(["--model", self._model, "--dangerously-skip-permissions", prompt])
+        # 不再传 --model：CLI 启动时从 opencode.json 读 default model
+        cmd.extend(["--dangerously-skip-permissions", prompt])
 
         logger.info(
             "OpenCode spawn: %s (provider=%s, oc_session=%s)",

@@ -64,13 +64,15 @@ export function TweaksPanel() {
       <button
         onClick={() => setOpen((v) => !v)}
         title="外观调节"
-        className="glass-strong fixed bottom-4 right-4 z-40 grid h-10 w-10 place-items-center rounded-full border text-muted-foreground shadow-lg transition-colors hover:text-foreground"
+        // 不再 fixed 到 viewport（会被右栏盖住）。改 absolute 到 AppShell 内部右下角，
+        // 配合 z-50 永远在右栏之上。
+        className="glass-strong absolute bottom-3 right-3 z-50 grid h-9 w-9 place-items-center rounded-full border text-muted-foreground shadow-lg transition-colors hover:text-foreground"
       >
-        <Icon name="sliders" className="h-4 w-4" />
+        <Icon name="sliders" className="h-3.5 w-3.5" />
       </button>
 
       {open && (
-        <div className="animate-[var(--animate-slide-in)] glass-strong fixed bottom-16 right-4 z-40 w-64 rounded-2xl border p-4 shadow-xl">
+        <div className="animate-[var(--animate-slide-in)] glass-strong absolute bottom-14 right-3 z-50 w-64 rounded-2xl border p-4 shadow-xl">
           <div className="mb-3 flex items-center justify-between">
             <span className="text-[13px] font-semibold">外观</span>
             <button

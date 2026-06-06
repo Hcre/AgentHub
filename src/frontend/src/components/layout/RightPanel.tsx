@@ -166,13 +166,13 @@ function TabBar({
         aria-label="新建预览"
         aria-expanded={dropdownOpen}
         className={cn(
-          'grid h-7 w-7 flex-shrink-0 place-items-center rounded-md border text-muted-foreground transition-colors',
+          'grid h-[clamp(26px,2.1vw,32px)] w-[clamp(26px,2.1vw,32px)] flex-shrink-0 place-items-center rounded-md border text-muted-foreground transition-colors',
           dropdownOpen
             ? 'border-border bg-card text-foreground'
             : 'border-transparent hover:border-border hover:bg-card/60 hover:text-foreground',
         )}
       >
-        <Icon name="plus" className="h-3.5 w-3.5" strokeWidth={2} />
+        <Icon name="plus" className="h-[clamp(12px,1vw,16px)] w-[clamp(12px,1vw,16px)]" strokeWidth={2} />
       </button>
     </div>
   )

@@ -34,7 +34,7 @@ export function NavRail() {
     <>
       <aside
         aria-label="主导航"
-        className="glass-panel flex h-full w-[60px] flex-col items-center rounded-2xl border shadow-sm"
+        className="glass-panel flex h-full w-[clamp(56px,4.5vw,88px)] flex-col items-center rounded-2xl border shadow-sm"
       >
         {/* ── 顶部：用户头像 ── */}
         <div className="pt-3">
@@ -55,7 +55,7 @@ export function NavRail() {
                 aria-current={active ? 'page' : undefined}
                 data-active={active ? 'true' : undefined}
                 className={cn(
-                  'group relative grid h-10 w-10 place-items-center rounded-lg text-muted-foreground transition-colors',
+                  'group relative grid h-[clamp(36px,2.6vw,44px)] w-[clamp(36px,2.6vw,44px)] place-items-center rounded-lg text-muted-foreground transition-colors',
                   'hover:bg-accent hover:text-foreground',
                   'data-[active=true]:bg-brand/15 data-[active=true]:text-brand',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background',
@@ -69,7 +69,7 @@ export function NavRail() {
                 )}
                 <Icon
                   name={item.icon}
-                  className="h-[18px] w-[18px]"
+                  className="h-[clamp(14px,1.1vw,18px)] w-[clamp(14px,1.1vw,18px)]"
                   strokeWidth={active ? 2.25 : 1.75}
                 />
                 {showUnread && (
@@ -91,20 +91,20 @@ export function NavRail() {
             onClick={toggleTheme}
             title={theme === 'dark' ? '切换到浅色' : '切换到暗色'}
             aria-label="切换主题"
-            className="grid h-10 w-10 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+            className="grid h-[clamp(36px,2.6vw,44px)] w-[clamp(36px,2.6vw,44px)] place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
           >
             <Icon
               name={theme === 'dark' ? 'sun' : 'moon'}
-              className="h-[18px] w-[18px]"
+              className="h-[clamp(14px,1.1vw,18px)] w-[clamp(14px,1.1vw,18px)]"
             />
           </button>
           <button
             onClick={() => setHelpOpen(true)}
             title="帮助与反馈"
             aria-label="帮助与反馈"
-            className="grid h-10 w-10 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+            className="grid h-[clamp(36px,2.6vw,44px)] w-[clamp(36px,2.6vw,44px)] place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
           >
-            <Icon name="info" className="h-[18px] w-[18px]" />
+            <Icon name="info" className="h-[clamp(14px,1.1vw,18px)] w-[clamp(14px,1.1vw,18px)]" />
           </button>
           <button
             onClick={() => setSection('api-keys')}
@@ -113,7 +113,7 @@ export function NavRail() {
             aria-current={section === 'api-keys' ? 'page' : undefined}
             data-active={section === 'api-keys' ? 'true' : undefined}
             className={cn(
-              'group relative grid h-10 w-10 place-items-center rounded-lg text-muted-foreground transition-colors',
+              'group relative grid h-[clamp(36px,2.6vw,44px)] w-[clamp(36px,2.6vw,44px)] place-items-center rounded-lg text-muted-foreground transition-colors',
               'hover:bg-accent hover:text-foreground',
               'data-[active=true]:bg-brand/15 data-[active=true]:text-brand',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background',
@@ -125,7 +125,7 @@ export function NavRail() {
                 className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-brand"
               />
             )}
-            <Icon name="settings" className="h-[18px] w-[18px]" strokeWidth={section === 'api-keys' ? 2.25 : 1.75} />
+            <Icon name="settings" className="h-[clamp(14px,1.1vw,18px)] w-[clamp(14px,1.1vw,18px)]" strokeWidth={section === 'api-keys' ? 2.25 : 1.75} />
           </button>
         </div>
       </aside>
