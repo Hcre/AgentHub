@@ -3,6 +3,8 @@ import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { Avatar, Button, Icon } from '../ui'
 import type { Agent, ChatMessage, UserInfo } from '../../types'
+import { WebPreviewCard } from './WebPreviewCard'
+import { collectUrls } from './webPreviewUrl'
 
 export function MessageBubble({
   msg,
@@ -14,6 +16,8 @@ export function MessageBubble({
   user: UserInfo
 }) {
   const isAgent = msg.from === 'agent'
+  // 优先用 Agent 显式声明的 urls 字段；退化路径从 text 抓 http(s)://
+  const previewUrls = isAgent ? collectUrls(msg.text, msg.urls) : []
   return (
     <div className="animate-[var(--animate-fade-in)] flex gap-3">
       <div className="pt-0.5">
@@ -91,18 +95,29 @@ export function MessageBubble({
             ))
           )}
         </div>
+        {previewUrls.map((u) => (
+          <WebPreviewCard key={u} url={u} />
+        ))}
         {msg.attachment && (
-          <div className="mt-2 inline-flex items-center gap-2.5 rounded-md border bg-muted/40 px-3 py-2">
+          <a
+            href={msg.attachment.url ?? '#'}
+            download={msg.attachment.url ? undefined : undefined}
+            target="_blank"
+            rel="noopener"
+            className="mt-2 inline-flex items-center gap-2.5 rounded-md border bg-muted/40 px-3 py-2 transition-colors hover:bg-muted/60"
+          >
             <div className="grid h-7 w-7 place-items-center rounded border bg-background text-muted-foreground">
               <Icon name="doc" className="h-3.5 w-3.5" />
             </div>
             <div className="text-left">
-              <div className="font-mono text-[12px]">{msg.attachment.name}</div>
+              <div className="font-mono text-[12px] underline-offset-2 group-hover:underline">
+                {msg.attachment.name}
+              </div>
               <div className="font-mono text-[10.5px] text-muted-foreground">
                 {msg.attachment.size}
               </div>
             </div>
-          </div>
+          </a>
         )}
         {msg.actions && (
           <div className="mt-2 flex gap-2">

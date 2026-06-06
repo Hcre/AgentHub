@@ -60,6 +60,8 @@ export interface CenterTab {
 export interface Attachment {
   name: string
   size: string
+  /** 后端返回的下载/预览 URL（如 /api/attachments/{id}），点附件即跳此 URL */
+  url?: string
 }
 
 export interface ChatMessage {
@@ -71,6 +73,11 @@ export interface ChatMessage {
   streaming?: boolean
   attachment?: Attachment
   actions?: string[]
+  /**
+   * Agent 显式声明要渲染为可预览 iframe 的链接（优先于从 text 正则抓取）。
+   * 退化路径：MessageBubble 内部用正则从 text 中抓 http(s)://。
+   */
+  urls?: string[]
 }
 
 export interface StageTask {
