@@ -16,6 +16,7 @@
   "dependencies": {
     "lucide-react": "^1.16.0",
     "react": "^19.2.6",
+    "react-diff-viewer-continued": "^4.2.2",
     "react-dom": "^19.2.6",
     "react-markdown": "^10.1.0",
     "rehype-highlight": "^7.0.2",

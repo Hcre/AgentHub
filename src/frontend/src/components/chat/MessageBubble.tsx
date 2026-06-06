@@ -3,8 +3,75 @@ import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { Avatar, Button, Icon } from '../ui'
 import type { Agent, ChatMessage, UserInfo } from '../../types'
+import { DiffView } from './DiffView'
 import { WebPreviewCard } from './WebPreviewCard'
 import { collectUrls } from './webPreviewUrl'
+import { extractDiffFences } from './diffParse'
+
+/**
+ * 把 ReactMarkdown 的自定义 components 抽出来 —— 跟 DiffView 拆围栏后产生的
+ * 「围栏前/围栏后」两段 markdown 共用同一套渲染规则（pre/code/a/table/blockquote）。
+ * 抽出来后：
+ *   1. 避免 2 段 markdown + 1 段 diff 拼接时重复写 60 行 components 对象
+ *   2. 风格保持完全一致（包括表格、表头、引用块、code 块灰底）
+ */
+const MARKDOWN_COMPONENTS = {
+  pre: ({ children }) => (
+    <pre className="overflow-x-auto whitespace-pre-wrap rounded-lg border bg-muted/50 p-3 text-[13px] font-mono text-foreground/80">
+      {children}
+    </pre>
+  ),
+  code: ({ className, children, ...props }) => {
+    const isInline = !className
+    return isInline ? (
+      <code className="text-[13px] font-mono text-foreground" {...props}>
+        {children}
+      </code>
+    ) : (
+      <code
+        className="rounded bg-muted/50 px-1 py-0.5 font-mono text-[12px] text-foreground"
+        {...props}
+      >
+        {children}
+      </code>
+    )
+  },
+  a: ({ href, children }) => (
+    <a href={href} target="_blank" rel="noopener" className="text-brand underline">
+      {children}
+    </a>
+  ),
+  table: ({ children }) => (
+    <div className="overflow-x-auto my-2">
+      <table className="min-w-full border-separate border-spacing-0 rounded-lg border text-[13px]">
+        {children}
+      </table>
+    </div>
+  ),
+  th: ({ children }) => (
+    <th className="border-b bg-muted/50 px-3 py-1.5 text-left font-medium text-muted-foreground">
+      {children}
+    </th>
+  ),
+  td: ({ children }) => <td className="border-b px-3 py-1.5">{children}</td>,
+  blockquote: ({ children }) => (
+    <blockquote className="my-2 border-l-2 border-brand/40 pl-3 italic text-muted-foreground">
+      {children}
+    </blockquote>
+  ),
+} satisfies Components
+
+function MarkdownBody({ text }: { text: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      rehypePlugins={[rehypeHighlight]}
+      components={MARKDOWN_COMPONENTS}
+    >
+      {text}
+    </ReactMarkdown>
+  )
+}
 
 export function MessageBubble({
   msg,
@@ -18,6 +85,14 @@ export function MessageBubble({
   const isAgent = msg.from === 'agent'
   // 优先用 Agent 显式声明的 urls 字段；退化路径从 text 抓 http(s)://
   const previewUrls = isAgent ? collectUrls(msg.text, msg.urls) : []
+
+  // Agent 消息：识别 ```diff``` 围栏，把围栏内容交给 DiffView 渲染彩色 diff，
+  // 围栏前/后的纯 markdown 段落走标准 ReactMarkdown。
+  // - 非 Agent 消息：保持原行为（按段渲染纯文本），不解析 diff 围栏。
+  // - 没有 diff 围栏：保持原行为（一整段 ReactMarkdown）。
+  const fence = isAgent ? extractDiffFences(msg.text) : null
+  const showDiffInline = isAgent && fence?.hasDiffFence
+
   return (
     <div className="animate-[var(--animate-fade-in)] flex gap-3">
       <div className="pt-0.5">
@@ -33,60 +108,14 @@ export function MessageBubble({
           <span className="font-mono text-[11px] text-muted-foreground">{msg.time}</span>
         </div>
         <div className="prose min-w-0 max-w-full break-words text-[14px] leading-[1.6] text-foreground">
-          {isAgent ? (
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeHighlight]}
-              components={{
-                pre: ({ children }) => (
-                  <pre className="overflow-x-auto whitespace-pre-wrap rounded-lg border bg-muted/50 p-3 text-[13px] font-mono text-foreground/80">
-                    {children}
-                  </pre>
-                ),
-                code: ({ className, children, ...props }) => {
-                  const isInline = !className
-                  return isInline ? (
-                    <code className="text-[13px] font-mono text-foreground" {...props}>
-                      {children}
-                    </code>
-                  ) : (
-                    <code
-                      className="rounded bg-muted/50 px-1 py-0.5 font-mono text-[12px] text-foreground"
-                      {...props}
-                    >
-                      {children}
-                    </code>
-                  )
-                },
-                a: ({ href, children }) => (
-                  <a href={href} target="_blank" rel="noopener" className="text-brand underline">
-                    {children}
-                  </a>
-                ),
-                table: ({ children }) => (
-                  <div className="overflow-x-auto my-2">
-                    <table className="min-w-full border-separate border-spacing-0 rounded-lg border text-[13px]">
-                      {children}
-                    </table>
-                  </div>
-                ),
-                th: ({ children }) => (
-                  <th className="border-b bg-muted/50 px-3 py-1.5 text-left font-medium text-muted-foreground">
-                    {children}
-                  </th>
-                ),
-                td: ({ children }) => (
-                  <td className="border-b px-3 py-1.5">{children}</td>
-                ),
-                blockquote: ({ children }) => (
-                  <blockquote className="my-2 border-l-2 border-brand/40 pl-3 italic text-muted-foreground">
-                    {children}
-                  </blockquote>
-                ),
-              } satisfies Components}
-            >
-              {msg.text}
-            </ReactMarkdown>
+          {showDiffInline && fence ? (
+            <>
+              {fence.before.trim() && <MarkdownBody text={fence.before} />}
+              <DiffView unifiedDiff={fence.diffBody} />
+              {fence.after.trim() && <MarkdownBody text={fence.after} />}
+            </>
+          ) : isAgent ? (
+            <MarkdownBody text={msg.text} />
           ) : (
             msg.text.split('\n\n').map((p, i) => (
               <p key={i} className={i > 0 ? 'mt-2' : undefined}>
