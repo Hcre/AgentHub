@@ -27,18 +27,18 @@ export function AppShell() {
   const showLeftExpand = inChat && sidebarCollapsed
 
   return (
-    <div ref={shellRef} className="flex h-full">
-      {/* 最左侧导航栏（60px，固定显示） */}
+    <div ref={shellRef} className="relative mx-auto flex h-full w-full max-w-[1920px]">
+      {/* 最左侧导航栏（clamp(56px, 4.5vw, 88px) 自适应） */}
       <div className="flex-shrink-0 p-2.5 pr-1.5">
         <NavRail />
       </div>
 
-      {/* 左侧栏（会话列表） */}
+      {/* 左侧栏（会话列表，clamp(240px, 18vw, 320px) 自适应） */}
       {(inChat || section === 'group') && (
         <div
           className={cn(
             'flex-shrink-0 overflow-hidden py-2.5 pl-1.5 pr-1.5 transition-all duration-300 ease-out',
-            sidebarCollapsed ? 'w-0 p-0' : 'w-[280px]',
+            sidebarCollapsed ? 'w-0 p-0' : 'w-[clamp(240px,18vw,320px)]',
           )}
         >
           {!sidebarCollapsed && <LeftPanel />}
@@ -76,7 +76,7 @@ export function AppShell() {
         />
       )}
 
-      {/* 右侧栏（折叠时不渲染） */}
+      {/* 右侧栏（折叠时不渲染；宽度由 uiStore.rightPanelWidth 决定，拖拽 math 钳到视口 × 0.7） */}
       {showRight && (
         <div
           style={{ width: rightPanelWidth }}
@@ -159,26 +159,28 @@ function RightPanelResizeHandle({
       onDoubleClick={() => onResetRef.current()}
       title="拖拽调整宽度 · 双击重置默认"
       data-dragging={dragging ? 'true' : 'false'}
-      // 4px 命中区：默认完全透明，hover/drag 时浮出淡紫背景
+      // 8px 命中区（之前 4px 太窄，大窗口更难点中）：默认有极淡灰背景让用户能看见，
+      // hover/drag 时变紫
       style={{
-        flex: '0 0 4px',
-        width: 4,
-        minWidth: 4,
-        maxWidth: 4,
+        flex: '0 0 8px',
+        width: 8,
+        minWidth: 8,
+        maxWidth: 8,
         height: '100%',
         cursor: 'col-resize',
         position: 'relative',
-        background: dragging ? 'rgba(124,58,237,0.15)' : 'transparent',
+        background: dragging
+          ? 'rgba(124,58,237,0.15)'
+          : 'rgba(113,113,130,0.08)',
         transition: 'background 120ms',
         touchAction: 'none',
         userSelect: 'none',
       }}
       onMouseEnter={(e) => {
-        // hover 时浮出极淡紫底
-        ;(e.currentTarget as HTMLDivElement).style.background = 'rgba(124,58,237,0.06)'
+        ;(e.currentTarget as HTMLDivElement).style.background = 'rgba(124,58,237,0.10)'
       }}
       onMouseLeave={(e) => {
-        if (!dragging) (e.currentTarget as HTMLDivElement).style.background = 'transparent'
+        if (!dragging) (e.currentTarget as HTMLDivElement).style.background = 'rgba(113,113,130,0.08)'
       }}
     />
   )

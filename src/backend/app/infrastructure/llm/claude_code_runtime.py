@@ -411,15 +411,10 @@ class ClaudeCodeRuntime(AgentRuntime):
     def _build_env(self) -> dict[str, str]:
         """构造 CLI 子进程环境变量。
 
-        代理模式（proxy_url 非空）：ANTHROPIC_BASE_URL 指向本地代理，API Key 为占位。
-        全局模式（proxy_url 为空）：继承当前 shell 环境（用户自己的 Claude Code 配置）。
+        不再注入 ANTHROPIC_* 配置：CLI 启动时自己从 ~/.claude/ 读 model/api_key/base_url。
+        AgentHub 这边只控制 cwd / system_prompt / skills / MCP 注入（与"配置"无关的部分）。
         """
         env = os.environ.copy()
-        if self._proxy_url:
-            env["ANTHROPIC_BASE_URL"] = self._proxy_url
-            env["ANTHROPIC_API_KEY"] = "agenthub-proxy"
-        if self._model:
-            env["ANTHROPIC_MODEL"] = self._model
         return env
 
     @staticmethod

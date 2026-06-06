@@ -1,25 +1,15 @@
 import { useEffect, useState } from 'react'
-import { providers } from '../../data/extra'
 import { resolveProviderConfig } from '../../data/cliProviderMatrix'
 import { useAgentStore } from '../../stores/agentStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useUIStore } from '../../stores/uiStore'
 import { Button, Dialog, DialogContent, Icon, Input, Textarea } from '../ui'
 import { useApiKeyStore } from '../../stores/apiKeyStore'
+import { providersApi, type DefaultConfig, type ProviderInfo } from '../../api/providers'
+import { CliIcon } from '../icons/cli/CliIcon'
 
 const SELECT_CLS =
   'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring'
-
-interface ProviderInfo {
-  name: string
-  display_name: string
-  binary: string
-  executable_path: string
-  version: string | null
-  adapter: string
-  description: string
-  available: boolean
-}
 
 // --- Step 1 模板 ---
 interface Template {
@@ -75,6 +65,15 @@ function Label({ children }: { children: string }) {
   return <span className="text-[12px] font-medium text-muted-foreground">{children}</span>
 }
 
+/** 脱敏 api_key：保留前 4 + 后 4，中间用 • 替代，最多 24 字符宽度。
+ *  特殊字符串 "(chatgpt-login)" 直接原样显示。 */
+function maskApiKey(key: string): string {
+  if (key === '(chatgpt-login)' || key.length < 12) return key
+  const head = key.slice(0, 4)
+  const tail = key.slice(-4)
+  return `${head}•••${tail}`
+}
+
 /** 跳转技能市场时暂存草稿，回来后恢复 */
 let wizardDraft: { name: string; prompt: string; skills: string[] } | null = null
 
@@ -82,22 +81,42 @@ let wizardDraft: { name: string; prompt: string; skills: string[] } | null = nul
 let providerCache: ProviderInfo[] | null = null
 let providerScanned = false
 
-const DEFAULT_RUNTIMES = [
-  { id: 'claude_code', label: 'Claude CLI · 代理接入第三方' },
-  { id: 'pi_agent', label: 'Pi Agent · 多Provider CLI' },
-  { id: 'mock', label: 'Mock · 演示假数据' },
+/** 卡片用的 CLI 摘要（统一扫描结果 + 硬编码兜底两种来源的形状） */
+interface CliCardData {
+  id: string
+  label: string
+  version: string | null
+  available: boolean
+  /** 来自上次点击时缓存的默认 model（点过才有，未点过为 null → 卡片显示 "—"） */
+  model: string | null
+}
+
+const DEFAULT_RUNTIMES: CliCardData[] = [
+  { id: 'claude_code', label: 'Claude Code', version: null, available: false, model: null },
+  { id: 'pi_agent', label: 'Pi Agent', version: null, available: false, model: null },
+  { id: 'mock', label: 'Mock', version: null, available: false, model: null },
 ]
 
-function buildRuntimes(scanned: ProviderInfo[] | null, scanning: boolean): {id:string;label:string}[] {
+function buildCards(
+  scanned: ProviderInfo[] | null,
+  scanning: boolean,
+  loadedDefaults: Record<string, DefaultConfig>,
+): CliCardData[] {
   // 还没扫描过 → 显示硬编码兜底
   if (!scanned || scanning) return DEFAULT_RUNTIMES
   // 扫描完成 → 只显示实际检测到的 CLI + mock 兜底
-  const list = scanned
-    .filter(p => p.available)
-    .map(p => ({ id: p.name, label: p.display_name + (p.version ? ` · ${p.version}` : '') }))
+  const list: CliCardData[] = scanned
+    .filter((p) => p.available)
+    .map((p) => ({
+      id: p.name,
+      label: p.display_name,
+      version: p.version,
+      available: true,
+      model: loadedDefaults[p.name]?.model ?? null,
+    }))
   // 始终保留 mock 作为兜底
-  if (!list.find(r => r.id === 'mock')) {
-    list.push({ id: 'mock', label: 'Mock · 演示假数据' })
+  if (!list.find((r) => r.id === 'mock')) {
+    list.push({ id: 'mock', label: 'Mock', version: null, available: false, model: null })
   }
   return list.length > 0 ? list : DEFAULT_RUNTIMES
 }
@@ -112,7 +131,10 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
   // Wizard state
   const [scannedProviders, setScannedProviders] = useState<ProviderInfo[] | null>(null)
   const [scanning, setScanning] = useState(false)
-  const runtimes = buildRuntimes(scannedProviders, scanning)
+  const [loadedDefaults, setLoadedDefaults] = useState<Record<string, DefaultConfig>>({})
+  const [loadingDefault, setLoadingDefault] = useState<string | null>(null)
+  const [loadDefaultError, setLoadDefaultError] = useState<string | null>(null)
+  const cards = buildCards(scannedProviders, scanning, loadedDefaults)
   const [step, setStep] = useState(1)
   // Step 1
   const [pickedIndex, setPickedIndex] = useState<number | null>(null)
@@ -122,7 +144,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
   const [skillList, setSkillList] = useState<{name:string}[]>([])
   const [skillLoading, setSkillLoading] = useState(false)
   // Step 2
-  const [agentSystem, setAgentSystem] = useState('claude_code')
+  const [agentSystem, setAgentSystem] = useState<string>('')
   const [providerId, setProviderId] = useState('deepseek')
   const [model, setModel] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
@@ -190,7 +212,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
     setCustomPrompt('')
     setCustomSkills([])
     setSkillList([])
-    setAgentSystem('claude_code')
+    setAgentSystem('')
     setProviderId('deepseek')
     setModel('')
     setBaseUrl('')
@@ -200,6 +222,8 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
     setSelectedKeyId('')
     setStatus('idle')
     setErrorMsg('')
+    setLoadDefaultError(null)
+    // 不清 loadedDefaults / scannedProviders：模块级缓存，下一次进入 Step 2 仍可复用
   }
 
   const handleClose = () => {
@@ -217,31 +241,59 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
 
   const goNext = () => {
     if (!canNext) return
-    setAgentSystem('claude_code')
-    setProviderId('deepseek')
-    setModel(providers.find(p => p.id === 'deepseek')?.models[0] ?? '')
+    // 进入 Step 2：清空上次的 CLI 选择与 model/base_url，让用户从卡片里挑。
+    setAgentSystem('')
+    setModel('')
     setBaseUrl('')
     setApiKey('')
+    setSelectedKeyId('')
+    setLoadDefaultError(null)
     setStep(2)
 
-    // 后台异步扫描 CLI，只显示实际检测到的
+    // 后台异步扫描 CLI，只显示实际检测到的；不自动选中第一个，等用户点。
     if (providerScanned && providerCache) {
       setScannedProviders(providerCache)
-      const firstCli = providerCache.find(p => p.adapter !== 'mock')
-      if (firstCli) setAgentSystem(firstCli.name)
     } else {
       setScanning(true)
-      fetch('/api/providers')
-        .then(r => r.json())
-        .then((list: ProviderInfo[]) => {
+      providersApi
+        .list()
+        .then((list) => {
           providerCache = list
           providerScanned = true
           setScannedProviders(list)
-          const firstCli = list.find((p: ProviderInfo) => p.adapter !== 'mock')
-          if (firstCli) setAgentSystem(firstCli.name)
         })
         .catch(() => setScannedProviders(null))
         .finally(() => setScanning(false))
+    }
+  }
+
+  // 卡片点击：选中 CLI + 调 default-config 端点回填 model/base_url/api_key/provider
+  const handlePickCli = async (id: string) => {
+    setAgentSystem(id)
+    setLoadDefaultError(null)
+    setTestStatus('idle')
+    // mock 没有 default-config，端点会返 null/null，直接清空即可
+    if (id === 'mock') {
+      setModel('')
+      setBaseUrl('')
+      setApiKey('')
+      setProviderId('deepseek')
+      return
+    }
+    setLoadingDefault(id)
+    try {
+      const cfg = await providersApi.getDefaultConfig(id)
+      setLoadedDefaults((prev) => ({ ...prev, [id]: cfg }))
+      setModel(cfg.model ?? '')
+      setBaseUrl(cfg.base_url ?? '')
+      // provider / api_key 有就读；没读到就不动，让用户自己选/填
+      if (cfg.provider) setProviderId(cfg.provider)
+      if (cfg.api_key) setApiKey(cfg.api_key)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '加载默认配置失败'
+      setLoadDefaultError(msg)
+    } finally {
+      setLoadingDefault(null)
     }
   }
 
@@ -259,6 +311,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
         body: JSON.stringify({
           agent_system: agentSystem,
           provider: providerId,
+          // 注：model/api_key/base_url 仍传 ping 端点（探测连通用），但 spawn CLI 时不再注入
           model: model.trim(),
           api_key: apiKey,
           base_url: baseUrl.trim() || undefined,
@@ -318,9 +371,11 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
         role: agentName.trim(),
         agentSystem,
         provider: providerId,
-        model: showProviderSection ? model.trim() : '',
-        baseUrl: showProviderSection ? baseUrl.trim() || undefined : undefined,
-        apiKey,
+        // 注：model / baseUrl / apiKey 不再传给后端（CLI 启动时从本地配置读）。
+        // 保留字段在 form 上展示"会用什么"作参考。
+        model: '',
+        baseUrl: undefined,
+        apiKey: '',
         skills: selectedSkills,
         systemPrompt: agentSystemPrompt,
         // 工作目录不在创建时选择（走后端默认）；具体项目上下文在「发起私聊」时按需指定
@@ -479,7 +534,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
 
             <div className="flex flex-col gap-3 overflow-y-auto p-4" style={{ maxHeight: '55vh' }}>
 
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <Label>运行依赖</Label>
                   <Button
@@ -488,12 +543,13 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
                     onClick={() => {
                       setScanning(true)
                       providerScanned = false
-                      fetch('/api/providers')
-                        .then(r => r.json())
-                        .then((list: ProviderInfo[]) => {
+                      providersApi
+                        .list()
+                        .then((list) => {
                           providerCache = list
                           providerScanned = true
                           setScannedProviders(list)
+                          // 重新扫描后保留当前选中；用户没点过的话不动
                         })
                         .catch(() => setScannedProviders(null))
                         .finally(() => setScanning(false))
@@ -513,24 +569,63 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
                     )}
                   </Button>
                 </div>
-                <select
-                  className={SELECT_CLS}
-                  value={agentSystem}
-                  onChange={(e) => setAgentSystem(e.target.value)}
-                >
-                  {runtimes.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.label}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-[11px] text-muted-foreground">
-                  {scanning
-                    ? '扫描中…'
-                    : providerScanned
-                      ? `扫描完成，${runtimes.filter(r => r.id !== 'mock').length} 个可用`
-                      : ''}
-                </span>
+
+                {/* 卡片列表：每个 CLI 一张，点选后调 default-config 回填 */}
+                <div className="grid grid-cols-2 gap-2">
+                  {cards.map((c) => {
+                    const picked = agentSystem === c.id
+                    const loading = loadingDefault === c.id
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => handlePickCli(c.id)}
+                        data-picked={picked ? 'true' : undefined}
+                        className="group flex items-start gap-2 rounded-lg border p-2.5 text-left transition-colors hover:border-brand/40 data-[picked=true]:border-brand data-[picked=true]:bg-brand/5 disabled:opacity-50"
+                        disabled={loading}
+                      >
+                        <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md bg-background">
+                          <CliIcon agentSystem={c.id} size={18} />
+                        </div>
+                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="truncate text-[12px] font-medium">{c.label}</span>
+                            {c.version ? (
+                              <span className="shrink-0 rounded bg-muted px-1 py-px text-[9px] text-muted-foreground">
+                                {c.version}
+                              </span>
+                            ) : c.available ? null : (
+                              <span className="shrink-0 text-[9px] text-muted-foreground">—</span>
+                            )}
+                          </div>
+                          <span className="truncate text-[10px] text-muted-foreground">
+                            {loading
+                              ? '加载默认配置…'
+                              : c.model
+                                ? c.model
+                                : picked
+                                  ? '已选中'
+                                  : '点击加载默认 model'}
+                          </span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                  <span>
+                    {scanning
+                      ? '扫描中…'
+                      : providerScanned
+                        ? `扫描完成，${cards.filter((c) => c.id !== 'mock' && c.available).length} 个可用`
+                        : '尚未扫描（显示默认列表）'}
+                  </span>
+                  {loadDefaultError && (
+                    <span className="text-red-500 truncate max-w-[200px]" title={loadDefaultError}>
+                      加载失败：{loadDefaultError}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {showProviderSection && (
@@ -585,6 +680,44 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
                       </div>
                     )}
                   </label>
+
+                  {/* 卡片点选时从服务端加载的默认配置（只读回显）。
+                      用户选中保存的 Provider 配置后会用矩阵推导值覆盖此区。 */}
+                  {loadedDefaults[agentSystem] &&
+                    (loadedDefaults[agentSystem]?.model ||
+                      loadedDefaults[agentSystem]?.base_url ||
+                      loadedDefaults[agentSystem]?.api_key ||
+                      loadedDefaults[agentSystem]?.provider) && (
+                      <div className="rounded-md border border-dashed bg-muted/30 p-2.5 text-[12px] text-muted-foreground space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-foreground">从 {agentSystem} 默认加载</span>
+                          <span className="text-[10px]">只读 · 选 Provider 后会被矩阵值覆盖</span>
+                        </div>
+                        <div className="grid grid-cols-[auto,1fr] gap-x-2 gap-y-0.5">
+                          <span>model</span>
+                          <span className="font-mono text-foreground truncate">
+                            {loadedDefaults[agentSystem]?.model ?? '—'}
+                          </span>
+                          <span>base_url</span>
+                          <span className="font-mono text-foreground truncate">
+                            {loadedDefaults[agentSystem]?.base_url ?? '—'}
+                          </span>
+                          <span>provider</span>
+                          <span className="font-mono text-foreground truncate">
+                            {loadedDefaults[agentSystem]?.provider ?? '—'}
+                          </span>
+                          <span>api_key</span>
+                          <span
+                            className="font-mono text-foreground truncate"
+                            title={loadedDefaults[agentSystem]?.api_key ?? ''}
+                          >
+                            {loadedDefaults[agentSystem]?.api_key
+                              ? maskApiKey(loadedDefaults[agentSystem]!.api_key!)
+                              : '—'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
                   {/* 自动推导 + 可编辑的连接配置 */}
                   {selectedKeyId && derivedConfig && (

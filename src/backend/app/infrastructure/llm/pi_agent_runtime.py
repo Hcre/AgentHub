@@ -233,8 +233,7 @@ class PiAgentRuntime(AgentRuntime):
         pi_provider = _PROVIDER_MAP.get(self._provider, "anthropic")
         cmd.extend(["--provider", pi_provider])
 
-        if self._model:
-            cmd.extend(["--model", self._model])
+        # 不再传 --model：CLI 启动时从 ~/.pi/agent/settings.json 读 defaultModel
 
         if self._thinking_level != "off":
             cmd.extend(["--thinking", self._thinking_level])
@@ -255,22 +254,11 @@ class PiAgentRuntime(AgentRuntime):
         return cmd
 
     def _build_env(self) -> dict[str, str]:
+        """不再注入 model/api_key/base_url：CLI 启动时自己从 ~/.pi/ 读。
+        AgentHub 只控制 cwd / system_prompt / skills。
+        """
         env = os.environ.copy()
-
-        if self._proxy_url:
-            env["ANTHROPIC_BASE_URL"] = self._proxy_url
-            env["ANTHROPIC_API_KEY"] = "agenthub-proxy"
-        else:
-            if self._api_key:
-                env_key = _PROVIDER_ENV_KEY.get(self._provider, "ANTHROPIC_API_KEY")
-                env[env_key] = self._api_key
-            # base_url: anthropic 用 ANTHROPIC_BASE_URL，其他用 OPENAI_BASE_URL
-            base = self._base_url or _PROVIDER_BASE_URL.get(self._provider, "")
-            if base:
-                base_key = (
-                    "ANTHROPIC_BASE_URL" if self._provider == "anthropic" else "OPENAI_BASE_URL"
-                )
-                env[base_key] = base
+        return env
 
         return env
 

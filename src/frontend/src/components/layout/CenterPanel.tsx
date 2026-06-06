@@ -61,8 +61,15 @@ function Panel({ children }: { children: ReactNode }) {
 }
 
 export function CenterPanel() {
-  const { section, activeTab, activeAgentId, activeConversationId, setActiveTab, toggleRightPanel } =
-    useUIStore()
+  const {
+    section,
+    activeTab,
+    activeAgentId,
+    activeConversationId,
+    setActiveTab,
+    toggleRightPanel,
+    rightPanelCollapsed,
+  } = useUIStore()
   const agents = useAgentStore((s) => s.agents)
 
   if (section === 'groups') return <GroupsListPage />
@@ -118,7 +125,12 @@ export function CenterPanel() {
             {agent.role} · 私密 · 仅你可见
           </div>
         </div>
-        <Button variant="ghost" size="iconSm" onClick={toggleRightPanel} title="收起右侧面板">
+        <Button
+          variant="ghost"
+          size="iconSm"
+          onClick={toggleRightPanel}
+          title={rightPanelCollapsed ? '展开右侧面板' : '收起右侧面板'}
+        >
           <Icon name="panelRight" className="h-3.5 w-3.5" />
         </Button>
       </header>
