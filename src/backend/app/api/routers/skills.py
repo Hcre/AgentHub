@@ -1,19 +1,90 @@
-"""技能库路由：本地 library、市场搜索、安装。"""
+"""技能库路由：本地 library、市场搜索（skillhub.cn）、安装（下载 + 解压到 SKILLS_DIR）。"""
 
 from __future__ import annotations
 
+import asyncio
+import io
+import json
 import os
 import re
+import subprocess
+import sys
+import time
+import zipfile
 from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from app.core.config import settings
+
 router = APIRouter(prefix="/api/skills", tags=["skills"])
 
-SKILLS_DIR = Path("/skills")
-MARKETPLACE_URL = "https://skillsmp.com/api/v1/skills/search"
+# 解析后的绝对路径（启动时一次性 resolve）
+SKILLS_DIR = settings.skills_dir_path
+
+
+def _extract_description(skill_md_path: Path, max_chars: int = 200) -> str:
+    """从 SKILL.md 提取首段文字作为 description。
+
+    规则（按顺序）：
+      1) 跳过文件开头的 YAML frontmatter（`---` ... `---` 块）
+      2) 跳过 # 标题行
+      3) 跳过 ``` 代码块标记 + 代码块内
+      4) 跳过空行
+      5) 取第一段非空连续行（直到下一个空行）
+    """
+    try:
+        text = skill_md_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return ""
+    lines = text.splitlines()
+    para: list[str] = []
+    in_code = False
+    in_yaml = False
+    yaml_seen = False  # 是否见过起始的 ---
+    for line in lines:
+        stripped = line.strip()
+        # YAML frontmatter 检测：文件开头的第一个 --- 起到下一个 --- 止
+        if stripped == "---":
+            if not yaml_seen:
+                in_yaml = True
+                yaml_seen = True
+                continue
+            if in_yaml:
+                in_yaml = False
+                continue
+        if in_yaml:
+            continue
+        if stripped.startswith("```"):
+            in_code = not in_code
+            continue
+        if in_code:
+            continue
+        if not stripped:
+            if para:
+                break
+            continue
+        if stripped.startswith("#"):
+            continue
+        para.append(stripped)
+    desc = " ".join(para)
+    if len(desc) > max_chars:
+        desc = desc[: max_chars - 3] + "..."
+    return desc
+
+# ── skillhub.cn 上游契约 ──────────────────────────────────────────
+# 公开端点（无需鉴权），见 docs/reports 或 worklog：
+#   GET /api/skills?keyword=X&page=1&pageSize=N
+#     → { code:0, data:{ skills:[{name, slug, description, description_zh,
+#                                   ownerName, stars, downloads, installs,
+#                                   category, homepage, version, score,
+#                                   created_at(ms), updated_at(ms)}]}}
+#   GET /api/v1/showcase/{section}  section ∈ {hot_downloads, newest,
+#                                                trending, hot, featured}
+SKILLHUB_API = "https://api.skillhub.cn"
+SKILLHUB_WEB = "https://www.skillhub.cn"
 HTTPX_TIMEOUT = 15.0
 
 
@@ -24,77 +95,286 @@ class MarketSearchRequest(BaseModel):
     q: str = ""
     page: int = 1
     limit: int = 20
-    sort_by: str = "stars"
+    # sort_by: 'default' | 'stars' | 'downloads' — 上游不接受自定义 sort，全在客户端 sort
+    sort_by: str = "default"
 
 
 class MarketInstallRequest(BaseModel):
     skill_id: str
-    github_url: str
     name: str
+
+
+# ── 本地 metadata（写进 skill 目录的 .agenthub.json sidecar）──
+class LocalMeta(BaseModel):
+    slug: str
+    name: str
+    author: str  # 显示用的作者名（owner.displayName）
+    owner_id: str = ""  # 内部 ID
+    version: str = ""
+    source: str = "skillhub"  # 安装来源（未来可加 git/local）
+    installed_at: int = 0  # unix ts（落地时间）
+
+
+class DeleteSkillRequest(BaseModel):
+    name: str  # skill 目录名（slug）
+
+
+class BatchDeleteRequest(BaseModel):
+    names: list[str]
 
 
 # ── Library ──────────────────────────────────────────────────────
 
 
+def _read_sidecar(skill_dir: Path) -> dict:
+    """读 .agenthub.json sidecar（装时落地）。无则返空 dict。"""
+    sc = skill_dir / ".agenthub.json"
+    if not sc.exists():
+        return {}
+    try:
+        return json.loads(sc.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+async def _backfill_sidecars(skills_without_sc: list[tuple[str, Path]]) -> None:
+    """懒回填：library 看到没 sidecar 的，去 skillhub batch 查一次。
+
+    单次 batch 最多支持 50 个 slug，所以数量再多也是 1 次网络往返。
+    失败不影响 library 主流程（静默 fallthrough）。
+    """
+    if not skills_without_sc:
+        return
+    slugs = [slug for slug, _ in skills_without_sc]
+    slug_to_dir = dict(skills_without_sc)
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            bresp = await client.post(
+                f"{SKILLHUB_API}/api/v1/skills/batch",
+                json={"slugs": slugs},
+            )
+            if bresp.status_code != 200:
+                return
+            bdata = bresp.json()
+            items_by_slug = {it.get("skill", {}).get("slug"): it for it in bdata.get("items", [])}
+            for slug in slugs:
+                it = items_by_slug.get(slug)
+                if not it:
+                    continue
+                # 读 SKILL.md 拿 name（fallback 到 slug）
+                sc_dir = slug_to_dir[slug]
+                sc = _read_sidecar(sc_dir)
+                sidecar = {
+                    "slug": slug,
+                    "name": sc.get("name") or it.get("skill", {}).get("displayName", slug),
+                    "author": it.get("owner", {}).get("displayName", "unknown"),
+                    "owner_id": it.get("owner", {}).get("handle", ""),
+                    "version": it.get("latestVersion", {}).get("version", ""),
+                    "source": "skillhub",
+                    "installed_at": sc.get("installed_at", int(time.time())),
+                }
+                (sc_dir / ".agenthub.json").write_text(
+                    json.dumps(sidecar, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+    except Exception:
+        # 网络/上游问题不影响 library 返回——sidecar 写不进去就 unknown
+        pass
+
+
 @router.get("/library")
 async def list_skills():
-    """递归列出本地所有 skill（子目录名/SKILL.md）。"""
+    """递归列出本地所有 skill。
+
+    主入口文件名兼容：SKILL.md / SKILLS.md / skill.md / skills.md
+    （skillhub 上游不规范，归一化之前可能混着用；library 只读不写，
+    所以历史装的非 SKILL.md 也得识别）。
+
+    每条带：
+      - description：读 SKILL.md 首段（跳过 YAML frontmatter / 标题 / 代码块），200 字截断
+      - author / version / installed_at：读 .agenthub.json sidecar（装时落地），
+        老装无 sidecar 时 author = "unknown"（不回退 skillhub，避免阻塞）
+    """
     if not SKILLS_DIR.exists():
         return []
     result = []
-    for p in sorted(SKILLS_DIR.rglob("SKILL.md")):
-        name = p.parent.name
-        if name == "skills":
+    needs_backfill: list[tuple[str, Path]] = []  # (slug, dir) — 后面 batch 回填
+    for skill_dir in sorted([p.parent for p in SKILLS_DIR.rglob("*.md") if p.name in _SKILL_ENTRY_NAMES]):
+        # 去重：同一目录可能多个变体都扫到（一个目录只有一个主入口，跳过重复）
+        if any(r["name"] == skill_dir.name for r in result):
             continue
+        name = skill_dir.name
+        # 找主入口
+        entry = _find_entry_file(skill_dir)
+        if entry is None:
+            continue
+        rel = entry.relative_to(SKILLS_DIR).as_posix()
+        # 读 sidecar
+        sc = _read_sidecar(skill_dir)
+        if not sc:
+            # 没 sidecar → 加入 backfill 队列（library 返完后异步回填）
+            needs_backfill.append((name, skill_dir))
         result.append(
             {
                 "name": name,
-                "path": f"/skills/{p.relative_to(SKILLS_DIR)}",
-                "source": "local",
+                "path": f"{SKILLS_DIR.as_posix()}/{rel}",
+                "rel_path": rel,
+                "source": sc.get("source", "skillhub"),
+                "description": _extract_description(entry),
+                "author": sc.get("author", "unknown"),
+                "version": sc.get("version", ""),
+                "installed_at": sc.get("installed_at", 0),
             }
         )
+    # 懒回填没 sidecar 的（不阻塞响应，写在 task 里）
+    if needs_backfill:
+        import asyncio
+        asyncio.create_task(_backfill_sidecars(needs_backfill))
     return result
 
 
-# ── Marketplace ──────────────────────────────────────────────────
+@router.delete("/library/{name}")
+async def delete_skill(name: str) -> dict:
+    """删除单个 skill 目录。
+
+    安全护栏：
+      - name 必须在 SKILLS_DIR 下（防 ../ 逃逸）
+      - 必须是 skill 目录（存在 SKILL.md/skill.md 等主入口）
+    """
+    if not name:
+        raise HTTPException(status_code=400, detail="name 必填")
+    slug = _sanitize_name(name)
+    target = (SKILLS_DIR / slug).resolve()
+    skills_real = SKILLS_DIR.resolve()
+    if not str(target).startswith(str(skills_real)):
+        raise HTTPException(status_code=403, detail="越界路径")
+    if not target.exists() or not target.is_dir():
+        raise HTTPException(status_code=404, detail=f"Skill「{slug}」不存在")
+    # 校验是合法 skill 目录（有主入口）
+    if _find_entry_file(target) is None:
+        raise HTTPException(status_code=400, detail=f"「{slug}」不是合法 skill 目录")
+    import shutil
+    shutil.rmtree(target)
+    return {"deleted": slug}
+
+
+@router.post("/library/batch-delete")
+async def batch_delete_skills(body: BatchDeleteRequest) -> dict:
+    """批量删除 skill。逐个尝试，单个失败不阻断其他。"""
+    if not body.names:
+        raise HTTPException(status_code=400, detail="names 不能为空")
+    deleted: list[str] = []
+    failed: list[dict] = []
+    import shutil
+    for raw in body.names:
+        try:
+            slug = _sanitize_name(raw)
+            target = (SKILLS_DIR / slug).resolve()
+            skills_real = SKILLS_DIR.resolve()
+            if not str(target).startswith(str(skills_real)):
+                failed.append({"name": raw, "reason": "越界"})
+                continue
+            if not target.exists() or not target.is_dir():
+                failed.append({"name": raw, "reason": "不存在"})
+                continue
+            if _find_entry_file(target) is None:
+                failed.append({"name": raw, "reason": "非合法 skill 目录"})
+                continue
+            shutil.rmtree(target)
+            deleted.append(slug)
+        except Exception as e:
+            failed.append({"name": raw, "reason": str(e)[:80]})
+    return {"deleted": deleted, "failed": failed}
+
+
+# ── Marketplace: skillhub.cn 适配 ────────────────────────────────
+
+
+def _skillhub_to_market(s: dict) -> dict:
+    """skillhub skill item → 统一市场 schema。
+
+    字段映射：
+      id        ← slug
+      name      ← name
+      author    ← ownerName
+      description ← description_zh (fallback description)
+      homepage  ← homepage (skillhub 内链，作为「打开 skillhub」用)
+      skill_url ← `${SKILLHUB_WEB}/s/${slug}`
+      stars     ← stars
+      downloads ← downloads
+      installs  ← installs
+      category  ← category
+      version   ← version
+      updated_at ← updated_at (ms → s)
+    """
+    return {
+        "id": s.get("slug", ""),
+        "name": s.get("name", ""),
+        "author": s.get("ownerName", ""),
+        # 中文友好：优先 description_zh
+        "description": s.get("description_zh") or s.get("description") or "",
+        "github_url": s.get("homepage", ""),
+        "skill_url": f"{SKILLHUB_WEB}/skills/{s.get('slug', '')}",
+        "stars": s.get("stars", 0),
+        "downloads": s.get("downloads", 0),
+        "installs": s.get("installs", 0),
+        "category": s.get("category", ""),
+        "version": s.get("version", ""),
+        # ms → s（前端按 s 解析，toLocaleDateString 友好）
+        "updated_at": str(s.get("updated_at", 0) // 1000),
+    }
 
 
 @router.post("/marketplace/search")
 async def marketplace_search(body: MarketSearchRequest):
-    """代理请求 skillsmp.com 搜索技能市场。"""
+    """搜索 skillhub.cn 技能市场（关键词 + 客户端排序）。
+
+    上游 `/api/skills` 不接受自定义 sort= 参数（实测都返默认数据），
+    所以**客户端 sort 在后端做**——分页拉够数据后按 body.sort_by 排序截断。
+
+    上游硬约束：响应体被 CDN/反代在 ~5000 字节截断。`pageSize=5`（3689B）安全，
+    超过就 JSON 不完整。**多页并发拉**避开限制：4×5=20 满足前端 limit≤18。
+    """
+    keyword = body.q.strip()
+    page_size = 5  # 安全值（3689B < 5000B 截断线）
+    pages_needed = (body.limit + page_size - 1) // page_size
+
+    base_params: dict[str, str | int] = {"pageSize": page_size}
+    if keyword:
+        base_params["keyword"] = keyword
+
     async with httpx.AsyncClient(timeout=HTTPX_TIMEOUT) as client:
-        resp = await client.get(
-            MARKETPLACE_URL,
-            params={"q": body.q, "page": body.page, "limit": body.limit, "sortBy": body.sort_by},
-        )
-        resp.raise_for_status()
-        data = resp.json()
-    if not data.get("success"):
-        raise HTTPException(status_code=502, detail="上游市场返回异常")
-    skills = data["data"]["skills"]
-    pagination = data["data"]["pagination"]
-    return {
-        "skills": [
-            {
-                "id": s["id"],
-                "name": s["name"],
-                "author": s["author"],
-                "description": s["description"],
-                "github_url": s["githubUrl"],
-                "skill_url": s["skillUrl"],
-                "stars": s["stars"],
-                "updated_at": s["updatedAt"],
-            }
-            for s in skills
-        ],
-        "pagination": {
-            "page": pagination["page"],
-            "limit": pagination["limit"],
-            "total": pagination["total"],
-            "total_pages": pagination["totalPages"],
-            "has_next": pagination["hasNext"],
-        },
-    }
+        tasks = [
+            client.get(f"{SKILLHUB_API}/api/skills", params={**base_params, "page": i + 1})
+            for i in range(pages_needed)
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    skills_raw: list[dict] = []
+    seen: set[str] = set()
+    for resp in results:
+        if isinstance(resp, Exception) or resp.status_code != 200:
+            continue
+        try:
+            data = resp.json()
+        except Exception:
+            continue
+        if data.get("code") != 0:
+            continue
+        for s in data.get("data", {}).get("skills", []):
+            slug = s.get("slug", "")
+            if slug and slug not in seen:
+                seen.add(slug)
+                skills_raw.append(s)
+
+    # 客户端 sort（上游 sort= 都不生效）
+    if body.sort_by == "stars":
+        skills_raw.sort(key=lambda s: s.get("stars", 0), reverse=True)
+    elif body.sort_by == "downloads":
+        skills_raw.sort(key=lambda s: s.get("downloads", 0), reverse=True)
+    # else 'default' → 保持上游 score 排序
+
+    return {"skills": [_skillhub_to_market(s) for s in skills_raw[:body.limit]]}
 
 
 def _sanitize_name(name: str) -> str:
@@ -104,81 +384,127 @@ def _sanitize_name(name: str) -> str:
     return name.strip("-.") or "skill"
 
 
-GITHUB_API = "https://api.github.com"
+# skillhub 上游主入口文件名不统一：接受任意一种
+_SKILL_ENTRY_NAMES = ("SKILL.md", "SKILLS.md", "skill.md", "skills.md")
+
+
+def _find_entry_file(skill_dir: Path) -> Path | None:
+    """在 skill 根目录找主入口 md。返回第一个匹配的文件路径。"""
+    for name in _SKILL_ENTRY_NAMES:
+        p = skill_dir / name
+        if p.exists():
+            return p
+    return None
 
 
 @router.post("/marketplace/install")
 async def marketplace_install(body: MarketInstallRequest):
-    """从 GitHub 递归拉取整个 skill 目录（含 scripts/templates 等）。"""
-    name = _sanitize_name(body.name)
-    install_dir = SKILLS_DIR / name
-    if install_dir.exists():
-        raise HTTPException(status_code=409, detail=f"Skill「{name}」已存在")
+    """从 skillhub 下载 skill zip 并解压到 SKILLS_DIR/{slug}/。
 
-    parts = _parse_github_url(body.github_url)
-    if not parts:
-        raise HTTPException(status_code=400, detail="仅支持 GitHub 仓库安装")
-    owner, repo, branch, path = parts
+    上游链路：
+      POST skillhub `/api/v1/download?slug={slug}` → 302 → 腾讯云 COS zip
+      zip 内容：skill.md / skill.json / examples.md / README.md / _meta.json 等
 
+    写 sidecar `.agenthub.json`：保存 author（owner.displayName）+ 落地时间，
+    供 library 端点展示用。
+    """
+    import time as _time
+    if not body.skill_id:
+        raise HTTPException(status_code=400, detail="skill_id 必填")
+    slug = _sanitize_name(body.skill_id)
+    install_dir = SKILLS_DIR / slug
+    if install_dir.exists() and (install_dir / "SKILL.md").exists():
+        raise HTTPException(status_code=409, detail=f"Skill「{slug}」已存在")
+    install_dir.mkdir(parents=True, exist_ok=True)
+
+    # 下载（follow_redirects 默认开启，自动跟 302 到 COS）
+    download_url = f"{SKILLHUB_API}/api/v1/download?slug={body.skill_id}"
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            await _fetch_dir(client, owner, repo, branch, path, install_dir)
-    except httpx.TimeoutException as e:
-        raise HTTPException(status_code=504, detail="下载超时，请检查网络") from e
+        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+            resp = await client.get(download_url)
+            resp.raise_for_status()
+            zip_bytes = resp.content
     except httpx.HTTPStatusError as e:
         raise HTTPException(
-            status_code=502, detail=f"GitHub 下载失败: {e.response.status_code}"
+            status_code=502, detail=f"下载失败 {e.response.status_code}：{e.response.text[:200]}"
         ) from e
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=504, detail=f"下载超时/网络错误：{e}") from e
 
-    # 确保至少有 SKILL.md
-    if not (install_dir / "SKILL.md").exists():
-        raise HTTPException(status_code=400, detail="未在目录中找到 SKILL.md")
+    # 解压（防 zip-slip：拒绝 ../ 路径）
+    try:
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+            for member in zf.namelist():
+                # 跳过目录条目 / 跳过绝对路径 / 跳过父目录穿越
+                if not member or member.endswith("/"):
+                    continue
+                member_path = (install_dir / member).resolve()
+                if not str(member_path).startswith(str(install_dir.resolve())):
+                    raise HTTPException(status_code=400, detail=f"非法 zip 条目：{member}")
+                member_path.parent.mkdir(parents=True, exist_ok=True)
+                with zf.open(member) as src, open(member_path, "wb") as dst:
+                    dst.write(src.read())
+    except zipfile.BadZipFile as e:
+        # 回滚
+        import shutil
+        shutil.rmtree(install_dir, ignore_errors=True)
+        raise HTTPException(status_code=502, detail="下载内容不是合法 zip") from e
 
-    return {"name": name, "path": f"/skills/{name}/SKILL.md", "source": "marketplace"}
+    # 校验主入口文件（skillhub 命名不统一：SKILL.md / SKILLS.md / skill.md / skills.md 都可能）
+    entry = _find_entry_file(install_dir)
+    if entry is None:
+        import shutil
+        shutil.rmtree(install_dir, ignore_errors=True)
+        raise HTTPException(
+            status_code=400,
+            detail="zip 中未找到主入口文件（SKILL.md / SKILLS.md / skill.md / skills.md 任一）",
+        )
+    # 归一化：重命名为 SKILL.md（项目统一约定）
+    normalized = install_dir / "SKILL.md"
+    if entry != normalized:
+        entry.rename(normalized)
 
+    # 写 .agenthub.json sidecar：author + 安装时间
+    author = "unknown"
+    owner_id = ""
+    version = ""
+    # 优先用 batch 端点拿 owner.displayName（人类可读），降级用 _meta.json 里的 ownerId
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            bresp = await client.post(
+                f"{SKILLHUB_API}/api/v1/skills/batch",
+                json={"slugs": [body.skill_id]},
+            )
+            if bresp.status_code == 200:
+                bdata = bresp.json()
+                for it in bdata.get("items", []):
+                    if it.get("skill", {}).get("slug") == body.skill_id:
+                        author = it.get("owner", {}).get("displayName") or "unknown"
+                        owner_id = it.get("owner", {}).get("handle") or ""
+                        version = it.get("latestVersion", {}).get("version") or ""
+                        break
+    except Exception:
+        pass
+    sidecar = {
+        "slug": body.skill_id,
+        "name": body.name,
+        "author": author,
+        "owner_id": owner_id,
+        "version": version,
+        "source": "skillhub",
+        "installed_at": int(_time.time()),
+    }
+    (install_dir / ".agenthub.json").write_text(
+        json.dumps(sidecar, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
-async def _fetch_dir(
-    client: httpx.AsyncClient,
-    owner: str,
-    repo: str,
-    branch: str,
-    path: str,
-    dest: Path,
-) -> None:
-    """递归拉取 GitHub 目录内容到本地。"""
-    url = f"{GITHUB_API}/repos/{owner}/{repo}/contents/{path}?ref={branch}"
-    resp = await client.get(url)
-    resp.raise_for_status()
-    items = resp.json()
-    # API 可能返回单个文件而不是数组
-    if not isinstance(items, list):
-        items = [items]
-
-    for item in items:
-        item_name = item["name"]
-        item_type = item["type"]
-        if item_type == "dir":
-            sub_dest = dest / item_name
-            sub_dest.mkdir(parents=True, exist_ok=True)
-            await _fetch_dir(client, owner, repo, branch, item["path"], sub_dest)
-        else:
-            dest.mkdir(parents=True, exist_ok=True)
-            dl = await client.get(item["download_url"])
-            dl.raise_for_status()
-            (dest / item_name).write_bytes(dl.content)
-
-
-def _parse_github_url(github_url: str) -> tuple[str, str, str, str] | None:
-    """解析 GitHub tree URL → (owner, repo, branch, path)。
-
-    https://github.com/owner/repo/tree/branch/dir/sub  →  (owner, repo, branch, dir/sub)
-    """
-    m = re.match(r"https?://github\.com/([^/]+)/([^/]+)/tree/([^/]+)/(.+)", github_url)
-    if not m:
-        return None
-    owner, repo, branch, path = m.group(1), m.group(2), m.group(3), m.group(4)
-    repo = re.sub(r"\.git$", "", repo)
-    return owner, repo, branch, path
+    return {
+        "name": slug,
+        "path": str(normalized),
+        "source": "skillhub",
+        "action": "installed",
+    }
 
 
 # ── Filesystem browsing ──────────────────────────────────────────
@@ -199,177 +525,133 @@ def _resolve_path(path: str) -> str:
     return path
 
 
-def _to_win_path(path: str) -> str:
-    """任意路径 → Windows 格式。"""
-    m = re.match(r"^/mnt/host_([a-z])/(.*)", path)
-    if m:
-        return f"{m.group(1).upper()}:\\" + m.group(2).replace("/", "\\")
-    # 已经是 Windows 路径或 Unix 路径，原样返回
-    return path
-
-
-@FS_ROUTER.get("/drives")
-async def list_drives():
-    """列出可用的盘符。"""
-    drives = []
-    for d in "CDEFGHIJKLMNOPQRSTUVWXYZ":
-        win = f"{d}:/"
-        container = f"/mnt/host_{d.lower()}"
-        if os.path.isdir(win) or os.path.isdir(container):
-            drives.append({"letter": f"{d}:", "path": win, "label": f"本地磁盘 ({d}:)"})
-    return drives
-
-
 @FS_ROUTER.get("/browse")
-async def browse_dir(path: str = ""):
-    """浏览指定目录，返回子项（文件夹 + 文件）。"""
+async def fs_browse(path: str = "") -> dict:
+    """浏览目录：path 为空返回盘符列表，否则返回该目录的子项。"""
+    import os as _os
     if not path:
-        return await list_drives()
+        if hasattr(_os, "listdrives"):
+            drives = _os.listdrives()
+            letters = [d.rstrip("\\").rstrip("/") for d in drives]
+        else:
+            letters = [f"{c}:\\" for c in "CDEFGHIJKLMNOPQRSTUVWXYZ" if _os.path.isdir(f"{c}:\\")]
+        return {
+            "path": "",
+            "parent": "",
+            "items": [
+                {"name": l, "path": l, "type": "drive"} for l in letters
+            ],
+        }
     real = _resolve_path(path)
-    if not os.path.isdir(real):
-        return {"error": f"目录不存在: {path}", "items": []}
+    if not _os.path.isdir(real):
+        raise HTTPException(status_code=404, detail=f"目录不存在：{real}")
     items = []
+    for name in sorted(_os.listdir(real)):
+        full = _os.path.join(real, name)
+        try:
+            is_dir = _os.path.isdir(full)
+        except OSError:
+            continue
+        items.append({"name": name, "path": full, "type": "dir" if is_dir else "file"})
+    parent = _os.path.dirname(real.rstrip("/\\")) if real else ""
+    return {"path": real, "parent": parent, "items": items}
+
+
+@FS_ROUTER.get("/read")
+async def fs_read(path: str = "") -> dict:
+    """读文件内容（限文本类，>2MB 返 413）。"""
+    import os as _os
+    if not path:
+        raise HTTPException(status_code=400, detail="path 必填")
+    real = _resolve_path(path)
+    if not _os.path.isfile(real):
+        raise HTTPException(status_code=404, detail=f"文件不存在：{real}")
+    size = _os.path.getsize(real)
+    if size > 2 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="文件超过 2MB")
     try:
-        for name in sorted(os.listdir(real)):
-            if name.startswith("."):
-                continue  # 隐藏文件 / .git / .vscode 之类一律跳过
-            full = os.path.join(real, name)
-            win = _to_win_path(full)
-            items.append(
-                {
-                    "name": name,
-                    "path": win,
-                    "type": "dir" if os.path.isdir(full) else "file",
-                }
-            )
-    except PermissionError:
-        pass
-    parent = str(Path(real).parent)
-    parent_win = _to_win_path(parent) if parent != real else ""
-    return {"path": path, "parent": parent_win, "items": items}
-
-
-from pydantic import BaseModel
-
-
-class MkdirIn(BaseModel):
-    parent: str  # 父目录（Windows 或 Unix 路径）
-    name: str  # 新建文件夹名
+        with open(real, "r", encoding="utf-8") as f:
+            return {"path": real, "content": f.read(), "size": size}
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=415, detail="二进制文件不支持预览")
 
 
 @FS_ROUTER.post("/mkdir")
-async def mkdir_dir(body: MkdirIn):
-    """在指定目录下新建一个空文件夹。返回新建路径。"""
-    parent_real = _resolve_path(body.parent)
-    if not os.path.isdir(parent_real):
-        raise HTTPException(status_code=400, detail=f"父目录不存在: {body.parent}")
-    # 禁止路径穿越与危险字符
-    if not body.name or any(c in body.name for c in "/\\:*?\"<>|"):
-        raise HTTPException(status_code=400, detail="文件夹名不合法")
-    target = os.path.join(parent_real, body.name)
-    if os.path.exists(target):
-        raise HTTPException(status_code=409, detail=f"已存在: {body.name}")
+async def fs_mkdir(parent: str, name: str) -> dict:
+    """在 parent 下新建文件夹 name。"""
+    import os as _os
+    parent_real = _resolve_path(parent)
+    if not _os.path.isdir(parent_real):
+        raise HTTPException(status_code=404, detail=f"父目录不存在：{parent_real}")
+    new_path = _os.path.join(parent_real, name)
+    if _os.path.exists(new_path):
+        raise HTTPException(status_code=409, detail=f"已存在：{new_path}")
     try:
-        os.makedirs(target, exist_ok=False)
+        _os.makedirs(new_path)
     except OSError as e:
-        raise HTTPException(status_code=500, detail=f"创建失败: {e}")
-    return {"path": _to_win_path(target), "name": body.name, "parent": body.parent}
-
-
-# ── 读文件（限文本/代码类，限大小防 OOM） ──────────────────────────────
-# 单文件读取上限 2 MB；超过返回 413。binary 文件返回 415。
-READ_MAX_BYTES = 2 * 1024 * 1024
-
-
-class ReadIn(BaseModel):
-    path: str
-
-
-@FS_ROUTER.post("/read")
-async def read_file(body: ReadIn):
-    """读取一个文本/代码文件的内容（限文本类 + 限大小）。"""
-    real = _resolve_path(body.path)
-    if not os.path.isfile(real):
-        raise HTTPException(status_code=404, detail=f"文件不存在: {body.path}")
-    # 拒绝 binary：嗅探前 8KB 是否有 NUL 字节
-    try:
-        with open(real, "rb") as f:
-            head = f.read(8192)
-            if b"\x00" in head:
-                raise HTTPException(status_code=415, detail="binary 文件不支持在线预览")
-            f.seek(0, os.SEEK_END)
-            size = f.tell()
-            if size > READ_MAX_BYTES:
-                raise HTTPException(status_code=413, detail=f"文件过大 ({size} bytes)，仅支持 ≤ {READ_MAX_BYTES} bytes")
-            f.seek(0)
-            content_bytes = f.read()
-    except OSError as e:
-        raise HTTPException(status_code=500, detail=f"读取失败: {e}")
-    # 用 utf-8 解码；失败时退回 latin-1（保证一定可读）
-    try:
-        content = content_bytes.decode("utf-8")
-    except UnicodeDecodeError:
-        content = content_bytes.decode("latin-1", errors="replace")
-    return {
-        "path": _to_win_path(real),
-        "name": os.path.basename(real),
-        "size": len(content_bytes),
-        "content": content,
-    }
-
-
-# ── 递归搜索（限定深度/数量防 OOM） ──────────────────────────────
-
-SEARCH_MAX_DEPTH = 12
-SEARCH_MAX_RESULTS = 200
-SEARCH_DIR_SKIP = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build", ".next", ".cache"}
+        raise HTTPException(status_code=500, detail=f"创建失败：{e}") from e
+    return {"path": new_path}
 
 
 @FS_ROUTER.get("/search")
-async def search_files(path: str, q: str = "", limit: int = 100):
-    """在 `path` 下递归按文件名模糊搜索（大小写不敏感）。
-
-    返回的文件路径按 `_to_win_path` 归一为客户端能用的形态。
-    """
-    if not q or not q.strip():
-        return {"results": [], "truncated": False}
+async def fs_search(path: str, q: str, limit: int = 100) -> dict:
+    """在 path 下按文件名模糊搜索（递归），返回前 limit 条。"""
+    import os as _os
     real = _resolve_path(path)
-    if not os.path.isdir(real):
-        return {"results": [], "truncated": False, "error": f"目录不存在: {path}"}
-    needle = q.strip().lower()
-    cap = max(1, min(limit, SEARCH_MAX_RESULTS))
+    if not _os.path.isdir(real):
+        raise HTTPException(status_code=404, detail=f"目录不存在：{real}")
+    q_lower = q.lower()
+    out: list[dict] = []
+    for root, dirs, files in _os.walk(real):
+        for f in files:
+            if q_lower in f.lower():
+                out.append({"name": f, "path": _os.path.join(root, f), "type": "file"})
+                if len(out) >= limit:
+                    return {"items": out, "truncated": True}
+    return {"items": out, "truncated": False}
 
-    results: list[dict] = []
-    truncated = False
 
-    def walk(dir_path: str, depth: int) -> None:
-        nonlocal truncated
-        if depth > SEARCH_MAX_DEPTH or truncated:
-            return
-        try:
-            entries = sorted(os.listdir(dir_path))
-        except (PermissionError, OSError):
-            return
-        for name in entries:
-            if truncated:
-                return
-            if name in SEARCH_DIR_SKIP:
-                continue
-            full = os.path.join(dir_path, name)
-            is_dir = os.path.isdir(full)
-            if needle in name.lower():
-                results.append(
-                    {
-                        "name": name,
-                        "path": _to_win_path(full),
-                        "type": "dir" if is_dir else "file",
-                    }
-                )
-                if len(results) >= cap:
-                    truncated = True
-                    return
-            if is_dir:
-                walk(full, depth + 1)
+class RevealRequest(BaseModel):
+    path: str
+    """目标路径：文件 = explorer /select 高亮；目录 = 直接打开"""
 
-    walk(real, 0)
-    return {"results": results, "truncated": truncated, "query": q}
+
+@FS_ROUTER.post("/reveal")
+async def fs_reveal(body: RevealRequest) -> dict:
+    """在 OS 文件资源管理器中打开 path。
+
+    Windows: `explorer <dir>` 或 `explorer /select,<file>`（高亮）
+    macOS:   `open <path>`
+    Linux:   `xdg-open <path>`
+
+    **安全限定**：path 必须解析到 SKILLS_DIR 下（防任意执行 explorer）。
+    """
+    if not body.path:
+        raise HTTPException(status_code=400, detail="path 必填")
+    real = Path(_resolve_path(body.path)).resolve()
+    if not real.exists():
+        raise HTTPException(status_code=404, detail=f"路径不存在：{real}")
+
+    # 安全护栏：只允许打开 SKILLS_DIR 子路径
+    skills_real = SKILLS_DIR.resolve()
+    if not str(real).startswith(str(skills_real)):
+        raise HTTPException(status_code=403, detail="只允许打开 SKILLS_DIR 内的路径")
+
+    is_file = real.is_file()
+    try:
+        if sys.platform == "win32":
+            if is_file:
+                # /select,<file> 在资源管理器中打开父目录并高亮文件
+                subprocess.Popen(["explorer", f"/select,{real}"])
+            else:
+                subprocess.Popen(["explorer", str(real)])
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", str(real)])
+        else:
+            subprocess.Popen(["xdg-open", str(real)])
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=500, detail=f"系统命令不可用：{e}") from e
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"启动资源管理器失败：{e}") from e
+
+    return {"ok": True, "path": str(real), "kind": "file" if is_file else "folder"}

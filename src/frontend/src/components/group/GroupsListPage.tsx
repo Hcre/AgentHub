@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
 import { cn } from '../../lib/cn'
+import { useAgentStore } from '../../stores/agentStore'
 import { useGroupStore } from '../../stores/groupStore'
 import { useUIStore } from '../../stores/uiStore'
-import { Button, Icon } from '../ui'
+import type { Agent } from '../../types'
+import { Avatar, Button, Icon } from '../ui'
 import { CreateGroupModal } from './CreateGroupModal'
 
 /**
@@ -15,6 +17,7 @@ import { CreateGroupModal } from './CreateGroupModal'
 export function GroupsListPage() {
   const groups = useGroupStore((s) => s.groups)
   const deleteGroup = useGroupStore((s) => s.deleteGroup)
+  const agents = useAgentStore((s) => s.agents)
   const { setSection } = useUIStore()
 
   const [batchMode, setBatchMode] = useState(false)
@@ -129,9 +132,19 @@ export function GroupsListPage() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
             {sortedGroups.map((g) => {
               const selected = selectedIds.has(g.id)
+              // 协调者不在 g.members 里，单独 +1 算总成员数（产品口径：协调者也是成员）
+              const totalMembers = g.members.length + (g.coordinatorId ? 1 : 0)
+              // 头像只显示 g.members 里的 agent（协调者在 agentStore 不存在，不显示头像）
+              const memberAgents: Agent[] = g.members
+                .map((id) => agents.find((a) => a.id === id))
+                .filter((a): a is Agent => a !== undefined)
+              const visibleMembers = memberAgents.slice(0, 3)
+              // +N 包含「剩余成员 + 协调者」
+              const extraCount =
+                memberAgents.length - visibleMembers.length + (g.coordinatorId ? 1 : 0)
               return (
                 <article
                   key={g.id}
@@ -160,32 +173,83 @@ export function GroupsListPage() {
                     </span>
                   )}
 
-                  {/* 头部：群头像 + 群名 + 成员数 */}
-                  <div className="flex items-start gap-2.5">
-                    <div className="grid h-[32px] w-[32px] flex-shrink-0 place-items-center rounded-lg bg-brand/15 text-brand">
-                      <Icon name="channels" className="h-4 w-4" strokeWidth={2} />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="truncate text-[14px] font-semibold leading-tight">
+                  {/* 头部：群头像 + 群名 + 总成员数 + 成员堆叠头像 + 2 个 GlassIconBtn
+                      - 成员堆叠挪到「按钮左边」（同一行）— 卡片瘦身
+                      - 简介行已删（产品口径：群组卡片不展示描述） */}
+                  <div className="flex items-center gap-1.5">
+                    <Avatar
+                      initial={g.name[0] ?? '?'}
+                      color="brand"
+                      size={32}
+                      className="flex-shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13.5px] font-semibold leading-tight">
                         {g.name}
                       </div>
-                      <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <div className="mt-0.5 flex items-center gap-1 text-[11px] leading-tight text-muted-foreground">
                         <Icon name="users" className="h-2.5 w-2.5" />
-                        <span>{g.members.length} 个成员</span>
-                        {g.coordinatorName && (
-                          <>
-                            <span>·</span>
-                            <span className="truncate">协调者 {g.coordinatorName}</span>
-                          </>
-                        )}
+                        <span>{totalMembers} 成员</span>
                       </div>
                     </div>
-                  </div>
 
-                  {/* 简介 */}
-                  <p className="line-clamp-2 min-h-[2.6em] text-[12px] leading-snug text-foreground/75">
-                    {g.description?.trim() || '暂无简介'}
-                  </p>
+                    {/* 成员堆叠头像（最多 3 个 + +N 隐藏）— 与按钮同列，按钮在右 */}
+                    {visibleMembers.length > 0 && (
+                      <div className="flex flex-shrink-0 items-center">
+                        {visibleMembers.map((m, i) => (
+                          <div
+                            key={m.id}
+                            title={m.name}
+                            className="inline-flex rounded-full ring-2 ring-background"
+                            style={{ marginLeft: i === 0 ? 0 : -6 }}
+                          >
+                            <Avatar initial={m.name[0] ?? '?'} color={m.color} size={18} />
+                          </div>
+                        ))}
+                        {extraCount > 0 && (
+                          <span className="ml-1 text-[10.5px] text-muted-foreground">
+                            +{extraCount}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 右侧：批量模式=复选框；普通模式=2 个玻璃图标按钮（贴右） */}
+                    {batchMode ? (
+                      <span
+                        className={cn(
+                          'grid h-5 w-5 flex-shrink-0 place-items-center rounded border-2',
+                          selected
+                            ? 'border-brand bg-brand text-brand-foreground'
+                            : 'border-border bg-background',
+                        )}
+                      >
+                        {selected && <Icon name="check" className="h-3 w-3" strokeWidth={3} />}
+                      </span>
+                    ) : (
+                      <div
+                        className="flex flex-shrink-0 items-center gap-0.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <GlassIconBtn
+                          icon="chat"
+                          title="进入群聊"
+                          onClick={() => {
+                            useUIStore.getState().openGroup(g.id)
+                          }}
+                        />
+                        <GlassIconBtn
+                          icon="moreVertical"
+                          title="详细"
+                          onClick={() =>
+                            window.alert(
+                              `「${g.name}」\n\n成员：${totalMembers} 个\n${g.workdir ? `工作目录：\n${g.workdir}` : '工作目录：未设置'}\n\n（详细抽屉后续接入）`,
+                            )
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
 
                   {/* 工作目录预览（仅在有值时显示） */}
                   {g.workdir && (
@@ -194,35 +258,6 @@ export function GroupsListPage() {
                       <span className="truncate font-mono" title={g.workdir}>
                         {g.workdir}
                       </span>
-                    </div>
-                  )}
-
-                  {/* 动作按钮（仅 2 个：进入群聊 + 详细） */}
-                  {!batchMode && (
-                    <div
-                      className="flex items-center gap-1.5"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Button
-                        variant="brand"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => {
-                          setSection('group')
-                        }}
-                      >
-                        <Icon name="chat" className="h-3.5 w-3.5" />
-                        进入群聊
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.alert(`「${g.name}」\n\n成员：${g.members.length} 个\n${g.workdir ? `工作目录：\n${g.workdir}` : '工作目录：未设置'}\n\n（详细抽屉后续接入）`)}
-                        title="查看详情"
-                      >
-                        <Icon name="info" className="h-3.5 w-3.5" />
-                        详细
-                      </Button>
                     </div>
                   )}
                 </article>
@@ -234,5 +269,33 @@ export function GroupsListPage() {
 
       <CreateGroupModal open={createOpen} onClose={() => setCreateOpen(false)} />
     </div>
+  )
+}
+
+/** 与 AI 队友卡（AgentsListPage.GlassIconBtn）同款玻璃图标按钮。 */
+function GlassIconBtn({
+  icon,
+  title,
+  onClick,
+}: {
+  icon: 'chat' | 'moreVertical'
+  title: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      className={cn(
+        'grid h-7 w-7 place-items-center rounded-lg border border-border/60 glass-soft transition-colors',
+        'text-muted-foreground',
+        'hover:bg-accent hover:text-foreground',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background',
+      )}
+    >
+      <Icon name={icon} className="h-3.5 w-3.5" />
+    </button>
   )
 }

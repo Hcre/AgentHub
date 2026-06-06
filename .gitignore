@@ -63,3 +63,16 @@ _assets/
 # 锚定到仓库根：原裸 `backend/` 会误伤源码树 src/backend/，
 # 导致所有新增后端文件被静默忽略（2026-06-03 修正）。仓库根无 backend/ 目录。
 /backend/
+
+# === 本地已装 skill（per-user，不入库；重装从市场再拉）===
+.agenthub/skills/
+# === 调试 / 测试 artifacts（不进库）===
+.agenthub-skills-test.json
+.lib-test.json
+.lib-test2.json
+.tmp/
+src/.tmp/
+src/frontend/.tmp/
+src/frontend/diag.mjs
+src/frontend/tmp-shoot.mjs
+.worktrees/
