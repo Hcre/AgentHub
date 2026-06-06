@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { Pin } from 'lucide-react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -77,12 +79,55 @@ export function MessageBubble({
   msg,
   agent,
   user,
+  sessionId,
 }: {
   msg: ChatMessage
   agent: Agent
   user: UserInfo
+  /**
+   * 当前会话的后端 Session id。Pin 操作调 POST/DELETE
+   * /api/sessions/{sessionId}/messages/{msg.id}/pin 时需要。
+   * 不传则按钮 disabled（避免在没绑会话的 mock 消息上乱发请求）。
+   */
+  sessionId?: string
 }) {
   const isAgent = msg.from === 'agent'
+  // 乐观更新本地 Pin 状态；初始值用 msg.pinned（后端真值），点击后立刻翻转，再
+  // 调后端 200 则保持；非 2xx 回滚 + console.error 提示。
+  const [pinned, setPinned] = useState<boolean>(msg.pinned ?? false)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const togglePin = async () => {
+    if (pending) return
+    if (!sessionId) {
+      // 没绑 session 的消息（典型：mock 假回复）— 允许视觉切换但不发请求，
+      // 避免在没绑会话的 mock 消息上乱发 404
+      setPinned((v) => !v)
+      return
+    }
+    const willPin = !pinned
+    const prev = pinned
+    // 乐观更新：先翻状态，失败再回滚
+    setPinned(willPin)
+    setError(null)
+    setPending(true)
+    const url = `/api/sessions/${sessionId}/messages/${msg.id}/pin`
+    try {
+      const resp = await fetch(url, { method: willPin ? 'POST' : 'DELETE' })
+      if (!resp.ok && resp.status !== 204) {
+        throw new Error(`API ${resp.status}`)
+      }
+    } catch (e) {
+      // 回滚 + 错误提示
+      setPinned(prev)
+      const msgText = e instanceof Error ? e.message : 'Pin 操作失败'
+      setError(msgText)
+      console.error('[MessageBubble] pin toggle failed:', msgText)
+    } finally {
+      setPending(false)
+    }
+  }
   // 优先用 Agent 显式声明的 urls 字段；退化路径从 text 抓 http(s)://
   const previewUrls = isAgent ? collectUrls(msg.text, msg.urls) : []
 
@@ -106,6 +151,39 @@ export function MessageBubble({
         <div className="mb-1 flex items-center gap-2">
           <span className="text-[13px] font-semibold">{isAgent ? agent.name : user.handle}</span>
           <span className="font-mono text-[11px] text-muted-foreground">{msg.time}</span>
+          {/* P0-4 Pin 按钮：放在时间戳旁。已 pinned → 填充态 + 主色（lucide fill 用 fill="currentColor"）；
+              未 pinned → outline（stroke only）。optimistic update + 失败回滚。 */}
+          <button
+            type="button"
+            data-testid="pin-btn"
+            data-pinned={pinned ? 'true' : 'false'}
+            aria-pressed={pinned}
+            aria-label={pinned ? '取消置顶' : '置顶消息'}
+            title={pinned ? '取消置顶' : '置顶消息'}
+            disabled={pending}
+            onClick={togglePin}
+            className={
+              pinned
+                ? 'inline-flex h-5 w-5 items-center justify-center rounded text-brand transition-colors hover:bg-accent disabled:opacity-50'
+                : 'inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50'
+            }
+          >
+            <Pin
+              className="h-3.5 w-3.5"
+              fill={pinned ? 'currentColor' : 'none'}
+              strokeWidth={1.75}
+            />
+          </button>
+          {error && (
+            <span
+              data-testid="pin-error"
+              role="alert"
+              className="font-mono text-[10.5px] text-destructive"
+              title={error}
+            >
+              Pin 失败
+            </span>
+          )}
         </div>
         <div className="prose min-w-0 max-w-full break-words text-[14px] leading-[1.6] text-foreground">
           {showDiffInline && fence ? (

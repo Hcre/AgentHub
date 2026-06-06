@@ -212,7 +212,15 @@ export function ChatView({ agent }: { agent: Agent }) {
               onPick={(text) => composerRef.current?.setText(text)}
             />
           ) : (
-            list.map((m) => <MessageBubble key={m.id} msg={m} agent={agent} user={user} />)
+            list.map((m) => (
+              <MessageBubble
+                key={m.id}
+                msg={m}
+                agent={agent}
+                user={user}
+                sessionId={sessionId ?? undefined}
+              />
+            ))
           )}
           {isTyping && <TypingIndicator agent={agent} />}
           <div ref={bottomRef} />

@@ -78,6 +78,12 @@ export interface ChatMessage {
    * 退化路径：MessageBubble 内部用正则从 text 中抓 http(s)://。
    */
   urls?: string[]
+  /**
+   * 消息是否已 Pin。P0-4 新增：MessageBubble 渲染 Pin 按钮，乐观更新
+   * 本地状态后通过 POST/DELETE /api/sessions/{sid}/messages/{mid}/pin 同步到后端。
+   * 缺省 = 未 Pin。
+   */
+  pinned?: boolean
 }
 
 export interface StageTask {
