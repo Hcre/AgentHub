@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { cn } from '../../lib/cn'
 import { fsApi } from '../../api/fs'
-import { Icon } from '../ui'
+import { Button, Icon } from '../ui'
 import { FileTree } from './FileTree'
+import { useUIStore } from '../../stores/uiStore'
 
 /** 文件树固定宽度（与 AppShell 全局拖拽的右栏宽度解耦） */
 const TREE_WIDTH = 140
@@ -26,6 +27,7 @@ interface OpenTab {
 export function FilePreview({ workdir, initialPath }: FilePreviewProps) {
   const [tabs, setTabs] = useState<OpenTab[]>([])
   const [activePath, setActivePath] = useState<string | null>(null)
+  const fileTreeCollapsed = useUIStore((s) => s.fileTreeCollapsed)
 
   useEffect(() => {
     if (initialPath) void openFile(initialPath)
@@ -129,10 +131,10 @@ export function FilePreview({ workdir, initialPath }: FilePreviewProps) {
         })}
       </div>
 
-      {/* 面包屑：当前打开文件的相对路径 */}
-      {active && <Breadcrumb path={active.path} workdir={workdir} />}
+      {/* 面包屑：当前打开文件的相对路径 + 文件树折叠按钮 */}
+      {active && <Breadcrumb path={active.path} workdir={workdir} right={<TreeToggleButton />} />}
 
-      {/* 主体：内容（flex-1） + 文件树（固定 280px） */}
+      {/* 主体：内容（flex-1） + 文件树（固定 140px，折叠时 0） */}
       <div className="flex min-h-0 flex-1">
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 overflow-auto bg-background">
@@ -157,21 +159,53 @@ export function FilePreview({ workdir, initialPath }: FilePreviewProps) {
           </div>
         </div>
 
-        {/* 文件树：固定宽度，不可拖拽 */}
-        <aside
-          style={{ width: TREE_WIDTH }}
-          className="flex flex-shrink-0 flex-col border-l border-border/70 bg-muted/10"
-        >
-          <FileTree root={workdir} selectedPath={activePath ?? undefined} onSelect={openFile} />
-        </aside>
+        {/* 文件树：固定宽度 140px；折叠时 width:0,内容不渲染（用 hidden 而非 width:0,避免留白 transition 抖动） */}
+        {!fileTreeCollapsed && (
+          <aside
+            style={{ width: TREE_WIDTH }}
+            className="flex flex-shrink-0 flex-col border-l border-border/70 bg-muted/10"
+          >
+            <FileTree root={workdir} selectedPath={activePath ?? undefined} onSelect={openFile} />
+          </aside>
+        )}
       </div>
     </div>
   )
 }
 
+// ── 文件树折叠按钮(放在 Breadcrumb 行右侧) ─────────────────────────
+
+function TreeToggleButton() {
+  const collapsed = useUIStore((s) => s.fileTreeCollapsed)
+  const toggle = useUIStore((s) => s.toggleFileTree)
+  return (
+    <Button
+      variant="ghost"
+      size="iconSm"
+      onClick={toggle}
+      title={collapsed ? '展开文件树' : '收起文件树'}
+      aria-label={collapsed ? '展开文件树' : '收起文件树'}
+    >
+      <Icon
+        name={collapsed ? 'chevronLeft' : 'chevronRight'}
+        className="h-3.5 w-3.5"
+        strokeWidth={2}
+      />
+    </Button>
+  )
+}
+
 // ── 面包屑 ────────────────────────────────────────────────────────
 
-function Breadcrumb({ path, workdir }: { path: string; workdir: string }) {
+function Breadcrumb({
+  path,
+  workdir,
+  right,
+}: {
+  path: string
+  workdir: string
+  right?: React.ReactNode
+}) {
   const norm = (s: string) => s.replace(/\\/g, '/').replace(/\/+$/, '')
   const root = norm(workdir)
   const full = norm(path)
@@ -182,7 +216,7 @@ function Breadcrumb({ path, workdir }: { path: string; workdir: string }) {
       className="flex flex-shrink-0 items-center gap-1 border-b border-border/60 bg-muted/10 px-3 py-1 font-mono text-[11.5px] text-muted-foreground"
       title={path}
     >
-      <span className="truncate">
+      <span className="min-w-0 flex-1 truncate">
         <span className="text-foreground/80">{root.split(/[/\\]/).pop() || root}</span>
         {segs.map((s, i) => (
           <span key={i}>
@@ -191,6 +225,7 @@ function Breadcrumb({ path, workdir }: { path: string; workdir: string }) {
           </span>
         ))}
       </span>
+      {right}
     </div>
   )
 }

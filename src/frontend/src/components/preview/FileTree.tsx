@@ -196,7 +196,7 @@ function TreeNode({
         ) : (
           <span className="h-3 w-3 flex-shrink-0" />
         )}
-        <span className="flex-shrink-0 text-[11px]">{isDir ? '📁' : '📄'}</span>
+        {!isDir && <span className="flex-shrink-0 text-[11px]">📄</span>}
         <span className="truncate text-[12px]">{item.name}</span>
       </button>
       {isDir && isOpen && (
@@ -305,7 +305,9 @@ function SearchResults({
                     )}
                     title={r.path}
                   >
-                    <span className="flex-shrink-0 text-[11px]">{r.type === 'dir' ? '📁' : '📄'}</span>
+                    {r.type !== 'dir' && (
+                      <span className="flex-shrink-0 text-[11px]">📄</span>
+                    )}
                     <span className="flex-shrink-0 text-foreground">{r.name}</span>
                     <span className="flex-1 truncate text-muted-foreground/70">{rel}</span>
                   </button>

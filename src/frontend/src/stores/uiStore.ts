@@ -27,6 +27,8 @@ interface UIState {
   rightPanelCollapsed: boolean
   /** 右栏（预览面板）宽度（px），拖拽全局分界线时更新；持久化 */
   rightPanelWidth: number
+  /** 右栏内 FilePreview 的文件树是否折叠（仅隐藏文件树,不收起整个右栏） */
+  fileTreeCollapsed: boolean
   /** 右栏（预览面板）内的预览 tab 列表（files / diff / deploy / webpage） */
   previewTabs: PreviewTab[]
   /** 右栏内当前激活的预览 tab id */
@@ -57,6 +59,9 @@ interface UIState {
   setRightPanelCollapsed: (v: boolean) => void
   /** 右栏宽度 */
   setRightPanelWidth: (w: number) => void
+  /** FilePreview 内文件树折叠/展开 */
+  toggleFileTree: () => void
+  setFileTreeCollapsed: (v: boolean) => void
   /** 预览 tab 操作 */
   addPreviewTab: (tab: PreviewTab) => void
   removePreviewTab: (id: string) => void
@@ -92,8 +97,9 @@ export const useUIStore = create<UIState>()(
   activeConversationId: 'c2',
   activeGroupId: 'design',
   fileWorkdir: null,
-  rightPanelCollapsed: false,
+  rightPanelCollapsed: true,
   rightPanelWidth: 380,
+  fileTreeCollapsed: false,
   previewTabs: [],
   activePreviewTabId: null,
 
@@ -122,6 +128,8 @@ export const useUIStore = create<UIState>()(
   toggleRightPanel: () => set((s) => ({ rightPanelCollapsed: !s.rightPanelCollapsed })),
   setRightPanelCollapsed: (v) => set({ rightPanelCollapsed: v }),
   setRightPanelWidth: (rightPanelWidth) => set({ rightPanelWidth }),
+  toggleFileTree: () => set((s) => ({ fileTreeCollapsed: !s.fileTreeCollapsed })),
+  setFileTreeCollapsed: (v) => set({ fileTreeCollapsed: v }),
   addPreviewTab: (tab) => set((s) => ({ previewTabs: [...s.previewTabs, tab] })),
   removePreviewTab: (id) =>
     set((s) => {
@@ -143,6 +151,7 @@ export const useUIStore = create<UIState>()(
         fileWorkdir: state.fileWorkdir,
         rightPanelCollapsed: state.rightPanelCollapsed,
         rightPanelWidth: state.rightPanelWidth,
+        fileTreeCollapsed: state.fileTreeCollapsed,
         previewTabs: state.previewTabs,
         activePreviewTabId: state.activePreviewTabId,
         theme: state.theme,
@@ -152,13 +161,19 @@ export const useUIStore = create<UIState>()(
         sidebarCollapsed: state.sidebarCollapsed,
       }),
       // v1 → v2：清掉 fileTreeWidth / fileTreeCollapsed（FilePreview 已不引用）
-      version: 2,
-      migrate: (persisted) => {
-        // 旧版里的死字段直接丢弃
+      // v2 → v3：右栏默认改为「折叠」，强制覆盖旧的 false 持久化值（产品行为变更：会话界面启动不再默认展开预览）
+      // v3 → v4：fileTreeCollapsed 复活（FilePreview 重新引入,Breadcrumb 行加折叠按钮）
+      version: 4,
+      migrate: (persisted, fromVersion) => {
         if (persisted && typeof persisted === 'object') {
           const p = persisted as Record<string, unknown>
+          // 死字段直接丢弃
           delete p.fileTreeWidth
-          delete p.fileTreeCollapsed
+          if (fromVersion < 3) {
+            // 强制把右栏折叠状态置为隐藏（产品行为变更：会话界面启动不再默认展开预览）
+            p.rightPanelCollapsed = true
+          }
+          // v3 → v4：fileTreeCollapsed 复活；如果旧 persisted 没有此字段,merge 阶段会用默认值(false=展开)
         }
         return persisted as UIState
       },
