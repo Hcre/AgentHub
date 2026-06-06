@@ -15,7 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get update && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/* \
     && npm install -g @anthropic-ai/claude-code \
-    && npm install -g @earendil-works/pi-coding-agent
+    && npm install -g @earendil-works/pi-coding-agent \
+    && npm install -g opencode-ai
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

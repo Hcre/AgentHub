@@ -40,7 +40,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ../../.agenthub/skills:/skills
-      - D:\:/mnt/host_d
+      # - D:\:/mnt/host_d  # 宿主需有 D 盘；本机缺盘时取消注释
     env_file:
       - ../../.env
     environment:
