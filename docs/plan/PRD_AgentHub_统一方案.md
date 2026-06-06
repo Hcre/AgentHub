@@ -603,16 +603,16 @@ AgentHub 由 3 位人类开发者 + 1 位 Claude Agent 共同完成，遵循「O
 
 | # | 标题 | 关键决策 |
 |---|------|---------|
-| [0001](../decisions/0001-cli-first-pivot.md) | **CLI 优先** | API 95h+ 自建 Harness 不可行 → CLI 模式（Claude Code 自带 tool/state/Permission）<300 行 + SessionStore（Redis 7d TTL） |
-| [0002](../decisions/0002-phase1-long-running-cli.md) | **Phase 1 长驻 CLI** | spawn+EOF 短驻 → stdin 持久监听 + stream-json 长驻 |
-| [0003](../decisions/0003-mcp-url-prefix-and-ap05-deferral.md) | **MCP URL = `/api/mcp`** | 对齐现状（全库无 `/v1/`），AP-05 暂缓进 NB-02；记忆 MCP 协议端 mount 移到 `/api/mcp-memory` |
-| [0004](../decisions/0004-mcp-f1-landing-and-installer-seam.md) | **MCP F1 二次对账** | 计划写「FK→workspaces」实无该表 → 裸 UUID stand-in；安装=结构校验探针（422 拦截） |
-| [0005](../decisions/0005-mcp-attach-request-carried.md) | **attach = 请求携带** | `AgentRequest.mcp_servers` 逐调用带 config（避免池化跨 agent 串号） |
-| [0006](../decisions/0006-mcp-injection-per-runtime-isolated-channel.md) | **MCP 注入逐调用隔离通道** | claude_code `--mcp-config <tmp>` / opencode `OPENCODE_CONFIG=<tmp>`；pi_agent deferred |
-| [0007](../decisions/0007-tauri-desktop-pivot.md) | **Tauri 2 桌面 App 转向** | Tauri 2 + 瘦客户端（M2）+ GitHub Releases；3-5MB vs Electron 100MB+ |
-| [0008](../decisions/0008-self-governance-authorization.md) | **owner 自决授权** | 用户明早未到岗期间 owner 自主判断（不可删用户文件 / 不可 force push main） |
-| [0009](../decisions/0009-p2-handoff-cron.md) | **P2 兜底 cron** | 2026-06-07 10:00 用户未报备 → cron 自动启动 P2 接力 |
-| [0010](../decisions/0010-integration-verify-downscope-e.md) | **集成验证 E downscope** | Inbox 视觉 M4 TODO（不在 P0 范围）→ 5/6 PASS override_accept |
+| [0001](../../worklogs/decisions/0001-cli-first-pivot.md) | **CLI 优先** | API 95h+ 自建 Harness 不可行 → CLI 模式（Claude Code 自带 tool/state/Permission）<300 行 + SessionStore（Redis 7d TTL） |
+| [0002](../../worklogs/decisions/0002-phase1-long-running-cli.md) | **Phase 1 长驻 CLI** | spawn+EOF 短驻 → stdin 持久监听 + stream-json 长驻 |
+| [0003](../../worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md) | **MCP URL = `/api/mcp`** | 对齐现状（全库无 `/v1/`），AP-05 暂缓进 NB-02；记忆 MCP 协议端 mount 移到 `/api/mcp-memory` |
+| [0004](../../worklogs/decisions/0004-mcp-f1-landing-and-installer-seam.md) | **MCP F1 二次对账** | 计划写「FK→workspaces」实无该表 → 裸 UUID stand-in；安装=结构校验探针（422 拦截） |
+| [0005](../../worklogs/decisions/0005-mcp-attach-request-carried.md) | **attach = 请求携带** | `AgentRequest.mcp_servers` 逐调用带 config（避免池化跨 agent 串号） |
+| [0006](../../worklogs/decisions/0006-mcp-injection-per-runtime-isolated-channel.md) | **MCP 注入逐调用隔离通道** | claude_code `--mcp-config <tmp>` / opencode `OPENCODE_CONFIG=<tmp>`；pi_agent deferred |
+| [0007](../../worklogs/decisions/0007-tauri-desktop-pivot.md) | **Tauri 2 桌面 App 转向** | Tauri 2 + 瘦客户端（M2）+ GitHub Releases；3-5MB vs Electron 100MB+ |
+| [0008](../../worklogs/decisions/0008-self-governance-authorization.md) | **owner 自决授权** | 用户明早未到岗期间 owner 自主判断（不可删用户文件 / 不可 force push main） |
+| [0009](../../worklogs/decisions/0009-p2-handoff-cron.md) | **P2 兜底 cron** | 2026-06-07 10:00 用户未报备 → cron 自动启动 P2 接力 |
+| [0010](../../worklogs/decisions/0010-integration-verify-downscope-e.md) | **集成验证 E downscope** | Inbox 视觉 M4 TODO（不在 P0 范围）→ 5/6 PASS override_accept |
 
 **方法论固化**（ADR-04/06 沉淀）：凡「N 个组件都能做 X」必须逐个打开验证 X 在每个组件里可行——避免 R11「opencode 也能注入 MCP」未经实测断言。ADR-06 据此实测发现 opencode 的 `OPENCODE_CONFIG` env 才是逐调用隔离通道（不是写全局），R11 的「写全局会串号」根因不成立 → opencode 拉回本期。
 
