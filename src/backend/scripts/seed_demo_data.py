@@ -19,7 +19,6 @@ import asyncio
 import logging
 import sys
 from pathlib import Path
-from uuid import UUID
 
 # 让脚本能 import app.*
 _BACKEND_ROOT = Path(__file__).resolve().parent.parent
@@ -62,14 +61,8 @@ async def _cleanup_existing(db) -> dict[str, int]:
     """
     cleared: dict[str, int] = {}
 
-    # 1) messages：按 extra['demo_tag'] = DEMO_TAG
-    # PG 走 JSONB 下标查询；SQLite 用 json_extract。
-    # 为可移植，这里在 Python 层先查 sessions.id 再按 session_id 删。
-    # 先找所有 demo session 的 id。
-    stmt_sessions = select(SessionModel.id).where(
-        SessionModel.title.like(tuple(f"{p}%" for p in STORY_TITLE_PREFIXES)[0])
-    )
-    # tuple 不支持 like in —— 改用 OR 拼
+    # 1) messages：按 session_id IN (demo session ids)
+    # 先找所有 demo session 的 id（按 title 前缀 OR 拼）
     from sqlalchemy import or_
 
     stmt_sessions = select(SessionModel.id).where(
