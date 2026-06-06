@@ -1,6 +1,12 @@
-import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
+import {
+  forwardRef,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from 'react'
 import { Button, Icon } from '../ui'
-import type { Agent } from '../../types'
+import type { Agent, Attachment } from '../../types'
 
 /** 父组件可调用 setText 从外部塞值（prompt 建议卡点击、@提及等） */
 export type ComposerHandle = {
@@ -8,10 +14,22 @@ export type ComposerHandle = {
   focus: () => void
 }
 
-export const Composer = forwardRef<ComposerHandle, { agent: Agent; onSend: (text: string) => void }>(
-  function Composer({ agent, onSend }, ref) {
+/** 发送载荷：text 必有，attachment 可选（先上传拿到 url 再回显） */
+export type ComposerPayload = {
+  text: string
+  attachment?: Attachment
+}
+
+export const Composer = forwardRef<
+  ComposerHandle,
+  { agent: Agent; onSend: (payload: ComposerPayload) => void }
+>(function Composer({ agent, onSend }, ref) {
   const [val, setVal] = useState('')
+  const [attachment, setAttachment] = useState<Attachment | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   useImperativeHandle(ref, () => ({
     setText: (text: string) => {
@@ -30,9 +48,11 @@ export const Composer = forwardRef<ComposerHandle, { agent: Agent; onSend: (text
 
   const send = () => {
     const text = val.trim()
-    if (!text) return
-    onSend(text)
+    if (!text && !attachment) return
+    onSend({ text, attachment: attachment ?? undefined })
     setVal('')
+    setAttachment(null)
+    setUploadError(null)
     const ta = taRef.current
     if (ta) ta.style.height = 'auto'
   }
@@ -56,6 +76,59 @@ export const Composer = forwardRef<ComposerHandle, { agent: Agent; onSend: (text
     }, 0)
   }
 
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+  }
+
+  const uploadFile = async (file: File) => {
+    setUploading(true)
+    setUploadError(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const resp = await fetch('/api/attachments/multipart', {
+        method: 'POST',
+        body: fd,
+      })
+      if (!resp.ok) {
+        const detail =
+          resp.status === 413
+            ? '文件超过 10MB 限制'
+            : resp.status === 415
+              ? '文件类型不支持'
+              : `上传失败 (${resp.status})`
+        setUploadError(detail)
+        return
+      }
+      const data = (await resp.json()) as {
+        id: string
+        name: string
+        size: number
+        mime: string
+        url: string
+      }
+      setAttachment({ name: data.name, size: formatSize(data.size), url: data.url })
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : '网络错误')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const onFilePick = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    // 重置 input value 以便重复选同一文件
+    e.target.value = ''
+    if (file) void uploadFile(file)
+  }
+
+  const removeAttachment = () => {
+    setAttachment(null)
+    setUploadError(null)
+  }
+
   return (
     <div className="mx-4 mb-4 rounded-xl border bg-background shadow-sm transition-all focus-within:ring-2 focus-within:ring-ring">
       <textarea
@@ -76,13 +149,47 @@ export const Composer = forwardRef<ComposerHandle, { agent: Agent; onSend: (text
         className="w-full resize-none rounded-t-xl border-0 bg-transparent px-3 py-3 text-[14px] outline-none placeholder:text-muted-foreground"
         style={{ maxHeight: 200 }}
       />
+      {(attachment || uploadError || uploading) && (
+        <div className="flex flex-wrap items-center gap-2 border-t px-3 py-2 text-[12px]">
+          {uploading && (
+            <span className="font-mono text-muted-foreground">上传中…</span>
+          )}
+          {uploadError && (
+            <span className="font-mono text-destructive">{uploadError}</span>
+          )}
+          {attachment && !uploading && (
+            <span className="inline-flex items-center gap-2 rounded border bg-muted/40 px-2 py-1 font-mono">
+              <Icon name="paperclip" className="h-3 w-3 text-muted-foreground" />
+              <span className="max-w-[180px] truncate">{attachment.name}</span>
+              <span className="text-muted-foreground">{attachment.size}</span>
+              <button
+                type="button"
+                aria-label="移除附件"
+                onClick={removeAttachment}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <Icon name="x" className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+        </div>
+      )}
       <div className="flex items-center justify-between px-2 py-2">
         <div className="flex gap-0.5">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,application/pdf,text/markdown,text/plain,application/zip"
+            onChange={onFilePick}
+            className="hidden"
+            aria-label="上传附件"
+          />
           <Button
             variant="ghost"
             size="iconSm"
             title="附件"
-            onClick={() => insert('📎 ', '')}
+            disabled={uploading}
+            onClick={() => fileRef.current?.click()}
             className="h-7 w-7 text-muted-foreground"
           >
             <Icon name="paperclip" className="h-3.5 w-3.5" />
@@ -117,12 +224,17 @@ export const Composer = forwardRef<ComposerHandle, { agent: Agent; onSend: (text
         </div>
         <div className="flex items-center gap-2">
           <span className="font-mono text-[11px] text-muted-foreground">↵ 发送</span>
-          <Button variant="brand" size="iconSm" className="h-7 w-7" onClick={send}>
+          <Button
+            variant="brand"
+            size="iconSm"
+            className="h-7 w-7"
+            onClick={send}
+            disabled={uploading || (!val.trim() && !attachment)}
+          >
             <Icon name="send" className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
     </div>
   )
-  },
-)
+})

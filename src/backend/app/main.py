@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from app.api.mcp_memory import get_mcp_asgi
 from app.api.routers import (
     agents,
+    attachments,
     groups,
     inbox,
     mcp,
@@ -109,6 +110,7 @@ app.include_router(groups.router)
 app.include_router(memories.router)
 app.include_router(tasks.router)
 app.include_router(skills.router)
+app.include_router(attachments.router)  # 附件上传/下载（P0-3）
 app.include_router(FS_ROUTER)
 app.include_router(inbox.router)
 app.include_router(mcp.router)  # MCP 市场/安装/绑定 REST（/api/mcp/*，§2.6 冻结契约）

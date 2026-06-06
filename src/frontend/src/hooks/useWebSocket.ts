@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { WS_BASE } from "../api/client";
 import { useChatStore } from "../stores/chatStore";
-import type { StreamEvent } from "../types";
+import type { Attachment, StreamEvent } from "../types";
 
 const MAX_RECONNECT_DELAY = 10000;
 const BASE_DELAY = 1000;
@@ -68,14 +68,20 @@ export function useWebSocket(sessionId: string | null, convKey: string | null) {
     };
   }, [sessionId, applyStreamEvent, setConnected]);
 
-  /** 发送用户消息。返回 false 表示未连接，调用方可降级到 mock。 */
+  /**
+   * 发送用户消息。返回 false 表示未连接，调用方可降级到 mock。
+   * @param attachment 可选附件（仅本地回显，WS 文本末尾追加 URL 一行让后端能看到）
+   */
   const sendMessage = useCallback(
-    (content: string): boolean => {
+    (content: string, attachment?: Attachment): boolean => {
       const ws = wsRef.current;
       const key = keyRef.current;
       if (!ws || ws.readyState !== WebSocket.OPEN || !key) return false;
-      addUserMessage(key, content);
-      ws.send(JSON.stringify({ type: "message", content }));
+      addUserMessage(key, content, attachment);
+      const wireContent = attachment?.url
+        ? `${content}\n\n[attachment] ${attachment.name} ${attachment.url}`
+        : content;
+      ws.send(JSON.stringify({ type: "message", content: wireContent }));
       return true;
     },
     [addUserMessage],

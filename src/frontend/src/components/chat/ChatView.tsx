@@ -180,10 +180,11 @@ export function ChatView({ agent }: { agent: Agent }) {
     setPendingCount(0)
   }
 
-  const onSend = (text: string) => {
+  const onSend = (payload: { text: string; attachment?: { name: string; size: string; url?: string } }) => {
     if (!activeConversationId) return
+    const { text, attachment } = payload
     // 优先走真实 WS；未连接（mock agent / 后端不可用）则降级假回复
-    if (!sendMessage(text)) send(agent.id, activeConversationId, text)
+    if (!sendMessage(text, attachment)) send(agent.id, activeConversationId, text, attachment)
   }
 
   // 3 个 prompt 建议卡

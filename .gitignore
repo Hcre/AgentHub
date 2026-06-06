@@ -76,3 +76,6 @@ src/frontend/.tmp/
 src/frontend/diag.mjs
 src/frontend/tmp-shoot.mjs
 .worktrees/
+
+# === 附件存储（P0-3 上传落盘）===
+src/backend/storage/
