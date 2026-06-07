@@ -64,7 +64,7 @@ AgentHub/
 | `docs/specs/02-assumptions_假设清单.md` | 理解隐含假设前提 |
 | docs/specs/domains/ | 深入某个域时读对应文件（domain1-chat / domain2-orchestration / domain3-toolchain） |
 | `docs/plan/开发清单_roadmap.md` | 领任务前，看当前进度 |
-| `docs/plan/背景_PRD_AgentHub_统一方案.md` | 当前权威 PRD |
+| `docs/plan/背景.md` | 当前权威 PRD |
 | `docs/plan/task-assignment_任务分配.md` | 分工 |
 | docs/explore/ | 技术探索文档 → `docs/explore/README.md` 索引 + `docs/explore/EVOLUTION.md` 演进日志 |
 | `docs/archive/` | 历史版本归档 |
