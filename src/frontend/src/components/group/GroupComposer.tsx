@@ -1,9 +1,10 @@
-import { Fragment, useCallback, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Reply, X } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { useAgentStore } from '../../stores/agentStore'
 import { Button, Icon } from '../ui'
 import type { SendGroupOptions } from '../../stores/groupStore'
-import type { Group } from '../../types'
+import type { Group, ReplyRef } from '../../types'
 
 interface Mentionable {
   id: string
@@ -50,13 +51,23 @@ function detectMentionAtCursor(
 export function GroupComposer({
   group,
   onSend,
+  /**
+   * P1-1 reply/quote：父组件持有此 ref，调用 groupComposerRef.current.setReplyTo(ref)
+   * 即可让 GroupComposer 进入 reply 模式。setReplyTo(null) 清空。
+   */
+  groupComposerRef,
 }: {
   group: Group
   onSend: (text: string, opts: SendGroupOptions) => void
+  groupComposerRef?: React.MutableRefObject<{
+    setReplyTo: (ref: ReplyRef | null) => void
+  } | null>
 }) {
   const [val, setVal] = useState('')
   const [showMentions, setShowMentions] = useState(false)
   const [requiresApproval, setRequiresApproval] = useState(false)
+  // P1-1 reply mode：当前正在回复的消息引用；null = 普通模式
+  const [replyTo, setReplyTo] = useState<ReplyRef | null>(null)
   const agents = useAgentStore((s) => s.agents)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -108,12 +119,35 @@ export function GroupComposer({
   const send = () => {
     const text = val.trim()
     if (!text) return
-    onSend(text, { requiresApproval })
+    onSend(text, { requiresApproval, replyTo: replyTo ?? undefined })
     setVal('')
     setShowMentions(false)
     setMentionInfo(null)
     setRequiresApproval(false)
+    setReplyTo(null)
   }
+
+  const cancelReply = () => setReplyTo(null)
+
+  // 把 setReplyTo 暴露给父组件（GroupChatView → GroupMessageItem.onReply 路径）
+  // useCallback 保证 ref 调用的 setReplyTo 始终是最新闭包
+  const setReplyToStable = useCallback((ref: ReplyRef | null) => {
+    setReplyTo(ref)
+    if (ref) {
+      // 进入 reply mode → focus + 滚动到 textarea
+      requestAnimationFrame(() => {
+        const ta = textareaRef.current
+        if (ta) ta.focus()
+      })
+    }
+  }, [])
+
+  // 把 setReplyTo 透出到外部 ref（用 useEffect 而不是 render 期赋值，避免 react-hooks/refs 红线）
+  useEffect(() => {
+    if (groupComposerRef) {
+      groupComposerRef.current = { setReplyTo: setReplyToStable }
+    }
+  })
 
   const insertMention = (name: string) => {
     if (!mentionInfo) return
@@ -139,6 +173,32 @@ export function GroupComposer({
 
   return (
     <div className="relative mx-4 mb-4 rounded-xl border bg-background shadow-sm transition-all focus-within:ring-2 focus-within:ring-ring">
+      {/* P1-1 群聊 reply 引文条：与 Composer 视觉一致。test 期望 data-testid="group-reply-badge"。 */}
+      {replyTo && (
+        <div
+          data-testid="group-reply-badge"
+          data-reply-to-id={replyTo.id}
+          className="mx-2 mt-2 flex items-start gap-1.5 rounded-md border-l-2 border-brand/60 bg-muted/40 px-2 py-1 text-[12px] text-muted-foreground"
+        >
+          <Reply className="mt-0.5 h-3 w-3 flex-shrink-0 text-brand" strokeWidth={2} />
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-medium text-foreground/80">
+              回复 {replyTo.author}
+            </div>
+            <div className="line-clamp-2 break-words">{replyTo.snippet}</div>
+          </div>
+          <button
+            type="button"
+            data-testid="group-reply-cancel"
+            aria-label="取消回复"
+            title="取消回复"
+            onClick={cancelReply}
+            className="grid h-5 w-5 flex-shrink-0 place-items-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      )}
       {/* @mention 弹出菜单 */}
       {showMentions && filtered.length > 0 && (
         <div className="absolute bottom-full left-3 mb-2 w-64 rounded-lg border bg-popover p-1 shadow-lg z-10">
@@ -171,7 +231,9 @@ export function GroupComposer({
         <textarea
           ref={textareaRef}
           rows={1}
-          placeholder={`在 #${group.name} 里说点什么，或 @协调者 派活…`}
+          placeholder={replyTo
+            ? `回复 ${replyTo.author}…`
+            : `在 #${group.name} 里说点什么，或 @协调者 派活…`}
           value={val}
           onChange={(e) => handleChange(e.target.value)}
           onScroll={(e) => {

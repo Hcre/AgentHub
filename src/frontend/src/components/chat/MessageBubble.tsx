@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Copy, Pin, RefreshCw } from 'lucide-react'
+import { Copy, Pin, RefreshCw, Reply } from 'lucide-react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -9,6 +9,7 @@ import { DiffView } from './DiffView'
 import { WebPreviewCard } from './WebPreviewCard'
 import { collectUrls } from './webPreviewUrl'
 import { extractDiffFences } from './diffParse'
+import { DeployCardView } from '../deploy/DeployCard'
 
 /**
  * 把 ReactMarkdown 的自定义 components 抽出来 —— 跟 DiffView 拆围栏后产生的
@@ -75,11 +76,26 @@ function MarkdownBody({ text }: { text: string }) {
   )
 }
 
+/**
+ * P1-1：把引文 snippet 截到 60 字符（含省略号）。
+ * test: 「a」 重复 200 次 → DOM 里 ≤ 70 个 a（防漂移）。
+ */
+function truncateSnippet(s: string, max = 60): string {
+  if (s.length <= max) return s
+  return s.slice(0, max) + '…'
+}
+
 export function MessageBubble({
   msg,
   agent,
   user,
   sessionId,
+  /**
+   * P1-1 reply/quote：hover message 出回复按钮 → 点击触发此回调，
+   * 父组件 ChatView 把对应消息的 ReplyRef 塞进 Composer.setReplyTo。
+   * 不传则按钮 disabled（避免 mock 场景乱发）。
+   */
+  onReply,
 }: {
   msg: ChatMessage
   agent: Agent
@@ -90,6 +106,7 @@ export function MessageBubble({
    * 不传则按钮 disabled（避免在没绑会话的 mock 消息上乱发请求）。
    */
   sessionId?: string
+  onReply?: (msg: ChatMessage) => void
 }) {
   const isAgent = msg.from === 'agent'
   // 乐观更新本地 Pin 状态；初始值用 msg.pinned（后端真值），点击后立刻翻转，再
@@ -152,6 +169,10 @@ export function MessageBubble({
     // noop for now — 后端实现后再加 fetch
   }
 
+  const handleReply = () => {
+    onReply?.(msg)
+  }
+
   const togglePin = async () => {
     if (pending) return
     if (!sessionId) {
@@ -197,7 +218,7 @@ export function MessageBubble({
   const showDiffInline = isAgent && fence?.hasDiffFence
 
   return (
-    <div className="animate-[var(--animate-fade-in)] flex gap-3">
+    <div className="group/msg animate-[var(--animate-fade-in)] flex gap-3">
       <div className="pt-0.5">
         {isAgent ? (
           <Avatar initial={agent.name[0] ?? '?'} color={agent.color} size={32} />
@@ -206,6 +227,26 @@ export function MessageBubble({
         )}
       </div>
       <div className="min-w-0 flex-1">
+        {/* P1-1 引文小气泡（顶角）：msg.replyTo 存在时渲染，紧贴 author 行下方。
+            pointer-events-none：纯展示，不参与交互（不阻断下方的回复按钮）。 */}
+        {msg.replyTo && (
+          <div
+            data-testid="reply-quote"
+            data-reply-to-id={msg.replyTo.id}
+            className="mb-1.5 flex max-w-md items-start gap-1.5 rounded-md border-l-2 border-brand/60 bg-muted/40 px-2 py-1 text-[12px] text-muted-foreground"
+            title={`回复 ${msg.replyTo.author} 的消息`}
+          >
+            <Reply className="mt-0.5 h-3 w-3 flex-shrink-0 text-brand" strokeWidth={2} />
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-medium text-foreground/80">
+                {msg.replyTo.author}
+              </div>
+              <div className="line-clamp-2 break-words">
+                {truncateSnippet(msg.replyTo.snippet)}
+              </div>
+            </div>
+          </div>
+        )}
         <div className="mb-1 flex items-center gap-2">
           <span className="text-[13px] font-semibold">{isAgent ? agent.name : user.handle}</span>
           <span className="font-mono text-[11px] text-muted-foreground">{msg.time}</span>
@@ -231,6 +272,23 @@ export function MessageBubble({
               fill={pinned ? 'currentColor' : 'none'}
               strokeWidth={1.75}
             />
+          </button>
+          {/* P1-1 回复按钮：hover message 才出现（CSS 控制可见性，但 always in DOM，
+              以便测试与「键盘聚焦时也可见」）。onReply 未传时 disabled。 */}
+          <button
+            type="button"
+            data-testid="reply-btn"
+            aria-label="回复消息"
+            title="回复消息"
+            disabled={!onReply}
+            onClick={handleReply}
+            className={
+              'inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-all ' +
+              'opacity-0 group-hover/msg:opacity-100 focus-visible:opacity-100 ' +
+              'hover:bg-accent hover:text-foreground disabled:opacity-0'
+            }
+          >
+            <Reply className="h-3.5 w-3.5" strokeWidth={1.75} />
           </button>
           {error && (
             <span
@@ -263,6 +321,7 @@ export function MessageBubble({
         {previewUrls.map((u) => (
           <WebPreviewCard key={u} url={u} />
         ))}
+        {msg.deploy && <DeployCardView card={msg.deploy} />}
         {msg.attachment && (
           <a
             href={msg.attachment.url ?? '#'}

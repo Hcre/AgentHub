@@ -1,4 +1,4 @@
-"""Message 实体：会话内的一条消息，支持富媒体产物（content_type + metadata）。"""
+"""Message 实体：会话内的一条消息。"""
 
 from __future__ import annotations
 
@@ -20,16 +20,24 @@ class Message:
     content: str
     id: UUID = field(default_factory=uuid4)
     content_type: ContentType = ContentType.TEXT
-    sender_agent_id: UUID | None = None  # assistant 消息的来源 Agent
-    mentions: list[str] = field(default_factory=list)  # @ 的 Agent name
+    sender_agent_id: UUID | None = None
+    mentions: list[str] = field(default_factory=list)
     reply_to: UUID | None = None
     pinned: bool = False
     status: MessageStatus = MessageStatus.COMPLETED
-    metadata: dict = field(default_factory=dict)  # diff/preview/task_plan 附加数据
+    metadata: dict = field(default_factory=dict)
     created_at: datetime = field(default_factory=_now)
+    # P0-4: 消息发送者 + Pin 审计
+    user_id: UUID | None = None
+    pinned_by_user_id: UUID | None = None
+    pinned_at: datetime | None = None
 
-    def pin(self) -> None:
+    def pin(self, by_user_id: UUID | None = None) -> None:
         self.pinned = True
+        self.pinned_by_user_id = by_user_id
+        self.pinned_at = _now()
 
     def unpin(self) -> None:
         self.pinned = False
+        self.pinned_by_user_id = None
+        self.pinned_at = None

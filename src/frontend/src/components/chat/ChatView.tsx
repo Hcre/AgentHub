@@ -8,7 +8,7 @@ import { Composer, type ComposerHandle } from './Composer'
 import { MessageBubble } from './MessageBubble'
 import { TypingIndicator } from './TypingIndicator'
 import { Button, Icon, Dialog, DialogContent } from '../ui'
-import type { Agent } from '../../types'
+import type { Agent, ChatMessage, ReplyRef } from '../../types'
 
 interface FsItem { name: string; path: string; type: string }
 
@@ -180,11 +180,22 @@ export function ChatView({ agent }: { agent: Agent }) {
     setPendingCount(0)
   }
 
-  const onSend = (payload: { text: string; attachment?: { name: string; size: string; url?: string } }) => {
+  const onSend = (payload: { text: string; attachment?: { name: string; size: string; url?: string }; replyTo?: ReplyRef }) => {
     if (!activeConversationId) return
-    const { text, attachment } = payload
+    const { text, attachment, replyTo } = payload
     // 优先走真实 WS；未连接（mock agent / 后端不可用）则降级假回复
-    if (!sendMessage(text, attachment)) send(agent.id, activeConversationId, text, attachment)
+    if (!sendMessage(text, attachment, replyTo)) send(agent.id, activeConversationId, text, attachment, replyTo)
+  }
+
+  // P1-1 reply/quote：MessageBubble 点的回复按钮 → 调 composerRef.setReplyTo
+  const handleReply = (target: ChatMessage) => {
+    const author =
+      target.from === 'user'
+        ? user.handle
+        : agent.name
+    const snippet = (target.text ?? '').slice(0, 60)
+    const ref: ReplyRef = { id: target.id, author, snippet }
+    composerRef.current?.setReplyTo(ref)
   }
 
   // 3 个 prompt 建议卡
@@ -219,6 +230,7 @@ export function ChatView({ agent }: { agent: Agent }) {
                 agent={agent}
                 user={user}
                 sessionId={sessionId ?? undefined}
+                onReply={handleReply}
               />
             ))
           )}

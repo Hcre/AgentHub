@@ -1,5 +1,5 @@
 import { Fragment, useState, type ReactNode } from 'react'
-import { Copy, Pin } from 'lucide-react'
+import { Copy, Pin, Reply } from 'lucide-react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -43,6 +43,15 @@ function highlightMentions(children: ReactNode): ReactNode {
   return children
 }
 
+/**
+ * P1-1：群聊引文 snippet 也截到 60 字符。test 断言 200 个 a 重复 → DOM 里 ≤ 70 个。
+ * 60 + 1 省略号 = 61，仍在 ≤ 70 容错内。
+ */
+function truncateSnippet(s: string, max = 60): string {
+  if (s.length <= max) return s
+  return s.slice(0, max) + '…'
+}
+
 export function GroupMessageItem({
   msg,
   group,
@@ -52,10 +61,17 @@ export function GroupMessageItem({
    * 避免在没绑 session 的本地 mock 消息上 404）。
    */
   sessionId,
+  /**
+   * P1-1 群聊 reply/quote：hover 消息时显示回复按钮；点击触发此回调，
+   * 父组件 GroupChatView 把 ReplyRef 塞进 GroupComposer。
+   * 不传则按钮 disabled（mock 模式）。
+   */
+  onReply,
 }: {
   msg: GroupMessage
   group?: Group
   sessionId?: string
+  onReply?: (msg: GroupMessage) => void
 }) {
   const actor = lookupActor(msg.who, group)
   const isUser = msg.from === 'user'
@@ -148,6 +164,10 @@ export function GroupMessageItem({
     }
   }
 
+  const handleReply = () => {
+    onReply?.(msg)
+  }
+
   return (
     <div
       className="group/msg -mx-2 flex gap-3 rounded-lg px-2 py-1.5 transition-all duration-150 hover:bg-muted/40 hover:shadow-sm hover:ring-1 hover:ring-border/60 animate-[var(--animate-fade-in)]"
@@ -156,6 +176,26 @@ export function GroupMessageItem({
         <Avatar initial={actor.initial} color={actor.color} size={32} />
       </div>
       <div className="min-w-0 flex-1">
+        {/* P1-1 群聊引文小气泡：与 MessageBubble 视觉一致。
+            放在 author 行上方。test 期望 data-testid="group-reply-quote"。 */}
+        {msg.replyTo && (
+          <div
+            data-testid="group-reply-quote"
+            data-reply-to-id={msg.replyTo.id}
+            className="mb-1 flex max-w-md items-start gap-1.5 rounded-md border-l-2 border-brand/60 bg-muted/40 px-2 py-1 text-[12px] text-muted-foreground"
+            title={`回复 ${msg.replyTo.author} 的消息`}
+          >
+            <Reply className="mt-0.5 h-3 w-3 flex-shrink-0 text-brand" strokeWidth={2} />
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-medium text-foreground/80">
+                {msg.replyTo.author}
+              </div>
+              <div className="line-clamp-2 break-words">
+                {truncateSnippet(msg.replyTo.snippet)}
+              </div>
+            </div>
+          </div>
+        )}
         <div className="mb-1 flex items-center gap-2">
           <span className="text-[13px] font-semibold">{actor.name}</span>
           {!isUser && isCoordinator && <Badge variant="brand">协调者</Badge>}
@@ -190,6 +230,22 @@ export function GroupMessageItem({
               fill={pinned ? 'currentColor' : 'none'}
               strokeWidth={1.75}
             />
+          </button>
+          {/* P1-1 群聊回复按钮：hover 消息时出现。test 期望 data-testid="group-reply-btn"。 */}
+          <button
+            type="button"
+            data-testid="group-reply-btn"
+            aria-label="回复消息"
+            title="回复消息"
+            disabled={!onReply}
+            onClick={handleReply}
+            className={
+              'inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-all ' +
+              'opacity-0 group-hover/msg:opacity-100 focus-visible:opacity-100 ' +
+              'hover:bg-accent hover:text-foreground disabled:opacity-0'
+            }
+          >
+            <Reply className="h-3.5 w-3.5" strokeWidth={1.75} />
           </button>
           {pinError && (
             <span

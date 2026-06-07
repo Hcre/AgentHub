@@ -2,10 +2,12 @@ import { create } from 'zustand'
 import { groupsApi, type CreateGroupInput } from '../api/groups'
 import { sessionsApi, type MessageOut } from '../api/sessions'
 import { nowStamp, uid } from '../lib/id'
-import type { ApiGroup, Group, GroupMessage, StreamEvent } from '../types'
+import type { ApiGroup, Group, GroupMessage, ReplyRef, StreamEvent } from '../types'
 
 export interface SendGroupOptions {
   requiresApproval?: boolean
+  /** P1-1 群聊 reply/quote：被引用消息的最小快照（透传给后端 + 写回消息流）。 */
+  replyTo?: ReplyRef
 }
 
 /** 流式哨兵 id 前缀；按 sender 区分多人独立聚合。 */
@@ -259,6 +261,7 @@ export const useGroupStore = create<GroupState>((set, get) => ({
       text,
       mentions,
       requiresApproval: opts?.requiresApproval,
+      ...(opts?.replyTo ? { replyTo: opts.replyTo } : {}),
     }
     set((s) => ({
       messagesByGroup: {
@@ -272,6 +275,7 @@ export const useGroupStore = create<GroupState>((set, get) => ({
       content: text,
       mentions,
       dispatch_mode: 'auto',
+      ...(opts?.replyTo ? { reply_to_id: opts.replyTo.id } : {}),
     })
     const ws = get().ws
     if (ws && ws.readyState === WebSocket.OPEN) {

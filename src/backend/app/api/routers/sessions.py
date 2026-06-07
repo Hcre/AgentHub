@@ -1,17 +1,13 @@
-"""会话与消息路由（PRD §6.3，架构 §4.3）。
-
-注意：发送消息的实时流式走 WS `/ws/sessions/{id}`；
-此处 REST POST 仅用于无 WS 场景的兜底（非流式，一次性返回完整回复）。
-"""
+"""会话与消息路由。"""
 
 from __future__ import annotations
 
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
-from app.api.deps import get_session_service
+from app.api.deps import CurrentUser, get_session_service
 from app.application.commands import (
     CreateSessionCommand,
     PinMessageCommand,
@@ -89,12 +85,39 @@ async def delete_message(message_id: UUID, svc: ServiceDep) -> Response:
 
 
 @router.post("/messages/{message_id}/pin", status_code=status.HTTP_204_NO_CONTENT)
-async def pin_message(message_id: UUID, session_id: UUID, svc: ServiceDep) -> Response:
-    await svc.pin_message(PinMessageCommand(session_id=session_id, message_id=message_id))
+async def pin_message(
+    message_id: UUID,
+    session_id: UUID,
+    svc: ServiceDep,
+    current_user: CurrentUser,
+) -> Response:
+    """P0-4 Pin 消息 — 必须登录（401），session_id 必须匹配（422），仅消息发送者可 Pin（403）。"""
+    if current_user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="E_AUTH_REQUIRED: pin operation requires login",
+        )
+    await svc.pin_message(
+        PinMessageCommand(session_id=session_id, message_id=message_id),
+        current_user=current_user,
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.delete("/messages/{message_id}/pin", status_code=status.HTTP_204_NO_CONTENT)
-async def unpin_message(message_id: UUID, session_id: UUID, svc: ServiceDep) -> Response:
-    await svc.unpin_message(UnpinMessageCommand(session_id=session_id, message_id=message_id))
+async def unpin_message(
+    message_id: UUID,
+    session_id: UUID,
+    svc: ServiceDep,
+    current_user: CurrentUser,
+) -> Response:
+    if current_user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="E_AUTH_REQUIRED: unpin operation requires login",
+        )
+    await svc.unpin_message(
+        UnpinMessageCommand(session_id=session_id, message_id=message_id),
+        current_user=current_user,
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)

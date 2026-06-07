@@ -5,19 +5,30 @@ import {
   useState,
   type ChangeEvent,
 } from 'react'
+import { Reply, X } from 'lucide-react'
 import { Button, Icon } from '../ui'
-import type { Agent, Attachment } from '../../types'
+import type { Agent, Attachment, ReplyRef } from '../../types'
 
 /** 父组件可调用 setText 从外部塞值（prompt 建议卡点击、@提及等） */
 export type ComposerHandle = {
   setText: (text: string) => void
   focus: () => void
+  /**
+   * P1-1 reply/quote：父组件（MessageBubble 点击回复按钮）调用此方法
+   * 把被引用消息的最小快照塞进 Composer。传入 null 清空 reply 状态。
+   */
+  setReplyTo: (ref: ReplyRef | null) => void
 }
 
-/** 发送载荷：text 必有，attachment 可选（先上传拿到 url 再回显） */
+/** 发送载荷：text 必有，attachment / replyTo 可选 */
 export type ComposerPayload = {
   text: string
   attachment?: Attachment
+  /**
+   * P1-1 reply/quote：被引用消息的最小快照（id/author/snippet）。
+   * 父组件拿到后写入 store.addUserMessage(... replyTo) + 透传给后端。
+   */
+  replyTo?: ReplyRef
 }
 
 export const Composer = forwardRef<
@@ -28,6 +39,8 @@ export const Composer = forwardRef<
   const [attachment, setAttachment] = useState<Attachment | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  // P1-1 reply mode：当前正在回复的消息引用；null = 普通模式
+  const [replyTo, setReplyTo] = useState<ReplyRef | null>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -44,18 +57,33 @@ export const Composer = forwardRef<
       })
     },
     focus: () => taRef.current?.focus(),
+    setReplyTo: (ref: ReplyRef | null) => {
+      setReplyTo(ref)
+      // 进入 reply mode → 自动 focus 到 textarea
+      requestAnimationFrame(() => {
+        const ta = taRef.current
+        if (ta) ta.focus()
+      })
+    },
   }))
 
   const send = () => {
     const text = val.trim()
     if (!text && !attachment) return
-    onSend({ text, attachment: attachment ?? undefined })
+    onSend({
+      text,
+      attachment: attachment ?? undefined,
+      replyTo: replyTo ?? undefined,
+    })
     setVal('')
     setAttachment(null)
     setUploadError(null)
+    setReplyTo(null)
     const ta = taRef.current
     if (ta) ta.style.height = 'auto'
   }
+
+  const cancelReply = () => setReplyTo(null)
 
   const autosize = () => {
     const ta = taRef.current
@@ -130,11 +158,40 @@ export const Composer = forwardRef<
   }
 
   return (
-    <div className="mx-4 mb-4 rounded-xl border bg-background shadow-sm transition-all focus-within:ring-2 focus-within:ring-ring">
+    <div className="composer-mobile-tight mx-4 mb-4 rounded-xl border bg-background shadow-sm transition-all focus-within:ring-2 focus-within:ring-ring">
+      {/* P1-1 reply 引文条：紧贴 textarea 上方。显示作者 + snippet + 取消按钮。
+          max-height 限制：snippet 超过 60 字符自动省略，与 MessageBubble.replyTo 保持视觉一致。 */}
+      {replyTo && (
+        <div
+          data-testid="reply-badge"
+          data-reply-to-id={replyTo.id}
+          className="mx-2 mt-2 flex items-start gap-1.5 rounded-md border-l-2 border-brand/60 bg-muted/40 px-2 py-1 text-[12px] text-muted-foreground"
+        >
+          <Reply className="mt-0.5 h-3 w-3 flex-shrink-0 text-brand" strokeWidth={2} />
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-medium text-foreground/80">
+              回复 {replyTo.author}
+            </div>
+            <div className="line-clamp-2 break-words">{replyTo.snippet}</div>
+          </div>
+          <button
+            type="button"
+            data-testid="reply-cancel"
+            aria-label="取消回复"
+            title="取消回复"
+            onClick={cancelReply}
+            className="grid h-5 w-5 flex-shrink-0 place-items-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      )}
       <textarea
         ref={taRef}
         rows={1}
-        placeholder={`Ask ${agent.role.toLowerCase()}…`}
+        placeholder={replyTo
+          ? `Ask ${agent.role.toLowerCase()} · 回复 ${replyTo.author}…`
+          : `Ask ${agent.role.toLowerCase()}…`}
         value={val}
         onChange={(e) => {
           setVal(e.target.value)
@@ -199,7 +256,7 @@ export const Composer = forwardRef<
             size="iconSm"
             title="粗体"
             onClick={() => insert('**', '**')}
-            className="h-7 w-7 text-muted-foreground"
+            className="composer-desktop-extras h-7 w-7 text-muted-foreground"
           >
             <Icon name="bold" className="h-3.5 w-3.5" />
           </Button>
@@ -208,7 +265,7 @@ export const Composer = forwardRef<
             size="iconSm"
             title="表情"
             onClick={() => insert('🙂 ', '')}
-            className="h-7 w-7 text-muted-foreground"
+            className="composer-desktop-extras h-7 w-7 text-muted-foreground"
           >
             <Icon name="smile" className="h-3.5 w-3.5" />
           </Button>
@@ -217,7 +274,7 @@ export const Composer = forwardRef<
             size="iconSm"
             title="提及"
             onClick={() => insert(`@${agent.name} `, '')}
-            className="h-7 w-7 text-muted-foreground"
+            className="composer-desktop-extras h-7 w-7 text-muted-foreground"
           >
             <Icon name="atSign" className="h-3.5 w-3.5" />
           </Button>

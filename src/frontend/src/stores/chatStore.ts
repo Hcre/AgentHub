@@ -6,6 +6,7 @@ import type {
   ChatMessage,
   Conversation,
   OutputFile,
+  ReplyRef,
   StageTask,
   StageStatus,
   StreamEvent,
@@ -42,7 +43,7 @@ interface ChatState {
   setConnected: (v: boolean) => void
   setSessionId: (key: string, sessionId: string) => void
   /** 本地回显用户气泡（WS 发送时由 hook 调用） */
-  addUserMessage: (key: string, text: string, attachment?: Attachment) => void
+  addUserMessage: (key: string, text: string, attachment?: Attachment, replyTo?: ReplyRef) => void
   /** 应用一条服务端流式事件到对应消息桶 */
   applyStreamEvent: (key: string, event: StreamEvent) => void
   /** mock 降级：本地假回复（WS 未连接时用） */
@@ -51,6 +52,7 @@ interface ChatState {
     conversationId: string,
     text: string,
     attachment?: Attachment,
+    replyTo?: ReplyRef,
   ) => void
   addConversation: (
     agentId: string,
@@ -80,13 +82,14 @@ export const useChatStore = create<ChatState>()(
   setSessionId: (key, sessionId) =>
     set((s) => ({ sessionIds: { ...s.sessionIds, [key]: sessionId } })),
 
-  addUserMessage: (key, text, attachment) => {
+  addUserMessage: (key, text, attachment, replyTo) => {
     const userMsg: ChatMessage = {
       id: uid('u'),
       from: 'user',
       time: nowStamp(),
       text,
       ...(attachment ? { attachment } : {}),
+      ...(replyTo ? { replyTo } : {}),
     }
     set((s) => {
       const prev = s.messages[key] ?? []
@@ -161,7 +164,7 @@ export const useChatStore = create<ChatState>()(
     })
   },
 
-  send: (agentId, conversationId, text, attachment) => {
+  send: (agentId, conversationId, text, attachment, replyTo) => {
     const key = convKey(agentId, conversationId)
     const userMsg: ChatMessage = {
       id: uid('u'),
@@ -169,6 +172,7 @@ export const useChatStore = create<ChatState>()(
       time: nowStamp(),
       text,
       ...(attachment ? { attachment } : {}),
+      ...(replyTo ? { replyTo } : {}),
     }
     set((s) => ({
       messages: { ...s.messages, [key]: [...(s.messages[key] ?? []), userMsg] },

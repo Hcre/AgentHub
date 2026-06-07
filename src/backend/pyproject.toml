@@ -22,7 +22,7 @@ select = [
     "SIM",       # flake8-simplify
     "RUF",       # ruff-specific rules
 ]
-ignore = ["E501", "RUF001", "RUF002", "RUF003"]  # RUF=中文注释/docstring 项目惯例
+ignore = ["E501", "RUF001", "RUF002", "RUF003", "B008"]  # RUF=中文注释/docstring 项目惯例; B008=FastAPI Query() 现有惯例
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["T20"]  # 测试文件允许 print 调试

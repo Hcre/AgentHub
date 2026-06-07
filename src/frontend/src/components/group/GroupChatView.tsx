@@ -8,6 +8,7 @@ import { Icon } from '../ui'
 import { GroupComposer } from './GroupComposer'
 import { GroupMembersStrip } from './GroupMembersStrip'
 import { GroupMessageItem } from './GroupMessageItem'
+import type { GroupMessage, ReplyRef } from '../../types'
 
 /**
  * 群聊主界面（与私聊 ChatView 同 shell 框架）：
@@ -30,6 +31,12 @@ export function GroupChatView() {
   const setGroupSession = useGroupStore((s) => s.setGroupSession)
   const loadGroupHistory = useGroupStore((s) => s.loadGroupHistory)
   const scrollRef = useRef<HTMLDivElement>(null)
+  // P1-1 reply/quote：GroupMessageItem.onReply 回调把 ref 塞进 GroupComposer。
+  // 通过 ref 而非 props：因为 GroupComposer 内部用 useState 持有 reply 状态，
+  // 暴露 setReplyTo 给父组件直接调。
+  const groupComposerRef = useRef<{
+    setReplyTo: (ref: ReplyRef | null) => void
+  } | null>(null)
 
   const group = groups.find((g) => g.id === activeGroupId)
   const msgs = activeGroupId ? (messagesByGroup[activeGroupId] ?? []) : []
@@ -66,6 +73,20 @@ export function GroupChatView() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [msgs.length])
+
+  // P1-1：被回复消息 → ReplyRef 最小快照
+  const handleReply = (target: GroupMessage) => {
+    if (!group) return
+    const author =
+      target.who === 'user'
+        ? '你'
+        : target.who === group.coordinatorId
+          ? (group.coordinatorName ?? '协调者')
+          : (target.text?.slice(0, 12) ?? '队友')
+    const snippet = (target.text ?? '').slice(0, 60)
+    const ref: ReplyRef = { id: target.id, author, snippet }
+    groupComposerRef.current?.setReplyTo(ref)
+  }
 
   if (!group) {
     return (
@@ -120,12 +141,22 @@ export function GroupChatView() {
       {/* 消息区 */}
       <div ref={scrollRef} className={cn('min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5')}>
         {msgs.map((m) => (
-          <GroupMessageItem key={m.id} msg={m} group={group} sessionId={sessionId ?? undefined} />
+          <GroupMessageItem
+            key={m.id}
+            msg={m}
+            group={group}
+            sessionId={sessionId ?? undefined}
+            onReply={handleReply}
+          />
         ))}
       </div>
 
       {/* 输入框 */}
-      <GroupComposer group={group} onSend={(text, opts) => sendGroup(group.id, text, opts)} />
+      <GroupComposer
+        group={group}
+        onSend={(text, opts) => sendGroup(group.id, text, opts)}
+        groupComposerRef={groupComposerRef}
+      />
     </main>
   )
 }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import exists, select
@@ -27,6 +28,9 @@ def _to_domain(m: MessageModel) -> Message:
         status=MessageStatus(m.status),
         metadata=dict(m.extra or {}),
         created_at=m.created_at,
+        user_id=m.user_id,
+        pinned_by_user_id=m.pinned_by_user_id,
+        pinned_at=m.pinned_at,
     )
 
 
@@ -50,6 +54,9 @@ class PostgresMessageRepository(MessageRepository):
                     pinned=message.pinned,
                     status=str(message.status),
                     extra=message.metadata,
+                    user_id=message.user_id,
+                    pinned_by_user_id=message.pinned_by_user_id,
+                    pinned_at=message.pinned_at,
                 )
             )
         else:
@@ -57,6 +64,9 @@ class PostgresMessageRepository(MessageRepository):
             existing.status = str(message.status)
             existing.pinned = message.pinned
             existing.extra = message.metadata
+            existing.user_id = message.user_id
+            existing.pinned_by_user_id = message.pinned_by_user_id
+            existing.pinned_at = message.pinned_at
         await self._s.flush()
 
     async def get_by_id(self, message_id: UUID) -> Message | None:
@@ -77,7 +87,7 @@ class PostgresMessageRepository(MessageRepository):
             if anchor is not None:
                 stmt = stmt.where(MessageModel.created_at < anchor.created_at)
         rows = (await self._s.execute(stmt)).scalars().all()
-        return [_to_domain(m) for m in reversed(rows)]  # 返回正序
+        return [_to_domain(m) for m in reversed(rows)]
 
     async def list_after(
         self, session_id: UUID, after_message_id: UUID, *, limit: int = 100
@@ -97,10 +107,22 @@ class PostgresMessageRepository(MessageRepository):
         rows = (await self._s.execute(stmt)).scalars().all()
         return [_to_domain(m) for m in rows]
 
-    async def set_pinned(self, message_id: UUID, pinned: bool) -> None:
+    async def set_pinned(
+        self,
+        message_id: UUID,
+        pinned: bool,
+        *,
+        pinned_by_user_id: UUID | None = None,
+    ) -> None:
         m = await self._s.get(MessageModel, message_id)
         if m is not None:
             m.pinned = pinned
+            if pinned:
+                m.pinned_by_user_id = pinned_by_user_id
+                m.pinned_at = datetime.now(UTC)
+            else:
+                m.pinned_by_user_id = None
+                m.pinned_at = None
             await self._s.flush()
 
     async def has_assistant_messages(self, session_id: UUID) -> bool:

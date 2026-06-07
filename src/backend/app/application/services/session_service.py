@@ -1,4 +1,4 @@
-"""SessionService（L3）：会话创建与消息历史查询。"""
+"""SessionService（L3）：会话创建与消息历史查询 + P0-4 Pin 所有权校验。"""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from app.application.commands import (
 )
 from app.application.dto import MessageResponse, SessionResponse
 from app.core.events import EventBus
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import NotFoundError, PermissionError, ValidationError
 from app.domain.entities.session import Session
 from app.domain.enums import SessionType
 from app.domain.events import MessagePinned, SessionCreated
@@ -54,7 +54,7 @@ class SessionService:
     async def get(self, session_id: UUID) -> SessionResponse:
         session = await self._sessions.get_by_id(session_id)
         if session is None:
-            raise NotFoundError(f"会话不存在: {session_id}")
+            raise NotFoundError(f"session not found: {session_id}")
         return SessionResponse.from_domain(session)
 
     async def list_messages(
@@ -66,7 +66,7 @@ class SessionService:
     async def update(self, cmd: UpdateSessionCommand) -> SessionResponse:
         session = await self._sessions.get_by_id(cmd.session_id)
         if session is None:
-            raise NotFoundError(f"会话不存在: {cmd.session_id}")
+            raise NotFoundError(f"session not found: {cmd.session_id}")
         if cmd.title is not None:
             session.title = cmd.title
         if cmd.workspace_path is not None:
@@ -77,24 +77,51 @@ class SessionService:
     async def delete_session(self, session_id: UUID) -> None:
         session = await self._sessions.get_by_id(session_id)
         if session is None:
-            raise NotFoundError(f"会话不存在: {session_id}")
+            raise NotFoundError(f"session not found: {session_id}")
         await self._sessions.delete(session_id)
 
     async def delete_message(self, message_id: UUID) -> None:
         msg = await self._messages.get_by_id(message_id)
         if msg is None:
-            raise NotFoundError(f"消息不存在: {message_id}")
+            raise NotFoundError(f"message not found: {message_id}")
         await self._messages.delete(message_id)
 
-    async def pin_message(self, cmd: PinMessageCommand) -> None:
+    async def pin_message(
+        self, cmd: PinMessageCommand, *, current_user: UUID | None
+    ) -> None:
+        """P0-4 Pin 消息 — 强制鉴权 + session 归属 + 消息所有权校验。"""
+        if current_user is None:
+            raise PermissionError("E_AUTH_REQUIRED: pin operation requires login")
         msg = await self._messages.get_by_id(cmd.message_id)
         if msg is None:
-            raise NotFoundError(f"消息不存在: {cmd.message_id}")
-        await self._messages.set_pinned(cmd.message_id, True)
-        await self._bus.publish(MessagePinned(session_id=cmd.session_id, message_id=cmd.message_id))
+            raise NotFoundError(f"message not found: {cmd.message_id}")
+        if msg.session_id != cmd.session_id:
+            raise ValidationError(
+                f"E_MESSAGE_PIN_SESSION_MISMATCH: message {cmd.message_id} not in session {cmd.session_id}"
+            )
+        if msg.user_id is not None and msg.user_id != current_user:
+            raise PermissionError(
+                f"E_MESSAGE_PIN_NOT_OWNER: only message owner can pin (current_user={current_user}, "
+                f"msg.user_id={msg.user_id})"
+            )
+        await self._messages.set_pinned(
+            cmd.message_id, True, pinned_by_user_id=current_user
+        )
+        await self._bus.publish(
+            MessagePinned(session_id=cmd.session_id, message_id=cmd.message_id)
+        )
 
-    async def unpin_message(self, cmd: UnpinMessageCommand) -> None:
+    async def unpin_message(
+        self, cmd: UnpinMessageCommand, *, current_user: UUID | None
+    ) -> None:
+        if current_user is None:
+            raise PermissionError("E_AUTH_REQUIRED: unpin operation requires login")
         msg = await self._messages.get_by_id(cmd.message_id)
         if msg is None:
-            raise NotFoundError(f"消息不存在: {cmd.message_id}")
+            raise NotFoundError(f"message not found: {cmd.message_id}")
+        if msg.user_id is not None and msg.user_id != current_user:
+            raise PermissionError(
+                f"E_MESSAGE_PIN_NOT_OWNER: only message owner can unpin (current_user={current_user}, "
+                f"msg.user_id={msg.user_id})"
+            )
         await self._messages.set_pinned(cmd.message_id, False)
