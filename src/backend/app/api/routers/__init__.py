@@ -2,6 +2,7 @@
 from app.api.routers import (
     agents,
     attachments,
+    cli,
     deploy,
     groups,
     inbox,
@@ -15,6 +16,7 @@ from app.api.routers import (
 __all__ = [
     "agents",
     "attachments",
+    "cli",
     "deploy",
     "groups",
     "inbox",
