@@ -30,6 +30,7 @@ from app.api.ws import router as ws_router
 from app.core.config import settings
 from app.core.exceptions import (
     AgentHubError,
+    AuthRequiredError,
     DomainError,
     NotFoundError,
     PermissionError,
@@ -88,6 +89,16 @@ async def _not_found(_: Request, exc: NotFoundError) -> JSONResponse:
 @app.exception_handler(PermissionError)
 async def _forbidden(_: Request, exc: PermissionError) -> JSONResponse:
     return JSONResponse(status_code=403, content={"detail": str(exc)})
+
+
+@app.exception_handler(AuthRequiredError)
+async def _unauth(_: Request, exc: AuthRequiredError) -> JSONResponse:
+    """M5 鉴权降级契约: AuthRequiredError 映射 401 (区别于 PermissionError 403).
+
+    必须先于 PermissionError handler 注册, 否则会被 PermissionError 接走.
+    FastAPI 实际上按 MRO 精确匹配, 不会因继承关系误派, 但保险起见 handler 顺序也合理.
+    """
+    return JSONResponse(status_code=401, content={"detail": str(exc)})
 
 
 @app.exception_handler(DomainError)
