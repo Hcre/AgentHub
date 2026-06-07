@@ -85,3 +85,17 @@ src/frontend/tmp-shoot.mjs
 
 # === 附件存储（P0-3 上传落盘）===
 src/backend/storage/
+
+# === 调试 / 临时产物（不入库；git 历史已 commit 的需要 git rm --cached 移除）===
+docs/deliverables/video/_work/
+docs/deliverables/video/_dbg/
+docs/deliverables/video/_work-debug/
+scripts/probe_*.py
+scripts/verify_frames.py
+scripts/e2e-*.py
+scripts/hover-*.py
+scripts/dom-*.py
+scripts/msg-*.py
+scripts/retest-*.py
+docs/deliverables/video/_work/*.js
+docs/deliverables/video/_work/*.py
