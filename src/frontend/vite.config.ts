@@ -7,11 +7,14 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
+    // proxy target 用 docker-compose service name 'backend'（不是 localhost:8000，
+    // 后者在容器内指向 frontend 容器自己，没有 8000 端口）。
+    // nginx.conf 已经这么写；v0.dev nginx serve 静态产物模式下也用 backend:8000。
+    // host/CHOKIDAR_USEPOLLING 由 docker-compose + Dockerfile 注入（dev 容器专用）。
     proxy: {
-      // 开发时前端请求自动转发到后端，规避 CORS
-      '/api': 'http://localhost:8000',
+      '/api': 'http://backend:8000',
       '/ws': {
-        target: 'ws://localhost:8000',
+        target: 'ws://backend:8000',
         ws: true,
       },
     },

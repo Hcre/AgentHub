@@ -94,7 +94,21 @@ services:
       backend:
         condition: service_started
     ports:
-      - "5174:80"
+      - "5174:5173"  # 主机 5174 → 容器 vite dev 5173（dev 模式，无 nginx）
+    # 源文件 volume mount：host 改文件即生效（vite HMR 实时刷新），
+    # 不再需要 docker compose build + up -d 重启
+    volumes:
+      - ../frontend/src:/app/src
+      - ../frontend/index.html:/app/index.html
+      - ../frontend/public:/app/public
+      - ../frontend/vite.config.ts:/app/vite.config.ts
+      # 4 个 tsconfig 全 mount（tsconfig.json 引用了 tsconfig.app/node/test）
+      - ../frontend/tsconfig.json:/app/tsconfig.json
+      - ../frontend/tsconfig.app.json:/app/tsconfig.app.json
+      - ../frontend/tsconfig.node.json:/app/tsconfig.node.json
+      - ../frontend/tsconfig.test.json:/app/tsconfig.test.json
+    environment:
+      - CHOKIDAR_USEPOLLING=true  # 跨平台 HMR 稳定（Windows + Docker Desktop 必开）
 
 volumes:
   pg_data:
