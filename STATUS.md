@@ -67,6 +67,42 @@
   - **下一步**：修 S1 建议按钮 + 接 P0-4/P0-5 到 S2 群聊 + 重做 v6 录制脚本（基于真实工作流）
   - 工具沉淀（详见 agent memory `MEMORY.md`）：cu PowerShell JSON 注入坑、cu 测试协议、ffmpeg gdigrab 录屏、Playwright demo 录屏核心约束
 
+- **🎯 2026-06-07 13:40 Mavis PRD 核心功能 vs 现状对照**（基于 `docs/plan/背景.md`）：
+  - 评估依据：playwright E2E 实测 + 代码阅读 + 凌晨冲刺产物（line 60-66 P0 段 + line 78-80 技术债）
+  - PRD 6 大核心功能（背景文件 line 15-56）：
+
+  | # | PRD 核心功能 | 子功能 | 状态 | 证据 |
+  |---|-------------|--------|------|------|
+  | **1. IM 聊天** | 对话列表（新建/置顶/归档/搜索/排序）| ⚠️ 部分 | 群组/私聊 tab + 卡片渲染；**置顶/归档/搜索未做**（UI 缺）|
+  | | 单聊 1v1（明确任务）| ✅ 完整 | S1 私聊 "技术负责人" + 3 建议 + 输入框 + 附件 + WS（Composer.tsx）|
+  | | 群聊（多 Agent + @ + Orchestrator）| ✅ 完整 | S2 群聊 6 条消息流（用户→Coordinator 拆解→Claude/OpenCode/MockBot 并行→合并汇报）|
+  | | 消息类型（文本/代码/图片/文件/网页预览/Diff/部署卡）| ⚠️ 部分 | 文本 ✅ 代码块 ✅（MessageBubble.tsx）网页预览 ✅（WebPreviewCard）Diff ✅（DiffView）图片/文件 ⚠️（Composer 上传按钮 + 后端 /api/attachments/multipart 实测 200）**部署状态卡 ❌**（P2）|
+  | | 消息操作（回复/引用/重新生成/复制代码/应用 Diff/展开预览）| ⚠️ 部分 | 复制代码 ✅ 重新生成 ⚠️（按钮 disabled "即将支持"，backend 无端点）Pin ✅（F9 验证 + 后端 sessions.py:91-99）**回复/引用 ❌** **应用 Diff ❌** |
+  | | 上下文管理（pin 关键消息）| ✅ 完整 | Pin 按钮 + 后端 /api/messages/{id}/pin 端点（schema 钉死测试）|
+  | **2. Orchestrator** | 自动分派/聚合/并行 | ✅ 完整 | Coordinator 拆解 3 任务 + 3 Agent 并行 + 合并汇报（CoordinatorPlan.tsx）|
+  | | 失败降级 | ❌ 未做 | 计划但未实现 |
+  | | 代码冲突处理 | ❌ 未做 | |
+  | **3. 多 Agent 接入** | 适配器层（Claude Code + Codex + OpenCode + Pi）| ✅ 完整 | CLI/SDK 双轨（per ADR-0001）+ 11 个队友含 Codex/OpenCode/Pi（per STATUS.md 5/6 月工作）|
+  | | 用户自建 Agent（对话式创建）| ⚠️ 部分 | CreateAgentModal 存在（E2E 验证 04-modal）|
+  | | 联系人列表（头像/名称/能力标签）| ✅ 完整 | AI 队友页 11 个 + 头像 + role 标签（AgentsListPage）|
+  | **4. 产物预览与编辑** | 网页 iframe 内联卡片 | ✅ 完整 | WebPreviewCard.tsx:80 iframe sandbox（集成验证 A 验）|
+  | | 文档渲染 | ⚠️ 部分 | MessageBubble 内 MarkdownBody（无独立文档渲染组件）|
+  | | 【P2】PPT 浏览 | ❌ 未做 | 已知 P2 |
+  | | 展开全屏预览 | ⚠️ 部分 | S2 群聊"新建预览"按钮 + 右侧 panel；缺全屏 modal |
+  | | 代码编辑器 | ❌ 未做 | 仅有 Composer textarea 输入；缺 Monaco/CodeMirror 集成 |
+  | | 【P2】Diff 视图 | ✅ 完整 | DiffView.tsx:29-41 彩色 emerald/rose（集成验证 B 验）|
+  | | 【P2】版本历史 | ❌ 未做 | |
+  | | 【P2】对话式局部修改（选中代码→描述修改）| ❌ 未做 | |
+  | **5. 【P2】部署发布** | 聊天发送"部署"指令 → 部署卡 | ❌ 未做 | 已知 P2 |
+  | | 预览 URL / 静态站点 / 容器化 / 源码打包 | ❌ 未做 | 已知 P2 |
+  | **6. 【P2】多端支持** | Web 端（主力）| ✅ 完整 | localhost:5174 vite dev 跑通 |
+  | | 桌面端 | 📋 计划 | Tauri 2 计划冻结中（`feature/desktop/spec-freeze`，per STATUS.md line 70-72）|
+  | | 移动端 | ❌ 未做 | |
+
+  - **整体覆盖率**：✅ 完整 9 / ⚠️ 部分 6 / ❌ 未做 7 / 📋 计划 1
+  - **核心必修 P0 项**（PRD "考察要点" 25% 功能完整度）：P0-1 iframe ✅ / P0-2 Diff ✅ / P0-3 附件 ✅ / P0-4 Pin ✅ / P0-5 复制代码 ✅ / P0-6 Demo 数据集 ✅（凌晨冲刺已全数完成）
+  - **下一步建议**：M5/MVP 重点补"⚠️ 部分"6 项（对话列表搜索/置顶、消息类型部署卡、消息操作回复/引用、文档渲染、全屏预览、代码编辑器）→ 答辩前可达 ✅ 完整 15+
+
 - **🚧 桌面 App 计划冻结中**（分支 `feature/desktop/spec-freeze`,docs-only,未 push）：
   - 决策:Tauri 2 + M2 瘦客户端(连用户自部署 backend)+ GitHub Releases 自下载,不进任何商店
   - 产出:ADR-0007(`worklogs/decisions/0007-tauri-desktop-pivot.md`)+ 规格草案(`docs/specs/06-desktop-app_桌面App规格.md`)
