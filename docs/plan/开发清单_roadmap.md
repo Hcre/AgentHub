@@ -12,14 +12,14 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 环境+验证     单聊MVP        群聊+协调者     产物预览     文档+打磨    提交
 ```
 
-| 里程碑 | 日期 | 交付标准 | 成功闸门 |
-|--------|------|---------|---------|
-| **M1** | 5/20-22 | API 环境就绪、适配器框架、前后端脚手架 | 调通至少 1 个 Agent 系统 API |
-| **M2** | 5/23-27 | 对话列表 + 1v1 聊天 + 流式 + 代码块渲染 | "需求→代码→预览"闭环可走通 |
-| **M3** | 5/28-6/1 | 群聊创建 + @协调者/自动检测 + 任务拆解 + DAG 编译 + 并行调度 | 复杂任务自动拆解到 ≥2 Agent |
-| **M4** | 6/2-5 | 网页预览卡片 + Diff 视图 + Pin + 自建 Agent（选系统+配模型） | 聊天流中预览、修改、确认产物 |
-| **M5** | 6/6-9 | PRD 终稿 + 架构文档 + SPEC/Skill/Rules 沉淀 + 3min Demo | 5 个 Core User Stories 覆盖 |
-| **M6** | 6/10 | 代码仓库整理、README 完善、最终提交 | 材料送达 |
+| 里程碑 | 日期 | 交付标准 | 成功闸门 | 状态（2026-06-07 13:00 更新）|
+|--------|------|---------|---------|--------------------------|
+| **M1** | 5/20-22 | API 环境就绪、适配器框架、前后端脚手架 | 调通至少 1 个 Agent 系统 API | ✅ **完成**（黎，per STATUS.md line 8）|
+| **M2** | 5/23-27 | 对话列表 + 1v1 聊天 + 流式 + 代码块渲染 | "需求→代码→预览"闭环可走通 | ✅ **完成**（董，per STATUS.md line 9）|
+| **M3** | 5/28-6/1 | 群聊创建 + @协调者/自动检测 + 任务拆解 + DAG 编译 + 并行调度 | 复杂任务自动拆解到 ≥2 Agent | ✅ **完成**（董，per STATUS.md line 9）|
+| **M4** | 6/2-5 | 网页预览卡片 + Diff 视图 + Pin + 自建 Agent（选系统+配模型） | 聊天流中预览、修改、确认产物 | ✅ **完成**（P0-1~P0-6 全 ✅，per §8.1 + 集成验证 6 E2E）|
+| **M5** | 6/6-9 | PRD 终稿 + 架构文档 + SPEC/Skill/Rules 沉淀 + 3min Demo | 5 个 Core User Stories 覆盖 | ⚠️ **部分**（5.1 UI 主题 ✅ / 5.2 任务看板 ✅ / 5.3 Token ⬜ / 5.4 E2E ⚠️ 10 screenshot + 11 单测 / 5.5 文档 ⚠️ / 5.6 Demo 视频 ✅ 但 v4 wallpaper 44.9% 残留待 v6 重录）|
+| **M6** | 6/10 | 代码仓库整理、README 完善、最终提交 | 材料送达 | ⏳ **进行中**（5:50 凌晨冲刺已完成 5 task 收束；v6 录制 + M3/M4 inbox 视觉补待）|
 
 ---
 
@@ -86,14 +86,14 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 
 ## 六、M5 — 文档 + 打磨（6/6-9）
 
-| # | 任务 | 工时 | 验收标准 |
-|---|------|------|---------|
-| 5.1 | UI/UX 优化（主题、响应式、动画） | 8h | 交互流畅 |
-| 5.2 | 任务看板（列表/看板视图 + 筛选） | 8h | 聊天派发的任务在看板中可见 |
-| 5.3 | Token 消耗监控 | 4h | 实时显示 |
-| 5.4 | E2E 测试（Playwright 覆盖 5 个 Story） | 8h | 全绿 |
-| 5.5 | 文档终稿（PRD + 架构 + SPEC + Rules） | 8h | 完整 |
-| 5.6 | 3min Demo 视频 | 8h | 覆盖 5 个 Core User Stories |
+| # | 任务 | 工时 | 验收标准 | 状态 | 验证 |
+|---|------|------|---------|------|------|
+| 5.1 | UI/UX 优化（主题、响应式、动画） | 8h | 交互流畅 | ✅ **已做**（主题切换 + 整卡点击 + cursor-pointer + 群组卡片 UX 改进）| E2E F5 截图 + 11 单测 |
+| 5.2 | 任务看板（列表/看板视图 + 筛选） | 8h | 聊天派发的任务在看板中可见 | ✅ **已做**（4 列 + 7 任务：待处理 3/进行中 2/阻塞 1/完成 1）| E2E F4 截图 |
+| 5.3 | Token 消耗监控 | 4h | 实时显示 | ⬜ 待办 | — |
+| 5.4 | E2E 测试（Playwright 覆盖 5 个 Story） | 8h | 全绿 | ⚠️ **部分**（10 个 E2E screenshot + 11 新单测 + vitest 47/47；未做 CI gate）| e2e-F1..F10 + vitest |
+| 5.5 | 文档终稿（PRD + 架构 + SPEC + Rules） | 8h | 完整 | ⚠️ **部分**（PRD ✅ + 架构 + SPEC + Rules 存在；Mavis 5:50 凌晨冲刺 + 今天 13:40 已补完 Mavis worklog + STATUS.md PRD 对照段）| STATUS.md 5 段 + worklogs/mavis/2 worklog |
+| 5.6 | 3min Demo 视频 | 8h | 覆盖 5 个 Core User Stories | ✅ **已做**（200s 1920x1080 17.7MB）+ ⚠️ **v4 wallpaper 44.9% 残留**（v5 SetWindowPos crash 失败；v6 待重录）| `docs/deliverables/video/AgentHub-Demo-Video.mp4` |
 
 ---
 
@@ -152,15 +152,21 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 
 ### 8.4 Demo 视频脚本（3min）
 
-| 时段 | 内容 | 关联 Story |
-|------|------|-----------|
-| 0:00-0:15 | 开场："4 CLI 适配器 + CLI×Provider 矩阵" | 创新点 |
-| 0:15-0:45 | S1 新建会话 → 1v1 流式 → 代码块 | Story 1 |
-| 0:45-1:15 | S2 群聊 → @协调者 → 多 Agent 并行 | Story 2 |
-| 1:15-1:45 | S3 产物内联预览（网页/Diff 卡片）| Story 3 + P0-1/P0-2 |
-| 1:45-2:15 | S4 自建 Agent：对话式 + 表单式 + 矩阵 | Story 4 |
-| 2:15-2:45 | S5 Inbox 审批 + 任务看板 | Story 5 |
-| 2:45-3:00 | 收尾：规范/SPEC/ADR/22 单元 + 创新点 | 考察 30% |
+| 时段 | 内容 | 关联 Story | 状态 |
+|------|------|-----------|------|
+| 0:00-0:15 | 开场："4 CLI 适配器 + CLI×Provider 矩阵" | 创新点 | ✅ |
+| 0:15-0:45 | S1 新建会话 → 1v1 流式 → 代码块 | Story 1 | ✅ |
+| 0:45-1:15 | S2 群聊 → @协调者 → 多 Agent 并行 | Story 2 | ✅ |
+| 1:15-1:45 | S3 产物内联预览（网页/Diff 卡片）| Story 3 + P0-1/P0-2 | ✅ |
+| 1:45-2:15 | S4 自建 Agent：对话式 + 表单式 + 矩阵 | Story 4 | ✅ |
+| 2:15-2:45 | S5 Inbox 审批 + 任务看板 | Story 5 | ⚠️ **S5 Inbox 后端 TODO 标 M4**（已 downscope，demo 视频不演示）→ 替换为"任务看板演示（F4 验证 7 任务）"|
+| 2:45-3:00 | 收尾：规范/SPEC/ADR/22 单元 + 创新点 | 考察 30% | ✅ |
+
+**录制状态（2026-06-07 13:00 更新）**：
+- ✅ `docs/deliverables/video/AgentHub-Demo-Video.mp4`（200s 1920x1080 17.7MB，6 章节 + 7 段 TTS + 27 字幕 + 2 AI cover）
+- ⚠️ **v4 wallpaper 44.9% 残留**（v5 Win32 SetWindowPos + ffmpeg crash 失败，per `worklogs/decisions/0011-plan-bcf9945c-complete.md` 已知 gap #5）
+- 📋 **v6 重录待做**（去掉 SetWindowPos + 改 Chrome `--start-maximized` + ffmpeg `-i desktop -video_size 1920x1080`，per agent memory "Playwright 录 demo 视频核心约束"）
+- 替代演示素材：10 个 E2E screenshot（`docs/deliverables/screenshots/e2e-F1..F10-*.png`，覆盖 Story 1-5 + 工具栏/主题/Pin/Skill）|
 
 ### 8.5 风险与降级
 
@@ -181,6 +187,12 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 | 2026-05-XX | 初版 M1-M6 路线图 | PRD v4 |
 | 2026-06-01 | §八 新增 MVP 收尾冲刺（基于 `docs/plan/后续升级计划/后续计划.txt` v1.0）| 后续计划补充稿 |
 | 2026-06-02 | §十 新增 **MCP 功能 v1**（P1→P3→P2→P4，4 阶段 13 天 + 严格收束）| `docs/plan/MCP功能PRD.md` v1.0 + `MCP功能计划_v0.md` v0.2 |
+| 2026-06-07 01:20-05:50 | **plan_bcf9945c 5 task 收束**（commit `e667579` / `57e4859` / `32485a1` / `602026f` / `82b265a`）— P0-4 Pin + P0-5 复制代码 + 6 E2E 集成验证 + 200s demo 视频 + 飞书文档 CJK 3214 | Mavis owner 凌晨冲刺 |
+| 2026-06-07 11:00-13:00 | **E2E 视觉验证**（cu + playwright 实测 11 章节）— 发现 3 gap（S1 私聊建议按钮不响应（实际是误判）+ S2 群聊卡片 UX 误导 + P0-4/P0-5 S2 群聊未实现）| Mavis owner |
+| 2026-06-07 12:30-13:00 | **G1 P0-4/P0-5 群聊修复**（commit `079cdca`）+ **G2 群组卡片整卡点击**（commit `f41934b`）+ merge → main（`d66ad3c`）| Mavis owner |
+| 2026-06-07 13:00-13:30 | **清理 + dev workflow 优化**（commits `811705d` / `43a7ff9` / `86b8317` / `0992270` / `25e4dd9` / `f0a2cb5`）— .harness reins 落档 + 5:50 凌晨产物落档 + rename + .gitignore 防御 + vite dev container + volume mount（HMR 实时刷新）| Mavis owner |
+| 2026-06-07 13:40-14:00 | **PRD 核心功能 vs 现状对照**（commit `c318b05` 改 roadmap §8.1/§8.2；STATUS.md 新增"🎯 PRD 核心功能 vs 现状对照"段）— 6 大功能子项状态表：✅ 完整 9 / ⚠️ 部分 6 / ❌ 未做 7 / 📋 计划 1| Mavis owner |
+| 2026-06-07 13:50-14:00 | **本 roadmap 大改**：§一总览加状态列 / §六 M5 子任务加状态 / §8.4 Demo 脚本替换 S5 Inbox 段 / §八.2.1 新增 user-driven 增量 / §▶接手指引更新（去掉"PR-01 闸门"过时的"计划已整理完毕"措辞）| Mavis owner |
 
 ---
 
@@ -244,3 +256,46 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 | P3 F3 创建 | 6/6-6/8 | stdio/sse 提交 + 模板 + dry-run 验证 | 34h | 收束 3 + ADR 0005 | ⬜ 待办 |
 | P2 F2 接入 | 6/9-6/11 | bind/unbind 端点 + 请求携带 attach（ADR-05）+ claude_code 注入 + rebind 修复(0010) ✅；统一注入原则 + opencode 拉回本期 + pi seam 冻结（ADR-06，[RT-MCP 施工蓝图](后续升级计划/MCP接入/06-详细设计/RT-MCP-V1.0-20260604.md)）✅；**opencode 注入落码（`_entry_to_opencode`+`_write_opencode_config`+`OPENCODE_CONFIG` 逐进程隔离通道+记忆补齐）+ 8 单测绿 ✅；pi_agent NB-02 seam 注释 ✅** | 40h | ✅ 收束-2 闭合（[收束报告-F2](../reports/收束报告-MCP-F2.md)，双线签核）+ ADR-05/06 | ✅ 完成（binding + claude_code/opencode 注入 + 34 测试绿 + opencode 连接级 E2E 冒烟；pi deferred 待上游） |
 | P4 F5 展示 | 6/12-6/15 | 工具调用内联卡片 + WebSocket 事件 | 33h | 收束 4 + ADR 0007 | ⬜ 待办 |
+
+---
+
+### ▶ 接手指引（Mavis owner M5/MVP 收尾视角，2026-06-07 13:00）
+
+如果接手人**不是**做 MCP v1（P3 F3 / P4 F5）而是继续 **M5 收尾**或**MVP 答辩准备**：
+
+**入口文档**
+- `worklogs/mavis/2026-06-07_凌晨冲刺_收束.md` — 5:50 凌晨 5 task 收束（5 commit + 2 ADR + 5 deliverable + 5 已知 gap）
+- `worklogs/mavis/2026-06-07_E2E视觉验证+群聊Pin+UX修复.md` — 今天 session（9 commit + 11 单测 + 10 E2E screenshot + 5+2 memory + 6 已知 gap + 关键决策 + 给下一位交接）
+- `STATUS.md` — 3 段增量（5:50 凌晨 / E2E 视觉验证 / PRD 核心功能 vs 现状对照）+ roadmap §1/§6 状态列
+
+**当前状态速查**
+- **M1-M4**: ✅ 全部完成
+- **M5**: ⚠️ 部分（5.1 ✅ / 5.2 ✅ / 5.3 ⬜ / 5.4 ⚠️ 10 screenshot + 11 单测 / 5.5 ⚠️ / 5.6 ✅ 但 v4 wallpaper 残留）
+- **M6**: ⏳ 进行中
+- **PRD 6 大功能 vs 现状**: ✅ 完整 9 / ⚠️ 部分 6 / ❌ 未做 7 / 📋 计划 1
+
+**dev workflow 优化（重要）**
+- Docker frontend 容器现在是 **vite dev mode** + volume mount（commit `f0a2cb5`）
+- 改 frontend 代码 → **HMR 实时刷新**（<1 秒），**不用 rebuild image**
+- Dockerfile + docker-compose.yml + vite.config.ts 都已改 + commit
+
+**10 个 E2E screenshot**（visual evidence）
+- `docs/deliverables/screenshots/e2e-F1..F10-*.png`
+- 覆盖 F1 S1 私聊 / F2 S2 群聊 / F3 AI 队友 / F4 任务看板 / F5 主题 / F6 创建群组 / F7 设置 / F8 私聊空 / F9 Pin hover / F10 Skill
+- **替代 v4 wallpaper 残留**作 demo 视频视觉证据
+
+**下一步建议**（按价值/工作量排序）
+1. 🔴 **M3/M4 Inbox 视觉补**（gap #1）— M4 TODO 标，可不补，**答辩前不加 S5 演示**
+2. 🟡 **M5 5.3 Token 消耗监控**（P1-2 缺口）— 3h
+3. 🟡 **M5 5.5 SPEC/Skill/Rules 沉淀**（P1-4 + 课题 30% 权重）— 4-8h，**对答辩很重要**
+4. 🟡 **M5 5.4 CI gate**（P1-4 缺口）— 1-2h（vitest + playwright 串到 GitHub Actions）
+5. 🟢 **v6 demo 录制脚本**（替代 v4 wallpaper 44.9%）— 基于 10 个 E2E screenshot + commit `079cdca` 群聊 Pin + `f0a2cb5` vite dev mode 重做
+6. 🟢 **commit `86b8317` history 60+ debug 文件清理**（force push reset）— 可选
+
+**已知 6 gap（截至 2026-06-07 13:50）**
+1. E 视觉 S5 inbox 3 重 gap（backend TODO / frontend mock / UI 无 nav）— M4 TODO 标
+2. S3 私聊 UI 不可达（ChatView mock-driven, LeftPanel 只 user-created）— 已 downscope
+3. Pin API 无 session 所有权校验（probe 2 FAIL）— 需 backend 修复
+4. Docker backend image 6h old 缺 `/api/attachments/*` — F 测试用 local uvicorn :8766
+5. 视频 v4 录屏 DISPLAY1 wallpaper 残留 — 已透明声明
+6. 6 个 ⚠️ 部分 + 7 个 ❌ 未做（per STATUS.md PRD 对照段）
