@@ -26,6 +26,7 @@ from uuid import UUID
 
 from app.application.services.context_builder import ContextBuilder
 from app.application.services.selector import Selector, SelectorDecision
+from app.application.services.usage_service import UsageService
 from app.core.config import settings
 from app.core.events import EventBus
 from app.domain.entities.agent import Agent
@@ -56,6 +57,7 @@ class DiscussionOrchestrator:
         context_builder: ContextBuilder,
         selector: Selector,
         event_bus: EventBus,
+        usage_service: UsageService | None = None,
     ) -> None:
         self._messages = message_repo
         self._agents = agent_repo
@@ -64,6 +66,7 @@ class DiscussionOrchestrator:
         self._ctx = context_builder
         self._sel = selector
         self._bus = event_bus
+        self._usage = usage_service  # P1-2 token 监控；None 时降级为 no-op
         self._flush_lock = _asyncio.Lock()  # 多 Agent 并发写 DB 的串行锁
 
     async def run_discussion(
@@ -288,6 +291,25 @@ class DiscussionOrchestrator:
             await self._messages.save(assistant_msg)
             await self._l1.append(session.id, {"role": "assistant", "content": full})
             await self._wm.set(group.id, target.id, assistant_msg.id)
+
+        # P1-2 token 消耗监控触发点（讨论模式 LLM 完成路径）
+        if self._usage is not None:
+            try:
+                last_meta = last_event.metadata if last_event else None
+                model = last_meta.get("model") if last_meta else None
+                await self._usage.record_completion(
+                    session_id=session.id,
+                    message_id=assistant_msg.id,
+                    agent_id=target.id,
+                    content=full,
+                    metadata=last_meta,
+                    model=model,
+                )
+            except Exception:
+                logger.exception(
+                    "record_completion failed (non-fatal) session=%s", session.id
+                )
+
         await self._bus.publish(
             StreamingCompleted(session_id=session.id, message_id=assistant_msg.id)
         )

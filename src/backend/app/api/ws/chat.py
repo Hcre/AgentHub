@@ -14,7 +14,7 @@ from uuid import UUID
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.application.commands import SendMessageCommand
-from app.application.services import ChatService
+from app.application.services import ChatService, UsageService
 from app.application.services.context_builder import ContextBuilder
 from app.application.services.discussion_orchestrator import DiscussionOrchestrator
 from app.application.services.memory_selector import MemorySelector
@@ -33,6 +33,7 @@ from app.infrastructure.repositories import (
     PostgresMemoryRepository,
     PostgresMessageRepository,
     PostgresSessionRepository,
+    PostgresUsageRepository,
 )
 from app.infrastructure.ws.connection_manager import ws_manager
 
@@ -79,6 +80,7 @@ async def _handle_message(ws: WebSocket, session_id: UUID, data: dict) -> None:
         mem_selector = MemorySelector(mem_repo)
         ctx = ContextBuilder(msg_repo, agent_repo, l1, wm, memory_selector=mem_selector)
         bus = get_event_bus()
+        usage_svc = UsageService(PostgresUsageRepository(db))
         discussion = DiscussionOrchestrator(
             message_repo=msg_repo,
             agent_repo=agent_repo,
@@ -87,6 +89,7 @@ async def _handle_message(ws: WebSocket, session_id: UUID, data: dict) -> None:
             context_builder=ctx,
             selector=Selector(),
             event_bus=bus,
+            usage_service=usage_svc,
         )
         chat = ChatService(
             PostgresSessionRepository(db),
@@ -99,6 +102,7 @@ async def _handle_message(ws: WebSocket, session_id: UUID, data: dict) -> None:
             discussion,
             _adapter,
             bus,
+            usage_service=usage_svc,
         )
         try:
             async for event in chat.send_and_stream(cmd):

@@ -228,6 +228,7 @@ def get_chat_service(
     memory_repo: Annotated[PostgresMemoryRepository, Depends(get_memory_repo)],
     binding_svc: Annotated[McpBindingService, Depends(get_mcp_binding_service)],
     bus: Annotated[EventBus, Depends(get_bus)],
+    usage_svc: Annotated[UsageService, Depends(get_usage_service)],
 ) -> ChatService:
     l1 = get_l1_memory()
     wm = get_watermark_store()
@@ -248,6 +249,7 @@ def get_chat_service(
         context_builder=ctx,
         selector=Selector(),
         event_bus=bus,
+        usage_service=usage_svc,
     )
     return ChatService(
         session_repo,
@@ -260,6 +262,7 @@ def get_chat_service(
         discussion,
         get_llm_adapter(),
         bus,
+        usage_service=usage_svc,
     )
 
 
@@ -287,6 +290,8 @@ async def build_chat_service_for_ws() -> AsyncIterator[ChatService]:
             mcp_resolver=binding_svc.build_request_mcp_servers,
         )
         bus = get_event_bus()
+        usage_repo = PostgresUsageRepository(session)
+        usage_svc = UsageService(usage_repo)
         discussion = DiscussionOrchestrator(
             message_repo=msg_repo,
             agent_repo=agent_repo,
@@ -295,6 +300,7 @@ async def build_chat_service_for_ws() -> AsyncIterator[ChatService]:
             context_builder=ctx,
             selector=Selector(),
             event_bus=bus,
+            usage_service=usage_svc,
         )
         yield ChatService(
             PostgresSessionRepository(session),
@@ -307,6 +313,7 @@ async def build_chat_service_for_ws() -> AsyncIterator[ChatService]:
             discussion,
             get_llm_adapter(),
             bus,
+            usage_service=usage_svc,
         )
 
 

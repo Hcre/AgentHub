@@ -1,18 +1,22 @@
-"""CLI PATH 扫描 API 路由（P1-3）。"""
+"""CLI PATH 扫描 API 路由（P1-3）。
+
+数据源 = `app.infrastructure.cli_scheduler.CliScheduler`（lifespan startup 立即扫一次 +
+后台每 1h 扫一次），路由只读取调度器缓存，未命中时再同步补一次（兜底）。
+"""
 
 from __future__ import annotations
 
-import time
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Query
 
-from app.infrastructure.cli_scanner import DEFAULT_BINS, scan_all
+from app.infrastructure.cli_scanner import DEFAULT_BINS
+from app.infrastructure.cli_scheduler import get_cli_scheduler
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/cli", tags=["cli"])
-
-_CACHE_TTL_SECONDS = 3600
-_scan_cache: dict[str, tuple[float, list[dict]]] = {}
 
 
 def _parse_bins(raw: str | None) -> list[str]:
@@ -28,26 +32,18 @@ async def scan_cli(
     refresh: Annotated[bool, Query()] = False,
 ) -> dict:
     names = _parse_bins(bins)
-    cache_key = ",".join(names)
-    now = time.time()
-    cached = _scan_cache.get(cache_key)
-    if not refresh and cached and (now - cached[0]) < _CACHE_TTL_SECONDS:
-        items, ts = cached[1], cached[0]
-        return {
-            "items": items,
-            "scanned_at": ts,
-            "next_scan_at": ts + _CACHE_TTL_SECONDS,
-            "cached": True,
-        }
-    results = scan_all(names)
-    items = [r.to_dict() for r in results]
-    _scan_cache[cache_key] = (now, items)
-    return {
-        "items": items,
-        "scanned_at": now,
-        "next_scan_at": now + _CACHE_TTL_SECONDS,
-        "cached": False,
-    }
+    sched = get_cli_scheduler()
+
+    if refresh:
+        return await sched.force_refresh(names)
+
+    cached = sched.now(names)
+    if cached is not None:
+        return cached
+
+    # 兜底：scheduler 未启动（如测试场景或 lifespan 异常）→ 同步补一次
+    logger.debug("cli /scan cache miss → 同步补扫 bins=%s", names)
+    return await sched.force_refresh(names)
 
 
 @router.post("/scan/refresh")

@@ -1,8 +1,9 @@
 # AgentHub 命令接口
 
-> 版本: v2.2 | 基于 PRD v4.0 + 架构设计 v1.0 | 2026-06-07
+> 版本: v2.3 | 基于 PRD v4.0 + 架构设计 v1.0 | 2026-06-08
 > v2.1: 环境变量摘除 Celery/LiteLLM，新增 CLI 相关配置
 > v2.2: 新增 §六 BDD 验收场景（Given/When/Then），覆盖 PRD 6 大核心功能 + roadmap §8 P0-4/P1-2/P1-3 + 11 项 P2 缺口
+> v2.3: §2.6 + §三 复查校正（2026-06-08）— (1) DELETE /api/mcp/bindings 副作用与 ADR-05 口径对齐 (2) tool_call:cancel 错放修正（client→server 节） (3) §2.6 标题加 Reviewer Pending 24h SLA 标记（董/黎离线，downscope docs-only）
 
 ---
 
@@ -199,7 +200,7 @@ POST   /api/approvals/{task_id}/respond  # { "payload": {"response": "更多信�
 GET    /api/inbox/calendar         ?from=2026-05-01&to=2026-06-30
 ```
 
-### 2.6 MCP API 〔🔒 PR-01 冻结草案 · 2026-06-03 · 待 2 人 Review〕
+### 2.6 MCP API 〔🔒 PR-01 冻结草案 · 2026-06-03 · 2026-06-08 复查校正 · Reviewer Pending 24h SLA 2026-06-08 23:03 (董 yii.d + 黎 oldmanpushbike 离线,downscope docs-only)〕
 
 > 单一权威需求：`docs/plan/后续升级计划/MCP接入/README-REVISION.md`；契约来源：`06-详细设计/IC-MCP-V1.0-20260602.md`。
 > **冻结时校正的口径漂移**（与全库现状对齐）：
@@ -253,7 +254,9 @@ POST   /api/mcp/bindings
 
 DELETE /api/mcp/bindings/{binding_id}
   returns 204
-  副作用: 经既有 WS 通道更新路由表（≤5s，F-011）
+  副作用: 无运行时有状态 attach（per ADR-05 请求携带）——同 POST /bindings/bindings 反向：
+          下次该 agent 的 stream 由 ContextBuilder 不再解析此 binding（active 集合移除）；
+          Runtime 不再写 .mcp.json 注入此 binding 的 server
   errors: 401 / 403 / 404 E_MCP_NOT_FOUND / 500
 
 # —— 创建类（1）——
@@ -308,6 +311,10 @@ POST   /api/mcp/servers
 
 // 标记已读
 {"type":"message:read", "payload":{"message_ids":["uuid..."]}}
+
+// 〔🔒 PR-01 冻结草案〕MCP 工具调用取消（F-016）：按 AP-07 带 request_id
+{"type":"tool_call:cancel", "payload":{"request_id":"uuid"}}
+// 后端动作: 转 Runtime（≤2s）→ Runtime 收到 SIGTERM 沙箱进程
 ```
 
 ### 服务端 → 客户端
@@ -329,12 +336,11 @@ POST   /api/mcp/servers
 // Token 消耗
 {"type":"token:update", "payload":{"session_tokens":15000, "daily_tokens":250000, "daily_budget":1000000}}
 
-// 〔🔒 PR-01 冻结草案〕MCP 工具调用（F-014，复用既有会话 WS；信封对齐 + request_id 按 AP-07）
+// 〔🔒 PR-01 冻结草案〕MCP 工具调用（F-014，复用既有会话 WS；信封对齐 + request_id 按 AP-07；取消见 client→server 节）
 {"type":"tool_call:request",  "payload":{"request_id":"uuid","trace_id":"trace-abc","agent_id":"uuid","binding_id":"uuid","tool_name":"read_file","args":{"path":"/data/x.txt"},"ts":"2026-06-03T12:34:56.789Z"}}
 {"type":"tool_call:progress", "payload":{"request_id":"uuid","trace_id":"trace-abc","binding_id":"uuid","tool_name":"read_file","progress":60,"message":"...","duration_ms":120}}
 {"type":"tool_call:response", "payload":{"request_id":"uuid","trace_id":"trace-abc","binding_id":"uuid","tool_name":"read_file","result":{}, "duration_ms":340}}
 {"type":"tool_call:error",    "payload":{"request_id":"uuid","trace_id":"trace-abc","binding_id":"uuid","tool_name":"read_file","error_code":"TIMEOUT|PERMISSION_DENIED|RUNTIME_ERROR","error_message":"...","duration_ms":30000}}
-// 取消（F-016，客户端→服务端）：{"type":"tool_call:cancel","payload":{"request_id":"uuid"}} → 后端转 Runtime（≤2s）
 // 后端动作：tool_call:request 落 mcp_tool_call_logs(status=pending) 并广播 IM；response/error 更新日志
 ```
 
@@ -757,3 +763,4 @@ make lint           # ruff + eslint + tsc
 | 2026-05-23 | v2.1 | 初版（环境变量 + REST API + WS + CLI + 启动）|
 | 2026-06-03 | v2.1 + §2.6 | MCP API 冻结草案（PR-01 待 Review）|
 | 2026-06-07 | v2.2 | 新增 §六 BDD 验收场景（覆盖 P0-4/P1-2/P1-3 + 11 P2 缺口 + 失败降级）+ §七 BDD↔任务映射表 + §八 关联文档 |
+| 2026-06-08 | v2.3 | §2.6 + §三 复查校正（PR-01 闸门 Reviewer Pending 24h SLA,downscope docs-only,alembic 0006 暂不动）|

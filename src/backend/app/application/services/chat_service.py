@@ -4,6 +4,7 @@
   持久化用户消息 → 写 L1 滑动窗口 → 路由目标 Agent(s)
   → 对每个 Agent: ContextBuilder.build_for_agent → 适配器流式
   → 完成时落库 + 推进 watermark + 重写 L1
+  → 触发 token 消耗监控（P1-2 record_completion / record_user_message）
 
 群聊路由：
   - 用户 @ Agent → V1 串行执行（list[Agent]）
@@ -21,6 +22,7 @@ from collections.abc import AsyncIterator
 from app.application.commands import SendMessageCommand
 from app.application.services.context_builder import ContextBuilder
 from app.application.services.discussion_orchestrator import DiscussionOrchestrator
+from app.application.services.usage_service import UsageService
 from app.core.events import EventBus
 from app.core.exceptions import NotFoundError
 from app.domain.entities.agent import Agent
@@ -83,6 +85,7 @@ class ChatService:
         discussion: DiscussionOrchestrator,
         llm: UnifiedAgent,
         event_bus: EventBus,
+        usage_service: UsageService | None = None,
     ) -> None:
         self._sessions = session_repo
         self._messages = message_repo
@@ -94,6 +97,7 @@ class ChatService:
         self._discussion = discussion
         self._llm = llm  # 全局默认，per-agent 覆盖时优先
         self._bus = event_bus
+        self._usage = usage_service  # P1-2 token 监控；None 时降级为 no-op
 
     async def send_and_stream(self, cmd: SendMessageCommand) -> AsyncIterator[StreamEvent]:
         """发送用户消息并流式返回 Agent 响应。"""
@@ -260,6 +264,23 @@ class ChatService:
         await self._l1.append(session.id, {"role": "assistant", "content": full})
         if group is not None:
             await self._wm.set(group.id, target.id, assistant_msg.id)
+
+        # P1-2 token 消耗监控触发点（LLM 完成路径）
+        if self._usage is not None:
+            try:
+                last_meta = last_event.metadata if last_event else None
+                model = last_meta.get("model") if last_meta else None
+                await self._usage.record_completion(
+                    session_id=session.id,
+                    message_id=assistant_msg.id,
+                    agent_id=target.id,
+                    content=full,
+                    metadata=last_meta,
+                    model=model,
+                )
+            except Exception:
+                logger.exception("record_completion failed (non-fatal) session=%s", session.id)
+
         await self._bus.publish(
             StreamingCompleted(session_id=session.id, message_id=assistant_msg.id)
         )
@@ -276,6 +297,14 @@ class ChatService:
         )
         await self._messages.save(msg)
         await self._l1.append(session.id, {"role": "user", "content": cmd.content})
+        # P1-2 token 消耗监控触发点（用户消息路径）
+        if self._usage is not None:
+            try:
+                await self._usage.record_user_message(
+                    session_id=session.id, message_id=msg.id, content=cmd.content
+                )
+            except Exception:
+                logger.exception("record_user_message failed (non-fatal) session=%s", session.id)
         await self._bus.publish(
             MessageSent(
                 session_id=session.id,
