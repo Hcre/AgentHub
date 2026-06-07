@@ -78,7 +78,7 @@ async def start_deployment(body: DeploymentStartRequest, svc: ServiceDep) -> Dep
 async def list_deployments(
     svc: ServiceDep,
     session_id: Annotated[UUID, Query(description="按 session 过滤部署")],
-    include_deleted: Annotated[bool, Query(default=False)] = False,
+    include_deleted: Annotated[bool, Query()] = False,
 ) -> list[DeploymentOut]:
     """列部署（按 session）。"""
     items = await svc.list_by_session(session_id, include_deleted=include_deleted)
