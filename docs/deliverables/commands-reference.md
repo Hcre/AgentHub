@@ -352,12 +352,12 @@ setInterval(() => ws.send(JSON.stringify({ type: "ping" })), 30000);
 |------|------|---------|------|
 | v0 | 2026-05-20 | Agent/Group/Session/Message/Task 5 域基础 | M1 出口 |
 | v1 | 2026-05-23 | Pin/DiffPreview/工作目录/Inbox | M2-M4 |
-| v2 | 2026-06-03 | MCP 8 端点（PR-01 冻结草案）| [ADR-0003](../worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md) |
+| v2 | 2026-06-03 | MCP 8 端点（PR-01 冻结草案）| [ADR-0003](../../worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md) |
 | v2.1 | 2026-06-04 | MCP F2 2 端点（bind/unbind）+ UseAgentPwdAuth | MCP F1+F2 收束 |
 | v2.2 | 2026-06-07 | 17 BDD 场景（契约冻结）+ P0-4 所有权校验 | M5 5.5 沉淀 |
 | 计划 v3 | 待定 | P1-2 Usage 3 端点 / P1-3 CLI Scan 2 端点 / [P2] 会话置顶 + Deploy 3 端点 + 移动端 / 部署卡 | roadmap §6 + §8.3 |
 
-> **AP-05 暂缓说明**：当前无 URL 版本段（`/api/mcp/...` 而非 `/api/v1/mcp/...`），依据 [ADR-0003](../worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md)。未来引入版本段时机：跨版本不兼容 schema 变更时。
+> **AP-05 暂缓说明**：当前无 URL 版本段（`/api/mcp/...` 而非 `/api/v1/mcp/...`），依据 [ADR-0003](../../worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md)。未来引入版本段时机：跨版本不兼容 schema 变更时。
 
 ---
 
@@ -370,8 +370,8 @@ setInterval(() => ws.send(JSON.stringify({ type: "ping" })), 30000);
 | 数据模型（5 主表）| [docs/specs/03-data-model_数据模型.md](../specs/03-data-model_数据模型.md) |
 | 5 层架构 | [docs/specs/01-architecture_架构定义.md](../specs/01-architecture_架构定义.md) |
 | API 7 红线 | [docs/conventions/04-api_API设计规范.md](../conventions/04-api_API设计规范.md) |
-| MCP URL 决策 | [ADR-0003](../worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md) |
-| MCP 注入原则 | [ADR-0005](../worklogs/decisions/0005-mcp-attach-request-carried.md) + [ADR-0006](../worklogs/decisions/0006-mcp-injection-per-runtime-isolated-channel.md) |
+| MCP URL 决策 | [ADR-0003](../../worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md) |
+| MCP 注入原则 | [ADR-0005](../../worklogs/decisions/0005-mcp-attach-request-carried.md) + [ADR-0006](../../worklogs/decisions/0006-mcp-injection-per-runtime-isolated-channel.md) |
 | Roadmap 状态 | [docs/plan/开发清单_roadmap.md §6 M5 5.5](../plan/开发清单_roadmap.md) |
 
 ---

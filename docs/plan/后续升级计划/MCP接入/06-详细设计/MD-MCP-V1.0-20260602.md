@@ -4,7 +4,7 @@
 > **修订依据**：可行性清单 I-01/I-05/I-08/I-10（30 实体 → 3 表；`user_mcp_installations` → `workspace_mcp_installations`）
 > **上一版**：30 个数据实体 + 22 模块 + 新建 alembic env（与现链 0001-0005 不衔接）
 > **本文档**：MCP 接入的**数据模型**权威（4 张表 = §十 + 工具调用日志）
-> **单一权威入口**：[`../../README-REVISION.md`](../../README-REVISION.md)
+> **单一权威入口**：[`../README-REVISION.md`](../README-REVISION.md)
 
 ---
 

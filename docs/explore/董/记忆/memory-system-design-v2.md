@@ -219,8 +219,8 @@ class MemoryJanitor:
 # Agent 上下文
 
 ## 领域知识
-- [技术栈](context/tech-stack.md) -- python, fastapi
-- [代码规范](context/conventions.md) -- 后端专家
+- 技术栈（context/tech-stack.md）-- python, fastapi
+- 代码规范（context/conventions.md）-- 后端专家
 ```
 
 ### 5.2 V2 增强（加入记忆索引）
@@ -229,14 +229,14 @@ class MemoryJanitor:
 # Agent 上下文
 
 ## 领域知识
-- [技术栈](context/tech-stack.md) -- python, fastapi
-- [代码规范](context/conventions.md) -- 后端专家
+- 技术栈（context/tech-stack.md）-- python, fastapi
+- 代码规范（context/conventions.md）-- 后端专家
 
 ## 记忆
-- [facts/](memory/facts/) -- 项目事实（架构、技术栈、约定）
-- [preferences/](memory/preferences/) -- 用户偏好（交互风格、审批习惯）
-- [procedures/](memory/procedures/) -- 操作流程（部署、排查、常见任务）
-- [context/](memory/context/) -- 短期上下文（本周目标、最近决策）
+- facts/（memory/facts/）-- 项目事实（架构、技术栈、约定）
+- preferences/（memory/preferences/）-- 用户偏好（交互风格、审批习惯）
+- procedures/（memory/procedures/）-- 操作流程（部署、排查、常见任务）
+- context/（memory/context/）-- 短期上下文（本周目标、最近决策）
 
 > 收到新任务时，按需 Read 相关记忆文件。不要一次性加载全部。
 ```

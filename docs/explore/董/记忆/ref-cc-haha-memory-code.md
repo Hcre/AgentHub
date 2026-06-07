@@ -55,14 +55,14 @@ memory-dir/
 # auto memory
 
 ## 用户信息
-- [用户角色](user_profile.md) — 后端开发工程师，熟悉 Java
+- 用户角色（user_profile.md）— 后端开发工程师，熟悉 Java
 
 ## 项目背景
-- [项目上下文](project_context.md) — 电商平台，微服务架构
-- [技术栈](tech_stack.md) — Spring Boot + Redis + MySQL
+- 项目上下文（project_context.md）— 电商平台，微服务架构
+- 技术栈（tech_stack.md）— Spring Boot + Redis + MySQL
 
 ## 工作进展
-- [最近工作](recent_work.md) — 正在重构用户模块
+- 最近工作（recent_work.md）— 正在重构用户模块
 ```
 
 ### 2.3 主题文件格式

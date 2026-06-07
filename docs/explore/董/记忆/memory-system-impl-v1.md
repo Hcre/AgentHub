@@ -374,7 +374,7 @@ class AgentFileManager:
         """渲染 CLAUDE.md 索引（~300 tokens）。
 
         索引规则：
-        - 每条一行：[文件名](路径) — 一句话摘要（≤100 字符）
+        - 每条一行：文件名(路径) — 一句话摘要（≤100 字符）
         - 总行数 ≤20 行，总 token ≤300
         - 不放身份/角色（在 SP 中），不放 delta_text（在用户消息中）
         """
@@ -384,17 +384,17 @@ class AgentFileManager:
             "# Agent 上下文",
             "",
             "## 领域知识",
-            f"- [技术栈](context/tech-stack.md) — {tags_summary}",
-            f"- [代码规范](context/conventions.md) — {agent.role or '通用开发'}",
+            f"- 技术栈（context/tech-stack.md）— {tags_summary}",
+            f"- 代码规范（context/conventions.md）— {agent.role or '通用开发'}",
         ]
 
         if group_ctx:
             lines += [
                 "",
                 "## 群聊上下文",
-                f"- [群成员](context/members.md) — {group_ctx.members_summary}",
-                f"- [任务看板](context/task-board.md) — {group_ctx.task_board_summary}",
-                f"- [最近决策](context/decisions.md) — {group_ctx.decisions_summary}",
+                f"- 群成员（context/members.md）— {group_ctx.members_summary}",
+                f"- 任务看板（context/task-board.md）— {group_ctx.task_board_summary}",
+                f"- 最近决策（context/decisions.md）— {group_ctx.decisions_summary}",
             ]
 
         lines += ["", "需要详情时用 Read 工具查看对应文件。"]

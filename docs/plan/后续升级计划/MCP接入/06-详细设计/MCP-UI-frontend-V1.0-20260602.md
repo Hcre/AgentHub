@@ -1,12 +1,12 @@
 # MCP-UI-frontend-V1.0-20260602 — MCP 接入前端 UI 切片
 
-> ⚠️ **URL ERRATA（2026-06-03 整理）**：本文 API 前缀按全库现状统一为 **`/api/mcp/`**（**不带 `/v1/`**，见 [ADR-0003](../../../../worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md)）。下方凡写 `/api/v1/mcp/...` 处一律以 `/api/mcp/...` 为准；冻结契约见 `docs/specs/04-commands §2.6`。
+> ⚠️ **URL ERRATA（2026-06-03 整理）**：本文 API 前缀按全库现状统一为 **`/api/mcp/`**（**不带 `/v1/`**，见 [ADR-0003](../../../../../worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md)）。下方凡写 `/api/v1/mcp/...` 处一律以 `/api/mcp/...` 为准；冻结契约见 `docs/specs/04-commands §2.6`。
 
 > **版本**：V1.0（2026-06-03 新增）
 > **修订依据**：可行性清单 I-04 + 用户问询"相应的前端界面是否做了"
 > **状态**：🟡 **未实现**。本文档为落地切片（要做什么），不是已实现的现状报告。
 > **路径**：`src/frontend/src/`
-> **单一权威入口**：[`../../README-REVISION.md`](../../README-REVISION.md)
+> **单一权威入口**：[`../README-REVISION.md`](../README-REVISION.md)
 
 ---
 

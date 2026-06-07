@@ -197,19 +197,19 @@ CLAUDE.md 是**索引**，不是指南。遵循渐进式披露原则：索引永
 # Agent 上下文
 
 ## 领域知识
-- [技术栈](context/tech-stack.md) — Python, FastAPI, SQLAlchemy, PostgreSQL, Redis
-- [代码规范](context/conventions.md) — 5层洋葱架构，异步优先，Pydantic v2
+- 技术栈（context/tech-stack.md）— Python, FastAPI, SQLAlchemy, PostgreSQL, Redis
+- 代码规范（context/conventions.md）— 5层洋葱架构，异步优先，Pydantic v2
 
 ## 群聊上下文
-- [群成员](context/members.md) — 3人: 后端专家/前端专家/测试专家
-- [任务看板](context/task-board.md) — 进行中: 实现登录API (后端专家)
-- [最近决策](context/decisions.md) — 最新: JWT过期7天, refresh 30天 (2026-05-30)
+- 群成员（context/members.md）— 3人: 后端专家/前端专家/测试专家
+- 任务看板（context/task-board.md）— 进行中: 实现登录API (后端专家)
+- 最近决策（context/decisions.md）— 最新: JWT过期7天, refresh 30天 (2026-05-30)
 
 需要详情时用 Read 工具查看对应文件。
 ```
 
 **索引规则**：
-- 每条一行：`[文件名](路径) — 一句话摘要`（≤100 字符）
+- 每条一行：`文件名(路径) — 一句话摘要`（≤100 字符）
 - 总行数 ≤20 行，总 token ≤300
 - 动态条目（群聊上下文段）由 AgentHub 在上下文变更时更新摘要文本
 - 静态条目（领域知识段）仅在 Agent 创建/更新时渲染
@@ -436,16 +436,16 @@ class AgentFileManager:
             "# Agent 上下文",
             "",
             "## 领域知识",
-            f"- [技术栈](context/tech-stack.md) — {agent.tech_stack_summary}",
-            f"- [代码规范](context/conventions.md) — {agent.conventions_summary}",
+            f"- 技术栈（context/tech-stack.md）— {agent.tech_stack_summary}",
+            f"- 代码规范（context/conventions.md）— {agent.conventions_summary}",
         ]
         if group_ctx:
             lines += [
                 "",
                 "## 群聊上下文",
-                f"- [群成员](context/members.md) — {group_ctx.members_summary}",
-                f"- [任务看板](context/task-board.md) — {group_ctx.task_board_summary}",
-                f"- [最近决策](context/decisions.md) — {group_ctx.decisions_summary}",
+                f"- 群成员（context/members.md）— {group_ctx.members_summary}",
+                f"- 任务看板（context/task-board.md）— {group_ctx.task_board_summary}",
+                f"- 最近决策（context/decisions.md）— {group_ctx.decisions_summary}",
             ]
         lines += ["", "需要详情时用 Read 工具查看对应文件。"]
         (agent.cwd / "CLAUDE.md").write_text("\n".join(lines))

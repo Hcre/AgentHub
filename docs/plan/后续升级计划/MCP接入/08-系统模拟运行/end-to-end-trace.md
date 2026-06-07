@@ -9,7 +9,7 @@
 > - 🟢 **计划空间自洽**（按修订后 FS/SA/MD/IC/UI 切片，链路设计上可走通）
 > - 🔴 **代码空间未启动**（`src/backend/app/` 与 `src/frontend/src/` 均无 MCP 实现，0 命中）
 > - 真正"零修改走通"需在 P1 → P2 → P3 → P4 4 阶段实施后
-> **单一权威入口**：[`../../README-REVISION.md`](../../README-REVISION.md)
+> **单一权威入口**：[`../README-REVISION.md`](../README-REVISION.md)
 
 ---
 

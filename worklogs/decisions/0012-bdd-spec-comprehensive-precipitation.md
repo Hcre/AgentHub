@@ -3,9 +3,9 @@
 - **状态**: Accepted
 - **日期**: 2026-06-07
 - **决策者**: Mavis (owner, per ADR-0008 自主决策授权)
-- **关联 Spec**: [docs/specs/04-commands_命令接口.md §六 BDD 验收场景](../docs/specs/04-commands_命令接口.md) · [docs/conventions/05-testing_测试规范.md §二点五 BDD+TDD](../docs/conventions/05-testing_测试规范.md) · [docs/plan/开发清单_roadmap.md §8 P0/P1/P2 任务表](../docs/plan/开发清单_roadmap.md) · [docs/plan/背景.md PRD 6 大核心功能](../docs/plan/背景.md)
+- **关联 Spec**: [docs/specs/04-commands_命令接口.md §六 BDD 验收场景](../../docs/specs/04-commands_命令接口.md) · [docs/conventions/05-testing_测试规范.md §二点五 BDD+TDD](../../docs/conventions/05-testing_测试规范.md) · [docs/plan/开发清单_roadmap.md §8 P0/P1/P2 任务表](../../docs/plan/开发清单_roadmap.md) · [docs/plan/背景.md PRD 6 大核心功能](../../docs/plan/背景.md)
 - **关联 BDD**: §六 16+ 场景（B-1-P0-S01~S05, B-1-P0-04, B-2-P2-F01, B-3-P0-A01~A02, B-4-P2-D01~D03, B-5-P2-DP01, B-6-P2-M01, B-6-P2-V01, B-5.3-P1-2, B-5.4-P1-3, B-7-P2-FD01）
-- **关联 Skill**: [skills/agenthub-dev/SKILL.md](../skills/agenthub-dev/SKILL.md) v1.0
+- **关联 Skill**: [skills/agenthub-dev/SKILL.md](../../skills/agenthub-dev/SKILL.md) v1.0
 
 ## 背景
 
@@ -171,10 +171,10 @@
 
 - **上游决策**：[ADR-0008 自主决策授权](0008-self-governance-authorization.md)（Mavis owner 有权写 ADR）
 - **下游文档**：
-  - [04-commands §六 BDD 验收场景](../docs/specs/04-commands_命令接口.md)
-  - [05-testing §二点五 BDD+TDD 双循环](../docs/conventions/05-testing_测试规范.md)
-  - [skills/agenthub-dev/SKILL.md v1.0](../skills/agenthub-dev/SKILL.md)
-- **承接 worklog**：[worklogs/mavis/2026-06-07_BDD全量沉淀+M5-5.5落档.md](2026-06-07_BDD全量沉淀+M5-5.5落档.md)
+  - [04-commands §六 BDD 验收场景](../../docs/specs/04-commands_命令接口.md)
+  - [05-testing §二点五 BDD+TDD 双循环](../../docs/conventions/05-testing_测试规范.md)
+  - [skills/agenthub-dev/SKILL.md v1.0](../../skills/agenthub-dev/SKILL.md)
+- **承接 worklog**：[worklogs/mavis/2026-06-07_BDD全量沉淀+M5-5.5落档.md](../mavis/2026-06-07_BDD全量沉淀+M5-5.5落档.md)
 - **plan_ba86c4d0 board**：[C:\Users\yhn\.mavis\plans\plan_ba86c4d0\board.md]
 
 ---

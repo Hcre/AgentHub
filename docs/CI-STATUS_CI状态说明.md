@@ -68,7 +68,7 @@ ENV: test
 | vite preview（后台） | `npx vite preview --port 4173 --host 127.0.0.1` | 端口未起 |
 | screenshot 抓取 | `node scripts/screenshot_p0_p1.cjs` | 抓取失败（**仅 warning，不阻塞**） |
 
-> 当前 E2E 仅做 screenshot 抓取（[docs/specs/05-testing-strategy_测试策略.md §四 5 个 Core User Stories](../specs/05-testing-strategy_测试策略.md) 的真正 E2E assertion 在 road-map 5.4 后续推进；本 job 先把"基础 pipeline + 产物"立起来）。
+> 当前 E2E 仅做 screenshot 抓取（[docs/specs/05-testing-strategy_测试策略.md §四 5 个 Core User Stories](./specs/05-testing-strategy_测试策略.md) 的真正 E2E assertion 在 road-map 5.4 后续推进；本 job 先把"基础 pipeline + 产物"立起来）。
 
 ### 3.4 ci-status job
 
@@ -166,7 +166,7 @@ node scripts/screenshot_p0_p1.cjs
 | 优先级 | 项 | 来源 | 状态 |
 |--------|----|------|------|
 | P0 | ✅ 3 jobs（backend / frontend / e2e）+ cache + artifacts + concurrency | 本 PR | 完成 |
-| P1 | E2E 增加 assertion（5 Core User Stories [05-testing §四](../specs/05-testing-strategy_测试策略.md)） | roadmap 5.4 | 待办 |
+| P1 | E2E 增加 assertion（5 Core User Stories [05-testing §四](./specs/05-testing-strategy_测试策略.md)） | roadmap 5.4 | 待办 |
 | P1 | Codecov / SonarCloud 集成 | TBD | 待办 |
 | P2 | Matrix 多 Python / 多 Node 版本 | 防版本漂移 | 待办 |
 | P2 | Required check 强制（branch protection） | 需 Settings → Branches 配置 | 待办（[§九](#九-分支保护-推荐设置)） |

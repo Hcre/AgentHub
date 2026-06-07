@@ -4,7 +4,7 @@
 
 ## 🎬 演示视频
 
-- **最终视频**: [`AgentHub-Demo-Video.mp4`](./AgentHub-Demo-Video.mp4) — 200s 1920x1080 h264+aac+mov_text 字幕 zho, 17.7 MB
+- **最终视频**: AgentHub-Demo-Video.mp4 — 200s 1920x1080 h264+aac+mov_text 字幕 zho, 17.7 MB（文件暂缺）
 - **视频脚本**: [`video/script.md`](./video/script.md) — 13KB 6 章节 demo 脚本
 - **原始录屏**: [`video/raw-recording.mp4`](./video/raw-recording.mp4) — 200s 1920x1080, 14.5 MB
 - **抽帧**: [`video/frame-{01,02,03}.png`](./video/) — 1-2 MB each

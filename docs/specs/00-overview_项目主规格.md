@@ -213,7 +213,7 @@ PENDING → QUEUED → RUNNING → COMPLETED (终态)
 
 | 文档 | 内容 |
 |------|------|
-| [`PRD_AgentHub_v4_统一方案.md`](../plan/背景_PRD_AgentHub_统一方案.md) | 产品需求文档（User Stories + 功能需求） |
+| [`PRD_AgentHub_v4_统一方案.md`](../plan/PRD_AgentHub_统一方案.md) | 产品需求文档（User Stories + 功能需求） |
 | [`架构设计_分层与数据流.md`](01b-architecture-design_分层与数据流.md) | 24 个场景完整数据流 + 时序图 |
 | [`architecture_架构定义.md`](01-architecture_架构定义.md) | 5 层架构 + 核心模块定义 |
 | [`data-model_数据模型.md`](03-data-model_数据模型.md) | 6 张表 DDL + Pydantic Schema |

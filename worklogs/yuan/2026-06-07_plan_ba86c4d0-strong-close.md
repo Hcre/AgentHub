@@ -4,9 +4,9 @@
 > **owner**: 袁 (xiangbianpangde, AgentHub 团队成员, 人类项目负责人)
 > **executor**: Mavis（Mavis orchestrator root session `mvs_ee3d79d9bfb44a02b6dacda1d8d47f71`，handoff 自 `mvs_db6677b578d749d28ecd64c546e0765a`，AI 编排/收束执行者）
 > **关联 plan**: `plan_ba86c4d0`（C_all_p0_p1 + 包含 P2，9 task 强收 6 done + 3 plan-exit override_accept）
-> **关联 ADR**: [0014 plan_ba86c4d0 strong-close](..\decisions\0014-mavis-team-plan-ba86c4d0-strong-close.md)
-> **关联 worklog**: [cycle 3 recovery](2026-06-07_Mavis-owner-委派-cycle-3-recovery.md), [BDD 全量沉淀](2026-06-07_BDD全量沉淀+M5-5.5落档.md), [CI 全套落地](2026-06-07_CI全套落地_5.4收官.md), [凌晨冲刺收束](2026-06-07_凌晨冲刺_收束.md)
-> **关联 pitfalls**: [mavis-team-pitfalls §13](../../../../.mavis/agents/mavis/memory/mavis-team-pitfalls.md)
+> **关联 ADR**: [0014 plan_ba86c4d0 strong-close](../decisions/0014-mavis-team-plan-ba86c4d0-strong-close.md)
+> **关联 worklog**: [cycle 3 recovery](2026-06-07_Mavis-owner-委派-cycle-3-recovery.md), [BDD 全量沉淀](../mavis/2026-06-07_BDD全量沉淀+M5-5.5落档.md), [CI 全套落地](../mavis/2026-06-07_CI全套落地_5.4收束.md), [凌晨冲刺收束](../mavis/2026-06-07_凌晨冲刺_收束.md)
+> **关联 pitfalls**: mavis-team-pitfalls §13（文件暂缺）
 
 ## 1. 触发
 
@@ -88,7 +88,7 @@
 
 - M5 5.4/5.5 已收束（实物 + ADR + STATUS 闭环）
 - 3 known gap 工作量：P0-4 ~1h / P1-2 ~2h / P1-3 ~1h，合计 ~4h
-- 接手起点：[roadmap §▶ 接手指引](../../plan/开发清单_roadmap.md) 第 3 条
+- 接手起点：[roadmap §▶ 接手指引](../../docs/plan/开发清单_roadmap.md) 第 3 条
 - 桌面 App 仍待 PR-01 Review（5-7 周到首个公开 v0.1.0）
 - MCP 路径：F1 + F2 已并 main；P3 F3 (6/6-6/8 袁) / P4 F5 (6/12-6/15 袁) 待启动
 - 不需要再做任何 plan 强收相关动作（plan.status 留 failed 是终态）
