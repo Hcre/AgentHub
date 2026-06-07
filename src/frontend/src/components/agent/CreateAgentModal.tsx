@@ -40,43 +40,59 @@ export interface PreSelectedTemplate {
 
 const LEGACY_TEMPLATES: LegacyTemplate[] = [
   {
-    name: '技术负责人',
-    systemPrompt: '拆任务、排顺序、盯风险，协调工程师、评审和测试交付结果。',
+    name: '产品经理',
+    systemPrompt: `You are an expert business analyst specializing in data-driven decision making through advanced analytics, modern BI tools, and strategic business intelligence.
+
+Expert business analyst focused on transforming complex business data into actionable insights and strategic recommendations. Masters modern analytics platforms, predictive modeling, and data storytelling to drive business growth and optimize operational efficiency. Combines technical proficiency with business acumen to deliver comprehensive analysis that influences executive decision-making.`,
     skills: [],
   },
   {
-    name: '工程师',
-    systemPrompt: '接需求、写代码、上线。修 bug 比写代码还熟。',
+    name: '后端工程师',
+    systemPrompt: `You are a backend system architect specializing in scalable, resilient, and maintainable backend systems and APIs.
+
+Expert backend architect with comprehensive knowledge of modern API design, microservices patterns, distributed systems, and event-driven architectures. Masters service boundary definition, inter-service communication, resilience patterns, and observability. Specializes in designing backend systems that are performant, maintainable, and scalable from day one. Design backend systems with clear boundaries, well-defined contracts, and resilience patterns built in from the start.`,
     skills: [],
   },
   {
     name: '代码评审',
-    systemPrompt: '审 diff、提风险、走查测试、把合并前最后一道关。',
+    systemPrompt: `You are an elite code review expert specializing in modern code analysis techniques, AI-powered review tools, and production-grade quality assurance.
+
+Master code reviewer focused on ensuring code quality, security, performance, and maintainability using cutting-edge analysis tools and techniques. Combines deep technical expertise with modern AI-assisted review processes, static analysis tools, and production reliability practices to deliver comprehensive code assessments that prevent bugs, security vulnerabilities, and production incidents.`,
     skills: [],
   },
   {
-    name: '测试',
-    systemPrompt: '复现问题、跑验收、做回归，把用户路径测到真的能用。',
+    name: '测试工程师',
+    systemPrompt: `You are an expert test automation engineer specializing in AI-powered testing, modern frameworks, and comprehensive quality engineering strategies.
+
+Expert test automation engineer focused on building robust, maintainable, and intelligent testing ecosystems. Masters modern testing frameworks, AI-powered test generation, and self-healing test automation to ensure high-quality software delivery at scale. Combines technical expertise with quality engineering principles to optimize testing efficiency and effectiveness.`,
     skills: [],
   },
   {
-    name: '产品经理',
-    systemPrompt: '定方向、拆需求、写 PRD、推进交付。',
+    name: '技术负责人',
+    systemPrompt: `You are a master software architect specializing in modern software architecture patterns, clean architecture principles, and distributed systems design.
+
+Elite software architect focused on ensuring architectural integrity, scalability, and maintainability across complex distributed systems. Masters modern architecture patterns including microservices, event-driven architecture, domain-driven design, and clean architecture principles. Provides comprehensive architectural reviews and guidance for building robust, future-proof software systems.`,
     skills: [],
   },
   {
-    name: '文案',
-    systemPrompt: '写公众号、邮件、品牌稿。卖点和故事都能写。',
+    name: '运维工程师',
+    systemPrompt: `You are a DevOps troubleshooter specializing in rapid incident response, advanced debugging, and modern observability practices.
+
+Expert DevOps troubleshooter with comprehensive knowledge of modern observability tools, debugging methodologies, and incident response practices. Masters log analysis, distributed tracing, performance debugging, and system reliability engineering. Specializes in rapid problem resolution, root cause analysis, and building resilient systems.`,
     skills: [],
   },
   {
-    name: '编辑',
-    systemPrompt: '调语气、改结构、控篇幅，把稿子打磨到能发。',
+    name: '数据工程师',
+    systemPrompt: `You are a data engineer specializing in scalable data pipelines, modern data architecture, and analytics infrastructure.
+
+Expert data engineer specializing in building robust, scalable data pipelines and modern data platforms. Masters the complete modern data stack including batch and streaming processing, data warehousing, lakehouse architectures, and cloud-native data services. Focuses on reliable, performant, and cost-effective data solutions.`,
     skills: [],
   },
   {
-    name: '外联文案',
-    systemPrompt: '陌拜信、跟进序列、销售话术都他写。盯回复率反复优化。',
+    name: '安全审计',
+    systemPrompt: `You are a security auditor specializing in DevSecOps, application security, and comprehensive cybersecurity practices.
+
+Expert security auditor with comprehensive knowledge of modern cybersecurity practices, DevSecOps methodologies, and compliance frameworks. Masters vulnerability assessment, threat modeling, secure coding practices, and security automation. Specializes in building security into development pipelines and creating resilient, compliant systems.`,
     skills: [],
   },
 ]
@@ -215,6 +231,7 @@ export function CreateAgentModal({
   // Step 1 legacy fallback
   const [pickedIndex, setPickedIndex] = useState<number | null>(null)
   const [customPrompt, setCustomPrompt] = useState('')
+  const [customRoleName, setCustomRoleName] = useState('')
   const [customSkills, setCustomSkills] = useState<string[]>([])
   const [skillList, setSkillList] = useState<{name:string}[]>([])
   const [skillLoading, setSkillLoading] = useState(false)
@@ -311,23 +328,6 @@ export function CreateAgentModal({
   // -- Determine mode: dynamic (API) vs legacy (fallback) --
   const hasDynamicTemplates = !tplLoading && !tplError && templates.length > 0
 
-  // -- Favorite click: auto-select template and go to Step 2 --
-  const handleFavoriteClick = async (templateId: string) => {
-    setSelectedTemplateId(templateId)
-    setPickedIndex(null)
-    const cached = getCachedDetail(templateId)
-    if (cached) {
-      setSelectedTemplateData(cached)
-      return
-    }
-    setTplDetailLoadingId(templateId)
-    const detail = await loadTemplateDetail(templateId)
-    setTplDetailLoadingId(null)
-    if (detail) {
-      setSelectedTemplateData(detail)
-    }
-  }
-
   // -- Save favorite --
   const handleSaveFavorite = async () => {
     if (!favTargetId || !favName.trim()) return
@@ -360,9 +360,7 @@ export function CreateAgentModal({
   // -- Derived: is custom mode? --
   const isCustom = preSelectedTemplate
     ? false
-    : hasDynamicTemplates
-      ? selectedTemplateId === '__custom__'
-      : pickedIndex === LEGACY_TEMPLATES.length
+    : selectedTemplateId === '__custom__' || pickedIndex === LEGACY_TEMPLATES.length
 
   // -- Unified selectedTemplate --
   const selectedTemplate: UnifiedTemplate | null = useMemo(() => {
@@ -380,7 +378,7 @@ export function CreateAgentModal({
     if (hasDynamicTemplates && selectedTemplateData && selectedTemplateId !== '__custom__') {
       return apiDetailToUnified(selectedTemplateData)
     }
-    if (!hasDynamicTemplates && pickedIndex !== null && pickedIndex < LEGACY_TEMPLATES.length) {
+    if (pickedIndex !== null && pickedIndex < LEGACY_TEMPLATES.length) {
       const t = LEGACY_TEMPLATES[pickedIndex]
       return {
         name: t.name,
@@ -466,10 +464,9 @@ export function CreateAgentModal({
     setPickedIndex(null)
     setSelectedTemplateId(null)
     setSelectedTemplateData(null)
-    setTplDetailLoadingId(null)
     setAgentName('')
-    setCustomName('')
     setCustomPrompt('')
+    setCustomRoleName('')
     setCustomSkills([])
     setSkillList([])
     setAgentSystem('')
@@ -493,15 +490,13 @@ export function CreateAgentModal({
   }
 
   // Step 1 → Step 2
-  const hasAnySelection = hasDynamicTemplates
-    ? selectedTemplateId !== null
-    : pickedIndex !== null
+  const hasAnySelection = selectedTemplateId !== null || pickedIndex !== null
 
   const canNext = (() => {
     if (preSelectedTemplate) return true
     if (!hasAnySelection) return false
     if (!agentName.trim()) return false
-    if (isCustom && !customPrompt.trim()) return false
+    if (isCustom && (!customPrompt.trim() || !customRoleName.trim())) return false
     return true
   })()
 
@@ -653,19 +648,16 @@ export function CreateAgentModal({
     try {
       const id = await createAgent({
         name: agentName.trim(),
-        role: selectedTemplate?.name ?? agentName.trim(),
+        role: isCustom ? (customRoleName || agentName.trim()) : (selectedTemplate?.name ?? agentName.trim()),
         agentSystem,
         provider: providerId,
-        // 注：model / baseUrl / apiKey 不再传给后端（CLI 启动时从本地配置读）。
-        // 保留字段在 form 上展示"会用什么"作参考。
         model: model || '',
         baseUrl: baseUrl || undefined,
         apiKey: apiKey,
         skills: selectedSkills,
         capabilityTags: selectedCapabilityTags,
         systemPrompt: agentSystemPrompt,
-        templateName: selectedTemplate?.name,
-        templateId: preSelectedTemplate?.templateId ?? (selectedTemplateId !== '__custom__' ? selectedTemplateId : undefined),
+        templateName: isCustom ? customRoleName : selectedTemplate?.name,
         settings: undefined,
       })
 
@@ -705,14 +697,18 @@ export function CreateAgentModal({
             </header>
 
             <div className="flex flex-col gap-3 overflow-y-auto p-4" style={{ maxHeight: '60vh' }}>
-              <p className="text-[13px] text-muted-foreground">第一步：选择队友模板</p>
+              <p className="text-[13px] text-muted-foreground">给 AI 队友取个名字吧</p>
 
               <Input
                 value={agentName}
                 onChange={(e) => setAgentName(e.target.value)}
-                placeholder="队友名称"
+                placeholder="例如：我的代码助手"
                 autoFocus
               />
+
+              <div className="border-t border-border/60 my-1" />
+
+              <p className="text-[13px] text-muted-foreground">选择身份模板</p>
 
               {/* -- Loading skeletons -- */}
               {tplLoading && !hasDynamicTemplates && (
@@ -765,53 +761,30 @@ export function CreateAgentModal({
                 </div>
               )}
 
-              {/* -- Favorites ("常用模板") -- */}
-              {favoritesLoading ? (
-                <div className="grid grid-cols-4 gap-2">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={`favskel-${i}`} className="h-24 rounded-lg border bg-muted/20 animate-pulse" />
-                  ))}
-                </div>
-              ) : favorites.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                  <p className="text-[12px] text-muted-foreground">
-                    选择一个常用模板，或使用下方自定义选项创建
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {favorites.map((f) => {
-                      const favDisplayName = f.favorite_name || f.display_name_zh || f.name
-                      const favDisplayDesc = f.favorite_description || f.description_zh || f.description
-                      const picked = selectedTemplateId === f.id
-                      return (
-                        <button
-                          key={f.id}
-                          type="button"
-                          onClick={() => handleFavoriteClick(f.id)}
-                          data-picked={picked ? 'true' : undefined}
-                          className="relative flex flex-col gap-1 rounded-lg border p-3 text-left transition-colors data-[picked=true]:border-brand data-[picked=true]:bg-brand/5 data-[picked=true]:ring-1 data-[picked=true]:ring-brand/40 hover:border-brand/50 hover:bg-brand/5 border-border/60"
-                        >
-                          <span className="text-[13px] font-medium line-clamp-1">{favDisplayName}</span>
-                          <span className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
-                            {favDisplayDesc || '暂无描述'}
-                          </span>
-                          {f.model_tier !== 'inherit' && (
-                            <span className="mt-0.5 inline-block self-start rounded border border-brand/30 px-1.5 py-px text-[9px] text-brand/70">
-                              {f.model_tier}
-                            </span>
-                          )}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              ) : tplError ? (
-                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600">
-                  加载模板失败：{tplError}
-                  <Button variant="outline" size="sm" className="ml-2" onClick={() => loadTemplates()}>重试</Button>
-                </div>
-              ) : (
-                <p className="text-[12px] text-muted-foreground">模板加载中…</p>
-              )}
+              {/* -- 8 个身份模板（始终显示） -- */}
+              <div className="grid grid-cols-2 gap-2">
+                {LEGACY_TEMPLATES.map((t, i) => {
+                  const picked = pickedIndex === i && !isCustom
+                  return (
+                    <button
+                      key={t.name}
+                      type="button"
+                      onClick={() => {
+                        setPickedIndex(i)
+                        setSelectedTemplateId(null)
+                        setSelectedTemplateData(null)
+                      }}
+                      data-picked={picked ? 'true' : undefined}
+                      className="flex flex-col gap-1 rounded-lg border p-3 text-left transition-colors hover:border-brand/40 data-[picked=true]:border-brand data-[picked=true]:bg-brand/5"
+                    >
+                      <span className="text-[13px] font-medium">{t.name}</span>
+                      <span className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
+                        {t.systemPrompt}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
 
               {/* -- 自定义 -- */}
               <button
@@ -823,38 +796,16 @@ export function CreateAgentModal({
                 <span className="text-[12px]">自定义（从零创建）</span>
               </button>
 
-              {/* -- Legacy fallback grid (API not loaded, no error, no dynamic templates yet) -- */}
-              {!tplLoading && !hasDynamicTemplates && templates.length === 0 && !tplError && (
-                <div className="grid grid-cols-2 gap-2">
-                  {LEGACY_TEMPLATES.map((t, i) => {
-                    const picked = pickedIndex === i
-                    return (
-                      <button
-                        key={t.name}
-                        onClick={() => setPickedIndex(i)}
-                        data-picked={picked ? 'true' : undefined}
-                        className="flex flex-col gap-1 rounded-lg border p-3 text-left transition-colors hover:border-brand/40 data-[picked=true]:border-brand data-[picked=true]:bg-brand/5"
-                      >
-                        <span className="text-[13px] font-medium">{t.name}</span>
-                        <span className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
-                          {t.systemPrompt}
-                        </span>
-                      </button>
-                    )
-                  })}
-                  <button
-                    onClick={() => setPickedIndex(LEGACY_TEMPLATES.length)}
-                    data-picked={isCustom ? 'true' : undefined}
-                    className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed p-3 text-muted-foreground transition-colors hover:border-brand/40 hover:text-brand data-[picked=true]:border-brand data-[picked=true]:bg-brand/5 data-[picked=true]:text-brand"
-                  >
-                    <Icon name="plus" className="h-5 w-5" />
-                    <span className="text-[12px]">自定义</span>
-                  </button>
-                </div>
-              )}
-
               {isCustom && (
                 <div className="flex flex-col gap-3">
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-[12px] font-medium text-muted-foreground">身份（模板名）</span>
+                    <Input
+                      value={customRoleName}
+                      onChange={(e) => setCustomRoleName(e.target.value)}
+                      placeholder="例如：全栈工程师、DevOps 专家"
+                    />
+                  </label>
                   <Textarea
                     value={customPrompt}
                     onChange={(e) => setCustomPrompt(e.target.value)}
