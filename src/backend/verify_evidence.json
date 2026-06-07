@@ -1,0 +1,75 @@
+{
+  "verifier_steps": [
+    {
+      "step": "backend_health",
+      "pass": true,
+      "detail": "{\"status\": \"ok\", \"service\": \"agenthub-backend\", \"version\": \"0.1.0\"}"
+    },
+    {
+      "step": "agents_count_ge_5",
+      "pass": true,
+      "detail": "total=12 demo_visible=10"
+    },
+    {
+      "step": "S1_session_exists",
+      "pass": true,
+      "detail": "id=aff0f1e3-9fec-448d-8233-69725e885812 type=private"
+    },
+    {
+      "step": "S2_session_exists",
+      "pass": true,
+      "detail": "id=5a118a1f-4a44-49b8-8cce-5aecec54dfef type=group"
+    },
+    {
+      "step": "S3_session_exists",
+      "pass": true,
+      "detail": "id=3dafe567-aa10-43b0-b109-5ef627f8737d type=private"
+    },
+    {
+      "step": "S4_session_exists",
+      "pass": true,
+      "detail": "id=fea3aacf-5ad7-41b0-ba39-776fe8ecd342 type=private"
+    },
+    {
+      "step": "S1_message_count",
+      "pass": true,
+      "detail": "got=5 expected>= 5"
+    },
+    {
+      "step": "S1_has_code_fence",
+      "pass": true,
+      "detail": "code_fence=yes"
+    },
+    {
+      "step": "S2_message_count",
+      "pass": true,
+      "detail": "got=6 expected>= 6"
+    },
+    {
+      "step": "S3_message_count",
+      "pass": true,
+      "detail": "got=4 expected>= 4"
+    },
+    {
+      "step": "S3_has_code_fence",
+      "pass": true,
+      "detail": "code_fence=yes"
+    },
+    {
+      "step": "S3_has_diff_fence",
+      "pass": true,
+      "detail": "diff_fence or content_type=diff"
+    },
+    {
+      "step": "S3_has_url",
+      "pass": true,
+      "detail": "URL pattern found in messages"
+    },
+    {
+      "step": "S4_message_count",
+      "pass": true,
+      "detail": "got=4 expected>= 4"
+    }
+  ],
+  "verdict": "PASS"
+}

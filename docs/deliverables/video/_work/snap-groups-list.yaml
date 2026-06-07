@@ -1,0 +1,58 @@
+﻿### Page
+- Page URL: http://127.0.0.1:5174/
+- Page Title: AgentHub
+### Snapshot
+```yaml
+- generic [ref=e3]:
+  - complementary "涓诲鑸? [ref=e5]:
+    - generic [ref=e8]: T
+    - navigation [ref=e10]:
+      - button "浼氳瘽" [ref=e11]:
+        - img [ref=e13]
+      - button "AI 闃熷弸" [ref=e15]:
+        - img [ref=e16]
+      - button "缇ょ粍" [ref=e21]:
+        - img [ref=e22]
+      - button "Skill" [ref=e25]:
+        - img [ref=e26]
+    - generic [ref=e29]:
+      - button "鍒囨崲涓婚" [ref=e30]:
+        - img [ref=e31]
+      - button "甯姪涓庡弽棣? [ref=e37]:
+        - img [ref=e38]
+      - button "璁剧疆" [ref=e40]:
+        - img [ref=e41]
+  - generic [ref=e339]:
+    - banner [ref=e340]:
+      - generic [ref=e341]:
+        - heading "缇ょ粍" [level=1] [ref=e342]
+        - paragraph [ref=e343]: 鍏?1 涓兢缁?      - generic [ref=e344]:
+        - button "鎵归噺绠＄悊" [ref=e345]:
+          - img [ref=e346]
+          - text: 鎵归噺绠＄悊
+        - button "鍒涘缓缇ょ粍" [ref=e348]:
+          - img [ref=e349]
+          - text: 鍒涘缓缇ょ粍
+    - article [ref=e352]:
+      - generic [ref=e353]:
+        - generic [ref=e355]: S
+        - generic [ref=e356]:
+          - generic [ref=e357]: S2 - 钀ラ攢椤靛崌绾?          - generic [ref=e358]:
+            - img [ref=e359]
+            - generic [ref=e364]: 4 鎴愬憳
+        - generic [ref=e365]:
+          - generic "Claude (S2)" [ref=e366]:
+            - generic [ref=e368]: C
+          - generic "OpenCode (S2)" [ref=e369]:
+            - generic [ref=e371]: O
+          - generic "MockBot (S2)" [ref=e372]:
+            - generic [ref=e374]: M
+          - generic [ref=e375]: "+1"
+        - generic [ref=e376]:
+          - button "杩涘叆缇よ亰" [ref=e377]:
+            - img [ref=e378]
+          - button "璇︾粏" [ref=e380]:
+            - img [ref=e381]
+  - button "澶栬璋冭妭" [ref=e89]:
+    - img [ref=e90]
+```

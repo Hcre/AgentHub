@@ -1,0 +1,177 @@
+﻿### Page
+- Page URL: http://127.0.0.1:5174/
+- Page Title: AgentHub
+### Snapshot
+```yaml
+- generic [ref=e3]:
+  - complementary "涓诲鑸? [ref=e5]:
+    - generic [ref=e8]: T
+    - navigation [ref=e10]:
+      - button "浼氳瘽" [ref=e11]:
+        - img [ref=e13]
+      - button "AI 闃熷弸" [ref=e15]:
+        - img [ref=e16]
+      - button "缇ょ粍" [ref=e21]:
+        - img [ref=e22]
+      - button "Skill" [ref=e25]:
+        - img [ref=e26]
+    - generic [ref=e29]:
+      - button "鍒囨崲涓婚" [ref=e30]:
+        - img [ref=e31]
+      - button "甯姪涓庡弽棣? [ref=e37]:
+        - img [ref=e38]
+      - button "璁剧疆" [ref=e40]:
+        - img [ref=e41]
+  - complementary [ref=e486]:
+    - generic [ref=e487]:
+      - generic [ref=e488]:
+        - img [ref=e489]
+        - textbox "璺宠浆鍒扳€? [ref=e492]
+      - button "鏀惰捣浼氳瘽鍒楄〃" [ref=e493]:
+        - img [ref=e494]
+    - navigation [ref=e497]:
+      - generic [ref=e498]:
+        - button "缇ょ粍" [ref=e499]:
+          - img [ref=e500]
+          - generic [ref=e502]: 缇ょ粍
+        - button "鍒涘缓缇ょ粍" [ref=e503]:
+          - img [ref=e504]
+      - 'button "S S2 - 钀ラ攢椤靛崌绾?**鍚堝苟姹囨姤**锛氣渽 3/3 瀛愪换鍔″畬鎴愩€?| 浠诲姟 | 璐熻矗浜?| 鐘舵€?| |------|--------|------| | Hero 鏂囨 v2 | @Claude (S2) | 鉁?| | Pricing 鍗＄墖閲嶆瀯 | @OpenCode (S2) | 鉁?| | E2E 娴嬭瘯妗?| @MockBot (S2) | 鉁?| 寤鸿涓嬩竴姝ワ細璺?`pnpm test:e2e` 鍏ㄩ噺鍥炲綊銆? [ref=e506]':
+        - generic [ref=e508]: S
+        - generic [ref=e509]:
+          - generic [ref=e510]: S2 - 钀ラ攢椤靛崌绾?          - generic [ref=e511]: "**鍚堝苟姹囨姤**锛氣渽 3/3 瀛愪换鍔″畬鎴愩€?| 浠诲姟 | 璐熻矗浜?| 鐘舵€?| |------|--------|------| | Hero 鏂囨 v2 | @Claude (S2) | 鉁?| | Pricing 鍗＄墖閲嶆瀯 | @OpenCode (S2) | 鉁?| | E2E 娴嬭瘯妗?| @MockBot (S2) | 鉁?| 寤鸿涓嬩竴姝ワ細璺?`pnpm test:e2e` 鍏ㄩ噺鍥炲綊銆?
+      - button "绉佽亰" [ref=e513]:
+        - img [ref=e514]
+        - generic [ref=e516]: 绉佽亰
+      - paragraph [ref=e518]: 杩樻病鏈夌鑱?路 鍘?AI 闃熷弸閲屽彂璧?  - main [ref=e519]:
+    - generic [ref=e520]:
+      - generic [ref=e521]:
+        - img [ref=e523]
+        - generic [ref=e526]:
+          - heading "S2 - 钀ラ攢椤靛崌绾? [level=1] [ref=e527]
+          - generic [ref=e528]: 3 浣嶆垚鍛?路 缇ょ粍
+      - button "鏀惰捣鍙充晶闈㈡澘" [ref=e530]:
+        - img [ref=e531]
+    - generic [ref=e535]:
+      - generic [ref=e536]:
+        - button "C" [ref=e537]:
+          - generic [ref=e539]: C
+        - button "O" [ref=e541]:
+          - generic [ref=e543]: O
+        - button "M" [ref=e545]:
+          - generic [ref=e547]: M
+      - generic [ref=e549]: 3 涓垚鍛?    - generic [ref=e550]:
+      - generic [ref=e551]:
+        - generic [ref=e554]: T
+        - generic [ref=e555]:
+          - generic [ref=e556]:
+            - generic [ref=e557]: xiangbianpangde
+            - generic [ref=e558]: 6鏈?鏃?03:24
+          - paragraph [ref=e560]:
+            - generic [ref=e561]: "@Coordinator"
+            - text: 杩欐瑕佸崌绾ц惀閿€椤碉細1) 閲嶅啓 Hero 鏂囨 2) 閲嶅仛 Pricing 鍗＄墖缁勪欢 3) 鍔?E2E 娴嬭瘯銆傞夯鐑︽媶瑙ｅ悗鍒嗘淳缁?            - generic [ref=e562]: "@Claude"
+            - generic [ref=e563]: "@OpenCode"
+            - generic [ref=e564]: "@MockBot"
+            - text: 銆?      - generic [ref=e565]:
+        - generic [ref=e568]: C
+        - generic [ref=e569]:
+          - generic [ref=e570]:
+            - generic [ref=e571]: Coordinator
+            - generic [ref=e572]: 鍗忚皟鑰?            - generic [ref=e573]: 6鏈?鏃?03:24
+          - generic [ref=e574]:
+            - paragraph [ref=e575]: 宸叉媶瑙ｄ负 3 涓瓙浠诲姟锛屽苟琛屾墽琛岋細
+            - list [ref=e576]:
+              - listitem [ref=e577]:
+                - generic [ref=e578]: "@Claude"
+                - text: (S2) 鈫?Hero 鏂囨 v2
+              - listitem [ref=e579]:
+                - generic [ref=e580]: "@OpenCode"
+                - text: (S2) 鈫?Pricing 鍗＄墖缁勪欢閲嶆瀯
+              - listitem [ref=e581]:
+                - generic [ref=e582]: "@MockBot"
+                - text: (S2) 鈫?E2E 娴嬭瘯妗?            - paragraph [ref=e583]: 棰勮 2 鍒嗛挓鍚庡悎骞舵眹鎶ャ€?      - generic [ref=e584]:
+        - generic [ref=e587]: C
+        - generic [ref=e588]:
+          - generic [ref=e589]:
+            - generic [ref=e590]: Claude (S2)
+            - generic [ref=e591]: 6鏈?鏃?03:24
+          - generic [ref=e592]:
+            - paragraph [ref=e593]: Hero 鏂囨 v2 宸蹭氦浠橈細
+            - paragraph [ref=e594]:
+              - strong [ref=e595]: 涓绘爣棰?              - text: 锛氳 AI 鐪熸杩涘叆浣犵殑宸ヤ綔娴?              - strong [ref=e596]: 鍓爣棰?              - text: 锛? CLI 閫傞厤鍣?+ 缁熶竴璁板繂锛屽鏉備换鍔＄绾ф媶瑙ｃ€?              - strong [ref=e597]: CTA
+              - text: 锛氬厤璐硅瘯鐢?14 澶?      - generic [ref=e598]:
+        - generic [ref=e601]: O
+        - generic [ref=e602]:
+          - generic [ref=e603]:
+            - generic [ref=e604]: OpenCode (S2)
+            - generic [ref=e605]: 6鏈?鏃?03:24
+          - generic [ref=e606]:
+            - paragraph [ref=e607]:
+              - text: Pricing 鍗＄墖缁勪欢閲嶆瀯瀹屾垚銆傛柊澧?              - code [ref=e608]: "`PricingCard.tsx`"
+              - text: (function component + TypeScript)锛屽凡鏇挎崲鍘?class 鐗堟湰銆?            - paragraph [ref=e609]: 涓嬩竴姝ワ細绛夋祴璇曟々銆?      - generic [ref=e610]:
+        - generic [ref=e613]: M
+        - generic [ref=e614]:
+          - generic [ref=e615]:
+            - generic [ref=e616]: MockBot (S2)
+            - generic [ref=e617]: 6鏈?鏃?03:24
+          - paragraph [ref=e619]:
+            - text: E2E 娴嬭瘯妗╁氨缁細
+            - code [ref=e620]: "`tests/e2e/pricing.spec.ts`"
+            - text: 瑕嗙洊 3 涓敤渚嬶細1) 鍗＄墖娓叉煋 2) 楂樹寒鎬佸垏鎹?3) 璁㈤槄鎸夐挳绂佺敤鎬併€?      - generic [ref=e621]:
+        - generic [ref=e624]: C
+        - generic [ref=e625]:
+          - generic [ref=e626]:
+            - generic [ref=e627]: Coordinator
+            - generic [ref=e628]: 鍗忚皟鑰?            - generic [ref=e629]: 6鏈?鏃?03:24
+          - generic [ref=e630]:
+            - paragraph [ref=e631]:
+              - strong [ref=e632]: 鍚堝苟姹囨姤
+              - text: 锛氣渽 3/3 瀛愪换鍔″畬鎴愩€?            - table [ref=e633]:
+              - rowgroup [ref=e634]:
+                - row "浠诲姟 璐熻矗浜?鐘舵€? [ref=e635]:
+                  - columnheader "浠诲姟" [ref=e636]
+                  - columnheader "璐熻矗浜? [ref=e637]
+                  - columnheader "鐘舵€? [ref=e638]
+              - rowgroup [ref=e639]:
+                - row "Hero 鏂囨 v2 @Claude (S2) 鉁? [ref=e640]:
+                  - cell "Hero 鏂囨 v2" [ref=e641]
+                  - cell "@Claude (S2)" [ref=e642]
+                  - cell "鉁? [ref=e643]
+                - row "Pricing 鍗＄墖閲嶆瀯 @OpenCode (S2) 鉁? [ref=e644]:
+                  - cell "Pricing 鍗＄墖閲嶆瀯" [ref=e645]
+                  - cell "@OpenCode (S2)" [ref=e646]
+                  - cell "鉁? [ref=e647]
+                - row "E2E 娴嬭瘯妗?@MockBot (S2) 鉁? [ref=e648]:
+                  - cell "E2E 娴嬭瘯妗? [ref=e649]
+                  - cell "@MockBot (S2)" [ref=e650]
+                  - cell "鉁? [ref=e651]
+            - paragraph [ref=e652]:
+              - text: 寤鸿涓嬩竴姝ワ細璺?              - code [ref=e653]: "`pnpm test:e2e`"
+              - text: 鍏ㄩ噺鍥炲綊銆?    - generic [ref=e654]:
+      - 'textbox "鍦?#S2 - 钀ラ攢椤靛崌绾?閲岃鐐逛粈涔堬紝鎴?@鍗忚皟鑰?娲炬椿鈥? [ref=e656]'
+      - generic [ref=e657]:
+        - generic [ref=e658]:
+          - button [ref=e659]:
+            - img [ref=e660]
+          - button [ref=e662]:
+            - img [ref=e663]
+          - button [ref=e666]:
+            - img [ref=e667]
+          - button "鏉冮檺璁ゅ彲" [ref=e671]:
+            - img [ref=e672]
+            - text: 鏉冮檺璁ゅ彲
+        - generic [ref=e675]:
+          - generic [ref=e676]: Enter 鍙戦€?          - button [ref=e677]:
+            - img [ref=e678]
+  - separator "鎷栨嫿璋冩暣瀹藉害 路 鍙屽嚮閲嶇疆榛樿" [ref=e681]
+  - complementary [ref=e683]:
+    - tablist [ref=e684]:
+      - button "鏂板缓棰勮" [ref=e685]:
+        - img [ref=e686]
+    - generic [ref=e688]:
+      - img [ref=e689]
+      - paragraph [ref=e691]: 鐐瑰嚮鍙充笂瑙?+ 閫夋嫨棰勮妯″紡
+      - button "鏂板缓棰勮" [ref=e692]
+  - button "澶栬璋冭妭" [ref=e89]:
+    - img [ref=e90]
+```
