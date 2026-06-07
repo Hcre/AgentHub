@@ -3,20 +3,28 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
+
+// Proxy target 解析规则（按顺序）:
+//   1. 环境变量 BACKEND_URL 显式覆盖
+//   2. VITE_BACKEND_URL 显式覆盖
+//   3. 默认 http://localhost:18000 (主机开发模式 — 后端走 docker 主机端口映射)
+//
+// 容器内模式: docker compose 注入 BACKEND_URL=http://backend:8000
+// 主机模式:   不设环境变量，default 即 localhost:18000
+const backendUrl = process.env.BACKEND_URL || process.env.VITE_BACKEND_URL || 'http://localhost:18000'
+const backendWsUrl = backendUrl.replace(/^http/, 'ws')
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
-    // proxy target 用 docker-compose service name 'backend'（不是 localhost:8000，
-    // 后者在容器内指向 frontend 容器自己，没有 8000 端口）。
-    // nginx.conf 已经这么写；v0.dev nginx serve 静态产物模式下也用 backend:8000。
-    // host/CHOKIDAR_USEPOLLING 由 docker-compose + Dockerfile 注入（dev 容器专用）。
     proxy: {
-      '/api': 'http://backend:8000',
+      '/api': backendUrl,
       '/ws': {
-        target: 'ws://backend:8000',
+        target: backendWsUrl,
         ws: true,
       },
     },
   },
 })
+
