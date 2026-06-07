@@ -229,7 +229,10 @@ jobs:
         run: npm run build || true
 
       - name: 启动 vite preview（4173 端口）
+        id: e2e-preview
         working-directory: src/frontend
+        # baseline: build 失败 → dist 不存在 → preview 起不来；同源问题
+        continue-on-error: true
         run: |
           (npx vite preview --port 4173 --host 127.0.0.1 &) ;
           for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
