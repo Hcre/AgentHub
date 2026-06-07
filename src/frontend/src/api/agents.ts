@@ -15,6 +15,8 @@ export interface CreateAgentInput {
   skills?: string[];
   system_prompt?: string;
   settings?: Record<string, unknown>;
+  template_name?: string;
+  template_id?: string;
 }
 
 export const agentsApi = {

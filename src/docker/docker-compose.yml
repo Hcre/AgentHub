@@ -46,6 +46,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-agenthub}:${POSTGRES_PASSWORD:-agenthub_dev_pwd}@postgres:5432/${POSTGRES_DB:-agenthub}
       REDIS_URL: redis://redis:6379/0
+      SKILLS_DIR: /skills
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,6 +68,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-agenthub}:${POSTGRES_PASSWORD:-agenthub_dev_pwd}@postgres:5432/${POSTGRES_DB:-agenthub}
       REDIS_URL: redis://redis:6379/0
+      SKILLS_DIR: /skills
     depends_on:
       redis:
         condition: service_healthy
@@ -109,6 +111,7 @@ services:
       - ../frontend/tsconfig.test.json:/app/tsconfig.test.json
     environment:
       - CHOKIDAR_USEPOLLING=true  # 跨平台 HMR 稳定（Windows + Docker Desktop 必开）
+      - VITE_PROXY_TARGET=http://backend:8000  # Docker DNS 解析 backend 容器
 
 volumes:
   pg_data:

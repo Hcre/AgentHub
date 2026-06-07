@@ -85,19 +85,34 @@ class OpenCodeRuntime(AgentRuntime):
         if "HOME" not in env:
             env["HOME"] = os.environ.get("USERPROFILE", "")
 
-        # 不再注入 provider env（OPENAI_API_KEY 等）：CLI 启动时自己从
-        # ~/.config/opencode/opencode.json 读 model/api_key。AgentHub 这边只
-        # 注入 MCP 相关的 OPENCODE_CONFIG（与 provider 配置无关）。
+        # AgentHub 通过 OPENCODE_CONFIG 自包含临时配置文件注入 provider + apiKey，
+        # 不再依赖 ~/.config/opencode/opencode.json（用户本地可能不存在）。
+        # opencode 从配置文件读取密钥，不依赖环境变量传递。
 
         # MCP 注入（ADR-06 统一原则）：opencode 无 --mcp-config flag，改用逐进程隔离通道
         # OPENCODE_CONFIG=<tmp>（本机实测可注入，非全局，零串号）。临时配置自包含
-        # provider+mcp 块，但 mcp 块必须随每次 spawn 重写（provider 块如果用户本地
-        # 已有则保持不变 — 这就是"不传 model/apiKey"的设计意图）。
-        mcp_section = _build_opencode_mcp(request.mcp_servers, settings.mcp_memory_url, self._agent_id)
-        if mcp_section:
-            cfg_path = _write_opencode_config(self._provider, self._api_key, mcp_section)
+        # provider+mcp 块。mcp 块随每次 spawn 重写。
+        #
+        # 解析有效 API key：AgentHub 存储优先 → 回退环境变量。
+        api_key = self._api_key
+        if not api_key:
+            env_var = self._PROVIDER_ENV.get(self._provider)
+            if env_var:
+                api_key = os.environ.get(env_var, "")
+        mcp_section = _build_opencode_mcp(
+            request.mcp_servers, settings.mcp_memory_url, self._agent_id
+        )
+        # 有 apiKey 时必须注入配置（否则 opencode 无凭证，挂起直至超时）；MCP 可空。
+        # 两者都无时跳过：不写空配置覆盖用户本地的 ~/.config/opencode/opencode.json。
+        if api_key or mcp_section:
+            cfg_path = _write_opencode_config(self._provider, api_key, mcp_section)
             if cfg_path:
                 env["OPENCODE_CONFIG"] = cfg_path
+        else:
+            logger.warning(
+                "OpenCode: 无 apiKey 且无 MCP server，跳过 OPENCODE_CONFIG 注入。"
+                "opencode 将尝试 ~/.config/opencode/opencode.json；若不存在则无凭证，可能挂起。"
+            )
 
         # 多轮对话：首次创建 session，后续用 --session 继续
         ah_session = str(request.session_id)
@@ -121,7 +136,7 @@ class OpenCodeRuntime(AgentRuntime):
                 *cmd,
                 stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
                 env=env,
                 cwd=cwd,
             )
@@ -275,9 +290,14 @@ class OpenCodeRuntime(AgentRuntime):
                 StreamEvent(type=StreamEventType.DONE, seq=seq, metadata={"model": self._model})
             )
         elif event_type == "step_finish":
-            # 多步流程中间事件（tool_use 后必有 step_finish，之后可能还有 step_start + text）
-            # 不产生 DONE，循环靠进程退出自然结束
-            pass
+            # 单步完成（无 tool_use 时 step_finish 即为终态）；产生 DONE 并终止循环
+            events.append(
+                StreamEvent(
+                    type=StreamEventType.DONE,
+                    seq=seq,
+                    metadata={"model": self._model, "status": "step_finish"},
+                )
+            )
         elif event_type == "error":
             events.append(
                 StreamEvent(
@@ -417,7 +437,7 @@ def _build_opencode_mcp(
 
 
 def _build_provider_dict(provider: str, api_key: str) -> dict[str, Any]:
-    """返回 provider 配置 dict（复用 _write_provider_config 的模板，但产出 dict 供自包含临时配置）。"""
+    """返回 provider 配置 dict，产出 dict 供自包含临时配置。"""
     if provider == "deepseek":
         parsed: dict[str, Any] = json.loads(_OPENCODE_CONFIG_TEMPLATE.replace("{api_key}", api_key))
         return parsed
@@ -432,9 +452,7 @@ def _build_provider_dict(provider: str, api_key: str) -> dict[str, Any]:
     }
 
 
-def _write_opencode_config(
-    provider: str, api_key: str, mcp_section: dict[str, Any]
-) -> str | None:
+def _write_opencode_config(provider: str, api_key: str, mcp_section: dict[str, Any]) -> str | None:
     """写自包含临时 opencode 配置（provider+mcp），返回路径供 OPENCODE_CONFIG。
 
     delete=False 持久化供 CLI 读取，atexit 清理（对齐 claude_code _write_mcp_config）。

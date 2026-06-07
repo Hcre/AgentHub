@@ -22,7 +22,10 @@ class CreateAgentCommand:
     api_key: str | None = None  # 明文传入，L3 加密后交 L1；CLI 模式可为空
     base_url: str | None = None
     skills: list[str] = field(default_factory=list)
+    capability_tags: list[str] = field(default_factory=list)
     system_prompt: str | None = None
+    template_name: str | None = None
+    template_id: UUID | None = None
     settings: dict | None = None
 
 
@@ -39,7 +42,6 @@ class UpdateAgentCommand:
     base_url: str | None = None
     skills: list[str] | None = None
     capability_tags: list[str] | None = None
-    settings: dict | None = None
     system_prompt: str | None = None
     settings: dict | None = None
 
@@ -77,9 +79,9 @@ class DeleteGroupCommand:
 class CreateMemoryCommand:
     name: str
     description: str
-    memory_type: str       # facts | preferences | procedures | context
+    memory_type: str  # facts | preferences | procedures | context
     content: str
-    source: str = "manual" # manual | chat | system
+    source: str = "manual"  # manual | chat | system
     group_id: UUID | None = None
     metadata: dict = field(default_factory=dict)
 

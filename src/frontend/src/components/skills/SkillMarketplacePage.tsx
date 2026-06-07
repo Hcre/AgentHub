@@ -129,6 +129,15 @@ export function SkillMarketplacePage() {
     if (tab === 'installed') queueMicrotask(() => loadInstalled())
   }, [tab, loadInstalled])
 
+  // 监听来自 MessageBubble 中 SKILL.md 保存成功的事件，刷新已安装列表
+  useEffect(() => {
+    const handler = () => {
+      queueMicrotask(() => loadInstalled())
+    }
+    window.addEventListener('skill-library-updated', handler)
+    return () => window.removeEventListener('skill-library-updated', handler)
+  }, [loadInstalled])
+
   // 加载市场（统一走 /search，sort_by 后端客户端 sort）
   const search = useCallback(() => {
     setLoading(true)
@@ -263,11 +272,8 @@ export function SkillMarketplacePage() {
           </button>
         </div>
 
-        {/* 右侧：「数据来源」+ 「批量管理」按钮（仅 installed tab 用） */}
-        <div className="flex items-center gap-3">
-          <div className="font-mono text-[10.5px] text-muted-foreground/50">
-            数据来源 skillhub.cn
-          </div>
+        {/* 右侧：「批量管理」（仅 installed tab）+「+ 创建 skill」（所有 tab） */}
+        <div className="flex items-center gap-2">
           {tab === 'installed' && !installedBatchMode && installed.length > 0 && (
             <Button variant="outline" size="sm" onClick={() => setInstalledBatchMode(true)}>
               <Icon name="listCheck" className="h-3.5 w-3.5" />
@@ -585,20 +591,21 @@ export function SkillMarketplacePage() {
                         isSelected && 'border-brand bg-brand/10 ring-1 ring-brand/40',
                       )}
                     >
-                      {/* 批量模式复选框 */}
+                      {/* 批量模式复选框（占按钮位） */}
                       {installedBatchMode && (
                         <span
                           className={cn(
-                            'absolute right-3 top-3 grid h-5 w-5 place-items-center rounded border-2',
+                            'grid h-7 w-7 flex-shrink-0 place-items-center rounded-lg border-2',
                             isSelected
                               ? 'border-brand bg-brand text-brand-foreground'
                               : 'border-border bg-background',
                           )}
                         >
-                          {isSelected && <Icon name="check" className="h-3 w-3" strokeWidth={3} />}
+                          {isSelected && <Icon name="check" className="h-3.5 w-3.5" strokeWidth={3} />}
                         </span>
                       )}
 
+                      {/* 头部：头像 | 名+作者（竖排）| 按钮（贴右） */}
                       <div className="flex items-start gap-2.5">
                         <Avatar
                           initial={s.name[0]?.toUpperCase() ?? '?'}
@@ -610,28 +617,25 @@ export function SkillMarketplacePage() {
                           <h3 className="truncate text-[13.5px] font-semibold leading-tight">
                             {s.name}
                           </h3>
+                          <div
+                            className="mt-0.5 truncate text-[11px] text-muted-foreground/80"
+                            title={s.author}
+                          >
+                            <span className="text-muted-foreground/50">@</span>
+                            {s.author}
+                          </div>
                         </div>
-                      </div>
-                      {/* 描述：flex-1 占满剩余空间，把底部按钮顶到底 */}
-                      <p className="line-clamp-3 min-h-[3em] flex-1 text-[12px] leading-relaxed text-foreground/75">
-                        {s.description || '暂无描述'}
-                      </p>
-                      {/* 底部：左 作者（@）+ 右 2 个按钮（资源管理器 / 删除） */}
-                      <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-                        <span
-                          className="truncate text-[11.5px] text-muted-foreground/80"
-                          title={s.author}
-                        >
-                          <span className="text-muted-foreground/50">@</span>
-                          {s.author}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <GlassIconBtn
-                            icon="files"
-                            title="在文件资源管理器打开"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              ;(async () => {
+
+                        {/* 2 个玻璃图标按钮（贴右，跟头像同列）— 批量模式时隐藏 */}
+                        {!installedBatchMode && (
+                          <div
+                            className="flex flex-shrink-0 items-center gap-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <GlassIconBtn
+                              icon="files"
+                              title="在文件资源管理器打开"
+                              onClick={async () => {
                                 try {
                                   const r = await fetch('/api/fs/reveal', {
                                     method: 'POST',
@@ -645,34 +649,39 @@ export function SkillMarketplacePage() {
                                 } catch (e) {
                                   setError(e instanceof Error ? e.message : '打开失败')
                                 }
-                              })()
-                            }}
-                          />
-                          <GlassIconBtn
-                            icon="trash2"
-                            title="删除"
-                            onClick={async (e) => {
-                              e.stopPropagation()
-                              if (!window.confirm(`确定删除「${s.name}」？此操作不可恢复。`)) {
-                                return
-                              }
-                              try {
-                                const r = await fetch(`/api/skills/library/${encodeURIComponent(s.name)}`, {
-                                  method: 'DELETE',
-                                })
-                                if (!r.ok) {
-                                  const d = await r.json().catch(() => ({}))
-                                  setError(d.detail ?? `删除失败 (${r.status})`)
+                              }}
+                            />
+                            <GlassIconBtn
+                              icon="trash2"
+                              title="删除"
+                              onClick={async () => {
+                                if (!window.confirm(`确定删除「${s.name}」？此操作不可恢复。`)) {
                                   return
                                 }
-                                setInstalled((prev) => prev.filter((x) => x.name !== s.name))
-                              } catch (e) {
-                                setError(e instanceof Error ? e.message : '删除失败')
-                              }
-                            }}
-                          />
-                        </div>
+                                try {
+                                  const r = await fetch(
+                                    `/api/skills/library/${encodeURIComponent(s.name)}`,
+                                    { method: 'DELETE' },
+                                  )
+                                  if (!r.ok) {
+                                    const d = await r.json().catch(() => ({}))
+                                    setError(d.detail ?? `删除失败 (${r.status})`)
+                                    return
+                                  }
+                                  setInstalled((prev) => prev.filter((x) => x.name !== s.name))
+                                } catch (e) {
+                                  setError(e instanceof Error ? e.message : '删除失败')
+                                }
+                              }}
+                            />
+                          </div>
+                        )}
                       </div>
+
+                      {/* 描述：flex-1 占满剩余空间（没底部行了） */}
+                      <p className="line-clamp-3 min-h-[3em] flex-1 text-[12px] leading-relaxed text-foreground/75">
+                        {s.description || '暂无描述'}
+                      </p>
                     </article>
                   )
                 })}
@@ -681,6 +690,7 @@ export function SkillMarketplacePage() {
           )}
         </div>
       )}
+
     </div>
   )
 }

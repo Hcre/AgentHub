@@ -6,7 +6,10 @@ CLI 运行时优先（有文件系统访问），CLI 未安装时自动降级 HT
 
 from __future__ import annotations
 
+import json
 import logging
+import os
+from pathlib import Path
 
 from app.core.config import settings
 from app.core.security import decrypt_secret
@@ -27,6 +30,44 @@ _CLI_BINARIES: dict[AgentSystem, str] = {
     AgentSystem.CURSOR_AGENT: "cursor-agent",
 }
 
+# Provider → API Key env var / settings fallback
+_PROVIDER_KEY_FALLBACK: dict[str, str] = {
+    "deepseek": "DEEPSEEK_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai": "OPENAI_API_KEY",
+}
+
+
+def _resolve_api_key(agent: Agent) -> str:
+    """Resolve API key: encrypted field first, then env var, then settings globals."""
+    api_key = decrypt_secret(agent.api_key_encrypted) if agent.api_key_encrypted else ""
+    if api_key:
+        return api_key
+    provider = str(agent.provider.value)
+    env_var = _PROVIDER_KEY_FALLBACK.get(provider)
+    if env_var:
+        api_key = os.environ.get(env_var, "")
+        if api_key:
+            logger.info("Agent '%s': API key resolved from env %s", agent.name, env_var)
+            return api_key
+    # Secondary: read from Claude Code settings.json (stores ANTHROPIC_AUTH_TOKEN in env section)
+    try:
+        claude_cfg_path = Path.home() / ".claude" / "settings.json"
+        if claude_cfg_path.exists():
+            claude_cfg = json.loads(claude_cfg_path.read_text())
+            auth_token = claude_cfg.get("env", {}).get("ANTHROPIC_AUTH_TOKEN", "")
+            if auth_token:
+                logger.info("Agent '%s': API key resolved from ~/.claude/settings.json", agent.name)
+                return auth_token
+    except Exception:
+        pass
+    # Last resort: settings-level keys
+    if provider == "deepseek" and settings.deepseek_api_key:
+        return settings.deepseek_api_key
+    if provider == "anthropic" and settings.anthropic_api_key:
+        return settings.anthropic_api_key
+    return ""
+
 
 def _cli_installed(system: AgentSystem) -> bool:
     from app.infrastructure.llm.provider_scanner import _resolve_binary
@@ -39,7 +80,7 @@ def _build_api_fallback(agent: Agent) -> UnifiedAgent:
     """CLI 未安装时的 HTTP API 降级适配器。"""
     from app.infrastructure.llm.claude_adapter import ClaudeAdapter
 
-    api_key = decrypt_secret(agent.api_key_encrypted) if agent.api_key_encrypted else ""
+    api_key = _resolve_api_key(agent)
     s = agent.settings or {}
     model = agent.model
     base_url = agent.base_url or ""
@@ -81,6 +122,8 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
         return MockAdapter()
 
     if system == AgentSystem.CLAUDE_CODE:
+        # Claude Code CLI 自带认证（claude login OAuth），不需要 AgentHub 传 API Key。
+        # 只有当 CLI 未安装时，才降级 HTTP API（此时需要 Agent 配置中有 api_key）。
         if not _cli_installed(system):
             return _build_api_fallback(agent)
 
@@ -128,9 +171,10 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
 
         from app.infrastructure.llm.opencode_runtime import OpenCodeRuntime
 
-        # opencode.jsonc 通过 {env:DEEPSEEK_API_KEY} 读取 key
-        # AgentHub 注入环境变量，opencode 自己的 provider 系统处理协议+端点
-        api_key = decrypt_secret(agent.api_key_encrypted) if agent.api_key_encrypted else ""
+        # AgentHub 通过 OPENCODE_CONFIG 自包含临时配置文件注入 apiKey，
+        # opencode 从该文件读取 provider 配置 + 密钥（通过字符串替换 {api_key}）。
+        # 密钥来源：加密字段 > 环境变量 > settings 全局 key。
+        api_key = _resolve_api_key(agent)
         provider_value = str(agent.provider.value)
         # opencode 模型格式: provider/model（如 deepseek/deepseek-v4-flash）
         model = agent.model or ""
@@ -151,8 +195,24 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
             timeout=agent.settings.get("cli_timeout", settings.claude_cli_timeout),
         )
 
-    # CODEX / GEMINI / CURSOR_AGENT — CLI 适配器待实现，暂走 HTTP API
-    if system in (AgentSystem.CODEX, AgentSystem.GEMINI, AgentSystem.CURSOR_AGENT):
+    if system == AgentSystem.CODEX:
+        if not _cli_installed(system):
+            return _build_api_fallback(agent)
+
+        from app.infrastructure.llm.codex_runtime import CodexRuntime
+
+        api_key = _resolve_api_key(agent)
+        logger.info(
+            "Agent '%s' → CodexRuntime (CLI, model=%s)", agent.name, agent.model or "default"
+        )
+        return CodexRuntime(
+            model=agent.model or "",
+            agent_id=str(agent.id),
+            api_key=api_key,
+        )
+
+    # GEMINI / CURSOR_AGENT — CLI 适配器待实现，暂走 HTTP API
+    if system in (AgentSystem.GEMINI, AgentSystem.CURSOR_AGENT):
         return _build_api_fallback(agent)
 
     # AgentSystem.MOCK 或未知

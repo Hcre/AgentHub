@@ -12,6 +12,7 @@ from app.domain.repositories.memory_repository import MemoryRepository
 from app.domain.repositories.message_repository import MessageRepository
 from app.domain.repositories.session_repository import SessionRepository
 from app.domain.repositories.task_repository import TaskRepository
+from app.domain.repositories.template_repository import TemplateRepository
 from app.domain.repositories.usage_repository import UsageRepository
 
 __all__ = [
@@ -25,5 +26,6 @@ __all__ = [
     "MessageRepository",
     "SessionRepository",
     "TaskRepository",
+    "TemplateRepository",
     "UsageRepository",
 ]

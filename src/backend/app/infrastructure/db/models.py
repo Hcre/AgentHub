@@ -21,6 +21,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    func,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -44,6 +45,8 @@ class AgentModel(Base):
     model: Mapped[str] = mapped_column(String(128), default="")
     api_key_encrypted: Mapped[str] = mapped_column(Text, default="")
     base_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_from_template_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    template_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="offline")
     workload: Mapped[int] = mapped_column(Integer, default=0)
     is_system: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -80,7 +83,9 @@ class MessageModel(Base):
     session_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("sessions.id", ondelete="CASCADE"), index=True
     )
-    user_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True, index=True)  # P0-4 alembic 0012
+    user_id: Mapped[UUID | None] = mapped_column(
+        Uuid, nullable=True, index=True
+    )  # P0-4 alembic 0012
     role: Mapped[str] = mapped_column(String(16))
     content: Mapped[str] = mapped_column(Text, default="")
     content_type: Mapped[str] = mapped_column(String(32), default="text")
@@ -193,10 +198,10 @@ class MemoryModel(Base):
         Uuid, ForeignKey("groups.id", ondelete="CASCADE"), nullable=True
     )
     user_id: Mapped[UUID] = mapped_column(Uuid, index=True)
-    scope: Mapped[str] = mapped_column(String(10))              # agent | group
+    scope: Mapped[str] = mapped_column(String(10))  # agent | group
     name: Mapped[str] = mapped_column(String(150))
     description: Mapped[str] = mapped_column(String(300))
-    memory_type: Mapped[str] = mapped_column(String(20))        # facts|preferences|procedures|context
+    memory_type: Mapped[str] = mapped_column(String(20))  # facts|preferences|procedures|context
     content: Mapped[str] = mapped_column(Text)
     source: Mapped[str] = mapped_column(String(20), default="manual")  # manual|chat|system
     pinned: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -406,3 +411,51 @@ class UsageRecordModel(Base):
     tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     model: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+# --- Agent 模板系统 ---
+
+
+class TemplateModel(Base):
+    """Agent 模板（从 wshobson/skills 等源仓库同步）。"""
+
+    __tablename__ = "templates"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    source: Mapped[str] = mapped_column(String(16), default="wshobson")
+    source_path: Mapped[str] = mapped_column(String(1024), nullable=False)
+    name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    model_tier: Mapped[str] = mapped_column(String(16), default="inherit")
+    tools: Mapped[list] = mapped_column(JSON, default=list)
+    color: Mapped[str | None] = mapped_column(String(7), nullable=True)
+    display_name_zh: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    description_zh: Mapped[str | None] = mapped_column(Text, nullable=True)
+    recommended_skills: Mapped[list] = mapped_column(JSON, default=list)
+    compatible_agent_systems: Mapped[list] = mapped_column(JSON, default=list)
+    compatible_providers: Mapped[list] = mapped_column(JSON, default=list)
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_favorite: Mapped[bool] = mapped_column(Boolean, default=False)
+    favorite_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    favorite_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    favorite_order: Mapped[int] = mapped_column(Integer, default=0)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class TemplateSourceModel(Base):
+    """模板源注册信息（如 wshobson/skills 仓库）。"""
+
+    __tablename__ = "template_sources"
+
+    id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    url: Mapped[str] = mapped_column(String(1024), nullable=False)
+    branch: Mapped[str] = mapped_column(String(128), default="main")
+    description_zh: Mapped[str | None] = mapped_column(Text, nullable=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    template_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_synced: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

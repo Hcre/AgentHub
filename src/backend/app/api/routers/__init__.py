@@ -1,4 +1,5 @@
 """REST 路由聚合。"""
+
 from app.api.routers import (
     agents,
     attachments,
@@ -11,6 +12,7 @@ from app.api.routers import (
     sessions,
     skills,
     tasks,
+    templates,
 )
 
 __all__ = [
@@ -25,4 +27,5 @@ __all__ = [
     "sessions",
     "skills",
     "tasks",
+    "templates",
 ]

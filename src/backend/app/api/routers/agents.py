@@ -36,6 +36,8 @@ async def create_agent(body: AgentCreateRequest, svc: ServiceDep) -> AgentOut:
             skills=body.skills,
             system_prompt=body.system_prompt,
             settings=body.settings,
+            template_name=body.template_name,
+            template_id=body.created_from_template_id,
         )
     )
     return AgentOut(**resp.__dict__)

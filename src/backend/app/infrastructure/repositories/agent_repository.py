@@ -33,6 +33,8 @@ def _to_domain(m: AgentModel) -> Agent:
         settings=dict(m.settings or {}),
         created_at=m.created_at,
         updated_at=m.updated_at,
+        template_name=m.template_name,
+        created_from_template_id=m.created_from_template_id,
     )
 
 
@@ -102,6 +104,8 @@ def _to_model(a: Agent) -> AgentModel:
         capability_tags=a.capability_tags,
         system_prompt=a.system_prompt,
         settings=a.settings,
+        template_name=a.template_name,
+        created_from_template_id=a.created_from_template_id,
     )
 
 
@@ -120,3 +124,4 @@ def _update_model(m: AgentModel, a: Agent) -> None:
     m.capability_tags = a.capability_tags
     m.system_prompt = a.system_prompt
     m.settings = a.settings
+    m.template_name = a.template_name

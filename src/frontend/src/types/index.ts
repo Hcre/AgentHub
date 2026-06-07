@@ -41,6 +41,8 @@ export interface Agent {
   skillCount?: number
   /** 运行时 CLI：claude_code / pi_agent / opencode / mock */
   agentSystem?: string
+  /** 基于模板创建时的模板名称 */
+  templateName?: string
 }
 
 export interface Conversation {
@@ -390,6 +392,8 @@ export interface ApiAgent {
   skills: string[]
   capability_tags: string[]
   is_system: boolean
+  template_name?: string | null
+  created_from_template_id?: string | null
   created_at: string
 }
 

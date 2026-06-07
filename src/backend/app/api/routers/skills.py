@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import logging
 import os
 import re
 import subprocess
@@ -14,14 +15,20 @@ import zipfile
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.infrastructure.db.base import get_session
+from app.infrastructure.db.models import AgentModel
 
 router = APIRouter(prefix="/api/skills", tags=["skills"])
 
 # 解析后的绝对路径（启动时一次性 resolve）
+logger = logging.getLogger(__name__)
+
 SKILLS_DIR = settings.skills_dir_path
 
 
@@ -74,6 +81,7 @@ def _extract_description(skill_md_path: Path, max_chars: int = 200) -> str:
         desc = desc[: max_chars - 3] + "..."
     return desc
 
+
 # ── skillhub.cn 上游契约 ──────────────────────────────────────────
 # 公开端点（无需鉴权），见 docs/reports 或 worklog：
 #   GET /api/skills?keyword=X&page=1&pageSize=N
@@ -121,6 +129,33 @@ class DeleteSkillRequest(BaseModel):
 
 class BatchDeleteRequest(BaseModel):
     names: list[str]
+
+
+class CreateSkillRequest(BaseModel):
+    """用户用自然语言 / 表单填的字段，落到本地 SKILL.md + .agenthub.json。"""
+
+    name: str  # slug（也作目录名）
+    author: str = "local"
+    description: str  # 用户自然语言描述
+    triggers: list[str] = []  # 触发关键词
+    instructions: str = ""  # instructions markdown
+    examples: list[str] = []  # usage examples
+
+
+class GenerateSkillRequest(BaseModel):
+    """AI 渐进对话生成：用户一段自然语言 → LLM 抽出 4 字段。"""
+
+    description: str  # 用户用自然语言描述的 skill
+    # 现有字段（如果用户在中间步填过，AI 生成时纳入上下文避免覆盖）
+    name_hint: str = ""
+    triggers_hint: list[str] = []
+
+
+class GenerateSkillResponse(BaseModel):
+    name: str
+    description: str
+    triggers: list[str]
+    instructions: str
 
 
 # ── Library ──────────────────────────────────────────────────────
@@ -199,7 +234,9 @@ async def list_skills():
         return []
     result = []
     needs_backfill: list[tuple[str, Path]] = []  # (slug, dir) — 后面 batch 回填
-    for skill_dir in sorted([p.parent for p in SKILLS_DIR.rglob("*.md") if p.name in _SKILL_ENTRY_NAMES]):
+    for skill_dir in sorted(
+        [p.parent for p in SKILLS_DIR.rglob("*.md") if p.name in _SKILL_ENTRY_NAMES]
+    ):
         # 去重：同一目录可能多个变体都扫到（一个目录只有一个主入口，跳过重复）
         if any(r["name"] == skill_dir.name for r in result):
             continue
@@ -229,17 +266,23 @@ async def list_skills():
     # 懒回填没 sidecar 的（不阻塞响应，写在 task 里）
     if needs_backfill:
         import asyncio
+
         asyncio.create_task(_backfill_sidecars(needs_backfill))
     return result
 
 
 @router.delete("/library/{name}")
-async def delete_skill(name: str) -> dict:
+async def delete_skill(
+    name: str,
+    force: bool = Query(default=False, description="强制删除（即使有 Agent 引用）"),
+    db: AsyncSession = Depends(get_session),
+) -> dict:
     """删除单个 skill 目录。
 
     安全护栏：
       - name 必须在 SKILLS_DIR 下（防 ../ 逃逸）
       - 必须是 skill 目录（存在 SKILL.md/skill.md 等主入口）
+      - 如有 Agent 引用此 skill，返回 409（除非 force=true）
     """
     if not name:
         raise HTTPException(status_code=400, detail="name 必填")
@@ -253,7 +296,31 @@ async def delete_skill(name: str) -> dict:
     # 校验是合法 skill 目录（有主入口）
     if _find_entry_file(target) is None:
         raise HTTPException(status_code=400, detail=f"「{slug}」不是合法 skill 目录")
+
+    # 检查是否有 Agent 引用此 skill
+    if not force:
+        # JSONB @> 包含查询：skills 数组中是否含此 slug
+        result = await db.execute(
+            select(AgentModel.id, AgentModel.name).where(
+                AgentModel.is_deleted.is_(False),
+                AgentModel.skills.contains([slug]),
+            )
+        )
+        referencing_agents = [(str(row[0]), row[1]) for row in result.fetchall()]
+        if referencing_agents:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": {
+                        "code": "SKILL_IN_USE",
+                        "message": f"Skill「{slug}」被 {len(referencing_agents)} 个 Agent 引用，无法删除。使用 ?force=true 强制删除。",
+                        "agents": [{"id": aid, "name": aname} for aid, aname in referencing_agents],
+                    }
+                },
+            )
+
     import shutil
+
     shutil.rmtree(target)
     return {"deleted": slug}
 
@@ -266,6 +333,7 @@ async def batch_delete_skills(body: BatchDeleteRequest) -> dict:
     deleted: list[str] = []
     failed: list[dict] = []
     import shutil
+
     for raw in body.names:
         try:
             slug = _sanitize_name(raw)
@@ -285,6 +353,204 @@ async def batch_delete_skills(body: BatchDeleteRequest) -> dict:
         except Exception as e:
             failed.append({"name": raw, "reason": str(e)[:80]})
     return {"deleted": deleted, "failed": failed}
+
+
+# ── 自然语言 / 手动创建本地 skill（用户自创）─────────────────
+
+
+def _render_skill_md(
+    name: str, description: str, triggers: list[str], instructions: str, examples: list[str]
+) -> str:
+    """把字段拼成 skillhub 兼容的 SKILL.md（YAML frontmatter + 正文）。"""
+    triggers_yaml = "[" + ", ".join(f'"{t}"' for t in triggers) + "]" if triggers else "[]"
+    frontmatter = (
+        "---\n"
+        f"name: {name}\n"
+        f"description: |\n"
+        + "\n".join(f"  {ln}" for ln in description.splitlines() or [description])
+        + "\n"
+        f"version: 1.0.0\n"
+        f"triggers: {triggers_yaml}\n"
+        'tags: ["user-created"]\n'
+        "---\n\n"
+    )
+    body = "# " + name + "\n\n"
+    if triggers:
+        body += "**触发词**: " + "、".join(f"`{t}`" for t in triggers) + "\n\n"
+    if instructions:
+        body += "## Instructions\n\n" + instructions + "\n\n"
+    if examples:
+        body += "## Examples\n\n"
+        for i, ex in enumerate(examples, 1):
+            body += f"### Example {i}\n\n{ex}\n\n"
+    return frontmatter + body
+
+
+@router.post("/library/create")
+async def create_skill(body: CreateSkillRequest) -> dict:
+    """把用户填/AI 生成的字段落成本地 SKILL.md + .agenthub.json。
+
+    安全护栏：
+      - name 经 _sanitize_name，目录必须在 SKILLS_DIR 下
+      - 不能覆盖已有 skill
+    """
+    if not body.name.strip():
+        raise HTTPException(status_code=400, detail="name 必填")
+    if not body.description.strip():
+        raise HTTPException(status_code=400, detail="description 必填")
+    slug = _sanitize_name(body.name)
+    target = (SKILLS_DIR / slug).resolve()
+    skills_real = SKILLS_DIR.resolve()
+    if not str(target).startswith(str(skills_real)):
+        raise HTTPException(status_code=403, detail="越界路径")
+    if (target / "SKILL.md").exists():
+        raise HTTPException(status_code=409, detail=f"Skill「{slug}」已存在")
+    target.mkdir(parents=True, exist_ok=True)
+
+    # 写 SKILL.md
+    md = _render_skill_md(
+        name=body.name,
+        description=body.description,
+        triggers=body.triggers,
+        instructions=body.instructions,
+        examples=body.examples,
+    )
+    (target / "SKILL.md").write_text(md, encoding="utf-8")
+
+    # 写 sidecar
+    author = body.author.strip() or "local"
+    sidecar = {
+        "slug": slug,
+        "name": body.name,
+        "author": author,
+        "owner_id": "",
+        "version": "1.0.0",
+        "source": "local",
+        "installed_at": int(time.time()),
+    }
+    (target / ".agenthub.json").write_text(
+        json.dumps(sidecar, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    return {
+        "name": slug,
+        "path": str(target / "SKILL.md"),
+        "rel_path": f"{slug}/SKILL.md",
+        "source": "local",
+        "author": author,
+        "description": body.description,
+        "version": "1.0.0",
+        "installed_at": sidecar["installed_at"],
+    }
+
+
+@router.post("/library/generate")
+async def generate_skill_fields(body: GenerateSkillRequest) -> GenerateSkillResponse:
+    """AI 渐进对话：用户一段自然语言 → LLM 抽出 4 字段。
+
+    LLM 选择：DeepSeek（settings.deepseek_api_key）— 便宜快速。
+    无 key 时回退：直接基于用户输入猜，不调 LLM。
+    """
+    import re as _re
+
+    user_text = body.description.strip()
+    if not user_text:
+        raise HTTPException(status_code=400, detail="description 必填")
+
+    api_key = settings.deepseek_api_key
+    if not api_key:
+        # 离线回退：基于用户输入做基础拆分，不调 LLM
+        # 截前几个 token 当 triggers，第一句话当 description
+        return GenerateSkillResponse(
+            name=body.name_hint or _slugify_first_line(user_text),
+            description=user_text,
+            triggers=body.triggers_hint or _extract_keyword_triggers(user_text),
+            instructions=(
+                f"你是一个 SKILL，用户的描述如下：\n\n{user_text}\n\n请根据用户输入完成对应任务。"
+            ),
+        )
+
+    # LLM 调用（OpenAI SDK + DeepSeek base_url，复用 selector.py 模式）
+    system_prompt = (
+        "你是一个 skill 元数据生成助手。\n"
+        "用户用自然语言描述一个想创建的 skill。\n"
+        "你的任务：从描述里提取 4 个字段，**只返回 JSON，不要任何其他内容**。\n"
+        "字段：\n"
+        "  - name: 短横线分隔的小写英文 slug（kebab-case），≤ 40 字符，"
+        "必须反映 skill 功能\n"
+        "  - description: 精炼后的中文描述（≤ 200 字符），保留关键信息\n"
+        "  - triggers: 触发关键词数组（用户说这些话时启用 skill），3-7 个，"
+        "中文短词组\n"
+        "  - instructions: 详细指令 markdown，描述 skill 怎么执行任务，"
+        "包括步骤、约束、输出格式\n\n"
+        "示例输出（用户输入「帮我做小红书爆款标题」）：\n"
+        '{"name": "xhs-viral-title",'
+        ' "description": "基于真实爆款规律生成小红书吸睛标题",'
+        ' "triggers": ["小红书标题", "爆款标题", "xhs 标题"],'
+        ' "instructions": "1. 分析用户提供的主题\\n2. ..."}'
+    )
+    user_prompt_parts = [user_text]
+    if body.name_hint:
+        user_prompt_parts.append(f"\n\n用户已选名字：{body.name_hint}（AI 必须采纳）")
+    if body.triggers_hint:
+        user_prompt_parts.append(
+            f"\n\n用户已草拟的触发词：{', '.join(body.triggers_hint)}（AI 必须采纳并补充）"
+        )
+    user_prompt = "".join(user_prompt_parts)
+    try:
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
+        resp = await client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3,
+            max_tokens=1500,
+        )
+        import json as _json
+
+        raw = resp.choices[0].message.content or "{}"
+        data = _json.loads(raw)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"LLM 调用失败：{e}") from e
+
+    return GenerateSkillResponse(
+        name=_re.sub(r"[^a-z0-9\-]", "-", str(data.get("name", "")).lower()).strip("-")[:40]
+        or _slugify_first_line(user_text),
+        description=str(data.get("description", user_text))[:300],
+        triggers=[str(t) for t in (data.get("triggers") or [])][:7],
+        instructions=str(data.get("instructions", "")),
+    )
+
+
+def _slugify_first_line(text: str) -> str:
+    """用户自然语言的首句 → 英文 kebab slug。"""
+    import re as _re
+
+    first = (text.splitlines() or [text])[0][:50]
+    slug = _re.sub(r"[^a-z0-9]+", "-", first.lower()).strip("-")
+    return slug or "user-skill"
+
+
+def _extract_keyword_triggers(text: str) -> list[str]:
+    """从用户输入里抽 1-3 个关键词当 trigger。中文按字符切。"""
+    import re as _re
+
+    text = text.strip()
+    # 截前 24 字符，2-gram 切
+    head = text[:24]
+    bigrams: list[str] = []
+    for i in range(0, len(head) - 1):
+        bg = head[i : i + 2]
+        if not _re.search(r"[a-zA-Z一-鿿]", bg):
+            continue
+        bigrams.append(bg)
+    return bigrams[:3]
 
 
 # ── Marketplace: skillhub.cn 适配 ────────────────────────────────
@@ -374,7 +640,7 @@ async def marketplace_search(body: MarketSearchRequest):
         skills_raw.sort(key=lambda s: s.get("downloads", 0), reverse=True)
     # else 'default' → 保持上游 score 排序
 
-    return {"skills": [_skillhub_to_market(s) for s in skills_raw[:body.limit]]}
+    return {"skills": [_skillhub_to_market(s) for s in skills_raw[: body.limit]]}
 
 
 def _sanitize_name(name: str) -> str:
@@ -409,6 +675,7 @@ async def marketplace_install(body: MarketInstallRequest):
     供 library 端点展示用。
     """
     import time as _time
+
     if not body.skill_id:
         raise HTTPException(status_code=400, detail="skill_id 必填")
     slug = _sanitize_name(body.skill_id)
@@ -447,6 +714,7 @@ async def marketplace_install(body: MarketInstallRequest):
     except zipfile.BadZipFile as e:
         # 回滚
         import shutil
+
         shutil.rmtree(install_dir, ignore_errors=True)
         raise HTTPException(status_code=502, detail="下载内容不是合法 zip") from e
 
@@ -454,6 +722,7 @@ async def marketplace_install(body: MarketInstallRequest):
     entry = _find_entry_file(install_dir)
     if entry is None:
         import shutil
+
         shutil.rmtree(install_dir, ignore_errors=True)
         raise HTTPException(
             status_code=400,
@@ -515,9 +784,20 @@ FS_ROUTER = APIRouter(prefix="/api/fs", tags=["filesystem"])
 
 def _resolve_path(path: str) -> str:
     """解析路径：先试原生 → 再试 Docker mount。"""
+    # 盘符路径（如 D: 或 D:\） → 强制转为根目录，避免 os.path.isdir 指向当前工作目录
+    stripped = path.strip().rstrip("/").rstrip("\\")
+    if len(stripped) == 2 and stripped[0].isalpha() and stripped[1] == ":":
+        return f"{stripped}\\"
+    if (
+        len(stripped) == 3
+        and stripped[0].isalpha()
+        and stripped[1] == ":"
+        and stripped[2] in ("/", "\\")
+    ):
+        return f"{stripped[0]}:\\"
     if os.path.isdir(path):
         return path
-    m = re.match(r"^([A-Za-z]):[/\\]?(.*)", path.strip())
+    m = re.match(r"^([A-Za-z]):[/\\]?(.+)", path.strip())
     if m:
         container = f"/mnt/host_{m.group(1).lower()}/" + m.group(2).replace("\\", "/")
         if os.path.isdir(container):
@@ -529,6 +809,7 @@ def _resolve_path(path: str) -> str:
 async def fs_browse(path: str = "") -> dict:
     """浏览目录：path 为空返回盘符列表，否则返回该目录的子项。"""
     import os as _os
+
     if not path:
         if hasattr(_os, "listdrives"):
             drives = _os.listdrives()
@@ -538,9 +819,7 @@ async def fs_browse(path: str = "") -> dict:
         return {
             "path": "",
             "parent": "",
-            "items": [
-                {"name": l, "path": l, "type": "drive"} for l in letters
-            ],
+            "items": [{"name": l, "path": l, "type": "drive"} for l in letters],
         }
     real = _resolve_path(path)
     if not _os.path.isdir(real):
@@ -561,6 +840,7 @@ async def fs_browse(path: str = "") -> dict:
 async def fs_read(path: str = "") -> dict:
     """读文件内容（限文本类，>2MB 返 413）。"""
     import os as _os
+
     if not path:
         raise HTTPException(status_code=400, detail="path 必填")
     real = _resolve_path(path)
@@ -580,6 +860,7 @@ async def fs_read(path: str = "") -> dict:
 async def fs_mkdir(parent: str, name: str) -> dict:
     """在 parent 下新建文件夹 name。"""
     import os as _os
+
     parent_real = _resolve_path(parent)
     if not _os.path.isdir(parent_real):
         raise HTTPException(status_code=404, detail=f"父目录不存在：{parent_real}")
@@ -597,6 +878,7 @@ async def fs_mkdir(parent: str, name: str) -> dict:
 async def fs_search(path: str, q: str, limit: int = 100) -> dict:
     """在 path 下按文件名模糊搜索（递归），返回前 limit 条。"""
     import os as _os
+
     real = _resolve_path(path)
     if not _os.path.isdir(real):
         raise HTTPException(status_code=404, detail=f"目录不存在：{real}")

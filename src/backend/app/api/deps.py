@@ -32,6 +32,8 @@ from app.application.services.context_builder import ContextBuilder
 from app.application.services.discussion_orchestrator import DiscussionOrchestrator
 from app.application.services.memory_selector import MemorySelector
 from app.application.services.selector import Selector
+from app.application.services.template_service import TemplateService
+from app.core.config import settings
 from app.core.events import EventBus, get_event_bus
 from app.core.security import decode_access_token
 from app.domain.llm.protocol import UnifiedAgent
@@ -39,6 +41,7 @@ from app.infrastructure.cache.memory_l1 import L1MemoryStore, RedisL1Store
 from app.infrastructure.cache.redis_client import get_redis
 from app.infrastructure.cache.watermark_store import RedisWatermarkStore, WatermarkStore
 from app.infrastructure.db.base import get_session
+from app.infrastructure.git.git_manager import GitManager
 from app.infrastructure.llm.factory import build_adapter
 from app.infrastructure.mcp import LocalMcpInstaller
 from app.infrastructure.repositories import (
@@ -52,6 +55,9 @@ from app.infrastructure.repositories import (
     PostgresMessageRepository,
     PostgresSessionRepository,
     PostgresUsageRepository,
+)
+from app.infrastructure.repositories.template_repository import (
+    PostgresTemplateRepository,
 )
 
 logger = logging.getLogger(__name__)
@@ -309,3 +315,30 @@ async def build_chat_service_for_ws() -> AsyncIterator[ChatService]:
             bus,
             usage_service=usage_svc,
         )
+
+
+# --- 模板系统 ---
+
+
+def get_template_repo(
+    session: DbSession,
+) -> PostgresTemplateRepository:
+    return PostgresTemplateRepository(session)
+
+
+@lru_cache
+def get_git_manager() -> GitManager:
+    """进程级单例：模板源仓库的 Git 管理器。"""
+    repo_dir = settings.templates_dir_path / "sources" / "wshobson-agents"
+    return GitManager(repo_dir)
+
+
+def get_template_service(
+    repo: Annotated[PostgresTemplateRepository, Depends(get_template_repo)],
+) -> TemplateService:
+    return TemplateService(
+        template_repo=repo,
+        git_manager=get_git_manager(),
+        templates_dir=settings.templates_dir_path,
+        skills_dir=settings.skills_dir_path,
+    )

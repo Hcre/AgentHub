@@ -11,6 +11,8 @@ from app.domain.enums import AgentSystem
 
 
 class AgentCreateRequest(BaseModel):
+    model_config = {"populate_by_name": True}
+
     name: str = Field(min_length=1, max_length=128)
     avatar: str = Field(max_length=512)
     role: str = Field(max_length=256)
@@ -20,7 +22,10 @@ class AgentCreateRequest(BaseModel):
     api_key: str | None = Field(default=None, repr=False)
     base_url: str | None = None
     skills: list[str] = []
+    capability_tags: list[str] = []
     system_prompt: str | None = None
+    template_name: str | None = None
+    created_from_template_id: UUID | None = Field(default=None, alias="template_id")
     settings: dict | None = None
 
 
@@ -50,6 +55,9 @@ class AgentOut(BaseModel):
     status: str
     skills: list[str]
     capability_tags: list[str]
+    system_prompt: str | None = None
     is_system: bool
     settings: dict | None = None
+    template_name: str | None = None
+    created_from_template_id: UUID | None = None
     created_at: datetime

@@ -1,24 +1,44 @@
-import { useEffect, useState } from 'react'
-import { resolveProviderConfig } from '../../data/cliProviderMatrix'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  resolveProviderConfig,
+  resolveModelFromTier,
+} from '../../data/cliProviderMatrix'
 import { useAgentStore } from '../../stores/agentStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useUIStore } from '../../stores/uiStore'
 import { Button, Dialog, DialogContent, Icon, Input, Textarea } from '../ui'
 import { useApiKeyStore } from '../../stores/apiKeyStore'
 import { providersApi, type DefaultConfig, type ProviderInfo } from '../../api/providers'
+import { type TemplateDetail } from '../../api/templates'
+import { useTemplateStore } from '../../stores/templateStore'
 import { CliIcon } from '../icons/cli/CliIcon'
+import { StartChatModal } from '../chat/StartChatModal'
 
 const SELECT_CLS =
   'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
-// --- Step 1 模板 ---
-interface Template {
+// --- Step 1 模板（旧版硬编码兜底，API 不可用时显示） ---
+interface LegacyTemplate {
   name: string
   systemPrompt: string
   skills: string[]
 }
+/**
+ * 预填模板 prop：外部调用 CreateAgentModal 时可不经过 Step 1，
+ * 直接把给定模板数据预选好并从 Step 2 开始。
+ */
+export interface PreSelectedTemplate {
+  name: string
+  systemPrompt: string
+  skills: string[]
+  capabilityTags: string[]
+  /** 推荐模型层级（opus / sonnet / haiku），配合 resolveModelFromTier 自动推导模型名 */
+  model?: string
+  /** 模板 ID，用于将 Agent 关联回创建它的模板 */
+  templateId?: string
+}
 
-const TEMPLATES: Template[] = [
+const LEGACY_TEMPLATES: LegacyTemplate[] = [
   {
     name: '技术负责人',
     systemPrompt: '拆任务、排顺序、盯风险，协调工程师、评审和测试交付结果。',
@@ -60,6 +80,31 @@ const TEMPLATES: Template[] = [
     skills: [],
   },
 ]
+
+// --- Step 1 动态模板（从 API 加载，含 compatibility + modelTier） ---
+/** 用于 derived 的统一模板形状：legacy / API / preSelected 三种来源归一化 */
+interface UnifiedTemplate {
+  name: string
+  systemPrompt: string
+  skills: string[]
+  capabilityTags: string[]
+  compatibleAgentSystems: string[] | null
+  compatibleProviders: string[] | null
+  model: string | null
+}
+
+/** 把 API TemplateDetail 归一化为 UnifiedTemplate */
+function apiDetailToUnified(d: TemplateDetail): UnifiedTemplate {
+  return {
+    name: d.display_name_zh || d.name,
+    systemPrompt: d.system_prompt,
+    skills: d.recommended_skills ?? [],
+    capabilityTags: [],
+    compatibleAgentSystems: d.compatible_agent_systems?.length ? d.compatible_agent_systems : null,
+    compatibleProviders: d.compatible_providers?.length ? d.compatible_providers : null,
+    model: d.model_tier !== 'inherit' ? d.model_tier : null,
+  }
+}
 
 function Label({ children }: { children: string }) {
   return <span className="text-[12px] font-medium text-muted-foreground">{children}</span>
@@ -121,12 +166,37 @@ function buildCards(
   return list.length > 0 ? list : DEFAULT_RUNTIMES
 }
 
-export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function CreateAgentModal({
+  open,
+  onClose,
+  preSelectedTemplate,
+}: {
+  open: boolean
+  onClose: () => void
+  preSelectedTemplate?: PreSelectedTemplate
+}) {
   const createAgent = useAgentStore((s) => s.createAgent)
   const addConversation = useChatStore((s) => s.addConversation)
+  const conversations = useChatStore((s) => s.conversations)
   const openConversation = useUIStore((s) => s.openConversation)
   const setSection = useUIStore((s) => s.setSection)
   const savedKeys = useApiKeyStore((s) => s.keys)
+
+  // 创建成功后的 StartChatModal 状态
+  const [showStartChat, setShowStartChat] = useState(false)
+  const [newAgentId, setNewAgentId] = useState<string | null>(null)
+  const [newAgentName, setNewAgentName] = useState('')
+
+  // -- Template store --
+  const {
+    templates,
+    loading: tplLoading,
+    error: tplError,
+    loadTemplates,
+    loadTemplateDetail,
+    syncSource,
+    getCachedDetail,
+  } = useTemplateStore()
 
   // Wizard state
   const [scannedProviders, setScannedProviders] = useState<ProviderInfo[] | null>(null)
@@ -136,9 +206,14 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
   const [loadDefaultError, setLoadDefaultError] = useState<string | null>(null)
   const cards = buildCards(scannedProviders, scanning, loadedDefaults)
   const [step, setStep] = useState(1)
-  // Step 1
+  const [agentName, setAgentName] = useState('')
+
+  // Step 1: dynamic template selection
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
+  const [selectedTemplateData, setSelectedTemplateData] = useState<TemplateDetail | null>(null)
+
+  // Step 1 legacy fallback
   const [pickedIndex, setPickedIndex] = useState<number | null>(null)
-  const [customName, setCustomName] = useState('')
   const [customPrompt, setCustomPrompt] = useState('')
   const [customSkills, setCustomSkills] = useState<string[]>([])
   const [skillList, setSkillList] = useState<{name:string}[]>([])
@@ -157,11 +232,34 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
   const [status, setStatus] = useState<'idle' | 'creating' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
 
+  // -- Favorite dialog state --
+  const [favDialogOpen, setFavDialogOpen] = useState(false)
+  const [favTargetId] = useState<string | null>(null)
+  const [favName, setFavName] = useState('')
+  const [favDescription, setFavDescription] = useState('')
+  const [favSaving, setFavSaving] = useState(false)
+  const [favError, setFavError] = useState('')
+  const [toast, setToast] = useState<string | null>(null)
+
+  // -- Template store favorites --
+  const favorites = useTemplateStore((s) => s.favorites)
+  const favoritesLoading = useTemplateStore((s) => s.favoritesLoading)
+  const loadFavorites = useTemplateStore((s) => s.loadFavorites)
+  const setFavorite = useTemplateStore((s) => s.setFavorite)
+
   // CLI + Provider → 自动推导 base_url / 协议 / 模型
   const derivedConfig = resolveProviderConfig(agentSystem, providerId)
   const derivedBaseUrl = derivedConfig?.baseUrl ?? ''
   const derivedModels = derivedConfig?.models ?? []
   const derivedProtocol = derivedConfig?.protocol ?? ''
+
+  // -- Load templates + favorites when entering Step 1 --
+  useEffect(() => {
+    if (step === 1 && open) {
+      loadTemplates()
+      loadFavorites()
+    }
+  }, [step, open, loadTemplates, loadFavorites])
 
   // 选 CLI 或 Provider 变化时自动填默认值（setState 推迟到 microtask 避开 set-state-in-effect）
   // 只依赖 agentSystem / providerId；baseUrl / model 用 ref 思路避免输入时频繁触发
@@ -176,11 +274,164 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentSystem, providerId])
 
-  const isCustom = pickedIndex === TEMPLATES.length
-  const selectedTemplate = pickedIndex !== null && pickedIndex < TEMPLATES.length ? TEMPLATES[pickedIndex] : null
-  const agentName = isCustom ? customName : (selectedTemplate?.name ?? '')
+  // preSelectedTemplate: 外部传入模板数据时跳过 Step 1，直接从 Step 2 开始
+  useEffect(() => {
+    if (!open || !preSelectedTemplate) return
+    queueMicrotask(() => {
+      setStep(2)
+      setAgentSystem('')
+      setModel('')
+      setBaseUrl('')
+      setApiKey('')
+      setSelectedKeyId('')
+      setLoadDefaultError(null)
+      setTestStatus('idle')
+      // 后台扫描 CLI（同上步逻辑）
+      if (providerScanned && providerCache) {
+        setScannedProviders(providerCache)
+      } else {
+        setScanning(true)
+        providersApi
+          .list()
+          .then((list) => {
+            providerCache = list
+            providerScanned = true
+            setScannedProviders(list)
+          })
+          .catch((err) => {
+            console.error('CLI 扫描失败 (preSelected):', err)
+            setScannedProviders(null)
+          })
+          .finally(() => setScanning(false))
+      }
+    })
+    // 仅在 open 和 preSelectedTemplate 变化时触发
+  }, [open, preSelectedTemplate])
+
+  // -- Determine mode: dynamic (API) vs legacy (fallback) --
+  const hasDynamicTemplates = !tplLoading && !tplError && templates.length > 0
+
+  // -- Favorite click: auto-select template and go to Step 2 --
+  const handleFavoriteClick = async (templateId: string) => {
+    setSelectedTemplateId(templateId)
+    setPickedIndex(null)
+    const cached = getCachedDetail(templateId)
+    if (cached) {
+      setSelectedTemplateData(cached)
+      return
+    }
+    setTplDetailLoadingId(templateId)
+    const detail = await loadTemplateDetail(templateId)
+    setTplDetailLoadingId(null)
+    if (detail) {
+      setSelectedTemplateData(detail)
+    }
+  }
+
+  // -- Save favorite --
+  const handleSaveFavorite = async () => {
+    if (!favTargetId || !favName.trim()) return
+    setFavSaving(true)
+    setFavError('')
+    try {
+      await setFavorite(favTargetId, {
+        is_favorite: true,
+        favorite_name: favName.trim(),
+        favorite_description: favDescription.trim(),
+      })
+      setFavDialogOpen(false)
+      setToast('已添加到常用模板')
+      setTimeout(() => setToast(null), 2000)
+    } catch (e) {
+      setFavError(e instanceof Error ? e.message : '添加失败')
+    } finally {
+      setFavSaving(false)
+    }
+  }
+
+  // -- Custom button click handler --
+  const handleCustomClick = () => {
+    setSelectedTemplateId('__custom__')
+    setSelectedTemplateData(null)
+    setPickedIndex(LEGACY_TEMPLATES.length)
+  }
+
+
+  // -- Derived: is custom mode? --
+  const isCustom = preSelectedTemplate
+    ? false
+    : hasDynamicTemplates
+      ? selectedTemplateId === '__custom__'
+      : pickedIndex === LEGACY_TEMPLATES.length
+
+  // -- Unified selectedTemplate --
+  const selectedTemplate: UnifiedTemplate | null = useMemo(() => {
+    if (preSelectedTemplate) {
+      return {
+        name: preSelectedTemplate.name,
+        systemPrompt: preSelectedTemplate.systemPrompt,
+        skills: preSelectedTemplate.skills,
+        capabilityTags: preSelectedTemplate.capabilityTags,
+        compatibleAgentSystems: null,
+        compatibleProviders: null,
+        model: null,
+      }
+    }
+    if (hasDynamicTemplates && selectedTemplateData && selectedTemplateId !== '__custom__') {
+      return apiDetailToUnified(selectedTemplateData)
+    }
+    if (!hasDynamicTemplates && pickedIndex !== null && pickedIndex < LEGACY_TEMPLATES.length) {
+      const t = LEGACY_TEMPLATES[pickedIndex]
+      return {
+        name: t.name,
+        systemPrompt: t.systemPrompt,
+        skills: t.skills,
+        capabilityTags: [],
+        compatibleAgentSystems: null,
+        compatibleProviders: null,
+        model: null,
+      }
+    }
+    return null
+  }, [preSelectedTemplate, hasDynamicTemplates, selectedTemplateData, selectedTemplateId, pickedIndex])
+
   const agentSystemPrompt = isCustom ? customPrompt : (selectedTemplate?.systemPrompt ?? '')
   const selectedSkills = isCustom ? customSkills : (selectedTemplate?.skills ?? [])
+  const selectedCapabilityTags = selectedTemplate?.capabilityTags ?? []
+
+  // 兼容的 CLI 集合（用于 Step 2 灰显不兼容卡片）
+  const compatibleCliSet = useMemo(() => {
+    const list = selectedTemplate?.compatibleAgentSystems
+    return list ? new Set(list) : null
+  }, [selectedTemplate])
+
+  // 兼容的 Provider 集合（用于 Step 2 过滤下拉选项）
+  const compatibleProviderSet = useMemo(() => {
+    const list = selectedTemplate?.compatibleProviders
+    return list ? new Set(list) : null
+  }, [selectedTemplate])
+
+  // 模板推荐的 model tier → 当 CLI + Provider 都选定后自动推导具体模型名
+  const templateTier = selectedTemplate?.model
+  const resolvedTierModel = useMemo(() => {
+    if (!templateTier || !agentSystem || !providerId) return null
+    return resolveModelFromTier(
+      agentSystem,
+      providerId,
+      templateTier as 'opus' | 'sonnet' | 'haiku',
+    )
+  }, [templateTier, agentSystem, providerId])
+
+  // tier 自动推导模型 → 当 CLI 与 Provider 同时选定后，自动填入
+  useEffect(() => {
+    if (!resolvedTierModel || !agentSystem || providerId === '') return
+    queueMicrotask(() => {
+      if (!model || (derivedConfig && !derivedConfig.models.includes(model))) {
+        setModel(resolvedTierModel)
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedTierModel, agentSystem, providerId])
 
   // 自定义时加载 skill 列表 + 恢复草稿（setState 推迟到 microtask 避开 set-state-in-effect）
   useEffect(() => {
@@ -193,7 +444,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
         .catch(() => setSkillList([]))
         .finally(() => setSkillLoading(false))
       if (wizardDraft) {
-        setCustomName(wizardDraft.name)
+        setAgentName(wizardDraft.name)
         setCustomPrompt(wizardDraft.prompt)
         setCustomSkills(wizardDraft.skills)
         wizardDraft = null
@@ -213,6 +464,10 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
   const reset = () => {
     setStep(1)
     setPickedIndex(null)
+    setSelectedTemplateId(null)
+    setSelectedTemplateData(null)
+    setTplDetailLoadingId(null)
+    setAgentName('')
     setCustomName('')
     setCustomPrompt('')
     setCustomSkills([])
@@ -238,9 +493,15 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
   }
 
   // Step 1 → Step 2
+  const hasAnySelection = hasDynamicTemplates
+    ? selectedTemplateId !== null
+    : pickedIndex !== null
+
   const canNext = (() => {
-    if (pickedIndex === null) return false
-    if (isCustom && (!customName.trim() || !customPrompt.trim())) return false
+    if (preSelectedTemplate) return true
+    if (!hasAnySelection) return false
+    if (!agentName.trim()) return false
+    if (isCustom && !customPrompt.trim()) return false
     return true
   })()
 
@@ -255,6 +516,14 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
     setLoadDefaultError(null)
     setStep(2)
 
+    // If dynamic template has compatible systems, auto-select the first one
+    if (hasDynamicTemplates && selectedTemplateData?.compatible_agent_systems?.length) {
+      const firstSystem = selectedTemplateData.compatible_agent_systems[0]
+      queueMicrotask(() => {
+        handlePickCli(firstSystem)
+      })
+    }
+
     // 后台异步扫描 CLI，只显示实际检测到的；不自动选中第一个，等用户点。
     if (providerScanned && providerCache) {
       setScannedProviders(providerCache)
@@ -267,7 +536,10 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
           providerScanned = true
           setScannedProviders(list)
         })
-        .catch(() => setScannedProviders(null))
+        .catch((err) => {
+          console.error('CLI 扫描失败 (初始):', err)
+          setScannedProviders(null)
+        })
         .finally(() => setScanning(false))
     }
   }
@@ -302,7 +574,15 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
     }
   }
 
-  const goBack = () => setStep(1)
+  const goBack = () => {
+    if (preSelectedTemplate) {
+      // 外部预填模板时无 Step 1 可回退；直接关闭
+      reset()
+      onClose()
+      return
+    }
+    setStep(1)
+  }
 
   // 连通性预检（创建前执行，失败不损失任何东西）
   const doConnectivityTest = async () => {
@@ -373,27 +653,30 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
     try {
       const id = await createAgent({
         name: agentName.trim(),
-        role: agentName.trim(),
+        role: selectedTemplate?.name ?? agentName.trim(),
         agentSystem,
         provider: providerId,
         // 注：model / baseUrl / apiKey 不再传给后端（CLI 启动时从本地配置读）。
         // 保留字段在 form 上展示"会用什么"作参考。
-        model: '',
-        baseUrl: undefined,
-        apiKey: '',
+        model: model || '',
+        baseUrl: baseUrl || undefined,
+        apiKey: apiKey,
         skills: selectedSkills,
+        capabilityTags: selectedCapabilityTags,
         systemPrompt: agentSystemPrompt,
-        // 工作目录不在创建时选择（走后端默认）；具体项目上下文在「发起私聊」时按需指定
+        templateName: selectedTemplate?.name,
+        templateId: preSelectedTemplate?.templateId ?? (selectedTemplateId !== '__custom__' ? selectedTemplateId : undefined),
         settings: undefined,
       })
 
-      const convId = addConversation(id)
+      setNewAgentId(id)
+      setNewAgentName(agentName.trim())
       setStatus('success')
       setTimeout(() => {
         reset()
         onClose()
-        openConversation(id, convId)
-      }, 1000)
+        setShowStartChat(true)
+      }, 800)
     } catch (e) {
       setStatus('error')
       const msg = e instanceof Error ? e.message : '创建失败'
@@ -408,6 +691,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent>
         {/* === Step 1: 选模板 === */}
@@ -423,41 +707,154 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
             <div className="flex flex-col gap-3 overflow-y-auto p-4" style={{ maxHeight: '60vh' }}>
               <p className="text-[13px] text-muted-foreground">第一步：选择队友模板</p>
 
-              <div className="grid grid-cols-2 gap-2">
-                {TEMPLATES.map((t, i) => {
-                  const picked = pickedIndex === i
-                  return (
-                    <button
-                      key={t.name}
-                      onClick={() => setPickedIndex(i)}
-                      data-picked={picked ? 'true' : undefined}
-                      className="flex flex-col gap-1 rounded-lg border p-3 text-left transition-colors hover:border-brand/40 data-[picked=true]:border-brand data-[picked=true]:bg-brand/5"
+              <Input
+                value={agentName}
+                onChange={(e) => setAgentName(e.target.value)}
+                placeholder="队友名称"
+                autoFocus
+              />
+
+              {/* -- Loading skeletons -- */}
+              {tplLoading && !hasDynamicTemplates && (
+                <div className="grid grid-cols-2 gap-2">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div
+                      key={`skel-${i}`}
+                      className="flex flex-col gap-1 rounded-lg border p-3 animate-pulse"
                     >
-                      <span className="text-[13px] font-medium">{t.name}</span>
-                      <span className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
-                        {t.systemPrompt}
-                      </span>
-                    </button>
-                  )
-                })}
-                <button
-                  onClick={() => setPickedIndex(TEMPLATES.length)}
-                  data-picked={isCustom ? 'true' : undefined}
-                  className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed p-3 text-muted-foreground transition-colors hover:border-brand/40 hover:text-brand data-[picked=true]:border-brand data-[picked=true]:bg-brand/5 data-[picked=true]:text-brand"
-                >
-                  <Icon name="plus" className="h-5 w-5" />
-                  <span className="text-[12px]">自定义</span>
-                </button>
-              </div>
+                      <div className="h-3 w-20 rounded bg-muted" />
+                      <div className="h-2 w-full rounded bg-muted/60" />
+                      <div className="h-2 w-3/4 rounded bg-muted/60" />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* -- Error banner -- */}
+              {tplError && !tplLoading && !hasDynamicTemplates && (
+                <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600">
+                  <span className="truncate mr-2">加载模板失败：{tplError}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadTemplates()}
+                    className="shrink-0"
+                  >
+                    重试
+                  </Button>
+                </div>
+              )}
+
+              {/* -- Empty state (API succeeded but no templates) -- */}
+              {!tplLoading && !tplError && templates.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <Icon name="files" className="mb-2 h-8 w-8 text-muted-foreground/30" />
+                  <p className="text-[13px] font-medium">暂无可用模板</p>
+                  <p className="mt-1 text-[12px] text-muted-foreground">
+                    模板仓库尚未同步，请先同步获取最新模板
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => syncSource()}
+                  >
+                    <Icon name="zap" className="mr-1 h-3 w-3" />
+                    同步模板
+                  </Button>
+                </div>
+              )}
+
+              {/* -- Favorites ("常用模板") -- */}
+              {favoritesLoading ? (
+                <div className="grid grid-cols-4 gap-2">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={`favskel-${i}`} className="h-24 rounded-lg border bg-muted/20 animate-pulse" />
+                  ))}
+                </div>
+              ) : favorites.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  <p className="text-[12px] text-muted-foreground">
+                    选择一个常用模板，或使用下方自定义选项创建
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {favorites.map((f) => {
+                      const favDisplayName = f.favorite_name || f.display_name_zh || f.name
+                      const favDisplayDesc = f.favorite_description || f.description_zh || f.description
+                      const picked = selectedTemplateId === f.id
+                      return (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => handleFavoriteClick(f.id)}
+                          data-picked={picked ? 'true' : undefined}
+                          className="relative flex flex-col gap-1 rounded-lg border p-3 text-left transition-colors data-[picked=true]:border-brand data-[picked=true]:bg-brand/5 data-[picked=true]:ring-1 data-[picked=true]:ring-brand/40 hover:border-brand/50 hover:bg-brand/5 border-border/60"
+                        >
+                          <span className="text-[13px] font-medium line-clamp-1">{favDisplayName}</span>
+                          <span className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
+                            {favDisplayDesc || '暂无描述'}
+                          </span>
+                          {f.model_tier !== 'inherit' && (
+                            <span className="mt-0.5 inline-block self-start rounded border border-brand/30 px-1.5 py-px text-[9px] text-brand/70">
+                              {f.model_tier}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : tplError ? (
+                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600">
+                  加载模板失败：{tplError}
+                  <Button variant="outline" size="sm" className="ml-2" onClick={() => loadTemplates()}>重试</Button>
+                </div>
+              ) : (
+                <p className="text-[12px] text-muted-foreground">模板加载中…</p>
+              )}
+
+              {/* -- 自定义 -- */}
+              <button
+                onClick={handleCustomClick}
+                data-picked={isCustom ? 'true' : undefined}
+                className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed p-3 text-muted-foreground transition-colors hover:border-brand/40 hover:text-brand data-[picked=true]:border-brand data-[picked=true]:bg-brand/5 data-[picked=true]:text-brand"
+              >
+                <Icon name="plus" className="h-5 w-5" />
+                <span className="text-[12px]">自定义（从零创建）</span>
+              </button>
+
+              {/* -- Legacy fallback grid (API not loaded, no error, no dynamic templates yet) -- */}
+              {!tplLoading && !hasDynamicTemplates && templates.length === 0 && !tplError && (
+                <div className="grid grid-cols-2 gap-2">
+                  {LEGACY_TEMPLATES.map((t, i) => {
+                    const picked = pickedIndex === i
+                    return (
+                      <button
+                        key={t.name}
+                        onClick={() => setPickedIndex(i)}
+                        data-picked={picked ? 'true' : undefined}
+                        className="flex flex-col gap-1 rounded-lg border p-3 text-left transition-colors hover:border-brand/40 data-[picked=true]:border-brand data-[picked=true]:bg-brand/5"
+                      >
+                        <span className="text-[13px] font-medium">{t.name}</span>
+                        <span className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
+                          {t.systemPrompt}
+                        </span>
+                      </button>
+                    )
+                  })}
+                  <button
+                    onClick={() => setPickedIndex(LEGACY_TEMPLATES.length)}
+                    data-picked={isCustom ? 'true' : undefined}
+                    className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed p-3 text-muted-foreground transition-colors hover:border-brand/40 hover:text-brand data-[picked=true]:border-brand data-[picked=true]:bg-brand/5 data-[picked=true]:text-brand"
+                  >
+                    <Icon name="plus" className="h-5 w-5" />
+                    <span className="text-[12px]">自定义</span>
+                  </button>
+                </div>
+              )}
 
               {isCustom && (
                 <div className="flex flex-col gap-3">
-                  <Input
-                    value={customName}
-                    onChange={(e) => setCustomName(e.target.value)}
-                    placeholder="队友名称"
-                    autoFocus
-                  />
                   <Textarea
                     value={customPrompt}
                     onChange={(e) => setCustomPrompt(e.target.value)}
@@ -471,7 +868,7 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
                         type="button"
                         onClick={() => {
                           wizardDraft = {
-                            name: customName,
+                            name: agentName,
                             prompt: customPrompt,
                             skills: customSkills,
                           }
@@ -539,6 +936,24 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
 
             <div className="flex flex-col gap-3 overflow-y-auto p-4" style={{ maxHeight: '55vh' }}>
 
+              {/* -- Template compatibility info banner -- */}
+              {hasDynamicTemplates && selectedTemplateData && compatibleCliSet && (
+                <div className="rounded-md border border-brand/20 bg-brand/5 px-3 py-2 text-[12px] text-muted-foreground">
+                  <span className="font-medium text-brand">
+                    {selectedTemplateData.display_name_zh || selectedTemplateData.name}
+                  </span>
+                  <span className="mx-1">模板兼容：</span>
+                  <span className="text-foreground">
+                    {selectedTemplateData.compatible_agent_systems?.join(' / ') || '全部 CLI'}
+                  </span>
+                  {selectedTemplateData.model_tier !== 'inherit' && (
+                    <span className="ml-1 rounded bg-muted px-1 py-px text-[10px]">
+                      {selectedTemplateData.model_tier}
+                    </span>
+                  )}
+                </div>
+              )}
+
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <Label>运行依赖</Label>
@@ -556,7 +971,10 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
                           setScannedProviders(list)
                           // 重新扫描后保留当前选中；用户没点过的话不动
                         })
-                        .catch(() => setScannedProviders(null))
+                        .catch((err) => {
+                          console.error('CLI 重新扫描失败:', err)
+                          setScannedProviders(null)
+                        })
                         .finally(() => setScanning(false))
                     }}
                     disabled={scanning}
@@ -575,19 +993,29 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
                   </Button>
                 </div>
 
-                {/* 卡片列表：每个 CLI 一张，点选后调 default-config 回填 */}
+                {/* 卡片列表：每个 CLI 一张，点选后调 default-config 回填。
+                    兼容性过滤：模板声明了 compatibleAgentSystems 时，不在列表中的 CLI 灰显。 */}
                 <div className="grid grid-cols-2 gap-2">
                   {cards.map((c) => {
                     const picked = agentSystem === c.id
                     const loading = loadingDefault === c.id
+                    // 兼容性判断：兼容集为 null（未声明）→ 全部兼容；不在集合中 → 不兼容
+                    const isCompatible = !compatibleCliSet || compatibleCliSet.has(c.id) || c.id === 'mock'
                     return (
                       <button
                         key={c.id}
                         type="button"
-                        onClick={() => handlePickCli(c.id)}
+                        onClick={() => isCompatible && handlePickCli(c.id)}
                         data-picked={picked ? 'true' : undefined}
-                        className="group flex items-start gap-2 rounded-lg border p-2.5 text-left transition-colors hover:border-brand/40 data-[picked=true]:border-brand data-[picked=true]:bg-brand/5 disabled:opacity-50"
-                        disabled={loading}
+                        data-compatible={isCompatible ? 'true' : 'false'}
+                        disabled={loading || !isCompatible}
+                        title={isCompatible ? undefined : '此模板未针对该 CLI 优化'}
+                        className={
+                          'group flex items-start gap-2 rounded-lg border p-2.5 text-left transition-colors ' +
+                          (isCompatible
+                            ? 'hover:border-brand/40 data-[picked=true]:border-brand data-[picked=true]:bg-brand/5'
+                            : 'opacity-40 cursor-not-allowed')
+                        }
                       >
                         <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md bg-background">
                           <CliIcon agentSystem={c.id} size={18} />
@@ -595,7 +1023,11 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
                         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                           <div className="flex items-center justify-between gap-1">
                             <span className="truncate text-[12px] font-medium">{c.label}</span>
-                            {c.version ? (
+                            {!isCompatible ? (
+                              <span className="shrink-0 rounded bg-amber-100 px-1 py-px text-[9px] text-amber-600 dark:bg-amber-950 dark:text-amber-400">
+                                不兼容
+                              </span>
+                            ) : c.version ? (
                               <span className="shrink-0 rounded bg-muted px-1 py-px text-[9px] text-muted-foreground">
                                 {c.version}
                               </span>
@@ -604,13 +1036,15 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
                             )}
                           </div>
                           <span className="truncate text-[10px] text-muted-foreground">
-                            {loading
-                              ? '加载默认配置…'
-                              : c.model
-                                ? c.model
-                                : picked
-                                  ? '已选中'
-                                  : '点击加载默认 model'}
+                            {!isCompatible
+                              ? '此模板未针对该 CLI 优化'
+                              : loading
+                                ? '加载默认配置…'
+                                : c.model
+                                  ? c.model
+                                  : picked
+                                    ? '已选中'
+                                    : '点击加载默认 model'}
                           </span>
                         </div>
                       </button>
@@ -671,11 +1105,18 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
                         }}
                       >
                         <option value="">选择已保存的配置…</option>
-                        {savedKeys.map((k) => (
-                          <option key={k.id} value={k.id}>
-                            {k.name} · {k.keyPrefix}****
+                        {savedKeys
+                          .filter((k) => !compatibleProviderSet || compatibleProviderSet.has(k.provider))
+                          .map((k) => (
+                            <option key={k.id} value={k.id}>
+                              {k.name} · {k.keyPrefix}****
+                            </option>
+                          ))}
+                        {compatibleProviderSet && savedKeys.filter((k) => compatibleProviderSet.has(k.provider)).length === 0 && (
+                          <option value="" disabled>
+                            暂无兼容的 Provider 配置
                           </option>
-                        ))}
+                        )}
                       </select>
                     ) : (
                       <div className="rounded-md border border-dashed p-3 text-center text-[12px] text-muted-foreground">
@@ -866,5 +1307,76 @@ export function CreateAgentModal({ open, onClose }: { open: boolean; onClose: ()
       </DialogContent>
 
     </Dialog>
-  )
+
+    {/* Favorite dialog */}
+    <Dialog open={favDialogOpen} onOpenChange={(o) => !o && setFavDialogOpen(false)}>
+      <DialogContent className="w-[420px]">
+        <header className="flex items-center justify-between border-b px-4 py-3">
+          <h3 className="text-[15px] font-medium">添加到常用</h3>
+          <Button variant="ghost" size="iconSm" onClick={() => setFavDialogOpen(false)}>
+            <Icon name="x" className="h-3.5 w-3.5" />
+          </Button>
+        </header>
+
+        <div className="flex flex-col gap-3 p-4">
+          {favError && (
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600">
+              {favError}
+            </div>
+          )}
+
+          <label className="flex flex-col gap-1">
+            <span className="text-[12px] font-medium text-muted-foreground">显示名</span>
+            <Input
+              value={favName}
+              onChange={(e) => setFavName(e.target.value)}
+              placeholder="模板显示名"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-[12px] font-medium text-muted-foreground">简介</span>
+            <Textarea
+              value={favDescription}
+              onChange={(e) => setFavDescription(e.target.value)}
+              placeholder="模板简介"
+              className="min-h-[60px]"
+            />
+          </label>
+        </div>
+
+        <footer className="flex justify-end gap-2 border-t px-4 py-3">
+          <Button variant="outline" size="sm" onClick={() => setFavDialogOpen(false)}>
+            取消
+          </Button>
+          <Button variant="brand" size="sm" onClick={handleSaveFavorite} disabled={favSaving || !favName.trim()}>
+            {favSaving ? '保存中…' : '确认'}
+          </Button>
+        </footer>
+      </DialogContent>
+    </Dialog>
+
+    {/* Toast notification */}
+    {toast && (
+      <div className="fixed bottom-6 right-6 z-50 animate-[var(--animate-slide-in)] rounded-lg border border-border/60 bg-background px-4 py-2.5 text-[13px] shadow-lg glass-soft">
+        {toast}
+      </div>
+    )}
+
+    {/* 创建成功后弹出「发起私聊」选择窗 */}
+    {showStartChat && newAgentId && (
+      <StartChatModal
+        open={showStartChat}
+        onOpenChange={setShowStartChat}
+        agentName={newAgentName}
+        existingCount={(conversations?.[newAgentId]?.length) ?? 0}
+        onConfirm={(name, workdir) => {
+          const convId = addConversation(newAgentId, { name, workdir })
+          if (workdir?.trim()) setSection('files')
+          openConversation(newAgentId, convId)
+          setShowStartChat(false)
+        }}
+      />
+    )}
+  </>)
 }

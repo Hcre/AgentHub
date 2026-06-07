@@ -38,8 +38,8 @@ export type ComposerPayload = {
 
 export const Composer = forwardRef<
   ComposerHandle,
-  { agent: Agent; onSend: (payload: ComposerPayload) => void }
->(function Composer({ agent, onSend }, ref) {
+  { agent: Agent; onSend: (payload: ComposerPayload) => void; onCreateSkill?: () => void }
+>(function Composer({ agent, onSend, onCreateSkill }, ref) {
   const [val, setVal] = useState('')
   const [attachment, setAttachment] = useState<Attachment | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -292,6 +292,17 @@ export const Composer = forwardRef<
             className="hidden"
             aria-label="上传附件"
           />
+          {onCreateSkill && (
+            <Button
+              variant="ghost"
+              size="iconSm"
+              title="创建新 Skill"
+              onClick={onCreateSkill}
+              className="h-7 w-7 text-muted-foreground hover:text-brand"
+            >
+              <Icon name="sparkle" className="h-3.5 w-3.5" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="iconSm"

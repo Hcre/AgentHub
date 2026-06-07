@@ -66,7 +66,7 @@ async def _handle_message(ws: WebSocket, session_id: UUID, data: dict) -> None:
         session_id=session_id,
         content=data.get("content", ""),
         mentions=data.get("mentions", []),
-        reply_to=data.get("reply_to"),
+        reply_to=data.get("reply_to_id") or data.get("reply_to"),
         dispatch_mode=DispatchMode(data.get("dispatch_mode", "auto")),
     )
     async with session_factory() as db:
