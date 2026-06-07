@@ -6,6 +6,10 @@ import rehypeHighlight from 'rehype-highlight'
 import { Avatar, Badge, Button, Icon } from '../ui'
 import { CoordinatorPlan } from './CoordinatorPlan'
 import { lookupActor } from './actors'
+import { ThinkingBlock } from '../chat/ThinkingBlock'
+import { ToolCallsGroup } from '../chat/ToolCallsGroup'
+import { ApprovalRequestBlock } from '../chat/ApprovalRequestBlock'
+import { TaskPlanBlock } from '../chat/TaskPlanBlock'
 import type { Group, GroupMessage } from '../../types'
 
 /**
@@ -258,6 +262,12 @@ export function GroupMessageItem({
             </span>
           )}
         </div>
+        {/* ── CLI 流式块：思考过程（主文本之上）── */}
+        {msg.thinking && <ThinkingBlock text={msg.thinking} streaming={msg.streaming} />}
+
+        {/* ── CLI 流式块：任务计划（主文本之上，思考之下）── */}
+        {msg.taskPlan && <TaskPlanBlock plan={msg.taskPlan} />}
+
         {msg.text && (
           <div className="prose prose-sm max-w-none text-[14px] leading-[1.6] text-foreground [text-wrap:pretty]">
             <ReactMarkdown
@@ -310,6 +320,17 @@ export function GroupMessageItem({
             )}
           </div>
         )}
+
+        {/* ── CLI 流式块：工具调用 + 工具结果（默认折叠）── */}
+        {(msg.toolCalls?.length || msg.toolResults?.length) && (
+          <ToolCallsGroup toolCalls={msg.toolCalls} toolResults={msg.toolResults} />
+        )}
+
+        {/* ── CLI 流式块：审批请求（阻断性 CTA）── */}
+        {msg.approvalRequest && (
+          <ApprovalRequestBlock data={msg.approvalRequest} />
+        )}
+
         {/* P0-5 群聊复制代码：仅在文本含代码围栏时显示。视觉与 MessageBubble 同步。 */}
         {codePayload && (
           <div className="mt-2 flex flex-wrap items-center gap-2">

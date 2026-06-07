@@ -5,6 +5,10 @@ import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { Avatar, Button, Icon } from '../ui'
 import type { Agent, ChatMessage, UserInfo } from '../../types'
+import { ThinkingBlock } from './ThinkingBlock'
+import { ToolCallsGroup } from './ToolCallsGroup'
+import { ApprovalRequestBlock } from './ApprovalRequestBlock'
+import { TaskPlanBlock } from './TaskPlanBlock'
 import { DiffView } from './DiffView'
 import { WebPreviewCard } from './WebPreviewCard'
 import { collectUrls } from './webPreviewUrl'
@@ -308,6 +312,12 @@ export function MessageBubble({
             </span>
           )}
         </div>
+        {/* ── CLI 流式块：思考过程（主文本之上）── */}
+        {msg.thinking && <ThinkingBlock text={msg.thinking} streaming={msg.streaming} />}
+
+        {/* ── CLI 流式块：任务计划（主文本之上，思考之下）── */}
+        {msg.taskPlan && <TaskPlanBlock plan={msg.taskPlan} />}
+
         <div className="prose min-w-0 max-w-full break-words text-[14px] leading-[1.6] text-foreground">
           {showDiffInline && fence ? (
             <>
@@ -325,6 +335,17 @@ export function MessageBubble({
             ))
           )}
         </div>
+
+        {/* ── CLI 流式块：工具调用 + 工具结果（默认折叠，主文本之下）── */}
+        {(msg.toolCalls?.length || msg.toolResults?.length) && (
+          <ToolCallsGroup toolCalls={msg.toolCalls} toolResults={msg.toolResults} />
+        )}
+
+        {/* ── CLI 流式块：审批请求（阻断性 CTA，置于底部醒目位置）── */}
+        {msg.approvalRequest && (
+          <ApprovalRequestBlock data={msg.approvalRequest} />
+        )}
+
         {previewUrls.map((u) => (
           <WebPreviewCard key={u} url={u} />
         ))}

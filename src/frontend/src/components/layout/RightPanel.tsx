@@ -45,6 +45,27 @@ export function RightPanel() {
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null
 
+  /** 文件树中点击文件 → 在顶层 tab 栏打开（复用已有同文件 tab 或新建） */
+  const openFilePath = (filePath: string) => {
+    const name = filePath.replace(/\\/g, '/').split('/').pop() || filePath
+    // 已存在同文件 tab → 直接切换
+    const existing = tabs.find((t) => t.filePath === filePath)
+    if (existing) {
+      setActivePreviewTab(existing.id)
+      return
+    }
+    // 新建文件 tab
+    const newTab: PreviewTab = {
+      id: uid('tab'),
+      type: 'files',
+      label: name,
+      workdir: currentWorkdir,
+      filePath,
+    }
+    addPreviewTab(newTab)
+    setActivePreviewTab(newTab.id)
+  }
+
   // 点击外部关 dropdown（dropdown 在 Portal 里，要同时检查 + 按钮和 dropdown 自身）
   useEffect(() => {
     if (!dropdownOpen) return
@@ -109,7 +130,7 @@ export function RightPanel() {
 
       <div className="min-h-0 flex-1">
         {activeTab ? (
-          <ActiveTabContent tab={activeTab} />
+          <ActiveTabContent tab={activeTab} onOpenFile={openFilePath} />
         ) : (
           <EmptyState onPickFirst={togglePlus} />
         )}
@@ -258,8 +279,8 @@ function TabButton({
   )
 }
 
-function ActiveTabContent({ tab }: { tab: PreviewTab }) {
-  if (tab.type === 'files') return <FilePreview workdir={tab.workdir} />
+function ActiveTabContent({ tab, onOpenFile }: { tab: PreviewTab; onOpenFile: (path: string) => void }) {
+  if (tab.type === 'files') return <FilePreview workdir={tab.workdir} initialPath={tab.filePath} onOpenFile={onOpenFile} />
   return (
     <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted-foreground">
       <div>
