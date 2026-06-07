@@ -91,12 +91,16 @@ async def pin_message(
     svc: ServiceDep,
     current_user: CurrentUser,
 ) -> Response:
-    """P0-4 Pin 消息 — 必须登录（401），session_id 必须匹配（422），仅消息发送者可 Pin（403）。"""
-    if current_user is None:
-        raise HTTPException(
-            status_code=401,
-            detail="E_AUTH_REQUIRED: pin operation requires login",
-        )
+    """P0-4 Pin 消息 — M5 鉴权降级。
+
+    鉴权链 (M5 简化契约 per docs/specs/04-commands §6.1.6 + plan_agenthub-m5-m6 brief):
+    - session_id query 必传 (M5 之前就有, 现仍然)
+    - Authorization header 可选 (有则解析, 无则不强求)
+    - 无 JWT 时 service 层用 msg.user_id 作 implicit owner (dev mode auto-trust)
+    - 仅"无 JWT + msg 无 user_id (system message)"才 401
+    - session_id 与 msg.session_id 不匹配 → 422 E_MESSAGE_PIN_SESSION_MISMATCH
+    - 有 JWT 但 ≠ msg.user_id → 403 E_MESSAGE_PIN_NOT_OWNER
+    """
     await svc.pin_message(
         PinMessageCommand(session_id=session_id, message_id=message_id),
         current_user=current_user,
@@ -111,11 +115,7 @@ async def unpin_message(
     svc: ServiceDep,
     current_user: CurrentUser,
 ) -> Response:
-    if current_user is None:
-        raise HTTPException(
-            status_code=401,
-            detail="E_AUTH_REQUIRED: unpin operation requires login",
-        )
+    """P0-4 Unpin 消息 — 与 pin 对称, M5 鉴权降级一致."""
     await svc.unpin_message(
         UnpinMessageCommand(session_id=session_id, message_id=message_id),
         current_user=current_user,

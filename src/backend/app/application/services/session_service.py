@@ -12,7 +12,12 @@ from app.application.commands import (
 )
 from app.application.dto import MessageResponse, SessionResponse
 from app.core.events import EventBus
-from app.core.exceptions import NotFoundError, PermissionError, ValidationError
+from app.core.exceptions import (
+    AuthRequiredError,
+    NotFoundError,
+    PermissionError,
+    ValidationError,
+)
 from app.domain.entities.session import Session
 from app.domain.enums import SessionType
 from app.domain.events import MessagePinned, SessionCreated
@@ -89,9 +94,14 @@ class SessionService:
     async def pin_message(
         self, cmd: PinMessageCommand, *, current_user: UUID | None
     ) -> None:
-        """P0-4 Pin 消息 — 强制鉴权 + session 归属 + 消息所有权校验。"""
-        if current_user is None:
-            raise PermissionError("E_AUTH_REQUIRED: pin operation requires login")
+        """P0-4 Pin 消息 — M5 鉴权降级 + session 归属 + 消息所有权校验。
+
+        M5 鉴权降级契约 (per docs/specs/04-commands §6.1.6 + plan_agenthub-m5-m6 brief):
+        - 有 JWT → 强制 current_user == msg.user_id (否则 403 E_MESSAGE_PIN_NOT_OWNER)
+        - 无 JWT + msg 有 user_id → 自动用 msg.user_id 作为 implicit current_user (dev mode
+          auto-trust, 22:00 E2E 401 bug 修复 — frontend 不发 Authorization header 时不再 401)
+        - 无 JWT + msg 无 user_id (system message) → 401 E_AUTH_REQUIRED (无主可托)
+        """
         msg = await self._messages.get_by_id(cmd.message_id)
         if msg is None:
             raise NotFoundError(f"message not found: {cmd.message_id}")
@@ -99,7 +109,15 @@ class SessionService:
             raise ValidationError(
                 f"E_MESSAGE_PIN_SESSION_MISMATCH: message {cmd.message_id} not in session {cmd.session_id}"
             )
-        if msg.user_id is not None and msg.user_id != current_user:
+        # M5: 无 JWT 时用 msg.user_id 作为 implicit owner (session 归属即权限)
+        if current_user is None:
+            if msg.user_id is None:
+                # 真正无主可托 (system message + 无 JWT) → 401
+                raise AuthRequiredError(
+                    "E_AUTH_REQUIRED: pin operation requires login"
+                )
+            current_user = msg.user_id
+        elif msg.user_id is not None and msg.user_id != current_user:
             raise PermissionError(
                 f"E_MESSAGE_PIN_NOT_OWNER: only message owner can pin (current_user={current_user}, "
                 f"msg.user_id={msg.user_id})"
@@ -114,12 +132,17 @@ class SessionService:
     async def unpin_message(
         self, cmd: UnpinMessageCommand, *, current_user: UUID | None
     ) -> None:
-        if current_user is None:
-            raise PermissionError("E_AUTH_REQUIRED: unpin operation requires login")
+        """M5 鉴权降级 (与 pin_message 对称): 无 JWT + msg 有 user_id → auto-trust."""
         msg = await self._messages.get_by_id(cmd.message_id)
         if msg is None:
             raise NotFoundError(f"message not found: {cmd.message_id}")
-        if msg.user_id is not None and msg.user_id != current_user:
+        if current_user is None:
+            if msg.user_id is None:
+                raise AuthRequiredError(
+                    "E_AUTH_REQUIRED: unpin operation requires login"
+                )
+            current_user = msg.user_id
+        elif msg.user_id is not None and msg.user_id != current_user:
             raise PermissionError(
                 f"E_MESSAGE_PIN_NOT_OWNER: only message owner can unpin (current_user={current_user}, "
                 f"msg.user_id={msg.user_id})"
