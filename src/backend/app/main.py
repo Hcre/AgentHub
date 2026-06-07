@@ -14,6 +14,7 @@ from app.api.mcp_memory import get_mcp_asgi
 from app.api.routers import (
     agents,
     attachments,
+    cli,
     groups,
     inbox,
     mcp,
@@ -36,6 +37,7 @@ from app.core.exceptions import (
 )
 from app.core.logging import setup_logging
 from app.infrastructure.cache.redis_client import close_redis
+from app.infrastructure.cli_scheduler import shutdown_cli_scheduler, startup_cli_scheduler
 from app.infrastructure.llm.claude_code_process_pool import (
     shutdown_pool,
     start_pool_sweeper,
@@ -50,7 +52,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # 长驻 CLI 进程池 idle sweeper（仅 V1 模式下池会被填充，sweeper 始终安全启动）
     if settings.claude_code_long_running:
         start_pool_sweeper()
+    # CLI PATH 扫描调度器：启动时立即扫一次 + 后台每 1h 扫一次（P1-3，best-effort）
+    await startup_cli_scheduler()
     yield
+    await shutdown_cli_scheduler()
     await shutdown_pool()
     await client.aclose()
     await close_redis()
@@ -105,6 +110,7 @@ async def _app_error(_: Request, exc: AgentHubError) -> JSONResponse:
 app.include_router(proxy.router)
 app.include_router(providers.router)
 app.include_router(agents.router)
+app.include_router(cli.router)  # CLI PATH 扫描 + scheduler 缓存（P1-3）
 app.include_router(sessions.router)
 app.include_router(groups.router)
 app.include_router(memories.router)
