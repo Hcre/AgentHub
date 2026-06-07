@@ -60,6 +60,8 @@ export interface CenterTab {
 export interface Attachment {
   name: string
   size: string
+  /** 后端返回的下载/预览 URL（如 /api/attachments/{id}），点附件即跳此 URL */
+  url?: string
 }
 
 export interface ChatMessage {
@@ -71,6 +73,17 @@ export interface ChatMessage {
   streaming?: boolean
   attachment?: Attachment
   actions?: string[]
+  /**
+   * Agent 显式声明要渲染为可预览 iframe 的链接（优先于从 text 正则抓取）。
+   * 退化路径：MessageBubble 内部用正则从 text 中抓 http(s)://。
+   */
+  urls?: string[]
+  /**
+   * 消息是否已 Pin。P0-4 新增：MessageBubble 渲染 Pin 按钮，乐观更新
+   * 本地状态后通过 POST/DELETE /api/sessions/{sid}/messages/{mid}/pin 同步到后端。
+   * 缺省 = 未 Pin。
+   */
+  pinned?: boolean
 }
 
 export interface StageTask {
@@ -150,6 +163,11 @@ export interface GroupMessage {
   streaming?: boolean
   /** 用户消息的 @mention 名单（解析自正文，发送时透传给后端）。 */
   mentions?: string[]
+  /**
+   * P0-4 群聊 Pin 状态：与 ChatMessage.pinned 同源 schema。
+   * GroupMessageItem 渲染时优先用后端真值，乐观更新本地 state。
+   */
+  pinned?: boolean
 }
 
 // ── 次要视图（Phase 5） ──

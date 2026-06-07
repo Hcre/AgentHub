@@ -149,11 +149,20 @@ export function GroupsListPage() {
                   key={g.id}
                   data-batch={batchMode ? 'true' : undefined}
                   data-selected={selected ? 'true' : undefined}
-                  onClick={batchMode ? () => toggleSelect(g.id) : undefined}
+                  /**
+                   * G2 UX 修复：
+                   *   批量模式 → 点击切换选中（toggleSelect）
+                   *   普通模式 → 点击整张卡片直接进入群聊（与 IM 类应用一致：微信/钉钉/Telegram
+                   *     都用整卡点击进入，原「进入群聊」icon 按钮因 h-7 w-7 + 仅 hover title
+                   *     可见导致用户找不到入口）
+                   * 右侧「详细」按钮保留 e.stopPropagation，避免冒泡到卡片 onClick。
+                   */
+                  onClick={batchMode ? () => toggleSelect(g.id) : () => useUIStore.getState().openGroup(g.id)}
                   className={cn(
                     'group relative flex flex-col gap-2 rounded-xl glass-soft p-3 transition-colors',
                     'border border-border/60',
                     'hover:border-border',
+                    'cursor-pointer',
                     batchMode && 'cursor-pointer',
                     selected ? 'border-brand bg-brand/10 ring-1 ring-brand/40' : '',
                   )}

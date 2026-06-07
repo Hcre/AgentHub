@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { nowStamp, uid } from '../lib/id'
 import type {
+  Attachment,
   ChatMessage,
   Conversation,
   OutputFile,
@@ -41,11 +42,16 @@ interface ChatState {
   setConnected: (v: boolean) => void
   setSessionId: (key: string, sessionId: string) => void
   /** 本地回显用户气泡（WS 发送时由 hook 调用） */
-  addUserMessage: (key: string, text: string) => void
+  addUserMessage: (key: string, text: string, attachment?: Attachment) => void
   /** 应用一条服务端流式事件到对应消息桶 */
   applyStreamEvent: (key: string, event: StreamEvent) => void
   /** mock 降级：本地假回复（WS 未连接时用） */
-  send: (agentId: string, conversationId: string, text: string) => void
+  send: (
+    agentId: string,
+    conversationId: string,
+    text: string,
+    attachment?: Attachment,
+  ) => void
   addConversation: (
     agentId: string,
     opts?: { name?: string; workdir?: string },
@@ -74,8 +80,14 @@ export const useChatStore = create<ChatState>()(
   setSessionId: (key, sessionId) =>
     set((s) => ({ sessionIds: { ...s.sessionIds, [key]: sessionId } })),
 
-  addUserMessage: (key, text) => {
-    const userMsg: ChatMessage = { id: uid('u'), from: 'user', time: nowStamp(), text }
+  addUserMessage: (key, text, attachment) => {
+    const userMsg: ChatMessage = {
+      id: uid('u'),
+      from: 'user',
+      time: nowStamp(),
+      text,
+      ...(attachment ? { attachment } : {}),
+    }
     set((s) => {
       const prev = s.messages[key] ?? []
       // 关闭还在流式的旧哨兵（防止新回复追加到旧消息上）
@@ -149,9 +161,15 @@ export const useChatStore = create<ChatState>()(
     })
   },
 
-  send: (agentId, conversationId, text) => {
+  send: (agentId, conversationId, text, attachment) => {
     const key = convKey(agentId, conversationId)
-    const userMsg: ChatMessage = { id: uid('u'), from: 'user', time: nowStamp(), text }
+    const userMsg: ChatMessage = {
+      id: uid('u'),
+      from: 'user',
+      time: nowStamp(),
+      text,
+      ...(attachment ? { attachment } : {}),
+    }
     set((s) => ({
       messages: { ...s.messages, [key]: [...(s.messages[key] ?? []), userMsg] },
       typing: { ...s.typing, [key]: true },
