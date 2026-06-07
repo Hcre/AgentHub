@@ -1,7 +1,8 @@
 # 2026-06-07 plan_ba86c4d0 强收 Phase 1 实测校正
 
 > **Session 时间**: 2026-06-07 19:39 - 19:50
-> **owner**: Mavis（mvs_ee3d79d9bfb44a02b6dacda1d8d47f71）
+> **owner**: 袁 (xiangbianpangde, AgentHub 团队成员, 人类项目负责人)
+> **executor**: Mavis（mvs_ee3d79d9bfb44a02b6dacda1d8d47f71，AI 编排/验证执行者）
 > **触发**: user 怀疑"STATUS 写得很漂亮但代码真在跑吗？"要求做真机 E2E 验证
 > **关联 ADR**: [0014 plan_ba86c4d0 强收](..\decisions\0014-mavis-team-plan-ba86c4d0-strong-close.md)（待追加 Phase 1 校正段）
 
