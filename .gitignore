@@ -55,6 +55,12 @@ _assets/
 .reasonix/
 .claude/
 
+# === Agent 工作区（mavis / opencode 等 agent 自己的本地状态，不入项目）===
+.mavis/
+.opencode/
+matrix-media-*.png
+matrix-media-*.mp3
+
 # === 代码图谱（conventions/08）===
 # 生成产物可由 scripts/gen_codegraph.py 重建，不入库；
 # 仅 graph_schema.json（节点/边定义）入 git。docs/CODE_MAP.md 照常入库。
