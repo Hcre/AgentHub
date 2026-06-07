@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     # --- 记忆系统 MCP ---
     # MCP_MEMORY_URL 非空时，CLI spawn 注入 --mcp-config，Agent 可调用 save_memory tool
     # 路径 = 记忆协议服务端 mount 点（main.py /api/mcp-memory）+ /sse（与 /api/mcp REST 分离）
-    mcp_memory_url: str = ""   # 例：http://127.0.0.1:8000/api/mcp-memory/sse
+    mcp_memory_url: str = ""  # 例：http://127.0.0.1:8000/api/mcp-memory/sse
 
     # --- CORS ---
     cors_origins: str = "http://localhost:5173"
@@ -76,9 +76,18 @@ class Settings(BaseSettings):
     # 默认 .agenthub/skills（相对 cwd，可被环境变量 SKILLS_DIR 覆盖）
     skills_dir: str = ".agenthub/skills"
 
+    # --- 模板市场 ---
+    # 模板存储根目录（git clone 落这里、本地模板也写这里）
+    # 默认 .agenthub/templates（相对 cwd，可被环境变量 TEMPLATES_DIR 覆盖）
+    templates_dir: str = ".agenthub/templates"
+
     @property
     def skills_dir_path(self) -> Path:
         return Path(self.skills_dir).resolve()
+
+    @property
+    def templates_dir_path(self) -> Path:
+        return Path(self.templates_dir).resolve()
 
     @property
     def cors_origin_list(self) -> list[str]:

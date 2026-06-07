@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Copy, Pin, RefreshCw, Reply } from 'lucide-react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -10,6 +10,7 @@ import { WebPreviewCard } from './WebPreviewCard'
 import { collectUrls } from './webPreviewUrl'
 import { extractDiffFences } from './diffParse'
 import { DeployCardView } from '../deploy/DeployCard'
+import { detectSkillMd, SkillMdPreview } from '../skills/SkillMdPreview'
 
 /**
  * 把 ReactMarkdown 的自定义 components 抽出来 —— 跟 DiffView 拆围栏后产生的
@@ -217,6 +218,12 @@ export function MessageBubble({
   const fence = isAgent ? extractDiffFences(msg.text) : null
   const showDiffInline = isAgent && fence?.hasDiffFence
 
+  // SKILL.md 检测：使用 useMemo 避免每次 render 重新解析（只在 msg.text 变化时触发）
+  const skillMdDetection = useMemo(() => {
+    if (!isAgent) return { found: false as const }
+    return detectSkillMd(msg.text)
+  }, [msg.text, isAgent])
+
   return (
     <div className="group/msg animate-[var(--animate-fade-in)] flex gap-3">
       <div className="pt-0.5">
@@ -400,6 +407,17 @@ export function MessageBubble({
               </span>
             )}
           </div>
+        )}
+
+        {/* SKILL.md 检测：Agent 消息中包含 YAML frontmatter 围栏草稿时，在气泡下方渲染预览面板 */}
+        {skillMdDetection.found && (
+          <SkillMdPreview
+            data={skillMdDetection.data}
+            onSaveSuccess={() => {
+              // 保存成功后触发自定义事件，让 SkillMarketplacePage 知道需要刷新列表
+              window.dispatchEvent(new CustomEvent('skill-library-updated'))
+            }}
+          />
         )}
       </div>
     </div>

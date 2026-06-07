@@ -142,3 +142,86 @@ export function resolveProviderConfig(
 export function listProvidersForCli(agentSystem: string): string[] {
   return Object.keys(CLI_PROVIDER_MATRIX[agentSystem] ?? {})
 }
+
+// ── Model Tier Mapping ────────────────────────────────────────────
+// 每个 agentSystem × provider 组合的 tier → model 映射。
+// 约定：opus=最强推理, sonnet=平衡, haiku=快速轻量, inherit=沿用 Agent 自身 model
+
+type ModelTier = 'opus' | 'sonnet' | 'haiku' | 'inherit'
+
+const TIER_ORDER: Record<string, number> = { opus: 0, sonnet: 1, haiku: 2 }
+
+interface TierModels {
+  opus: string | null
+  sonnet: string | null
+  haiku: string | null
+}
+
+/**
+ * 从矩阵 models 数组里按名字关键词推断 tier → model。
+ * 对于仅 1-2 个模型的 provider（DeepSeek/MiniMax/Xiaomi），高层 tier 回退到最佳模型。
+ */
+function inferTierModels(models: string[]): TierModels {
+  const byName = (keyword: string) =>
+    models.find((m) => m.toLowerCase().includes(keyword)) ?? null
+
+  const opus = byName('opus') ?? byName('pro') ?? models[0] ?? null
+  const sonnet = byName('sonnet') ?? byName('pro') ?? models[0] ?? models[1] ?? opus
+  const haiku = byName('haiku') ?? byName('flash') ?? models[models.length - 1] ?? sonnet
+
+  return { opus, sonnet, haiku }
+}
+
+/** 所有 agentSystem × provider 的 tier → model 推导结果（惰性初始化）。 */
+let _tierCache: Record<string, Record<string, TierModels>> | null = null
+
+function getTierCache(): Record<string, Record<string, TierModels>> {
+  if (_tierCache) return _tierCache
+  _tierCache = {}
+  for (const [agentSystem, providers] of Object.entries(CLI_PROVIDER_MATRIX)) {
+    _tierCache[agentSystem] = {}
+    for (const [provider, entry] of Object.entries(providers)) {
+      _tierCache[agentSystem][provider] = inferTierModels(entry.models)
+    }
+  }
+  return _tierCache
+}
+
+/**
+ * 根据 Agent 系统 + provider + tier 解析出具体模型名。
+ * - tier='inherit' → 返回 null（表示沿用 Agent 自身 model，不做覆盖）
+ * - 无此组合 → null
+ */
+export function resolveModelFromTier(
+  agentSystem: string,
+  provider: string,
+  tier: ModelTier,
+): string | null {
+  if (tier === 'inherit') return null
+  const cache = getTierCache()
+  const tierModels = cache[agentSystem]?.[provider]
+  if (!tierModels) return null
+  return tierModels[tier] ?? null
+}
+
+/** tier 的中文标签 */
+export function getTierLabel(tier: string): string {
+  const labels: Record<string, string> = {
+    opus: '旗舰（Opus）',
+    sonnet: '平衡（Sonnet）',
+    haiku: '轻量（Haiku）',
+    inherit: '继承默认',
+  }
+  return labels[tier] ?? tier
+}
+
+/** tier 的主题色（Tailwind 语义） */
+export function getTierColor(tier: string): string {
+  const colors: Record<string, string> = {
+    opus: 'text-purple-600 bg-purple-50 border-purple-200',
+    sonnet: 'text-blue-600 bg-blue-50 border-blue-200',
+    haiku: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+    inherit: 'text-muted-foreground bg-muted border-border',
+  }
+  return colors[tier] ?? 'text-muted-foreground bg-muted border-border'
+}

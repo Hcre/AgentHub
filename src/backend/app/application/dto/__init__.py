@@ -26,6 +26,8 @@ class AgentResponse:
     is_system: bool
     created_at: datetime
     settings: dict
+    template_name: str | None = None
+    created_from_template_id: UUID | None = None
     # 注意：绝不返回 api_key
 
     @classmethod
@@ -44,6 +46,8 @@ class AgentResponse:
             is_system=a.is_system,
             created_at=a.created_at,
             settings=a.settings,
+            template_name=a.template_name,
+            created_from_template_id=a.created_from_template_id,
         )
 
 

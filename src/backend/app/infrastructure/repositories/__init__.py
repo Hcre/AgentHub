@@ -17,6 +17,9 @@ from app.infrastructure.repositories.message_repository import (
 from app.infrastructure.repositories.session_repository import (
     PostgresSessionRepository,
 )
+from app.infrastructure.repositories.template_repository import (
+    PostgresTemplateRepository,
+)
 from app.infrastructure.repositories.usage_repository import PostgresUsageRepository
 
 __all__ = [
@@ -29,5 +32,6 @@ __all__ = [
     "PostgresMemoryRepository",
     "PostgresMessageRepository",
     "PostgresSessionRepository",
+    "PostgresTemplateRepository",
     "PostgresUsageRepository",
 ]

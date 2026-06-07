@@ -30,6 +30,8 @@ class Agent:
     model: str = ""
     api_key_encrypted: str = ""
     base_url: str | None = None
+    template_name: str | None = None
+    created_from_template_id: UUID | None = None
     id: UUID = field(default_factory=uuid4)
     skills: list[str] = field(default_factory=list)
     capability_tags: list[str] = field(default_factory=list)
@@ -66,6 +68,7 @@ class Agent:
             "model",
             "api_key_encrypted",
             "base_url",
+            "template_name",
             "skills",
             "capability_tags",
             "system_prompt",

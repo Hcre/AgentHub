@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && npm install -g @anthropic-ai/claude-code \
     && npm install -g @earendil-works/pi-coding-agent \
-    && npm install -g opencode-ai
+    && npm install -g opencode-ai || echo "opencode-ai skipped (glibc vs musl)"
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

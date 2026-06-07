@@ -24,11 +24,13 @@ export function WorkspaceBrowser({ open, onClose, onSelect }: {
   const [createErr, setCreateErr] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
 
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
+
   const browse = async (path: string): Promise<void> => {
     setLoading(true)
     try {
       const qs = path ? `?path=${encodeURIComponent(path)}` : ''
-      const r = await fetch(`/api/fs/browse${qs}`)
+      const r = await fetch(`${API_BASE}/api/fs/browse${qs}`)
       const data = await r.json()
       if (Array.isArray(data)) {
         setCurrent('')
@@ -67,7 +69,7 @@ export function WorkspaceBrowser({ open, onClose, onSelect }: {
     setCreating(true)
     setCreateErr(null)
     try {
-      const r = await fetch('/api/fs/mkdir', {
+      const r = await fetch(`${API_BASE}/api/fs/mkdir`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ parent: current, name: newName.trim() }),

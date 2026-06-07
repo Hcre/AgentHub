@@ -23,6 +23,7 @@ from app.api.routers import (
     sessions,
     skills,
     tasks,
+    templates,
 )
 from app.api.routers.skills import FS_ROUTER
 from app.api.ws import router as ws_router
@@ -110,6 +111,7 @@ app.include_router(groups.router)
 app.include_router(memories.router)
 app.include_router(tasks.router)
 app.include_router(skills.router)
+app.include_router(templates.router)  # Agent 模板系统
 app.include_router(attachments.router)  # 附件上传/下载（P0-3）
 app.include_router(FS_ROUTER)
 app.include_router(inbox.router)

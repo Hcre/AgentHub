@@ -9,6 +9,7 @@ from app.application.services.mcp_install_service import McpInstallService
 from app.application.services.mcp_market_service import McpMarketService
 from app.application.services.memory_service import MemoryService
 from app.application.services.session_service import SessionService
+from app.application.services.template_service import TemplateService
 from app.application.services.usage_service import UsageService
 
 __all__ = [
@@ -21,5 +22,6 @@ __all__ = [
     "McpMarketService",
     "MemoryService",
     "SessionService",
+    "TemplateService",
     "UsageService",
 ]

@@ -47,16 +47,18 @@ from app.infrastructure.llm.factory import build_adapter_for_agent
 
 logger = logging.getLogger(__name__)
 
-SKILLS_DIR = "/skills"
 
-
-def _load_skill_content(skill_names: list[str]) -> str:
+def _load_skill_content(skill_names: list[str], skills_dir: str | None = None) -> str:
     """读取 skill 文件内容，拼接为 system prompt 片段。"""
-    if not skill_names or not os.path.isdir(SKILLS_DIR):
+    if skills_dir is None:
+        from app.core.config import settings
+
+        skills_dir = str(settings.skills_dir_path)
+    if not skill_names or not os.path.isdir(skills_dir):
         return ""
     parts: list[str] = []
     for name in skill_names:
-        path = os.path.join(SKILLS_DIR, name, "SKILL.md")
+        path = os.path.join(skills_dir, name, "SKILL.md")
         if os.path.isfile(path):
             try:
                 with open(path, encoding="utf-8") as f:

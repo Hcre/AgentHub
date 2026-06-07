@@ -1,7 +1,7 @@
 import { type MouseEvent, useMemo, useState } from 'react'
 import { cn } from '../../lib/cn'
 import { useAgentStore } from '../../stores/agentStore'
-import { useChatStore } from '../../stores/chatStore'
+import { useChatStore, convKey } from '../../stores/chatStore'
 import { useGroupStore } from '../../stores/groupStore'
 import { useUIStore } from '../../stores/uiStore'
 import { CreateGroupModal } from '../group/CreateGroupModal'
@@ -72,6 +72,7 @@ export function LeftPanel() {
   const groups = useGroupStore((s) => s.groups)
   const messagesByGroup = useGroupStore((s) => s.messagesByGroup)
   const conversations = useChatStore((s) => s.conversations)
+  const messages = useChatStore((s) => s.messages)
   const [openGroup_, setOpenGroup] = useState(true)
   const [openDM, setOpenDM] = useState(true)
   const renameGroup = useGroupStore((s) => s.renameGroup)
@@ -173,6 +174,11 @@ export function LeftPanel() {
               dmList.map(({ agent, conv, key }) => {
                 const isActive =
                   section === 'chat' && activeAgentId === agent.id && activeConversationId === conv.id
+                // 最近一条消息
+                const msgKey = convKey(agent.id, conv.id)
+                const msgs = messages[msgKey] ?? []
+                const lastMsg = msgs[msgs.length - 1]
+                const lastText = lastMsg?.text?.trim() || conv.subtitle
                 return (
                   <button
                     key={key}
@@ -197,7 +203,7 @@ export function LeftPanel() {
                         </span>
                       </div>
                       <div className="truncate text-[10.5px] text-muted-foreground/80">
-                        {conv.subtitle}
+                        {lastText}
                       </div>
                     </div>
                   </button>

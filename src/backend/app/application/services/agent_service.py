@@ -29,6 +29,10 @@ class AgentService:
         if await self._repo.exists_by_name(cmd.name):
             raise DomainError(f"Agent name 已存在: {cmd.name}")
 
+        skills = list(cmd.skills) if cmd.skills else []
+        if "skill-creator" not in skills:
+            skills.append("skill-creator")
+
         agent = Agent(
             name=cmd.name,
             avatar=cmd.avatar,
@@ -38,9 +42,12 @@ class AgentService:
             model=cmd.model,
             api_key_encrypted=encrypt_secret(cmd.api_key) if cmd.api_key else "",
             base_url=cmd.base_url,
-            skills=cmd.skills,
+            skills=skills,
+            capability_tags=cmd.capability_tags,
             system_prompt=cmd.system_prompt,
             settings=cmd.settings or {},
+            template_name=cmd.template_name,
+            created_from_template_id=cmd.template_id,
         )
         await self._repo.save(agent)
         await self._bus.publish(

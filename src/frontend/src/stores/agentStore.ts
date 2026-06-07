@@ -16,8 +16,11 @@ export interface CreateAgentInput {
   /** 头像（首字母/emoji），留空则用名称首字母合成 */
   avatar?: string
   skills: string[]
+  capabilityTags: string[]
   systemPrompt?: string
   settings?: Record<string, unknown>
+  templateName?: string
+  templateId?: string
 }
 
 const COLOR_CYCLE: AgentColor[] = ['brand', 'sage', 'clay', 'rose', 'blue']
@@ -38,6 +41,7 @@ function toUiAgent(a: ApiAgent, idx: number): Agent {
     online: true,
     skillCount: a.skills.length,
     agentSystem: a.agent_system,
+    templateName: a.template_name ?? undefined,
   }
 }
 
@@ -104,8 +108,11 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         base_url: input.baseUrl,
         api_key: input.apiKey,
         skills: input.skills,
+        capability_tags: input.capabilityTags,
         system_prompt: input.systemPrompt,
         settings: input.settings,
+        template_name: input.templateName,
+        template_id: input.templateId,
       })
       const agent = toUiAgent(created, get().agents.length)
       set((s) => ({
@@ -127,6 +134,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         online: true,
         skillCount: input.skills.length,
         agentSystem: input.agentSystem,
+        templateName: input.templateName,
       }
       set((s) => ({
         agents: [...s.agents, agent],
