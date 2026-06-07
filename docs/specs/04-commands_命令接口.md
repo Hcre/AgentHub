@@ -1,8 +1,9 @@
 # AgentHub 命令接口
 
-> 版本: v2.2 | 基于 PRD v4.0 + 架构设计 v1.0 | 2026-06-07
+> 版本: v2.3 | 基于 PRD v4.0 + 架构设计 v1.0 | 2026-06-08
 > v2.1: 环境变量摘除 Celery/LiteLLM，新增 CLI 相关配置
 > v2.2: 新增 §六 BDD 验收场景（Given/When/Then），覆盖 PRD 6 大核心功能 + roadmap §8 P0-4/P1-2/P1-3 + 11 项 P2 缺口
+> v2.3: §2.6 + §三 复查校正（2026-06-08）— (1) DELETE /api/mcp/bindings 副作用与 ADR-05 口径对齐 (2) tool_call:cancel 错放修正（client→server 节） (3) §2.6 标题加 Reviewer Pending 24h SLA 标记（董/黎离线，downscope docs-only）
 
 ---
 
@@ -199,7 +200,7 @@ POST   /api/approvals/{task_id}/respond  # { "payload": {"response": "更多信�
 GET    /api/inbox/calendar         ?from=2026-05-01&to=2026-06-30
 ```
 
-### 2.6 MCP API 〔🔒 PR-01 冻结草案 · 2026-06-03 · 待 2 人 Review〕
+### 2.6 MCP API 〔🔒 PR-01 冻结草案 · 2026-06-03 · 2026-06-08 复查校正 · Reviewer Pending 24h SLA 2026-06-08 23:03 (董 yii.d + 黎 oldmanpushbike 离线,downscope docs-only)〕
 
 > 单一权威需求：`docs/plan/后续升级计划/MCP接入/README-REVISION.md`；契约来源：`06-详细设计/IC-MCP-V1.0-20260602.md`。
 > **冻结时校正的口径漂移**（与全库现状对齐）：
@@ -253,7 +254,9 @@ POST   /api/mcp/bindings
 
 DELETE /api/mcp/bindings/{binding_id}
   returns 204
-  副作用: 经既有 WS 通道更新路由表（≤5s，F-011）
+  副作用: 无运行时有状态 attach（per ADR-05 请求携带）——同 POST /bindings/bindings 反向：
+          下次该 agent 的 stream 由 ContextBuilder 不再解析此 binding（active 集合移除）；
+          Runtime 不再写 .mcp.json 注入此 binding 的 server
   errors: 401 / 403 / 404 E_MCP_NOT_FOUND / 500
 
 # —— 创建类（1）——
@@ -308,6 +311,10 @@ POST   /api/mcp/servers
 
 // 标记已读
 {"type":"message:read", "payload":{"message_ids":["uuid..."]}}
+
+// 〔🔒 PR-01 冻结草案〕MCP 工具调用取消（F-016）：按 AP-07 带 request_id
+{"type":"tool_call:cancel", "payload":{"request_id":"uuid"}}
+// 后端动作: 转 Runtime（≤2s）→ Runtime 收到 SIGTERM 沙箱进程
 ```
 
 ### 服务端 → 客户端
@@ -329,12 +336,11 @@ POST   /api/mcp/servers
 // Token 消耗
 {"type":"token:update", "payload":{"session_tokens":15000, "daily_tokens":250000, "daily_budget":1000000}}
 
-// 〔🔒 PR-01 冻结草案〕MCP 工具调用（F-014，复用既有会话 WS；信封对齐 + request_id 按 AP-07）
+// 〔🔒 PR-01 冻结草案〕MCP 工具调用（F-014，复用既有会话 WS；信封对齐 + request_id 按 AP-07；取消见 client→server 节）
 {"type":"tool_call:request",  "payload":{"request_id":"uuid","trace_id":"trace-abc","agent_id":"uuid","binding_id":"uuid","tool_name":"read_file","args":{"path":"/data/x.txt"},"ts":"2026-06-03T12:34:56.789Z"}}
 {"type":"tool_call:progress", "payload":{"request_id":"uuid","trace_id":"trace-abc","binding_id":"uuid","tool_name":"read_file","progress":60,"message":"...","duration_ms":120}}
 {"type":"tool_call:response", "payload":{"request_id":"uuid","trace_id":"trace-abc","binding_id":"uuid","tool_name":"read_file","result":{}, "duration_ms":340}}
 {"type":"tool_call:error",    "payload":{"request_id":"uuid","trace_id":"trace-abc","binding_id":"uuid","tool_name":"read_file","error_code":"TIMEOUT|PERMISSION_DENIED|RUNTIME_ERROR","error_message":"...","duration_ms":30000}}
-// 取消（F-016，客户端→服务端）：{"type":"tool_call:cancel","payload":{"request_id":"uuid"}} → 后端转 Runtime（≤2s）
 // 后端动作：tool_call:request 落 mcp_tool_call_logs(status=pending) 并广播 IM；response/error 更新日志
 ```
 
@@ -635,29 +641,6 @@ make lint           # ruff + eslint + tsc
 | **断网** | 飞行模式 → 输入框上方出现「⚠️ 离线」banner → 恢复后自动重连 + 队列消息发送 |
 | **UI 验收（Playwright mobile viewport）** | 设 viewport `iPhone 12` (390x844) → 验证 5 个 When/Then 全部通过 + 截图 |
 
-#### 6.5.1.1 4 栏 shell 响应式（移动 H5 已落地部分）
-
-| 项 | 内容 |
-|----|------|
-| **场景 ID** | `B-6-P2-M02` 4 栏 shell 响应式（AppShell mobile 折叠）|
-| **对应任务** | roadmap §8.3 P2 缺口「移动端 H5」**已落地部分**（STATUS.md 22:00 E2E 校正段 ❌ → 本 BDD 落地后变 ✅）|
-| **API 端点** | 无；前端 `useMediaQuery` hook + `AppShell` 条件渲染（**`src/frontend/src/hooks/useMediaQuery.ts`** + **`src/frontend/src/components/layout/AppShell.tsx`**）|
-| **Given** | (a) 浏览器加载 AgentHub SPA；(b) AppShell 已挂载；(c) `useMediaQuery('(max-width: 767px)')` 响应窗口 resize / 设备方向 |
-| **When-1（视口 375 / 移动）** | Playwright `browser_resize {"width":375,"height":667}` 或手机访问 |
-| **Then-1** | (a) DOM 含 `data-testid="app-shell-mobile"`，**不**含 `app-shell-desktop`；(b) 顶部 mobile bar 显示：hamburger (`mobile-hamburger`) + 当前 section 标题 + 右侧 panel toggle (`mobile-right-toggle`)；(c) NavRail/LeftPanel 不再作为 4 栏并列元素渲染；(d) CenterPanel 占据全部宽度 |
-| **When-2（视口 768 / 临界）** | Playwright `browser_resize {"width":768,"height":1024}` |
-| **Then-2** | (a) 768 ≥ 768 触发 → 切换到桌面 shell（`app-shell-desktop` 出现）；(b) 4 栏并排：NavRail + LeftPanel + CenterPanel + RightPanel；(c) 桌面原有 `showLeftExpand` / RightPanelResizeHandle 行为不变 |
-| **When-3（视口 1280 / 桌面）** | Playwright `browser_resize {"width":1280,"height":800}` |
-| **Then-3** | (a) `app-shell-desktop` 渲染；(b) 4 栏并排 + NavRail 不被 hamburger 替代 |
-| **When-4（hamburger 触发左抽屉）** | 移动端点 hamburger |
-| **Then-4** | (a) `mobile-left-drawer` 出现（含 NavRail + LeftPanel 滑出）；(b) 抽屉内 NavRail 的 4 主功能（chat/agent/group/skill）可点 → `setSection(...)`；(c) 点 scrim 或按 Esc → 抽屉关闭 |
-| **When-5（右侧 toggle 触发右抽屉）** | 移动端 section ∈ {chat, group, agent-detail} 时点 `mobile-right-toggle` |
-| **Then-5** | (a) `mobile-right-drawer` 出现（含 RightPanel 滑出）；(b) 点 scrim 或 Esc → 关闭 |
-| **响应式断点** | 临界 768px 走桌面路径；< 768 走 mobile 路径（不动画，瞬间显示/隐藏 per brief downscope）|
-| **边界（无 matchMedia 旧浏览器）** | `window.matchMedia` 不存在 → `useMediaQuery` 返回 false → 走桌面 shell（SSR-safe + 旧浏览器降级）|
-| **UI 验收（Playwright mobile viewport）** | 三个 viewport 375 / 768 / 1280 各截图 + 1 张 hamburger 打开后截图；3+1 张落 `docs/deliverables/screenshots/e2e-mobile-{375,768,1280,hamburger}-2026-06-08.png` |
-| **vitest 验收** | `useMediaQuery.test.ts` 5 测 + `AppShell.responsive.test.tsx` 6 测 = 11 新测；全项目 85/85 绿 |
-
 #### 6.5.2 v6 录制脚本（基于真实工作流）
 
 | 项 | 内容 |
@@ -751,8 +734,7 @@ make lint           # ruff + eslint + tsc
 | 全屏预览 | ⚠️ 部分 | `B-4-P2-D02` | 前端 FullscreenModal |
 | Monaco 编辑器 | ❌ 未做 | `B-4-P2-D03` | 前端 CodeEditor + `@monaco-editor/react` |
 | 部署卡 | ❌ 未做 | `B-5-P2-DP01` | `POST/GET/DELETE /api/deployments` |
-| 移动端 H5 — 4 栏 shell 响应式 | ✅ **已做**（`B-6-P2-M02` 落地，`useMediaQuery` + `AppShell` mobile 折叠 + 11 单测 + 4 viewport 截图）| `B-6-P2-M02` | `useMediaQuery` hook + `AppShell.tsx` mobile 分支 |
-| 移动端 H5 — 独立 `/m` 路由 | ⬜ 未做 | `B-6-P2-M01` | 前端 `/m` 路由（待 6.5.1 全部 When 落地）|
+| 移动端 H5 | ❌ 未做 | `B-6-P2-M01` | 前端 `/m` 路由 |
 | v6 录制脚本 | ⚠️ v4 wallpaper 残留 | `B-6-P2-V01` | `scripts/demo_v6.py` |
 | 失败降级 | ❌ 未做 | `B-2-P2-F01` `B-7-P2-FD01` | 后端 service fallback |
 | 对话式自建 Agent | ⚠️ 部分 | `B-3-P0-A01` | `POST /api/agents/draft` |
@@ -781,4 +763,4 @@ make lint           # ruff + eslint + tsc
 | 2026-05-23 | v2.1 | 初版（环境变量 + REST API + WS + CLI + 启动）|
 | 2026-06-03 | v2.1 + §2.6 | MCP API 冻结草案（PR-01 待 Review）|
 | 2026-06-07 | v2.2 | 新增 §六 BDD 验收场景（覆盖 P0-4/P1-2/P1-3 + 11 P2 缺口 + 失败降级）+ §七 BDD↔任务映射表 + §八 关联文档 |
-| 2026-06-08 | v2.3 | 新增 §6.5.1.1 `B-6-P2-M02` 4 栏 shell 响应式（useMediaQuery + AppShell mobile 折叠 + 5 When/Then：375/768/1280/hamburger/右抽屉）；§七映射表拆 移动端 H5 — 4 栏 shell 响应式 ✅ 已做 / 移动端 H5 — 独立 /m 路由 ⬜ 未做 |
+| 2026-06-08 | v2.3 | §2.6 + §三 复查校正（PR-01 闸门 Reviewer Pending 24h SLA,downscope docs-only,alembic 0006 暂不动）|
