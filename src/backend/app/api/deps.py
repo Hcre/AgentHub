@@ -120,6 +120,16 @@ def get_message_repo(session: DbSession) -> PostgresMessageRepository:
     return PostgresMessageRepository(session)
 
 
+def get_usage_repo(session: DbSession) -> PostgresUsageRepository:
+    return PostgresUsageRepository(session)
+
+
+def get_usage_service(
+    repo: Annotated[PostgresUsageRepository, Depends(get_usage_repo)],
+) -> UsageService:
+    return UsageService(repo)
+
+
 def get_mcp_server_repo(session: DbSession) -> PostgresMcpServerRepository:
     return PostgresMcpServerRepository(session)
 

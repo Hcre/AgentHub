@@ -39,7 +39,15 @@ class MessageRepository(ABC):
         ...
 
     @abstractmethod
-    async def set_pinned(self, message_id: UUID, pinned: bool) -> None: ...
+    async def set_pinned(
+        self,
+        message_id: UUID,
+        pinned: bool,
+        *,
+        pinned_by_user_id: UUID | None = None,
+    ) -> None:
+        """切换 pinned 状态。pinned=True 时记录 pinned_by_user_id + pinned_at，False 时清空。"""
+        ...
 
     @abstractmethod
     async def delete(self, message_id: UUID) -> None: ...
