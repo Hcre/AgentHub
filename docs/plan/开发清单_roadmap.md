@@ -115,23 +115,28 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 
 ### 8.1 必修（P0，6/2-6/5 必做，约 28h）
 
-| # | 任务 | 工时 | 验收标准 | 状态 | 关联 |
-|---|------|------|---------|------|------|
-| P0-1 | 网页预览 iframe 卡片内联到消息流 | 8h | 聊天流中点开 Agent 返回的 URL → sandbox iframe 渲染 | ⬜ 待办 | 课题 4 |
-| P0-2 | Diff 视图（diff2html 集成） | 6h | 增删行绿/红标注，可点开全屏 | ⬜ 待办 | 课题 4 |
-| P0-3 | 文件附件上传 + 预览 API | 6h | multipart 端点 + 消息中可下载/预览 | ⬜ 待办 | 课题 1 |
-| P0-4 | Pin 消息 UI（复用 context_builder 三层体系）| 3h | Pin 后跨会话可见，状态可见 | ⬜ 待办 | 课题 1 |
-| P0-5 | 复制代码 / 重新生成按钮 | 2h | MessageBubble 操作区可见 | ⬜ 待办 | 课题 1 |
-| P0-6 | 端到端 Demo 数据集 + 录制脚本 | 3h | 5 个 Core User Story 跑通 | ⬜ 待办 | 课题 交付物 |
+| # | 任务 | 工时 | 验收标准 | 状态 | 关联 | 验证 commit |
+|---|------|------|---------|------|------|------------|
+| P0-1 | 网页预览 iframe 卡片内联到消息流 | 8h | 聊天流中点开 Agent 返回的 URL → sandbox iframe 渲染 | ✅ **已做**（`WebPreviewCard.tsx:80`）| 课题 4 | 集成验证 A |
+| P0-2 | Diff 视图（diff2html 集成） | 6h | 增删行绿/红标注，可点开全屏 | ✅ **已做**（`DiffView.tsx:29-41` 彩色 emerald/rose）| 课题 4 | 集成验证 B |
+| P0-3 | 文件附件上传 + 预览 API | 6h | multipart 端点 + 消息中可下载/预览 | ✅ **已做**（`api/routers/attachments.py:99-158` 10MiB + 7 MIME）| 课题 1 | 集成验证 F 200+200 round-trip |
+| P0-4 | Pin 消息 UI（复用 context_builder 三层体系）| 3h | Pin 后跨会话可见，状态可见 | ✅ **已做**（`MessageBubble.tsx:155-188` + `GroupMessageItem.tsx` P0-4/P0-5 接群聊 `079cdca`）| 课题 1 | 集成验证 C 204x2 + 11 单测 |
+| P0-5 | 复制代码 / 重新生成按钮 | 2h | MessageBubble 操作区可见 | ✅ **已做**（`MessageBubble.tsx:112-144` handleCopyCode + mock.ts:105 + GroupMessageItem 群聊）| 课题 1 | 集成验证 D + 11 单测 |
+| P0-6 | 端到端 Demo 数据集 + 录制脚本 | 3h | 5 个 Core User Story 跑通 | ✅ **已做**（seed_demo_data.py 11 agents/4 sessions/19 messages + video script 6 章节）| 课题 交付物 | integration-verify-report.md 6 E2E |
 
 ### 8.2 加分（P1，时间允许，6/6-6/8，约 15h）
 
-| # | 任务 | 工时 | 验收标准 | 状态 | 关联 |
-|---|------|------|---------|------|------|
-| P1-1 | 工作目录 UI 落地（后端 0005 migration 已有）| 4h | Agent 详情页可切换工作目录 | ⬜ 待办 | 创新 10% |
-| P1-2 | Token 消耗监控（聊天/任务双视图）| 3h | 实时显示单 Agent / 单会话消耗 | ⬜ 待办 | 工程深度 |
-| P1-3 | CLI PATH 扫描前端实时展示 | 2h | 启动时自动扫，结果 UI 可视化 | ⬜ 待办 | 创新 10% |
-| P1-4 | Playwright E2E 覆盖 5 个 Story | 6h | 全绿，可作 CI gate | ⬜ 待办 | T-01~06 |
+| # | 任务 | 工时 | 验收标准 | 状态 | 关联 | 验证 |
+|---|------|------|---------|------|------|------|
+| P1-1 | 工作目录 UI 落地（后端 0005 migration 已有）| 4h | Agent 详情页可切换工作目录 | ✅ **已做**（`api/agents/{id}/workspace_path` + ChatView 工作目录 chip + WorkspaceBrowser 弹窗）| 创新 10% | E2E F1/F2 实测 |
+| P1-2 | Token 消耗监控（聊天/任务双视图）| 3h | 实时显示单 Agent / 单会话消耗 | ⬜ 待办 | 工程深度 | — |
+| P1-3 | CLI PATH 扫描前端实时展示 | 2h | 启动时自动扫，结果 UI 可视化 | ⬜ 待办 | 创新 10% | — |
+| P1-4 | Playwright E2E 覆盖 5 个 Story | 6h | 全绿，可作 CI gate | ⚠️ **部分**（10 个 screenshot + 11 单测；未做 CI gate）| T-01~06 | e2e-F1..F10 + vitest 47/47 |
+
+### 8.2.1 2026-06-07 新增（user-driven 增量）
+- **G1 群聊 P0-4/P0-5 修复**：`GroupMessageItem.tsx` + 类型 + 11 单测（commit `079cdca`）— 状态 P0-4/P0-5 实际覆盖率从"仅私聊"→ "私聊+群聊"
+- **G2 群组卡片整卡点击进群聊**：`GroupsListPage.tsx` article + onClick（commit `f41934b`）— UX 改进（不再依赖 hover icon 入口）
+- **vite dev container + volume mount**：`Dockerfile` + `docker-compose.yml` + `vite.config.ts`（commit `f0a2cb5`）— dev workflow 优化（改代码 HMR 实时刷新，不用 rebuild image）
 
 ### 8.3 MVP 不做（P2/P3，超出时间盒）
 
