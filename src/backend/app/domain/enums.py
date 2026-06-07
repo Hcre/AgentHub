@@ -132,3 +132,25 @@ class McpBindingStatus(StrEnum):
     ACTIVE = "active"
     PAUSED = "paused"
     REMOVED = "removed"
+
+
+class DeploymentTarget(StrEnum):
+    """部署目标类型（B-5-P2-DP01 §When-1/3/4）。"""
+
+    STATIC_SITE = "static_site"
+    CONTAINER = "container"
+    PACKAGE = "package"
+
+
+class DeploymentStatus(StrEnum):
+    """部署状态机（B-5-P2-DP01 §6.4.4）。
+
+    状态流转：queued → building → ready / failed
+    终态：ready / failed / deleted
+    """
+
+    QUEUED = "queued"
+    BUILDING = "building"
+    READY = "ready"
+    FAILED = "failed"
+    DELETED = "deleted"

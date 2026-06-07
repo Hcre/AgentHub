@@ -19,12 +19,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.services import (
     AgentService,
     ChatService,
+    DeployService,
     GroupService,
     McpBindingService,
     McpInstallService,
     McpMarketService,
     MemoryService,
     SessionService,
+    UsageService,
 )
 from app.application.services.context_builder import ContextBuilder
 from app.application.services.discussion_orchestrator import DiscussionOrchestrator
@@ -41,6 +43,7 @@ from app.infrastructure.llm.factory import build_adapter
 from app.infrastructure.mcp import LocalMcpInstaller
 from app.infrastructure.repositories import (
     PostgresAgentRepository,
+    PostgresDeploymentRepository,
     PostgresGroupRepository,
     PostgresMcpBindingRepository,
     PostgresMcpInstallationRepository,
@@ -48,6 +51,7 @@ from app.infrastructure.repositories import (
     PostgresMemoryRepository,
     PostgresMessageRepository,
     PostgresSessionRepository,
+    PostgresUsageRepository,
 )
 
 logger = logging.getLogger(__name__)
@@ -146,6 +150,10 @@ def get_mcp_binding_repo(session: DbSession) -> PostgresMcpBindingRepository:
     return PostgresMcpBindingRepository(session)
 
 
+def get_deploy_repo(session: DbSession) -> PostgresDeploymentRepository:
+    return PostgresDeploymentRepository(session)
+
+
 def get_mcp_binding_service(
     binding_repo: Annotated[PostgresMcpBindingRepository, Depends(get_mcp_binding_repo)],
     install_repo: Annotated[PostgresMcpInstallationRepository, Depends(get_mcp_installation_repo)],
@@ -165,6 +173,12 @@ def get_memory_service(
 
 
 # --- Service ---
+
+
+def get_deploy_service(
+    repo: Annotated[PostgresDeploymentRepository, Depends(get_deploy_repo)],
+) -> DeployService:
+    return DeployService(repo)
 
 
 def get_agent_service(

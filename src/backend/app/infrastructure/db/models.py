@@ -80,6 +80,7 @@ class MessageModel(Base):
     session_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("sessions.id", ondelete="CASCADE"), index=True
     )
+    user_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True, index=True)  # P0-4 alembic 0012
     role: Mapped[str] = mapped_column(String(16))
     content: Mapped[str] = mapped_column(Text, default="")
     content_type: Mapped[str] = mapped_column(String(32), default="text")
@@ -87,6 +88,10 @@ class MessageModel(Base):
     mentions: Mapped[list] = mapped_column(JSON, default=list)
     reply_to: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
     pinned: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    pinned_by_user_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)  # P0-4 alembic 0012
+    pinned_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )  # P0-4 alembic 0012
     status: Mapped[str] = mapped_column(String(16), default="completed")
     extra: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
@@ -342,3 +347,62 @@ class McpToolCallLogModel(Base):
     duration_ms: Mapped[int] = mapped_column(Integer)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+
+
+# --- 部署卡（P2 §4.2.4 + BDD B-5-P2-DP01，alembic 0013）---
+
+
+class DeploymentModel(Base):
+    """部署卡（deployments）。每行 = 一次部署（queued/building/ready/failed/deleted）。"""
+
+    __tablename__ = "deployments"
+    __table_args__ = (
+        Index("ix_deployments_session_id", "session_id"),
+        Index("idx_deployments_session_status", "session_id", "status"),
+        Index("idx_deployments_owner_created", "owner_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    session_id: Mapped[UUID] = mapped_column(Uuid)  # R1 裸 Uuid 无 FK
+    owner_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)  # R2 JWT sub
+    target: Mapped[str] = mapped_column(String(32))
+    entry_file: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    framework: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="queued", index=True)
+    stage: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    progress: Mapped[float] = mapped_column(default=0.0)
+    preview_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    download_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    build_logs: Mapped[list] = mapped_column(JSON, default=list)
+    error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ttl: Mapped[int] = mapped_column(Integer, default=3600)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
+
+
+# --- Token 消耗监控（P1-2，alembic 0012）---
+
+
+class UsageRecordModel(Base):
+    """Token 消耗日志（usage_records，append-only）。"""
+
+    __tablename__ = "usage_records"
+    __table_args__ = (
+        Index("ix_usage_records_agent_id", "agent_id"),
+        Index("ix_usage_records_session_id", "session_id"),
+        Index("ix_usage_records_created_at", "created_at"),
+        Index("idx_usage_records_agent_created", "agent_id", "created_at"),
+        Index("idx_usage_records_session_created", "session_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    agent_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    session_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    message_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    model: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
