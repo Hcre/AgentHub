@@ -52,9 +52,40 @@ def _jwt(user_id: UUID) -> str:
 
 @pytest.fixture
 def client() -> TestClient:
-    """Minimal app with only sessions router（避开 deploy.py 的并行任务 bug）。"""
+    """Minimal app with only sessions router（避开 deploy.py 的并行任务 bug）。
+
+    M5 调整: endpoint 不再 401, 改 service 层做 Auto-trust. 此 fixture 增加异常处理映射
+    (NotFoundError → 404) + SessionService dependency override (返回 raise NotFoundError 的 mock),
+    使 test_pin_route_anonymous_404 (发送非存在 message_id) 能正确得到 404.
+    """
+    from starlette.requests import Request
+    from starlette.responses import JSONResponse
+
+    from app.api.deps import get_session_service
+    from app.application.services import SessionService
+    from app.core.exceptions import NotFoundError, PermissionError
+
+    class _NotFoundService:
+        """Mock: 任何 pin/unpin 调用都 raise NotFoundError, 模拟"消息不存在"."""
+
+        async def pin_message(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            raise NotFoundError("message not found: mock")
+
+        async def unpin_message(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            raise NotFoundError("message not found: mock")
+
     app = FastAPI()
     app.include_router(sessions_router)
+
+    @app.exception_handler(NotFoundError)
+    async def _not_found(_: Request, exc: NotFoundError) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(PermissionError)
+    async def _forbidden(_: Request, exc: PermissionError) -> JSONResponse:
+        return JSONResponse(status_code=403, content={"detail": str(exc)})
+
+    app.dependency_overrides[get_session_service] = lambda: _NotFoundService()
     return TestClient(app)
 
 
@@ -156,10 +187,15 @@ async def test_pin_nonexistent_404(db_session) -> None:  # type: ignore[no-untyp
         )
 
 
-def test_pin_route_anonymous_401(client: TestClient) -> None:
-    """路径 5（HTTP 层）：无 JWT → 401 E_AUTH_REQUIRED"""
+def test_pin_route_anonymous_404(client: TestClient) -> None:
+    """路径 5（HTTP 层, M5 调整）：无 JWT + 不存在的 message → 404 (NotFoundError)。
+
+    22:00 E2E Pin 401 bug fix 后, 行为变化:
+    - 之前: 无 JWT → 401 (前端不发 Authorization header 必 401)
+    - 现在: 无 JWT + msg 不存在 → 404 (service 层先查 message 拿不到)
+    完整 401 路径需要"无 JWT + msg.user_id=None + 存在", 见 test_pin_auth.py::test_unauth_system_msg_http_401
+    """
     fake_msg = uuid4()
     fake_sess = uuid4()
     resp = client.post(f"/api/messages/{fake_msg}/pin?session_id={fake_sess}")
-    assert resp.status_code == 401, resp.text
-    assert "E_AUTH_REQUIRED" in resp.text
+    assert resp.status_code == 404, resp.text
