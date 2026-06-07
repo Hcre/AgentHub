@@ -7,8 +7,7 @@ import { Avatar, Badge, Button, Icon } from '../ui'
 import { CoordinatorPlan } from './CoordinatorPlan'
 import { lookupActor } from './actors'
 import { ThinkingBlock } from '../chat/ThinkingBlock'
-import { ToolCallBlock } from '../chat/ToolCallBlock'
-import { ToolResultBlock } from '../chat/ToolResultBlock'
+import { ToolCallsGroup } from '../chat/ToolCallsGroup'
 import { ApprovalRequestBlock } from '../chat/ApprovalRequestBlock'
 import { TaskPlanBlock } from '../chat/TaskPlanBlock'
 import type { Group, GroupMessage } from '../../types'
@@ -322,12 +321,9 @@ export function GroupMessageItem({
           </div>
         )}
 
-        {/* ── CLI 流式块：工具调用 + 工具结果（主文本之下）── */}
-        {msg.toolCalls && msg.toolCalls.length > 0 && (
-          <ToolCallBlock calls={msg.toolCalls} />
-        )}
-        {msg.toolResults && msg.toolResults.length > 0 && (
-          <ToolResultBlock results={msg.toolResults} />
+        {/* ── CLI 流式块：工具调用 + 工具结果（默认折叠）── */}
+        {(msg.toolCalls?.length || msg.toolResults?.length) && (
+          <ToolCallsGroup toolCalls={msg.toolCalls} toolResults={msg.toolResults} />
         )}
 
         {/* ── CLI 流式块：审批请求（阻断性 CTA）── */}

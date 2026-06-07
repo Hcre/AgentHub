@@ -6,8 +6,7 @@ import rehypeHighlight from 'rehype-highlight'
 import { Avatar, Button, Icon } from '../ui'
 import type { Agent, ChatMessage, UserInfo } from '../../types'
 import { ThinkingBlock } from './ThinkingBlock'
-import { ToolCallBlock } from './ToolCallBlock'
-import { ToolResultBlock } from './ToolResultBlock'
+import { ToolCallsGroup } from './ToolCallsGroup'
 import { ApprovalRequestBlock } from './ApprovalRequestBlock'
 import { TaskPlanBlock } from './TaskPlanBlock'
 import { DiffView } from './DiffView'
@@ -337,12 +336,9 @@ export function MessageBubble({
           )}
         </div>
 
-        {/* ── CLI 流式块：工具调用 + 工具结果（主文本之下，技术细节）── */}
-        {msg.toolCalls && msg.toolCalls.length > 0 && (
-          <ToolCallBlock calls={msg.toolCalls} />
-        )}
-        {msg.toolResults && msg.toolResults.length > 0 && (
-          <ToolResultBlock results={msg.toolResults} />
+        {/* ── CLI 流式块：工具调用 + 工具结果（默认折叠，主文本之下）── */}
+        {(msg.toolCalls?.length || msg.toolResults?.length) && (
+          <ToolCallsGroup toolCalls={msg.toolCalls} toolResults={msg.toolResults} />
         )}
 
         {/* ── CLI 流式块：审批请求（阻断性 CTA，置于底部醒目位置）── */}

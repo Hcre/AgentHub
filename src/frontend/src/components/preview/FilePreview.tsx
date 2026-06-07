@@ -11,8 +11,10 @@ const TREE_WIDTH = 140
 interface FilePreviewProps {
   /** 工作目录（项目根），为空时不显示 */
   workdir?: string
-  /** 初始打开的文件路径（可选） */
+  /** 初始打开的文件路径（从顶层 tab 传入） */
   initialPath?: string
+  /** 文件树点击回调：通知父组件在顶层 tab 栏打开文件 */
+  onOpenFile?: (path: string) => void
 }
 
 interface FileState {
@@ -24,17 +26,25 @@ interface FileState {
   error: string | null
 }
 
-export function FilePreview({ workdir, initialPath }: FilePreviewProps) {
+export function FilePreview({ workdir, initialPath, onOpenFile }: FilePreviewProps) {
   const [file, setFile] = useState<FileState | null>(null)
   const fileTreeCollapsed = useUIStore((s) => s.fileTreeCollapsed)
 
   useEffect(() => {
-    if (initialPath) void openFile(initialPath)
+    if (initialPath) void loadFile(initialPath)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPath])
 
-  const openFile = async (path: string) => {
-    // Already viewing this file — skip
+  /** 文件树点击 → 通知父组件打开顶层 tab */
+  const handleTreeSelect = (path: string) => {
+    if (onOpenFile) {
+      onOpenFile(path)
+    } else {
+      void loadFile(path)
+    }
+  }
+
+  const loadFile = async (path: string) => {
     if (file?.path === path) return
     setFile({ path, name: basename(path), content: '', size: 0, loading: true, error: null })
     try {
@@ -61,30 +71,8 @@ export function FilePreview({ workdir, initialPath }: FilePreviewProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* 文件标签栏：顶层，展示当前打开的文件 */}
-      {file && !file.loading && (
-        <div className="flex flex-shrink-0 items-center border-b border-border/70 bg-background px-2 py-0.5">
-          <button
-            type="button"
-            className="group flex max-w-[200px] items-center gap-1.5 rounded-t-md border border-b-0 border-border/60 bg-card px-3 py-1 font-mono text-[12px] text-foreground shadow-sm"
-            title={file.path}
-          >
-            <span className="truncate">{file.name}</span>
-            <span
-              role="button"
-              tabIndex={-1}
-              onClick={() => setFile(null)}
-              className="grid h-4 w-4 flex-shrink-0 cursor-pointer place-items-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-            >
-              <Icon name="x" className="h-2.5 w-2.5" />
-            </span>
-          </button>
-          <span className="ml-auto"><TreeToggleButton /></span>
-        </div>
-      )}
-
-      {/* 面包屑：当前文件路径 */}
-      {file && !file.loading && <Breadcrumb path={file.path} workdir={workdir} />}
+      {/* 面包屑：当前文件路径 + 文件树折叠按钮 */}
+      {file && !file.loading && <Breadcrumb path={file.path} workdir={workdir} right={<TreeToggleButton />} />}
 
       {/* 主体：内容（flex-1） + 文件树（固定 140px，折叠时 0） */}
       <div className="flex min-h-0 flex-1">
@@ -117,7 +105,7 @@ export function FilePreview({ workdir, initialPath }: FilePreviewProps) {
             style={{ width: TREE_WIDTH }}
             className="flex flex-shrink-0 flex-col border-l border-border/70 bg-muted/10"
           >
-            <FileTree root={workdir} selectedPath={file?.path} onSelect={openFile} />
+            <FileTree root={workdir} selectedPath={file?.path} onSelect={handleTreeSelect} />
           </aside>
         )}
       </div>

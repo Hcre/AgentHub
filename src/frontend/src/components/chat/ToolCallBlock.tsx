@@ -67,9 +67,13 @@ function ToolCallItem({ call, isLast }: { call: ToolCallEntry; isLast: boolean }
           {call.name}
         </span>
         {StatusIcon}
-        <span className="font-mono text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-[300px] ml-auto">
-          {argsPreview}{argsPreview.length >= 60 ? '…' : ''}
-        </span>
+        {!expanded && call.status !== 'pending' ? (
+          <span className="text-[10px] text-zinc-400 ml-auto">{call.status === 'success' ? '完成' : '失败'}</span>
+        ) : (
+          <span className="font-mono text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-[200px] ml-auto">
+            {argsPreview}{argsPreview.length >= 60 ? '…' : ''}
+          </span>
+        )}
         {expanded ? (
           <ChevronUp className="h-3.5 w-3.5 text-zinc-400 flex-shrink-0" strokeWidth={1.75} />
         ) : (
