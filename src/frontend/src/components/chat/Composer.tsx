@@ -5,8 +5,13 @@ import {
   useState,
   type ChangeEvent,
 } from 'react'
-import { Reply, X } from 'lucide-react'
+import { Code2, Reply, X } from 'lucide-react'
 import { Button, Icon } from '../ui'
+import {
+  MonacoEditor,
+  type MonacoEditorHandle,
+  type MonacoLanguage,
+} from '../editor/MonacoEditor'
 import type { Agent, Attachment, ReplyRef } from '../../types'
 
 /** 父组件可调用 setText 从外部塞值（prompt 建议卡点击、@提及等） */
@@ -41,14 +46,22 @@ export const Composer = forwardRef<
   const [uploadError, setUploadError] = useState<string | null>(null)
   // P1-1 reply mode：当前正在回复的消息引用；null = 普通模式
   const [replyTo, setReplyTo] = useState<ReplyRef | null>(null)
+  // P2-1 代码模式：开启后用 Monaco 替换 textarea；发送时把 val 包成 ```lang\n...\n```
+  const [codeMode, setCodeMode] = useState(false)
+  const [codeLang, setCodeLang] = useState<MonacoLanguage>('typescript')
   const taRef = useRef<HTMLTextAreaElement>(null)
+  const monacoRef = useRef<MonacoEditorHandle>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useImperativeHandle(ref, () => ({
     setText: (text: string) => {
       setVal(text)
-      // 触发 autosize
+      // 触发 autosize / Monaco focus
       requestAnimationFrame(() => {
+        if (codeMode) {
+          monacoRef.current?.focus()
+          return
+        }
         const ta = taRef.current
         if (!ta) return
         ta.style.height = 'auto'
@@ -56,13 +69,16 @@ export const Composer = forwardRef<
         ta.focus()
       })
     },
-    focus: () => taRef.current?.focus(),
+    focus: () => {
+      if (codeMode) monacoRef.current?.focus()
+      else taRef.current?.focus()
+    },
     setReplyTo: (ref: ReplyRef | null) => {
       setReplyTo(ref)
       // 进入 reply mode → 自动 focus 到 textarea
       requestAnimationFrame(() => {
-        const ta = taRef.current
-        if (ta) ta.focus()
+        if (codeMode) monacoRef.current?.focus()
+        else taRef.current?.focus()
       })
     },
   }))
@@ -70,8 +86,13 @@ export const Composer = forwardRef<
   const send = () => {
     const text = val.trim()
     if (!text && !attachment) return
+    // 代码模式：把 val 包成 ```lang\n...\n``` 围栏发出去，接收端 ReactMarkdown 自动高亮
+    const payloadText =
+      codeMode && text
+        ? '```' + codeLang + '\n' + text + '\n```'
+        : text
     onSend({
-      text,
+      text: payloadText,
       attachment: attachment ?? undefined,
       replyTo: replyTo ?? undefined,
     })
@@ -205,7 +226,37 @@ export const Composer = forwardRef<
         }}
         className="w-full resize-none rounded-t-xl border-0 bg-transparent px-3 py-3 text-[14px] outline-none placeholder:text-muted-foreground"
         style={{ maxHeight: 200 }}
+        hidden={codeMode}
       />
+      {codeMode && (
+        <div className="px-3 py-2" data-testid="composer-code-pane">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="font-mono text-[11px] text-muted-foreground">
+              代码模式 · 发送时自动包 {`\`\`\`${codeLang}\n…\n\`\`\``}
+            </span>
+            <select
+              aria-label="选择语言"
+              value={codeLang}
+              onChange={(e) => setCodeLang(e.target.value as MonacoLanguage)}
+              className="rounded border bg-background px-1.5 py-0.5 font-mono text-[11px]"
+            >
+              <option value="typescript">TypeScript</option>
+              <option value="javascript">JavaScript</option>
+              <option value="python">Python</option>
+              <option value="json">JSON</option>
+              <option value="markdown">Markdown</option>
+              <option value="plaintext">纯文本</option>
+            </select>
+          </div>
+          <MonacoEditor
+            ref={monacoRef}
+            value={val}
+            language={codeLang}
+            onChange={(next) => setVal(next ?? '')}
+            aria-label="Composer 代码编辑器"
+          />
+        </div>
+      )}
       {(attachment || uploadError || uploading) && (
         <div className="flex flex-wrap items-center gap-2 border-t px-3 py-2 text-[12px]">
           {uploading && (
@@ -259,6 +310,21 @@ export const Composer = forwardRef<
             className="composer-desktop-extras h-7 w-7 text-muted-foreground"
           >
             <Icon name="bold" className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="iconSm"
+            title={codeMode ? '切回普通文本' : '切到代码模式（Monaco）'}
+            aria-pressed={codeMode}
+            data-testid="composer-code-toggle"
+            onClick={() => setCodeMode((v) => !v)}
+            className={
+              codeMode
+                ? 'h-7 w-7 text-brand'
+                : 'h-7 w-7 text-muted-foreground'
+            }
+          >
+            <Code2 className="h-3.5 w-3.5" strokeWidth={1.75} />
           </Button>
           <Button
             variant="ghost"

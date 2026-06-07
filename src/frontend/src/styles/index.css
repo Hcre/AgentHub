@@ -282,3 +282,77 @@ a {
 *::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* ── P2-4 移动端 H5 响应式 ──────────────────────────────────────────────────
+   设计目标（PRD §6「多端支持」移动端）：
+   - md (768px) 以下隐藏「右侧预览/文件/Diff/部署」panel（移动端 1 列 IM）
+   - md 以下 Composer 简化：去掉按钮 padding，移除 bold/smile/at-sign
+     装饰按钮，只保留「附件」「代码」「发送」3 个核心按钮
+   - md 以下头像/字号/间距全部收紧
+   - md 以下 MessageBubble 全宽（去掉 max-w-md 之类的限宽）
+   - 不改后端 API / 不改 store / 不改业务逻辑（纯样式）
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* 全局：收窄行高 + 字号 */
+  body {
+    font-size: 14px;
+  }
+  /* Composer 简化版（仅移动端显示，桌面端 md 隐藏）*/
+  .composer-desktop-extras {
+    display: none !important;
+  }
+  .composer-mobile-only {
+    display: inline-flex !important;
+  }
+  /* 右侧 panel：移动端整列隐藏 */
+  aside.right-panel-mobile-hidden,
+  .ah-right-panel {
+    display: none !important;
+  }
+  /* 左侧 nav：移动端收成图标列（50px） */
+  .ah-left-nav {
+    width: 56px !important;
+  }
+  .ah-left-nav .nav-label {
+    display: none !important;
+  }
+  /* 聊天区：移动端占满 */
+  .ah-chat-pane {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .ah-chat-pane .prose {
+    max-width: 100% !important;
+  }
+  /* MessageBubble：移动端全宽、间距紧凑 */
+  .group\/msg {
+    gap: 0.5rem !important;
+    padding: 0.25rem 0 !important;
+  }
+  /* Composer 容器：移动端去掉大圆角 + margin，贴底 */
+  .composer-mobile-tight {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    margin-bottom: 0 !important;
+    border-radius: 0 !important;
+    border-left: 0 !important;
+    border-right: 0 !important;
+    border-bottom: 0 !important;
+  }
+  /* 隐藏一些仅桌面端有意义的 hover-only 按钮 */
+  .ah-hover-only {
+    display: none !important;
+  }
+  /* 顶栏/Header 在移动端更紧凑 */
+  .ah-topbar {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+}
+
+/* md 及以上：恢复桌面行为（移动端隐藏的 helper class）*/
+@media (min-width: 768px) {
+  .composer-mobile-only {
+    display: none !important;
+  }
+}

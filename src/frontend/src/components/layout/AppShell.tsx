@@ -80,7 +80,7 @@ export function AppShell() {
       {showRight && (
         <div
           style={{ width: rightPanelWidth }}
-          className="flex-shrink-0 p-2.5 pl-1.5 transition-all duration-200"
+          className="ah-right-panel flex-shrink-0 p-2.5 pl-1.5 transition-all duration-200"
         >
           <RightPanel />
         </div>

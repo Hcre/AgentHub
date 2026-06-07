@@ -137,7 +137,7 @@
 ## 🧾 技术债（收束盘点）
 
 | 问题 | 发现 | 优先级 | 预计修复 |
-|------|------|--------|---------|
+|------|------|--------|----------|
 | 既有套件测试隔离 flaky（`test_context_builder` 模块级 fakeredis 单例 / `test_selector` LLM 环境敏感）| MCP F1 收束-1 | 🟡 中 | 独立工单（非 MCP 引入）|
 | ~~`agent_mcp_bindings` UNIQUE(agent,installation) 与软删 rebind 冲突~~ ✅ **已修**（alembic 0010 部分唯一索引,解绑后可 rebind）| MCP F1 实现 | — | 已修（2026-06-03）|
 | ~~安装为结构校验骨架（无真实可达性/进程探针）~~ ✅ **已升级** McpInstaller 端口 + LocalMcpInstaller 结构校验(transport 必填项,422 拦截非法配置)替代骨架 ready；真实可达性/进程探针仍 deferred | MCP F1 → F2 收束 | 🟢 低 | P3/P4 真实探针(seam 已留) |
@@ -147,6 +147,9 @@
 | P0-3 文件附件后端 multipart API 缺失(前端 mock 渲染) | 现状盘点(2026-06-06) | 🟡 中 | M5/MVP 冲刺期补 |
 | P0-4 Pin 消息 UI 缺失(后端端点已在 sessions.py:91-99) | 现状盘点(2026-06-06) | 🟢 低 | M5/MVP 冲刺期补 |
 | P0-5 复制代码/重新生成 按钮(UI 框架有,actions 文案错位) | 现状盘点(2026-06-06) | 🟢 低 | M5/MVP 冲刺期补 |
+| **🆕 P0-4 后端 Pin session 所有权校验未实现**（mavis-team plan_ba86c4d0 backend-p0-p1 retry attempt 2 仅落了 deps.py fix 2 文件，entity/service/test 全缺）| 2026-06-07 plan_ba86c4d0 | 🔴 高 | M5 收束前手动补 ~1h（owner 写 endpoint + 2 测）|
+| **🆕 P1-2 后端 Token 消耗监控未实现**（plan_ba86c4d0 backend-p0-p1 retry attempt 2 仅有 UsageRepository 接口 dep，UsageService / record_completion / record_user_message 全缺）| 2026-06-07 plan_ba86c4d0 | 🟡 中 | M5/M6 补 ~2h（4 端点 + 7 测）|
+| **🆕 P1-3 后端 CLI PATH 扫描未实现**（plan_ba86c4d0 backend-p0-p1 retry attempt 2 完全没碰）| 2026-06-07 plan_ba86c4d0 | 🟡 中 | M5/M6 补 ~1h（1 端点 + 4 测）|
 
 ## Git ↔ 目录映射
 

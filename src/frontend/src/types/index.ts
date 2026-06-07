@@ -84,6 +84,66 @@ export interface ChatMessage {
    * 缺省 = 未 Pin。
    */
   pinned?: boolean
+  /**
+   * P2-2 部署卡数据：后端 deploy streaming / API 写入。MessageBubble 检测到
+   * 该字段时渲染 DeployCard（位于 components/deploy/DeployCard.tsx 的 DeployCardView）。
+   * 4 状态：queued / building / ready / failed。ready 时 deploy_url 必填。
+   * schema 与 backend `DeploymentStatus` 字段对齐（status/target/progress/...）。
+   */
+  deploy?: DeployCard
+  /**
+   * P1-1 引用：消息回复/引用某条历史消息时挂的引文数据。
+   * MessageBubble 在 author 行下方渲染引文小气泡，Composer 在 setReplyTo 时把
+   * 当前 hover 消息的 id/author/snippet 摘录到本字段，发送时通过 addUserMessage
+   * 传给后端。
+   */
+  replyTo?: ReplyRef
+}
+
+/**
+ * P1-1 引用摘要：引用某条消息时携带的最小上下文。
+ *   - id：被引用消息的 ID（点击引文可跳转 / 后端用于关联上下文）
+ *   - author：被引用消息的作者（agent.name 或 user.handle）
+ *   - snippet：截断后的原文摘录（一般 100-200 字符，避免 UI 爆行）
+ */
+export interface ReplyRef {
+  id: string
+  author: string
+  snippet: string
+}
+
+/** P2-2 部署状态机：4 态。 */
+export type DeployStatus = 'queued' | 'building' | 'ready' | 'failed'
+
+/** P2-2 部署目标形态。 */
+export type DeployTarget = 'static_site' | 'container' | 'package'
+
+/** P2-2 部署卡数据：与 backend `DeploymentStatus` 字段对齐。 */
+export interface DeployCard {
+  /** 部署 ID（后端生成）。 */
+  id: string
+  /** 状态：4 态机。 */
+  status: DeployStatus
+  /** 部署目标形态。 */
+  target: DeployTarget
+  /** 框架标签（可选，如 vite/next/django）。 */
+  framework?: string | null
+  /** 入口文件（可选，如 index.html）。 */
+  entry_file?: string | null
+  /** 0~1 进度（building 态展示用）。缺省时 ready→1，其他→0。 */
+  progress?: number | null
+  /** 当前阶段标签（building 态展示用，如「npm install」）。 */
+  stage?: string | null
+  /** TTL（秒），到时回收。 */
+  ttl?: number | null
+  /** 预览 URL（ready 态必填，其他态可缺省）。 */
+  deploy_url?: string | null
+  /** 失败错误码（failed 态展示）。 */
+  error_code?: string | null
+  /** 失败错误详情（failed 态展示）。 */
+  error_message?: string | null
+  /** epoch ms 时间戳（可选）。 */
+  updated_at?: number | null
 }
 
 export interface StageTask {
@@ -168,6 +228,10 @@ export interface GroupMessage {
    * GroupMessageItem 渲染时优先用后端真值，乐观更新本地 state。
    */
   pinned?: boolean
+  /**
+   * P1-1 群聊引用：与 ChatMessage.replyTo 同源 schema。
+   */
+  replyTo?: ReplyRef
 }
 
 // ── 次要视图（Phase 5） ──

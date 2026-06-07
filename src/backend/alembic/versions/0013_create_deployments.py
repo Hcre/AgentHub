@@ -1,7 +1,7 @@
 """create deployments table (P2 deploy card, BDD B-5-P2-DP01)
 
 Revision ID: 0013
-Revises: 0012
+Revises: 0011
 Create Date: 2026-06-07
 
 补齐：models.py 已定义 DeploymentModel（__tablename__='deployments'），新增此表。
@@ -39,7 +39,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0013"
-down_revision: str | None = "0012"
+down_revision: str | None = "0011"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
