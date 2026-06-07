@@ -120,7 +120,7 @@ export function GroupChatView() {
       {/* 消息区 */}
       <div ref={scrollRef} className={cn('min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5')}>
         {msgs.map((m) => (
-          <GroupMessageItem key={m.id} msg={m} group={group} />
+          <GroupMessageItem key={m.id} msg={m} group={group} sessionId={sessionId ?? undefined} />
         ))}
       </div>
 

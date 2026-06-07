@@ -163,6 +163,11 @@ export interface GroupMessage {
   streaming?: boolean
   /** 用户消息的 @mention 名单（解析自正文，发送时透传给后端）。 */
   mentions?: string[]
+  /**
+   * P0-4 群聊 Pin 状态：与 ChatMessage.pinned 同源 schema。
+   * GroupMessageItem 渲染时优先用后端真值，乐观更新本地 state。
+   */
+  pinned?: boolean
 }
 
 // ── 次要视图（Phase 5） ──
