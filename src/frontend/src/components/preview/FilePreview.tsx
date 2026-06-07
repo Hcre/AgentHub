@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { cn } from '../../lib/cn'
 import { fsApi } from '../../api/fs'
 import { Button, Icon } from '../ui'
@@ -15,7 +15,7 @@ interface FilePreviewProps {
   initialPath?: string
 }
 
-interface OpenTab {
+interface FileState {
   path: string
   name: string
   content: string
@@ -25,8 +25,7 @@ interface OpenTab {
 }
 
 export function FilePreview({ workdir, initialPath }: FilePreviewProps) {
-  const [tabs, setTabs] = useState<OpenTab[]>([])
-  const [activePath, setActivePath] = useState<string | null>(null)
+  const [file, setFile] = useState<FileState | null>(null)
   const fileTreeCollapsed = useUIStore((s) => s.fileTreeCollapsed)
 
   useEffect(() => {
@@ -35,51 +34,18 @@ export function FilePreview({ workdir, initialPath }: FilePreviewProps) {
   }, [initialPath])
 
   const openFile = async (path: string) => {
-    if (tabs.find((t) => t.path === path)) {
-      setActivePath(path)
-      return
-    }
-    const placeholder: OpenTab = {
-      path,
-      name: basename(path),
-      content: '',
-      size: 0,
-      loading: true,
-      error: null,
-    }
-    setTabs((prev) => [...prev, placeholder])
-    setActivePath(path)
+    // Already viewing this file — skip
+    if (file?.path === path) return
+    setFile({ path, name: basename(path), content: '', size: 0, loading: true, error: null })
     try {
       const data = await fsApi.readFile(path)
-      setTabs((prev) =>
-        prev.map((t) =>
-          t.path === path ? { ...t, content: data.content, size: data.size, loading: false } : t,
-        ),
-      )
+      setFile({ path, name: basename(path), content: data.content, size: data.size, loading: false, error: null })
     } catch (e) {
-      setTabs((prev) =>
-        prev.map((t) =>
-          t.path === path
-            ? { ...t, loading: false, error: e instanceof Error ? e.message : '读取失败' }
-            : t,
-        ),
-      )
+      setFile((prev) => prev?.path === path
+        ? { ...prev, loading: false, error: e instanceof Error ? e.message : '读取失败' }
+        : prev)
     }
   }
-
-  const closeTab = (path: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setTabs((prev) => prev.filter((t) => t.path !== path))
-    if (activePath === path) {
-      setActivePath((prev) => {
-        if (prev !== path) return prev
-        const remaining = tabs.filter((t) => t.path !== path)
-        return remaining.length > 0 ? (remaining[remaining.length - 1]?.path ?? null) : null
-      })
-    }
-  }
-
-  const active = useMemo(() => tabs.find((t) => t.path === activePath) ?? null, [tabs, activePath])
 
   if (!workdir) {
     return (
@@ -95,66 +61,52 @@ export function FilePreview({ workdir, initialPath }: FilePreviewProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* 顶部：文件 tab */}
-      <div className="flex flex-shrink-0 items-center gap-1 border-b border-border/70 bg-muted/30 px-2 py-1.5">
-        {tabs.length === 0 && (
-          <span className="px-2 font-mono text-[11.5px] text-muted-foreground">
-            从右侧文件树选个文件打开
-          </span>
-        )}
-        {tabs.map((t) => {
-          const isActive = t.path === activePath
-          return (
-            <button
-              key={t.path}
-              type="button"
-              onClick={() => setActivePath(t.path)}
-              className={cn(
-                'group flex max-w-[180px] items-center gap-1.5 rounded-md border px-2.5 py-1 font-mono text-[12px]',
-                isActive
-                  ? 'border-border bg-card text-foreground shadow-sm'
-                  : 'border-transparent text-muted-foreground hover:bg-card/60 hover:text-foreground',
-              )}
-              title={t.path}
+      {/* 文件标签栏：顶层，展示当前打开的文件 */}
+      {file && !file.loading && (
+        <div className="flex flex-shrink-0 items-center border-b border-border/70 bg-background px-2 py-0.5">
+          <button
+            type="button"
+            className="group flex max-w-[200px] items-center gap-1.5 rounded-t-md border border-b-0 border-border/60 bg-card px-3 py-1 font-mono text-[12px] text-foreground shadow-sm"
+            title={file.path}
+          >
+            <span className="truncate">{file.name}</span>
+            <span
+              role="button"
+              tabIndex={-1}
+              onClick={() => setFile(null)}
+              className="grid h-4 w-4 flex-shrink-0 cursor-pointer place-items-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
             >
-              <span className="truncate">{t.name}</span>
-              <span
-                role="button"
-                tabIndex={-1}
-                onClick={(e) => closeTab(t.path, e)}
-                className="grid h-4 w-4 flex-shrink-0 cursor-pointer place-items-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-              >
-                <Icon name="x" className="h-2.5 w-2.5" />
-              </span>
-            </button>
-          )
-        })}
-      </div>
+              <Icon name="x" className="h-2.5 w-2.5" />
+            </span>
+          </button>
+          <span className="ml-auto"><TreeToggleButton /></span>
+        </div>
+      )}
 
-      {/* 面包屑：当前打开文件的相对路径 + 文件树折叠按钮 */}
-      {active && <Breadcrumb path={active.path} workdir={workdir} right={<TreeToggleButton />} />}
+      {/* 面包屑：当前文件路径 */}
+      {file && !file.loading && <Breadcrumb path={file.path} workdir={workdir} />}
 
       {/* 主体：内容（flex-1） + 文件树（固定 140px，折叠时 0） */}
       <div className="flex min-h-0 flex-1">
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 overflow-auto bg-background">
-            {!active && (
+            {!file && (
               <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                选个文件开始
+                从右侧文件树选个文件打开
               </div>
             )}
-            {active?.loading && (
+            {file?.loading && (
               <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                 读取中…
               </div>
             )}
-            {active?.error && (
+            {file?.error && (
               <div className="flex h-full items-center justify-center text-sm text-destructive">
-                {active.error}
+                {file.error}
               </div>
             )}
-            {active && !active.loading && !active.error && (
-              <CodeView content={active.content} />
+            {file && !file.loading && !file.error && (
+              <CodeView content={file.content} />
             )}
           </div>
         </div>
@@ -165,7 +117,7 @@ export function FilePreview({ workdir, initialPath }: FilePreviewProps) {
             style={{ width: TREE_WIDTH }}
             className="flex flex-shrink-0 flex-col border-l border-border/70 bg-muted/10"
           >
-            <FileTree root={workdir} selectedPath={activePath ?? undefined} onSelect={openFile} />
+            <FileTree root={workdir} selectedPath={file?.path} onSelect={openFile} />
           </aside>
         )}
       </div>

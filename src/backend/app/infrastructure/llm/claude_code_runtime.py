@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_TIMEOUT = 300  # 秒
 _DEFAULT_MAX_TURNS = 10
-_DEFAULT_PERMISSION_MODE = "acceptEdits"
+_DEFAULT_PERMISSION_MODE = "bypassPermissions"
 
 
 def _resolve_cwd(workspace: str | None) -> str | None:

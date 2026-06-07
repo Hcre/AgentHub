@@ -66,6 +66,52 @@ export interface Attachment {
   url?: string
 }
 
+// ── CLI 流式事件扩展（Phase 1 前端渲染基建）──
+
+/** 工具调用条目：tool_call 事件写入，tool_result 事件更新状态。 */
+export interface ToolCallEntry {
+  id: string
+  callId: string
+  name: string
+  args: Record<string, unknown>
+  status: 'pending' | 'success' | 'error'
+}
+
+/** 工具结果条目：tool_result 事件写入，按 callId 与 ToolCallEntry 配对。 */
+export interface ToolResultEntry {
+  id: string
+  callId: string
+  content: string
+  isError: boolean
+}
+
+/** 审批请求数据：request_approval 事件写入。Phase 1 仅视觉占位，按钮本地翻转状态。
+ * Phase 2 接入后端 POST /api/approvals/{id}/resolve 后 true 持久化。 */
+export interface ApprovalRequestData {
+  id: string
+  action: string
+  description: string
+  metadata?: Record<string, unknown>
+  status: 'pending' | 'approved' | 'denied'
+  resolvedBy?: string
+  resolvedAt?: string
+}
+
+/** 任务计划步骤 */
+export interface TaskPlanStep {
+  id: string
+  label: string
+  eta?: number
+  depends?: string[]
+}
+
+/** 任务计划数据：task_plan 事件写入（当前无运行时生产，为 Phase 2 预飞计划模式预留）。 */
+export interface TaskPlanData {
+  summary: string
+  steps: TaskPlanStep[]
+  totalEta?: number
+}
+
 export interface ChatMessage {
   id: string
   from: 'agent' | 'user'
@@ -100,6 +146,19 @@ export interface ChatMessage {
    * 传给后端。
    */
   replyTo?: ReplyRef
+
+  // ── CLI 流式事件字段（Phase 1）──
+
+  /** thinking 事件累积：模型推理过程（ThinkingBlock 渲染） */
+  thinking?: string
+  /** tool_call 事件累积列表（ToolCallBlock 渲染，与 ToolResultBlock 配对） */
+  toolCalls?: ToolCallEntry[]
+  /** tool_result 事件累积列表（ToolResultBlock 渲染） */
+  toolResults?: ToolResultEntry[]
+  /** request_approval 事件：审批请求（ApprovalRequestBlock 渲染） */
+  approvalRequest?: ApprovalRequestData
+  /** task_plan 事件：任务计划（TaskPlanBlock 渲染，Phase 2 预飞模式预留） */
+  taskPlan?: TaskPlanData
 }
 
 /**
@@ -234,6 +293,19 @@ export interface GroupMessage {
    * P1-1 群聊引用：与 ChatMessage.replyTo 同源 schema。
    */
   replyTo?: ReplyRef
+
+  // ── CLI 流式事件字段（Phase 1）──
+
+  /** thinking 事件累积：模型推理过程 */
+  thinking?: string
+  /** tool_call 事件累积列表 */
+  toolCalls?: ToolCallEntry[]
+  /** tool_result 事件累积列表 */
+  toolResults?: ToolResultEntry[]
+  /** request_approval 事件：审批请求 */
+  approvalRequest?: ApprovalRequestData
+  /** task_plan 事件：任务计划（Phase 2 预飞模式预留） */
+  taskPlan?: TaskPlanData
 }
 
 // ── 次要视图（Phase 5） ──
@@ -450,6 +522,12 @@ export interface StreamEvent {
   type: StreamEventType
   seq: number
   content?: string | null
+  /** 后端 model_dump(mode="json") 序列化 ToolCall：{ call_id, name, arguments } */
+  tool_call?: { call_id: string; name: string; arguments: Record<string, unknown> } | null
+  /** 后端 model_dump(mode="json") 序列化 ToolResult：{ call_id, success, content, error, artifact } */
+  tool_result?: { call_id: string; success: boolean; content: string | null; error: string | null; artifact?: string | null } | null
+  /** 后端 model_dump(mode="json") 序列化 task_plan dict */
+  task_plan?: TaskPlanData | null
   metadata?: Record<string, unknown>
   /** 群聊场景下标识发言人；私聊为 null。前端按此分色气泡 / 路由到 messagesByGroup。 */
   sender_agent_id?: string | null

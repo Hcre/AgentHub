@@ -836,11 +836,15 @@ async def fs_browse(path: str = "") -> dict:
     return {"path": real, "parent": parent, "items": items}
 
 
-@FS_ROUTER.get("/read")
-async def fs_read(path: str = "") -> dict:
+class FsReadRequest(BaseModel):
+    path: str
+
+@FS_ROUTER.post("/read")
+async def fs_read(body: FsReadRequest) -> dict:
     """读文件内容（限文本类，>2MB 返 413）。"""
     import os as _os
 
+    path = body.path
     if not path:
         raise HTTPException(status_code=400, detail="path 必填")
     real = _resolve_path(path)
