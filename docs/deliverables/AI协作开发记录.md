@@ -38,16 +38,16 @@ AgentHub 由 **3 位人类开发者 + 1 位 Claude Agent** 共同完成，遵循
 
 **核心 10 份**（按时间顺序，每份含「背景 / 选项 / 决策 / 后果」四段）：
 
-1. **0001 CLI 优先**（[链接](../worklogs/decisions/0001-cli-first-pivot.md)）— API 模式自建 Harness 需 95h+（Tool Loop + Tool 沙箱 + HITL + 会话状态 + Worker Pool + 多模型路由），M2 6 天窗口不可行。CLI 模式（Claude Code 自带 tool/state/Permission）<300 行 + SessionStore（Redis 7d TTL）即可跑通。决策：**CLI 优先 + 双轨保留**，API 模式留 M3+。
-2. **0002 Phase 1 长驻 CLI**（[链接](../worklogs/decisions/0002-phase1-long-running-cli.md)）— V0 模式 `spawn → stdin.write(prompt) → write_eof() → exit` 每次新建进程无记忆。V1 改造为 `spawn(--input-format stream-json) → 持续 stdin JSONL → 长驻`。灰度开关 `CLAUDE_CODE_LONG_RUNNING=1` 默认关。决策：**长驻 + stream-json**，对外 `stream()` 契约不变。
-3. **0003 MCP URL = `/api/mcp`**（[链接](../worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md)）— AP-05 要求 `/api/v1/...`，但全库现状无 `/v1/`。MCP 单点加 v1 会制造不一致。决策：**对齐现状 `/api/mcp/` + AP-05 暂缓进 NB-02**。附则：记忆 MCP 协议端 mount 移到 `/api/mcp-memory`（避免 mount 遮蔽 REST 子路径）。
-4. **0004 MCP F1 二次对账**（[链接](../worklogs/decisions/0004-mcp-f1-landing-and-installer-seam.md)）— 计划写「FK→workspaces」实无该表（实际 workspace = `sessions.workspace_path` 字符串）。决策：**裸 UUID stand-in**（`workspace_id = session_id`、`created_by = JWT sub`），仅对真实表加 FK。安装=结构校验探针（422 拦截非法配置）而非拉起进程。
-5. **0005 attach = 请求携带**（[链接](../worklogs/decisions/0005-mcp-attach-request-carried.md)）— 原计划 `AgentRuntime.attach_mcp(bindings)` 存实例状态，但 runtime 是池化/进程级共享，存实例状态会跨 agent 串号。决策：**请求携带 `AgentRequest.mcp_servers`**（无状态、零串号），runtime 在 build_cmd 时读 + 写 .mcp.json。
-6. **0006 MCP 注入逐调用隔离通道**（[链接](../worklogs/decisions/0006-mcp-injection-per-runtime-isolated-channel.md)）— 隔离通道优先级：① 逐调用 flag（claude_code `--mcp-config <tmp>`） ② env 指向临时配置（opencode `OPENCODE_CONFIG=<tmp>`） ③ 逐 workspace 项目配置。**禁止全局/共享配置 mutation**。opencode 据此拉回本期，pi_agent 本机无 pi 二进制保留 deferred。
-7. **0007 Tauri 2 桌面 App 转向**（[链接](../worklogs/decisions/0007-tauri-desktop-pivot.md)）— 5 路径对比（Capacitor / Tauri 2 / RN / Flutter / PWA+TWA）。决策：**Tauri 2 + 瘦客户端（M2）+ GitHub Releases**，不进任何商店。包体 3-5MB vs Electron 100MB+。
-8. **0008 owner 自决授权**（[链接](../worklogs/decisions/0008-self-governance-authorization.md)）— 用户明早未到岗期间，owner 可自主做判断（verifier FAIL retry / 范围微调 / worker steer / 降级方案 / 临时改 prompt / git commit + push），但**不可删用户文件 / 不可 force push main / 不可 reset --hard**。每个重大决定必须落 `0009+NNN-<slug>.md`。
-9. **0009 P2 兜底 cron**（[链接](../worklogs/decisions/0009-p2-handoff-cron.md)）— 2026-06-07 10:00 用户未报备 → cron `p2-handoff-watch` 自动启动 P2 接力（MCP P3 F3 创建 / P4 F5 展示）。沿用 0008 自决授权 + 上下文清理规则。
-10. **0010 集成验证 E downscope**（[链接](../worklogs/decisions/0010-integration-verify-downscope.md)）— Inbox 视觉 M4 TODO（不在 P0 范围）。4 次 retry 失败后，**不盲目第 5 次 retry**，而是降级验证层级（visual → API+code）并主动记 known gap。决策：5/6 PASS override_accept，video-record 用 S2 group 真 backend 渲染。
+1. **0001 CLI 优先**（[链接](../../worklogs/decisions/0001-cli-first-pivot.md)）— API 模式自建 Harness 需 95h+（Tool Loop + Tool 沙箱 + HITL + 会话状态 + Worker Pool + 多模型路由），M2 6 天窗口不可行。CLI 模式（Claude Code 自带 tool/state/Permission）<300 行 + SessionStore（Redis 7d TTL）即可跑通。决策：**CLI 优先 + 双轨保留**，API 模式留 M3+。
+2. **0002 Phase 1 长驻 CLI**（[链接](../../worklogs/decisions/0002-phase1-long-running-cli.md)）— V0 模式 `spawn → stdin.write(prompt) → write_eof() → exit` 每次新建进程无记忆。V1 改造为 `spawn(--input-format stream-json) → 持续 stdin JSONL → 长驻`。灰度开关 `CLAUDE_CODE_LONG_RUNNING=1` 默认关。决策：**长驻 + stream-json**，对外 `stream()` 契约不变。
+3. **0003 MCP URL = `/api/mcp`**（[链接](../../worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md)）— AP-05 要求 `/api/v1/...`，但全库现状无 `/v1/`。MCP 单点加 v1 会制造不一致。决策：**对齐现状 `/api/mcp/` + AP-05 暂缓进 NB-02**。附则：记忆 MCP 协议端 mount 移到 `/api/mcp-memory`（避免 mount 遮蔽 REST 子路径）。
+4. **0004 MCP F1 二次对账**（[链接](../../worklogs/decisions/0004-mcp-f1-landing-and-installer-seam.md)）— 计划写「FK→workspaces」实无该表（实际 workspace = `sessions.workspace_path` 字符串）。决策：**裸 UUID stand-in**（`workspace_id = session_id`、`created_by = JWT sub`），仅对真实表加 FK。安装=结构校验探针（422 拦截非法配置）而非拉起进程。
+5. **0005 attach = 请求携带**（[链接](../../worklogs/decisions/0005-mcp-attach-request-carried.md)）— 原计划 `AgentRuntime.attach_mcp(bindings)` 存实例状态，但 runtime 是池化/进程级共享，存实例状态会跨 agent 串号。决策：**请求携带 `AgentRequest.mcp_servers`**（无状态、零串号），runtime 在 build_cmd 时读 + 写 .mcp.json。
+6. **0006 MCP 注入逐调用隔离通道**（[链接](../../worklogs/decisions/0006-mcp-injection-per-runtime-isolated-channel.md)）— 隔离通道优先级：① 逐调用 flag（claude_code `--mcp-config <tmp>`） ② env 指向临时配置（opencode `OPENCODE_CONFIG=<tmp>`） ③ 逐 workspace 项目配置。**禁止全局/共享配置 mutation**。opencode 据此拉回本期，pi_agent 本机无 pi 二进制保留 deferred。
+7. **0007 Tauri 2 桌面 App 转向**（[链接](../../worklogs/decisions/0007-tauri-desktop-pivot.md)）— 5 路径对比（Capacitor / Tauri 2 / RN / Flutter / PWA+TWA）。决策：**Tauri 2 + 瘦客户端（M2）+ GitHub Releases**，不进任何商店。包体 3-5MB vs Electron 100MB+。
+8. **0008 owner 自决授权**（[链接](../../worklogs/decisions/0008-self-governance-authorization.md)）— 用户明早未到岗期间，owner 可自主做判断（verifier FAIL retry / 范围微调 / worker steer / 降级方案 / 临时改 prompt / git commit + push），但**不可删用户文件 / 不可 force push main / 不可 reset --hard**。每个重大决定必须落 `0009+NNN-<slug>.md`。
+9. **0009 P2 兜底 cron**（[链接](../../worklogs/decisions/0009-p2-handoff-cron.md)）— 2026-06-07 10:00 用户未报备 → cron `p2-handoff-watch` 自动启动 P2 接力（MCP P3 F3 创建 / P4 F5 展示）。沿用 0008 自决授权 + 上下文清理规则。
+10. **0010 集成验证 E downscope**（[链接](../../worklogs/decisions/0010-integration-verify-downscope-e.md)）— Inbox 视觉 M4 TODO（不在 P0 范围）。4 次 retry 失败后，**不盲目第 5 次 retry**，而是降级验证层级（visual → API+code）并主动记 known gap。决策：5/6 PASS override_accept，video-record 用 S2 group 真 backend 渲染。
 
 **方法论固化**（ADR-04/06 沉淀）：凡「N 个组件都能做 X」必须逐个打开验证 X 在每个组件里可行——避免 R11「opencode 也能注入 MCP」未经实测断言。ADR-06 据此实测发现 opencode 的 `OPENCODE_CONFIG` env 才是逐调用隔离通道（不是写全局），R11 的「写全局会串号」根因不成立 → opencode 拉回本期。此方法论在 F2 实现期间避免了一次「想当然引入全 runtime 支持」的返工。
 
@@ -174,13 +174,13 @@ worklogs/
 
 - **入口**：`start.bat` → `python scripts/start_server.py` → http://localhost:8000/dashboard.html
 - **风格**：暖色 Claude 风（焦糖色 `#cc785c` + Songti SC 衬线），米色 `#f5f4ee` 背景
-- **数据源**：[`STATUS.md`](../STATUS.md)（一行 = 一位成员；每周更新「正在做 / 阻塞 / 完成了什么」）
+- **数据源**：[`STATUS.md`](../../STATUS.md)（一行 = 一位成员；每周更新「正在做 / 阻塞 / 完成了什么」）
 - **Tab**：进度（按人表格 + Git 映射）/ ADR 列表 / 收束报告 / 图谱（嵌入 `.understand-anything/graph.html`）
 - **关键作用**：① demoscene 可读（3 秒看全项目状态）；② 跨人交接（分布式协作看板）；③ 审计入口（图谱 Tab 直接看 `.codegraph/graph.json`）
 
 ### MCP F1 收束过程（4 阶段真实案例）
 
-**触发**：[`0001-cli-first-pivot.md`](../worklogs/decisions/0001-cli-first-pivot.md) 决策路径 → F1「市场 + 安装」5 端点全实现（commit `3c0027c`..`f59a45a`）。完整报告：[`收束报告-MCP-F1.md`](../reports/收束报告-MCP-F1.md)（140 行）。
+**触发**：[`0001-cli-first-pivot.md`](../../worklogs/decisions/0001-cli-first-pivot.md) 决策路径 → F1「市场 + 安装」5 端点全实现（commit `3c0027c`..`f59a45a`）。完整报告：[`收束报告-MCP-F1.md`](../reports/收束报告-MCP-F1.md)（140 行）。
 
 | 阶段 | 关键发现 / 决策 |
 |------|----------------|
@@ -198,6 +198,6 @@ worklogs/
 
 - **主规格**：[`PRD_AgentHub_统一方案.md`](../plan/PRD_AgentHub_统一方案.md) v4.0（含 2026-06-07 增量附录：实施进度速览 + AI 协作沉淀）
 - **协作流程**：[`ai-workflow_AI协作开发流程/`](../conventions/ai-workflow_AI协作开发流程/)（01-07 共 7 篇）
-- **STATUS**：[`STATUS.md`](../STATUS.md) · **dashboard**：[`dashboard.html`](../dashboard.html)
+- **STATUS**：[`STATUS.md`](../../STATUS.md) · **dashboard**：[`dashboard.html`](../dashboard.html)
 - **MCP 收束报告**：[`收束报告-MCP-F1.md`](../reports/收束报告-MCP-F1.md) · [`收束报告-MCP-F2.md`](../reports/收束报告-MCP-F2.md)
 - **集成验证 + 4 张真集成截图**：[`integration-verify-report.md`](integration-verify-report.md) + [`screenshots/integration-{01..04}.png`](screenshots/integration-{01..04}.png)

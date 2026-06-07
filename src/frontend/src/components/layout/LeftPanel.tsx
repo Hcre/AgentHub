@@ -5,7 +5,7 @@ import { useChatStore, convKey } from '../../stores/chatStore'
 import { useGroupStore } from '../../stores/groupStore'
 import { useUIStore } from '../../stores/uiStore'
 import { CreateGroupModal } from '../group/CreateGroupModal'
-import { Avatar, ContextMenu, Icon } from '../ui'
+import { Avatar, ConfirmDialog, ContextMenu, Icon } from '../ui'
 import type { ContextMenuItem } from '../ui'
 
 function SectionHeader({
@@ -79,6 +79,40 @@ export function LeftPanel() {
   const deleteGroup = useGroupStore((s) => s.deleteGroup)
   const [groupCreateOpen, setGroupCreateOpen] = useState(false)
   const [menu, setMenu] = useState<{ groupId: string; x: number; y: number } | null>(null)
+  const [deleteConfirming, setDeleteConfirming] = useState<string | null>(null) // groupId to delete
+  const [dmBatchMode, setDmBatchMode] = useState(false)
+  const [dmSelected, setDmSelected] = useState<Set<string>>(() => new Set())
+  const [dmBatchDeleteConfirm, setDmBatchDeleteConfirm] = useState(false)
+  const removeConversations = useChatStore((s) => s.removeConversations)
+
+  const exitDmBatch = () => {
+    setDmBatchMode(false)
+    setDmSelected(new Set())
+  }
+
+  const toggleDmSelect = (convId: string) => {
+    setDmSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(convId)) next.delete(convId)
+      else next.add(convId)
+      return next
+    })
+  }
+
+  const confirmDmBatchDelete = () => {
+    // Group by agent, then delete
+    const byAgent: Record<string, string[]> = {}
+    for (const key of dmSelected) {
+      const [agentId, convId] = key.split(':')
+      if (!byAgent[agentId]) byAgent[agentId] = []
+      byAgent[agentId].push(convId)
+    }
+    for (const [agentId, convIds] of Object.entries(byAgent)) {
+      removeConversations(agentId, convIds)
+    }
+    setDmBatchDeleteConfirm(false)
+    exitDmBatch()
+  }
 
   // 扁平私聊列表：每 Agent 内会话倒序（最新在前），跨 Agent 保持 store 顺序
   const dmList = useMemo(() => {
@@ -174,6 +208,7 @@ export function LeftPanel() {
               dmList.map(({ agent, conv, key }) => {
                 const isActive =
                   section === 'chat' && activeAgentId === agent.id && activeConversationId === conv.id
+                const selected = dmSelected.has(key)
                 // 最近一条消息
                 const msgKey = convKey(agent.id, conv.id)
                 const msgs = messages[msgKey] ?? []
@@ -182,13 +217,29 @@ export function LeftPanel() {
                 return (
                   <button
                     key={key}
-                    onClick={() => openConversation(agent.id, conv.id)}
+                    onClick={() => {
+                      if (dmBatchMode) {
+                        toggleDmSelect(key)
+                      } else {
+                        openConversation(agent.id, conv.id)
+                      }
+                    }}
                     data-active={isActive ? 'true' : undefined}
                     className={cn(
                       'flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
                       'data-[active=true]:bg-brand/10 data-[active=true]:text-foreground',
                     )}
                   >
+                    {dmBatchMode && (
+                      <div className={cn(
+                        'mt-1 grid h-4 w-4 flex-shrink-0 place-items-center rounded border-2 transition-colors',
+                        selected
+                          ? 'border-brand bg-brand text-brand-foreground'
+                          : 'border-muted-foreground/30',
+                      )}>
+                        {selected && <Icon name="check" className="h-2.5 w-2.5" />}
+                      </div>
+                    )}
                     <Avatar
                       initial={agent.name[0] ?? '?'}
                       color={agent.color}
@@ -210,11 +261,71 @@ export function LeftPanel() {
                 )
               })
             )}
+            {/* 批量管理按钮（柱在私聊列表底部） */}
+            {dmList.length > 0 && !dmBatchMode && (
+              <button
+                type="button"
+                onClick={() => setDmBatchMode(true)}
+                className="flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-2 text-[11px] text-muted-foreground/60 transition-colors hover:bg-accent hover:text-muted-foreground"
+              >
+                <Icon name="check" className="h-3 w-3" />
+                批量管理
+              </button>
+            )}
+            {dmBatchMode && (
+              <div className="flex items-center justify-between rounded-md px-2 py-2">
+                <span className="text-[11px] text-muted-foreground">
+                  已选 {dmSelected.size} 个
+                </span>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={exitDmBatch}
+                    className="rounded px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => dmSelected.size > 0 && setDmBatchDeleteConfirm(true)}
+                    disabled={dmSelected.size === 0}
+                    className="rounded px-2 py-0.5 text-[11px] text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-30"
+                  >
+                    删除选中
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </nav>
 
       <CreateGroupModal open={groupCreateOpen} onClose={() => setGroupCreateOpen(false)} />
+      <ConfirmDialog
+        open={deleteConfirming !== null}
+        title="删除群组"
+        message="确定删除该群组？此操作不可恢复。"
+        confirmLabel="删除"
+        danger
+        onConfirm={() => {
+          const gid = deleteConfirming!
+          deleteGroup(gid)
+          if (activeGroupId === gid && activeAgentId && activeConversationId) {
+            openConversation(activeAgentId, activeConversationId)
+          }
+          setDeleteConfirming(null)
+        }}
+        onCancel={() => setDeleteConfirming(null)}
+      />
+      <ConfirmDialog
+        open={dmBatchDeleteConfirm}
+        title="批量删除会话"
+        message={`确定删除选中的 ${dmSelected.size} 个私聊会话？此操作不可恢复。`}
+        confirmLabel="删除"
+        danger
+        onConfirm={confirmDmBatchDelete}
+        onCancel={() => setDmBatchDeleteConfirm(false)}
+      />
       {menu && (
         <ContextMenu
           x={menu.x} y={menu.y}
@@ -234,12 +345,8 @@ export function LeftPanel() {
                 label: '删除群组',
                 danger: true,
                 onClick: () => {
-                  if (window.confirm('确定删除该群组？')) {
-                    deleteGroup(menu.groupId)
-                    if (activeGroupId === menu.groupId && activeAgentId && activeConversationId) {
-                      openConversation(activeAgentId, activeConversationId)
-                    }
-                  }
+                  setDeleteConfirming(menu.groupId)
+                  setMenu(null)
                 },
               },
             ] satisfies ContextMenuItem[]

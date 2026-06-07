@@ -2,10 +2,10 @@
 
 > **上一版模块名**：多 OS 沙箱矩阵
 > **DEPRECATED 时间**：2026-06-03
-> **修订依据**：[可行性问题清单_2026-06-03.md](../../../可行性问题清单_2026-06-03.md) I-01/I-02/I-03/I-04/I-05
+> **修订依据**：[可行性问题清单_2026-06-03.md](../../../../plan/后续升级计划/MCP接入/可行性问题清单_2026-06-03.md) I-01/I-02/I-03/I-04/I-05
 > **处置**：**NB-02 下期（E-03 简化版替代）**
 > **真实落点**：本期用 src/backend/app/infrastructure/docker_sandbox/runner.py 单 Docker 容器 + compose 资源限额
-> **单一权威入口**：[`../../../README-REVISION.md`](../../../README-REVISION.md)
+> **单一权威入口**：[`../../../README-REVISION.md`](../../../../plan/后续升级计划/MCP接入/README-REVISION.md)
 
 ---
 

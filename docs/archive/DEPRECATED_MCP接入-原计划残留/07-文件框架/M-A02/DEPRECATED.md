@@ -2,10 +2,10 @@
 
 > **上一版模块名**：WS gateway
 > **DEPRECATED 时间**：2026-06-03
-> **修订依据**：[可行性问题清单_2026-06-03.md](../../../可行性问题清单_2026-06-03.md) I-01/I-02/I-03/I-04/I-05
+> **修订依据**：[可行性问题清单_2026-06-03.md](../../../../plan/后续升级计划/MCP接入/可行性问题清单_2026-06-03.md) I-01/I-02/I-03/I-04/I-05
 > **处置**：**DEPRECATED（沿用既有 L4 API/WS）**
 > **真实落点**：L4 WS = src/backend/app/api/ws/，工具调用通道 = toolcall.py（F-014 复用）
-> **单一权威入口**：[`../../../README-REVISION.md`](../../../README-REVISION.md)
+> **单一权威入口**：[`../../../README-REVISION.md`](../../../../plan/后续升级计划/MCP接入/README-REVISION.md)
 
 ---
 

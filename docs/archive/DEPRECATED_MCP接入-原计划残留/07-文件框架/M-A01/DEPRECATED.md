@@ -2,10 +2,10 @@
 
 > **上一版模块名**：API gateway
 > **DEPRECATED 时间**：2026-06-03
-> **修订依据**：[可行性问题清单_2026-06-03.md](../../../可行性问题清单_2026-06-03.md) I-01/I-02/I-03/I-04/I-05
+> **修订依据**：[可行性问题清单_2026-06-03.md](../../../../plan/后续升级计划/MCP接入/可行性问题清单_2026-06-03.md) I-01/I-02/I-03/I-04/I-05
 > **处置**：**DEPRECATED（沿用既有 L4 API）**
 > **真实落点**：L4 API = src/backend/app/api/v1/，MCP 端点 = mcp.py（详见 06-详细设计/IC-MCP-V1.0-20260602.md）
-> **单一权威入口**：[`../../../README-REVISION.md`](../../../README-REVISION.md)
+> **单一权威入口**：[`../../../README-REVISION.md`](../../../../plan/后续升级计划/MCP接入/README-REVISION.md)
 
 ---
 

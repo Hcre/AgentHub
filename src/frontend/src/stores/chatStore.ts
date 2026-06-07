@@ -63,6 +63,10 @@ interface ChatState {
   clearUnread: (key: string) => void
   /** 整组合计未读（给 NavRail 红点用） */
   totalUnread: () => number
+  /** 删除一个会话 */
+  removeConversation: (agentId: string, conversationId: string) => void
+  /** 批量删除会话 */
+  removeConversations: (agentId: string, conversationIds: string[]) => void
 }
 
 export const useChatStore = create<ChatState>()(
@@ -218,6 +222,35 @@ export const useChatStore = create<ChatState>()(
         ),
       },
     }))
+  },
+
+  removeConversation: (agentId, conversationId) => {
+    set((s) => {
+      const existing = s.conversations[agentId] ?? []
+      const filtered = existing.filter((c) => c.id !== conversationId)
+      const next = { ...s.conversations }
+      if (filtered.length > 0) {
+        next[agentId] = filtered
+      } else {
+        delete next[agentId]
+      }
+      return { conversations: next }
+    })
+  },
+
+  removeConversations: (agentId, conversationIds) => {
+    const ids = new Set(conversationIds)
+    set((s) => {
+      const existing = s.conversations[agentId] ?? []
+      const filtered = existing.filter((c) => !ids.has(c.id))
+      const next = { ...s.conversations }
+      if (filtered.length > 0) {
+        next[agentId] = filtered
+      } else {
+        delete next[agentId]
+      }
+      return { conversations: next }
+    })
   },
 
   clearUnread: (key) =>

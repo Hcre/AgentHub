@@ -3,7 +3,7 @@
 **Date**: 2026-06-07 19:05 (Asia/Shanghai)
 **Author**: Mavis owner (mvs_ee3d79d9bfb44a02b6dacda1d8d47f71)
 **Status**: Accepted (owner override)
-**Related**: [ADR-0012 BDD 全面沉淀](0012-bdd-spec-comprehensive-precipitation.md), [ADR-0013 mavis-team 委派 P0-P1-P2](0013-mavis-team-delegation-p0-p1-p2.md), [worklog 2026-06-07 mavis-team 委派 cycle 3 收束](../mavis/2026-06-07_Mavis-owner-委派-cycle-3-recovery.md)
+**Related**: [ADR-0012 BDD 全面沉淀](0012-bdd-spec-comprehensive-precipitation.md), [ADR-0013 mavis-team 委派 P0-P1-P2](0013-mavis-team-delegation-p0-p1-p2.md), [worklog 2026-06-07 mavis-team 委派 cycle 3 收束](../yuan/2026-06-07_Mavis-owner-委派-cycle-3-recovery.md)
 
 ## Context
 
@@ -102,8 +102,8 @@ plan_ba86c4d0 是 M5 5.4/5.5 全量委派 5 sub-agent 并行 + BDD+TDD 流程的
 
 ## References
 
-- [STATUS.md](../../../../STATUS.md) — M5 5.4/5.5 状态行
-- [开发清单_roadmap.md §▶ 接手指引](../../../../plan/开发清单_roadmap.md)
-- [mavis-team-pitfalls.md §13](../../../../../agents/mavis/memory/mavis-team-pitfalls.md)
-- [worklog 2026-06-07 mavis owner 委派 cycle 3 收束](../mavis/2026-06-07_Mavis-owner-委派-cycle-3-recovery.md)
+- [STATUS.md](../../STATUS.md) — M5 5.4/5.5 状态行
+- [开发清单_roadmap.md §▶ 接手指引](../../docs/plan/开发清单_roadmap.md)
+- mavis-team-pitfalls.md §13（文件暂缺）
+- worklog 2026-06-07 mavis owner 委派 cycle 3 收束（文件暂缺）
 - [worklog 2026-06-07 plan_ba86c4d0 强收] (pending — 本次写)

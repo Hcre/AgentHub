@@ -1,7 +1,7 @@
 # RT-MCP — MCP Runtime 注入接入计划（opencode 拉回 + pi seam + 后续 CLI）
 
 > 版本：V1.0-20260604 · 作者：袁（Claude Agent 协助）
-> 权威依据：[ADR-06](../../../../worklogs/decisions/0006-mcp-injection-per-runtime-isolated-channel.md)（统一注入原则）· [ADR-05](../../../../worklogs/decisions/0005-mcp-attach-request-carried.md)（请求携带）
+> 权威依据：[ADR-06](../../../../../worklogs/decisions/0006-mcp-injection-per-runtime-isolated-channel.md)（统一注入原则）· [ADR-05](../../../../../worklogs/decisions/0005-mcp-attach-request-carried.md)（请求携带）
 > 单一权威入口：[README-REVISION.md](../README-REVISION.md) §9 R11
 > 性质：本文件是 ADR-06 的**落地施工蓝图**（下一会话执行）。docs-only，未动代码。
 

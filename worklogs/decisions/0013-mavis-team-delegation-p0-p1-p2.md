@@ -3,10 +3,10 @@
 - **状态**: Accepted
 - **日期**: 2026-06-07
 - **决策者**: Mavis (owner, per ADR-0008 自主决策授权)
-- **关联 Spec**: [docs/specs/04-commands_命令接口.md v2.2](../docs/specs/04-commands_命令接口.md) · [docs/specs/01-architecture_架构定义.md](../docs/specs/01-architecture_架构定义.md) · [docs/specs/03-data-model_数据模型.md](../docs/specs/03-data-model_数据模型.md) · [docs/plan/开发清单_roadmap.md §六 M5 5.5](../docs/plan/开发清单_roadmap.md)
-- **关联 ADR**: [ADR-0008 self-governance](../worklogs/decisions/0008-self-governance-authorization.md) · [ADR-0012 BDD spec precipitation](../worklogs/decisions/0012-bdd-spec-comprehensive-precipitation.md)
+- **关联 Spec**: [docs/specs/04-commands_命令接口.md v2.2](../../docs/specs/04-commands_命令接口.md) · [docs/specs/01-architecture_架构定义.md](../../docs/specs/01-architecture_架构定义.md) · [docs/specs/03-data-model_数据模型.md](../../docs/specs/03-data-model_数据模型.md) · [docs/plan/开发清单_roadmap.md §六 M5 5.5](../../docs/plan/开发清单_roadmap.md)
+- **关联 ADR**: [ADR-0008 self-governance](./0008-self-governance-authorization.md) · [ADR-0012 BDD spec precipitation](./0012-bdd-spec-comprehensive-precipitation.md)
 - **关联 plan**: `plan_ba86c4d0` (Mavis owner 15:30 session 委派)
-- **关联 worklog**: [worklogs/mavis/2026-06-07_创建团队委派.md](../worklogs/mavis/2026-06-07_创建团队委派.md)
+- **关联 worklog**: [worklogs/mavis/2026-06-07_创建团队委派.md](../mavis/2026-06-07_创建团队委派.md)
 
 ## 背景
 
@@ -27,7 +27,7 @@
 - **命令 reference**：04-commands §二/§三是 759 行完整契约（37 REST + 11 WS + 错误码），缺一份**快速参考表**给答辩人 / 新接手人
 
 **ADR 编号冲突说明**：
-- 原任务指令指定 ADR 编号为 `0012`，但 [ADR-0012](../worklogs/decisions/0012-bdd-spec-comprehensive-precipitation.md) 已占用（14:26 session 落档）
+- 原任务指令指定 ADR 编号为 `0012`，但 [ADR-0012](./0012-bdd-spec-comprehensive-precipitation.md) 已占用（14:26 session 落档）
 - per `scripts/check_docs.py` line 112 `ADR_PATTERN = re.compile(r"^\d{4}-[a-z0-9-]+\.md$")` 4-digit pattern
 - 本 ADR 编号 **0013**（下一可用），并在本 ADR 内说明原因
 
@@ -169,11 +169,11 @@
   - [ADR-0008 自主决策授权](0008-self-governance-authorization.md)（Mavis owner 有权写 ADR）
   - [ADR-0012 BDD spec precipitation](0012-bdd-spec-comprehensive-precipitation.md)（14:26 session 平行工作）
 - **下游文档**：
-  - [roadmap §一/§六/§8.1/§8.2/§8.2.1/§8.4/§九/§▶](../docs/plan/开发清单_roadmap.md)
-  - [architecture-diagram.svg + .png](../docs/deliverables/architecture-diagram.svg)
-  - [er-diagram.svg + .png](../docs/deliverables/er-diagram.svg)
-  - [commands-reference.md](../docs/deliverables/commands-reference.md)
-- **承接 worklog**：[worklogs/mavis/2026-06-07_创建团队委派.md](../worklogs/mavis/2026-06-07_创建团队委派.md)
+  - [roadmap §一/§六/§8.1/§8.2/§8.2.1/§8.4/§九/§▶](../../docs/plan/开发清单_roadmap.md)
+  - [architecture-diagram.svg + .png](../../docs/deliverables/architecture-diagram.svg)
+  - [er-diagram.svg + .png](../../docs/deliverables/er-diagram.svg)
+  - [commands-reference.md](../../docs/deliverables/commands-reference.md)
+- **承接 worklog**：[worklogs/mavis/2026-06-07_创建团队委派.md](../mavis/2026-06-07_创建团队委派.md)
 - **plan_ba86c4d0 board**：[C:\Users\yhn\.mavis\plans\plan_ba86c4d0\board.md]
 
 ---

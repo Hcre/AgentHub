@@ -5,6 +5,8 @@ export { Card, CardContent, CardDescription, CardHeader, CardTitle } from './Car
 export { ContextMenu } from './ContextMenu'
 export type { ContextMenuItem } from './ContextMenu'
 export { Dialog, DialogContent } from './Dialog'
+export { ConfirmDialog } from './ConfirmDialog'
+export type { ConfirmDialogProps } from './ConfirmDialog'
 export { Icon } from './Icon'
 export { Input } from './Input'
 export { Kbd } from './Kbd'

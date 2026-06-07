@@ -10,7 +10,7 @@
 >   - 计划空间（修订后 FS/SA/MD/IC/UI 文档自洽性）：🟢
 >   - 代码空间（`src/backend/app/` + `src/frontend/src/` 真实落地）：🔴 须 P1-P4 实施后翻转为 🟢
 > **关键修订**：原版"🟢 三层闭环均建立且收敛；系统可在零修改下走通端到端主路径"——**该结论仅在计划自身虚构的 `src/agenthub/` 仓内成立，对真实代码库不成立**。本修订版做明确的口径分离。
-> **单一权威入口**：[`../../README-REVISION.md`](../../README-REVISION.md)
+> **单一权威入口**：[`../README-REVISION.md`](../README-REVISION.md)
 
 ---
 

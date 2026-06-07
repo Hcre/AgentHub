@@ -1,12 +1,12 @@
 # SA-MCP-V1.0-20260602（修订版）— MCP 接入整体结构与架构概览
 
-> ⚠️ **路径 ERRATA（2026-06-03 整理）**：本文以下出现的 `api/v1/mcp`、`application/mcp/*`、`infrastructure/agentruntime/mcp_injector`、`infrastructure/db/models/mcp.py`、`docker_sandbox`、`BaseAgentRuntime` 均为修订前残留。**实际落点以三处权威为准**：文件结构 → `06-详细设计/FS-MCP §1`；接口契约 → `docs/specs/04-commands §2.6`；架构映射 → `docs/specs/01-architecture §MCP.1`。URL 统一 `/api/mcp/`（无 `/v1/`，见 [ADR-0003](../../../../worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md)）。
+> ⚠️ **路径 ERRATA（2026-06-03 整理）**：本文以下出现的 `api/v1/mcp`、`application/mcp/*`、`infrastructure/agentruntime/mcp_injector`、`infrastructure/db/models/mcp.py`、`docker_sandbox`、`BaseAgentRuntime` 均为修订前残留。**实际落点以三处权威为准**：文件结构 → `06-详细设计/FS-MCP §1`；接口契约 → `docs/specs/04-commands §2.6`；架构映射 → `docs/specs/01-architecture §MCP.1`。URL 统一 `/api/mcp/`（无 `/v1/`，见 [ADR-0003](../../../../../worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md)）。
 
 > **版本**：V1.0-rev（2026-06-03 重写）
 > **修订依据**：可行性清单 I-01/I-02/I-03
 > **上一版**：Layer 1=Access → Layer 2=Application → Layer 3=Infrastructure → Layer 4=Data（**与 AR-01 反向**）
 > **本文档**：MCP 接入的**架构总览**权威
-> **单一权威入口**：[`../../README-REVISION.md`](../../README-REVISION.md)
+> **单一权威入口**：[`../README-REVISION.md`](../README-REVISION.md)
 
 ---
 

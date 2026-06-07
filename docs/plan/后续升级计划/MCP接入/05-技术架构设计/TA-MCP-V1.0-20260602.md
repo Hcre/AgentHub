@@ -4,7 +4,7 @@
 > **修订依据**：可行性清单 I-04（技术栈漂移：Poetry/gRPC/Vault/OTel/K8s 全非现有栈）
 > **上一版**：Poetry monorepo + gRPC protobuf + Vault + OpenTelemetry + Kubernetes
 > **本文档**：MCP 接入的**真实技术栈**对齐说明
-> **单一权威入口**：[`../../README-REVISION.md`](../../README-REVISION.md)
+> **单一权威入口**：[`../README-REVISION.md`](../README-REVISION.md)
 
 ---
 

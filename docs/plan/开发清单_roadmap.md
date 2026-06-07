@@ -137,8 +137,8 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 - **G1 群聊 P0-4/P0-5 修复**：`GroupMessageItem.tsx` + 类型 + 11 单测（commit `079cdca`）— 状态 P0-4/P0-5 实际覆盖率从"仅私聊"→ "私聊+群聊"
 - **G2 群组卡片整卡点击进群聊**：`GroupsListPage.tsx` article + onClick（commit `f41934b`）— UX 改进（不再依赖 hover icon 入口）
 - **vite dev container + volume mount**：`Dockerfile` + `docker-compose.yml` + `vite.config.ts`（commit `f0a2cb5`）— dev workflow 优化（改代码 HMR 实时刷新，不用 rebuild image）
-- **G3 BDD 17 场景全量沉淀 + M5 5.5 落档**（2026-06-07 14:26-15:00，commit `6ea00b6` + `63794e0` + `bfeceaf` + `5d14676` + `6ed92af` + `b9f7c99`）— M5 5.5 SPEC/Skill/Rules 沉淀✅，关联 [ADR-0012](../worklogs/decisions/0012-bdd-spec-comprehensive-precipitation.md) + [worklog](../worklogs/mavis/2026-06-07_BDD全量沉淀+M5-5.5落档.md)
-- **G4 M5 5.5 文档沉淀 + 架构图 + ER 图 + 命令 reference**（2026-06-07 15:30-17:00，本 session docs-writer 委派）— 5 必做落地（roadmap §▶ 接手指引 已对齐），关联 [ADR-0013](../worklogs/decisions/0013-mavis-team-delegation-p0-p1-p2.md) + [worklog](../worklogs/mavis/2026-06-07_创建团队委派.md) + [architecture-diagram.png](../deliverables/architecture-diagram.png) + [er-diagram.png](../deliverables/er-diagram.png) + [commands-reference.md](../deliverables/commands-reference.md)
+- **G3 BDD 17 场景全量沉淀 + M5 5.5 落档**（2026-06-07 14:26-15:00，commit `6ea00b6` + `63794e0` + `bfeceaf` + `5d14676` + `6ed92af` + `b9f7c99`）— M5 5.5 SPEC/Skill/Rules 沉淀✅，关联 [ADR-0012](../../worklogs/decisions/0012-bdd-spec-comprehensive-precipitation.md) + [worklog](../../worklogs/mavis/2026-06-07_BDD全量沉淀+M5-5.5落档.md)
+- **G4 M5 5.5 文档沉淀 + 架构图 + ER 图 + 命令 reference**（2026-06-07 15:30-17:00，本 session docs-writer 委派）— 5 必做落地（roadmap §▶ 接手指引 已对齐），关联 [ADR-0013](../../worklogs/decisions/0013-mavis-team-delegation-p0-p1-p2.md) + [worklog](../../worklogs/mavis/2026-06-07_创建团队委派.md) + [architecture-diagram.png](../deliverables/architecture-diagram.png) + [er-diagram.png](../deliverables/er-diagram.png) + [commands-reference.md](../deliverables/commands-reference.md)
 
 ### 8.3 MVP 不做（P2/P3，超出时间盒）
 

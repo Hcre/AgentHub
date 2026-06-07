@@ -77,7 +77,7 @@ CLI 路径在「短驻 + resume」模式下无干净解法。
 
 新路线：**ClaudeCodeRuntime 改造为长驻子进程，通过 `--input-format stream-json` 持续推送 JSONL user message，让 CLI 自己累积对话历史**。
 
-参考实现：cc-haha 项目（`SessionRunner` + `replBridge`，详见 [cc-haha 上下文管理分析](./cc-haha_context_management_analysis.md)）。
+参考实现：cc-haha 项目（`SessionRunner` + `replBridge`，详见 cc-haha 上下文管理分析（文件暂缺））。
 
 ### 决策 4：Phase 1 启动门槛 = Phase 0.5 验证通过 + Phase 0 量化基线达标
 
@@ -96,7 +96,7 @@ CLI 路径在「短驻 + resume」模式下无干净解法。
 
 ### 决策 6：记忆系统作为后续参考归档，不进当前 PRD
 
-cc-haha 的 frontmatter + AI 检索 + 团队记忆设计，记入 [memory-system-future.md](./memory-system-future.md)，作为「未来引入 Agent 长期记忆时的起点」，不影响本方案。
+cc-haha 的 frontmatter + AI 检索 + 团队记忆设计，记入 memory-system-future.md（文件暂缺），作为「未来引入 Agent 长期记忆时的起点」，不影响本方案。
 
 ## 三、根因 vs 方案覆盖矩阵
 
@@ -322,7 +322,7 @@ async def fanout_to_listeners(self, message, group, exclude_agent_id, pool):
 | # | 文件 |
 |---|------|
 | D1 | 本方案 v3 取代 v2，v2 内容仅在 EVOLUTION 中保留决策记录 |
-| D2 | [memory-system-future.md](./memory-system-future.md) — cc-haha 记忆系统作为后续参考 |
+| D2 | memory-system-future.md（文件暂缺） — cc-haha 记忆系统作为后续参考 |
 | D3 | EVOLUTION.md 新增今天的决策条目 |
 
 ## 六、风险与边界

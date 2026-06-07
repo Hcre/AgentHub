@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { cn } from '../../lib/cn'
-import { Avatar, Button, Icon } from '../ui'
+import { Avatar, Button, ConfirmDialog, Icon } from '../ui'
 
 interface MarketSkill {
   id: string
@@ -104,6 +104,8 @@ export function SkillMarketplacePage() {
   const [installedBatchMode, setInstalledBatchMode] = useState(false)
   const [installedSelected, setInstalledSelected] = useState<Set<string>>(new Set())
   const [installedDeleting, setInstalledDeleting] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState<string[] | null>(null)
 
   // ── tab 状态 ──
   const [tab, setTab] = useState<Tab>('market')
@@ -525,32 +527,8 @@ export function SkillMarketplacePage() {
                       variant="destructive"
                       size="sm"
                       disabled={installedSelected.size === 0 || installedDeleting}
-                      onClick={async () => {
-                        const names = Array.from(installedSelected)
-                        if (!window.confirm(`确定删除选中的 ${names.length} 个 skill？此操作不可恢复。`)) {
-                          return
-                        }
-                        setInstalledDeleting(true)
-                        try {
-                          const r = await fetch('/api/skills/library/batch-delete', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ names }),
-                          })
-                          if (!r.ok) {
-                            const d = await r.json().catch(() => ({}))
-                            setError(d.detail ?? `删除失败 (${r.status})`)
-                            return
-                          }
-                          // 成功 → 本地减集 + 清空选中 + 退出批量
-                          setInstalled((prev) => prev.filter((s) => !installedSelected.has(s.name)))
-                          setInstalledSelected(new Set())
-                          setInstalledBatchMode(false)
-                        } catch (e) {
-                          setError(e instanceof Error ? e.message : '删除失败')
-                        } finally {
-                          setInstalledDeleting(false)
-                        }
+                      onClick={() => {
+                        setBatchDeleteConfirm(Array.from(installedSelected))
                       }}
                     >
                       <Icon name="trash2" className="h-3.5 w-3.5" />
@@ -591,17 +569,17 @@ export function SkillMarketplacePage() {
                         isSelected && 'border-brand bg-brand/10 ring-1 ring-brand/40',
                       )}
                     >
-                      {/* 批量模式复选框（占按钮位） */}
+                      {/* 批量模式复选框（卡片右上角） */}
                       {installedBatchMode && (
                         <span
                           className={cn(
-                            'grid h-7 w-7 flex-shrink-0 place-items-center rounded-lg border-2',
+                            'absolute top-2 right-2 z-10 grid h-5 w-5 place-items-center rounded border-2',
                             isSelected
-                              ? 'border-brand bg-brand text-brand-foreground'
-                              : 'border-border bg-background',
+                              ? 'border-brand bg-brand text-white'
+                              : 'border-muted-foreground/40 bg-background/80',
                           )}
                         >
-                          {isSelected && <Icon name="check" className="h-3.5 w-3.5" strokeWidth={3} />}
+                          {isSelected && <Icon name="check" className="h-3 w-3" strokeWidth={3} />}
                         </span>
                       )}
 
@@ -654,25 +632,7 @@ export function SkillMarketplacePage() {
                             <GlassIconBtn
                               icon="trash2"
                               title="删除"
-                              onClick={async () => {
-                                if (!window.confirm(`确定删除「${s.name}」？此操作不可恢复。`)) {
-                                  return
-                                }
-                                try {
-                                  const r = await fetch(
-                                    `/api/skills/library/${encodeURIComponent(s.name)}`,
-                                    { method: 'DELETE' },
-                                  )
-                                  if (!r.ok) {
-                                    const d = await r.json().catch(() => ({}))
-                                    setError(d.detail ?? `删除失败 (${r.status})`)
-                                    return
-                                  }
-                                  setInstalled((prev) => prev.filter((x) => x.name !== s.name))
-                                } catch (e) {
-                                  setError(e instanceof Error ? e.message : '删除失败')
-                                }
-                              }}
+                              onClick={() => setDeleteConfirm(s.name)}
                             />
                           </div>
                         )}
@@ -691,6 +651,61 @@ export function SkillMarketplacePage() {
         </div>
       )}
 
+      {/* 单个删除确认 */}
+      <ConfirmDialog
+        open={deleteConfirm !== null}
+        title="删除 Skill"
+        message={`确定删除「${deleteConfirm}」？此操作不可恢复。`}
+        confirmLabel="删除"
+        danger
+        loading={installedDeleting}
+        onConfirm={async () => {
+          if (!deleteConfirm) return
+          setInstalledDeleting(true)
+          try {
+            const r = await fetch(`/api/skills/library/${encodeURIComponent(deleteConfirm)}`, { method: 'DELETE' })
+            if (!r.ok) { const d = await r.json().catch(() => ({})); setError(d.detail ?? `删除失败 (${r.status})`); return }
+            setInstalled((prev) => prev.filter((x) => x.name !== deleteConfirm))
+          } catch (e) {
+            setError(e instanceof Error ? e.message : '删除失败')
+          } finally {
+            setInstalledDeleting(false)
+            setDeleteConfirm(null)
+          }
+        }}
+        onCancel={() => setDeleteConfirm(null)}
+      />
+
+      {/* 批量删除确认 */}
+      <ConfirmDialog
+        open={batchDeleteConfirm !== null}
+        title="批量删除 Skill"
+        message={`确定删除选中的 ${batchDeleteConfirm?.length ?? 0} 个 skill？此操作不可恢复。`}
+        confirmLabel="删除"
+        danger
+        loading={installedDeleting}
+        onConfirm={async () => {
+          if (!batchDeleteConfirm) return
+          setInstalledDeleting(true)
+          try {
+            const r = await fetch('/api/skills/library/batch-delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ names: batchDeleteConfirm }),
+            })
+            if (!r.ok) { const d = await r.json().catch(() => ({})); setError(d.detail ?? `删除失败 (${r.status})`); return }
+            setInstalled((prev) => prev.filter((s) => !batchDeleteConfirm.includes(s.name)))
+            setInstalledSelected(new Set())
+            setInstalledBatchMode(false)
+          } catch (e) {
+            setError(e instanceof Error ? e.message : '删除失败')
+          } finally {
+            setInstalledDeleting(false)
+            setBatchDeleteConfirm(null)
+          }
+        }}
+        onCancel={() => setBatchDeleteConfirm(null)}
+      />
     </div>
   )
 }

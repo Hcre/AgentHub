@@ -5,7 +5,7 @@
 > **上一版**：22 个接口契约（散布在 22 模块）
 > **本文档**：MCP 接入的**8+2 端点 + WS 事件**契约
 > **PR-01 待办**：本节端点需在 P1 启动前冻结到 `docs/specs/04-commands`（2 人 Review）
-> **单一权威入口**：[`../../README-REVISION.md`](../../README-REVISION.md)
+> **单一权威入口**：[`../README-REVISION.md`](../README-REVISION.md)
 
 > ⚠️ **ERRATA（2026-06-03 PR-01 冻结时校正）**：本文档下方仍用 `/api/v1/mcp/...` 前缀与 `{"event":...}` 扁平 WS 格式，**已在冻结时按全库现状校正**，以 `docs/specs/04-commands_命令接口.md` §2.6 + §三 为准：① URL → `/api/mcp/...`（无 `/v1/`）；② WS → `{"type":"tool_call:*","payload":{...}}` 信封 + `request_id`（AP-07）；③ `attach_mcp` 落 `domain/llm/protocol.py::AgentRuntime`（非 `mcp_injector`）。本文档其余字段/错误码仍有效。
 
