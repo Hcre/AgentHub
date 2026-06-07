@@ -4,7 +4,7 @@ import { useAgentStore } from '../../stores/agentStore'
 import { useGroupStore } from '../../stores/groupStore'
 import { useUIStore } from '../../stores/uiStore'
 import type { Agent } from '../../types'
-import { Avatar, Button, Icon } from '../ui'
+import { Avatar, Button, Dialog, DialogContent, Icon } from '../ui'
 import { CreateGroupModal } from './CreateGroupModal'
 
 /**
@@ -22,6 +22,7 @@ export function GroupsListPage() {
   const [batchMode, setBatchMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [createOpen, setCreateOpen] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
 
   const selectedCount = selectedIds.size
   const allSelected = groups.length > 0 && selectedCount === groups.length
@@ -49,8 +50,12 @@ export function GroupsListPage() {
 
   const handleBatchDelete = () => {
     if (selectedCount === 0) return
-    if (!window.confirm(`确定删除选中的 ${selectedCount} 个群组？该操作不可恢复。`)) return
+    setDeleteConfirm(true)
+  }
+
+  const confirmBatchDelete = () => {
     selectedIds.forEach((id) => deleteGroup(id))
+    setDeleteConfirm(false)
     exitBatch()
   }
 
@@ -112,7 +117,7 @@ export function GroupsListPage() {
         {sortedGroups.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
-              <div className="mb-3 grid h-14 w-14 place-items-center rounded-full bg-muted text-muted-foreground">
+              <div className="mb-3 mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
                 <Icon name="channels" className="h-6 w-6" />
               </div>
               <p className="text-[14px] font-medium">还没有群组</p>
@@ -276,6 +281,27 @@ export function GroupsListPage() {
       </div>
 
       <CreateGroupModal open={createOpen} onClose={() => setCreateOpen(false)} />
+
+      {/* 批量删除确认弹窗 */}
+      <Dialog open={deleteConfirm} onOpenChange={(o) => !o && setDeleteConfirm(false)}>
+        <DialogContent className="w-[400px]">
+          <header className="flex items-start gap-3 border-b border-border/70 p-4">
+            <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg bg-destructive/10 text-destructive">
+              <Icon name="trash2" className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="text-[15px] font-semibold">批量删除群组</h2>
+              <p className="mt-1 text-[12.5px] text-muted-foreground">
+                确定删除选中的 {selectedCount} 个群组？该操作不可恢复。
+              </p>
+            </div>
+          </header>
+          <footer className="flex justify-end gap-2 border-t border-border/70 p-3">
+            <Button variant="outline" size="sm" onClick={() => setDeleteConfirm(false)}>取消</Button>
+            <Button variant="brand" size="sm" className="bg-destructive hover:bg-destructive/90" onClick={confirmBatchDelete}>确认删除</Button>
+          </footer>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

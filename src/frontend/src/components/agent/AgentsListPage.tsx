@@ -7,7 +7,7 @@ import { useTemplateStore, type TemplateData } from '../../stores/templateStore'
 import { StartChatModal } from '../chat/StartChatModal'
 import { CliIcon } from '../icons/cli/CliIcon'
 import { CLI_LABEL } from '../icons/cli/cliLabels'
-import { Avatar, Button, Icon } from '../ui'
+import { Avatar, Button, Dialog, DialogContent, Icon } from '../ui'
 import type { IconName } from '../../types'
 import { CreateAgentModal, type PreSelectedTemplate } from './CreateAgentModal'
 import { TemplateManagementTab } from '../template/TemplateManagementTab'
@@ -37,6 +37,8 @@ export function AgentsListPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [preSelectedTemplate, setPreSelectedTemplate] = useState<PreSelectedTemplate | undefined>(undefined)
   const [pendingChat, setPendingChat] = useState<{ agentId: string; agentName: string } | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ agentId: string; agentName: string } | null>(null)
+  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false)
 
   const selectedCount = selectedIds.size
   const allSelected = agents.length > 0 && selectedCount === agents.length
@@ -76,20 +78,28 @@ export function AgentsListPage() {
   }
 
   const handleDelete = (agentId: string, agentName: string) => {
-    if (window.confirm(`确定删除队友「${agentName}」？该操作不可恢复。`)) {
-      removeAgent(agentId)
-      setSelectedIds((prev) => {
-        const next = new Set(prev)
-        next.delete(agentId)
-        return next
-      })
-    }
+    setDeleteConfirm({ agentId, agentName })
+  }
+
+  const confirmDelete = () => {
+    if (!deleteConfirm) return
+    removeAgent(deleteConfirm.agentId)
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      next.delete(deleteConfirm.agentId)
+      return next
+    })
+    setDeleteConfirm(null)
   }
 
   const handleBatchDelete = () => {
     if (selectedCount === 0) return
-    if (!window.confirm(`确定删除选中的 ${selectedCount} 个队友？该操作不可恢复。`)) return
+    setBatchDeleteConfirm(true)
+  }
+
+  const confirmBatchDelete = () => {
     selectedIds.forEach((id) => removeAgent(id))
+    setBatchDeleteConfirm(false)
     exitBatch()
   }
 
@@ -210,7 +220,7 @@ export function AgentsListPage() {
           {sortedAgents.length === 0 ? (
             <div className="flex h-full items-center justify-center">
               <div className="text-center">
-                <div className="mb-3 grid h-14 w-14 place-items-center rounded-full bg-muted text-muted-foreground">
+                <div className="mb-3 mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
                   <Icon name="users" className="h-6 w-6" />
                 </div>
                 <p className="text-[14px] font-medium">还没有队友</p>
@@ -340,6 +350,48 @@ export function AgentsListPage() {
           onConfirm={handleStartChatConfirm}
         />
       )}
+
+      {/* 单个删除确认弹窗 */}
+      <Dialog open={deleteConfirm !== null} onOpenChange={(o) => !o && setDeleteConfirm(null)}>
+        <DialogContent className="w-[400px]">
+          <header className="flex items-start gap-3 border-b border-border/70 p-4">
+            <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg bg-destructive/10 text-destructive">
+              <Icon name="trash2" className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="text-[15px] font-semibold">删除队友</h2>
+              <p className="mt-1 text-[12.5px] text-muted-foreground">
+                确定删除「{deleteConfirm?.agentName}」？该操作不可恢复。
+              </p>
+            </div>
+          </header>
+          <footer className="flex justify-end gap-2 border-t border-border/70 p-3">
+            <Button variant="outline" size="sm" onClick={() => setDeleteConfirm(null)}>取消</Button>
+            <Button variant="brand" size="sm" className="bg-destructive hover:bg-destructive/90" onClick={confirmDelete}>确认删除</Button>
+          </footer>
+        </DialogContent>
+      </Dialog>
+
+      {/* 批量删除确认弹窗 */}
+      <Dialog open={batchDeleteConfirm} onOpenChange={(o) => !o && setBatchDeleteConfirm(false)}>
+        <DialogContent className="w-[400px]">
+          <header className="flex items-start gap-3 border-b border-border/70 p-4">
+            <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg bg-destructive/10 text-destructive">
+              <Icon name="trash2" className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="text-[15px] font-semibold">批量删除</h2>
+              <p className="mt-1 text-[12.5px] text-muted-foreground">
+                确定删除选中的 {selectedCount} 个队友？该操作不可恢复。
+              </p>
+            </div>
+          </header>
+          <footer className="flex justify-end gap-2 border-t border-border/70 p-3">
+            <Button variant="outline" size="sm" onClick={() => setBatchDeleteConfirm(false)}>取消</Button>
+            <Button variant="brand" size="sm" className="bg-destructive hover:bg-destructive/90" onClick={confirmBatchDelete}>确认删除</Button>
+          </footer>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
