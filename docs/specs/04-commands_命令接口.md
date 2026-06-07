@@ -635,6 +635,29 @@ make lint           # ruff + eslint + tsc
 | **断网** | 飞行模式 → 输入框上方出现「⚠️ 离线」banner → 恢复后自动重连 + 队列消息发送 |
 | **UI 验收（Playwright mobile viewport）** | 设 viewport `iPhone 12` (390x844) → 验证 5 个 When/Then 全部通过 + 截图 |
 
+#### 6.5.1.1 4 栏 shell 响应式（移动 H5 已落地部分）
+
+| 项 | 内容 |
+|----|------|
+| **场景 ID** | `B-6-P2-M02` 4 栏 shell 响应式（AppShell mobile 折叠）|
+| **对应任务** | roadmap §8.3 P2 缺口「移动端 H5」**已落地部分**（STATUS.md 22:00 E2E 校正段 ❌ → 本 BDD 落地后变 ✅）|
+| **API 端点** | 无；前端 `useMediaQuery` hook + `AppShell` 条件渲染（**`src/frontend/src/hooks/useMediaQuery.ts`** + **`src/frontend/src/components/layout/AppShell.tsx`**）|
+| **Given** | (a) 浏览器加载 AgentHub SPA；(b) AppShell 已挂载；(c) `useMediaQuery('(max-width: 767px)')` 响应窗口 resize / 设备方向 |
+| **When-1（视口 375 / 移动）** | Playwright `browser_resize {"width":375,"height":667}` 或手机访问 |
+| **Then-1** | (a) DOM 含 `data-testid="app-shell-mobile"`，**不**含 `app-shell-desktop`；(b) 顶部 mobile bar 显示：hamburger (`mobile-hamburger`) + 当前 section 标题 + 右侧 panel toggle (`mobile-right-toggle`)；(c) NavRail/LeftPanel 不再作为 4 栏并列元素渲染；(d) CenterPanel 占据全部宽度 |
+| **When-2（视口 768 / 临界）** | Playwright `browser_resize {"width":768,"height":1024}` |
+| **Then-2** | (a) 768 ≥ 768 触发 → 切换到桌面 shell（`app-shell-desktop` 出现）；(b) 4 栏并排：NavRail + LeftPanel + CenterPanel + RightPanel；(c) 桌面原有 `showLeftExpand` / RightPanelResizeHandle 行为不变 |
+| **When-3（视口 1280 / 桌面）** | Playwright `browser_resize {"width":1280,"height":800}` |
+| **Then-3** | (a) `app-shell-desktop` 渲染；(b) 4 栏并排 + NavRail 不被 hamburger 替代 |
+| **When-4（hamburger 触发左抽屉）** | 移动端点 hamburger |
+| **Then-4** | (a) `mobile-left-drawer` 出现（含 NavRail + LeftPanel 滑出）；(b) 抽屉内 NavRail 的 4 主功能（chat/agent/group/skill）可点 → `setSection(...)`；(c) 点 scrim 或按 Esc → 抽屉关闭 |
+| **When-5（右侧 toggle 触发右抽屉）** | 移动端 section ∈ {chat, group, agent-detail} 时点 `mobile-right-toggle` |
+| **Then-5** | (a) `mobile-right-drawer` 出现（含 RightPanel 滑出）；(b) 点 scrim 或 Esc → 关闭 |
+| **响应式断点** | 临界 768px 走桌面路径；< 768 走 mobile 路径（不动画，瞬间显示/隐藏 per brief downscope）|
+| **边界（无 matchMedia 旧浏览器）** | `window.matchMedia` 不存在 → `useMediaQuery` 返回 false → 走桌面 shell（SSR-safe + 旧浏览器降级）|
+| **UI 验收（Playwright mobile viewport）** | 三个 viewport 375 / 768 / 1280 各截图 + 1 张 hamburger 打开后截图；3+1 张落 `docs/deliverables/screenshots/e2e-mobile-{375,768,1280,hamburger}-2026-06-08.png` |
+| **vitest 验收** | `useMediaQuery.test.ts` 5 测 + `AppShell.responsive.test.tsx` 6 测 = 11 新测；全项目 85/85 绿 |
+
 #### 6.5.2 v6 录制脚本（基于真实工作流）
 
 | 项 | 内容 |
@@ -728,7 +751,8 @@ make lint           # ruff + eslint + tsc
 | 全屏预览 | ⚠️ 部分 | `B-4-P2-D02` | 前端 FullscreenModal |
 | Monaco 编辑器 | ❌ 未做 | `B-4-P2-D03` | 前端 CodeEditor + `@monaco-editor/react` |
 | 部署卡 | ❌ 未做 | `B-5-P2-DP01` | `POST/GET/DELETE /api/deployments` |
-| 移动端 H5 | ❌ 未做 | `B-6-P2-M01` | 前端 `/m` 路由 |
+| 移动端 H5 — 4 栏 shell 响应式 | ✅ **已做**（`B-6-P2-M02` 落地，`useMediaQuery` + `AppShell` mobile 折叠 + 11 单测 + 4 viewport 截图）| `B-6-P2-M02` | `useMediaQuery` hook + `AppShell.tsx` mobile 分支 |
+| 移动端 H5 — 独立 `/m` 路由 | ⬜ 未做 | `B-6-P2-M01` | 前端 `/m` 路由（待 6.5.1 全部 When 落地）|
 | v6 录制脚本 | ⚠️ v4 wallpaper 残留 | `B-6-P2-V01` | `scripts/demo_v6.py` |
 | 失败降级 | ❌ 未做 | `B-2-P2-F01` `B-7-P2-FD01` | 后端 service fallback |
 | 对话式自建 Agent | ⚠️ 部分 | `B-3-P0-A01` | `POST /api/agents/draft` |
@@ -757,3 +781,4 @@ make lint           # ruff + eslint + tsc
 | 2026-05-23 | v2.1 | 初版（环境变量 + REST API + WS + CLI + 启动）|
 | 2026-06-03 | v2.1 + §2.6 | MCP API 冻结草案（PR-01 待 Review）|
 | 2026-06-07 | v2.2 | 新增 §六 BDD 验收场景（覆盖 P0-4/P1-2/P1-3 + 11 P2 缺口 + 失败降级）+ §七 BDD↔任务映射表 + §八 关联文档 |
+| 2026-06-08 | v2.3 | 新增 §6.5.1.1 `B-6-P2-M02` 4 栏 shell 响应式（useMediaQuery + AppShell mobile 折叠 + 5 When/Then：375/768/1280/hamburger/右抽屉）；§七映射表拆 移动端 H5 — 4 栏 shell 响应式 ✅ 已做 / 移动端 H5 — 独立 /m 路由 ⬜ 未做 |
