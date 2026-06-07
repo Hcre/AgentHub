@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1020" font-family="-apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <linearGradient id="agentsGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="groupsGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="sessionsGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="messagesGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#60a5fa"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="tasksGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f87171"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
+    <linearGradient id="groupMembersGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#94a3b8"/>
+      <stop offset="100%" stop-color="#475569"/>
+    </linearGradient>
+    <marker id="fk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f172a"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="1020" fill="url(#bgGrad)"/>
+
+  <text x="800" y="38" text-anchor="middle" font-size="26" font-weight="700" fill="#0f172a">AgentHub 数据模型 ER 图 (5 主表 + 1 连接表)</text>
+  <text x="800" y="62" text-anchor="middle" font-size="13" fill="#64748b">v4 PRD 简化: 12 表 → 5 主表 + group_members 连接 | 5 主表: agents / groups / sessions / messages / tasks | 实现以 alembic migration 为准</text>
+
+  <!-- ============== agents table (top-left) ============== -->
+  <g>
+    <rect x="60" y="100" width="340" height="320" rx="8" fill="#ffffff" stroke="#d97706" stroke-width="2"/>
+    <rect x="60" y="100" width="340" height="32" rx="8" fill="url(#agentsGrad)"/>
+    <text x="230" y="122" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">agents</text>
+
+    <rect x="62" y="138" width="336" height="20" fill="#fef3c7"/>
+    <text x="68" y="153" font-size="11" font-weight="700" fill="#92400e">PK</text>
+    <text x="100" y="153" font-size="11" font-family="monospace" fill="#0f172a">id UUID</text>
+
+    <text x="68" y="173" font-size="11" font-family="monospace" fill="#0f172a">name TEXT UNIQUE NOT NULL</text>
+    <text x="68" y="190" font-size="11" font-family="monospace" fill="#0f172a">avatar TEXT NOT NULL</text>
+    <text x="68" y="207" font-size="11" font-family="monospace" fill="#0f172a">role TEXT NOT NULL</text>
+    <text x="68" y="224" font-size="11" font-family="monospace" fill="#0f172a">agent_system TEXT [claude|codex|trae]</text>
+    <text x="68" y="241" font-size="11" font-family="monospace" fill="#0f172a">provider TEXT NOT NULL</text>
+    <text x="68" y="258" font-size="11" font-family="monospace" fill="#0f172a">model TEXT NOT NULL</text>
+    <text x="68" y="275" font-size="11" font-family="monospace" fill="#0f172a">base_url TEXT</text>
+    <text x="68" y="292" font-size="11" font-family="monospace" fill="#dc2626">api_key_encrypted TEXT NOT NULL  (Fernet)</text>
+    <text x="68" y="309" font-size="11" font-family="monospace" fill="#0f172a">system_prompt TEXT</text>
+    <text x="68" y="326" font-size="11" font-family="monospace" fill="#0f172a">capability_tags TEXT[]</text>
+    <text x="68" y="343" font-size="11" font-family="monospace" fill="#0f172a">skills TEXT[]</text>
+    <text x="68" y="360" font-size="11" font-family="monospace" fill="#0f172a">status [online|offline|busy|error]</text>
+    <text x="68" y="377" font-size="11" font-family="monospace" fill="#0f172a">is_system BOOLEAN  (Coordinator=true)</text>
+    <text x="68" y="394" font-size="11" font-family="monospace" fill="#0f172a">workload INT / settings JSONB / memory_config JSONB</text>
+    <text x="68" y="411" font-size="11" font-family="monospace" fill="#0f172a">created_at / updated_at / deleted_at</text>
+  </g>
+
+  <!-- ============== groups table (bottom-left) ============== -->
+  <g>
+    <rect x="60" y="640" width="340" height="200" rx="8" fill="#ffffff" stroke="#7c3aed" stroke-width="2"/>
+    <rect x="60" y="640" width="340" height="32" rx="8" fill="url(#groupsGrad)"/>
+    <text x="230" y="662" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">groups</text>
+
+    <rect x="62" y="678" width="336" height="20" fill="#ede9fe"/>
+    <text x="68" y="693" font-size="11" font-weight="700" fill="#5b21b6">PK</text>
+    <text x="100" y="693" font-size="11" font-family="monospace" fill="#0f172a">id UUID</text>
+
+    <text x="68" y="713" font-size="11" font-family="monospace" fill="#0f172a">name TEXT NOT NULL</text>
+    <text x="68" y="730" font-size="11" font-family="monospace" fill="#0f172a">description TEXT DEFAULT ''</text>
+    <text x="68" y="747" font-size="11" font-family="monospace" fill="#0f172a">coordinator_config JSONB</text>
+    <text x="68" y="764" font-size="11" font-family="monospace" fill="#0f172a">created_at / updated_at TIMESTAMPTZ</text>
+    <text x="68" y="790" font-size="10" font-style="italic" fill="#5b21b6">1 group = 1 channel</text>
+    <text x="68" y="807" font-size="10" font-style="italic" fill="#5b21b6">自动生成 Coordinator (is_system=true)</text>
+    <text x="68" y="824" font-size="10" font-style="italic" fill="#5b21b6">名称: 协调者-{群组名称}</text>
+  </g>
+
+  <!-- ============== group_members table (middle-left, join) ============== -->
+  <g>
+    <rect x="60" y="480" width="340" height="140" rx="8" fill="#ffffff" stroke="#475569" stroke-width="2"/>
+    <rect x="60" y="480" width="340" height="32" rx="8" fill="url(#groupMembersGrad)"/>
+    <text x="230" y="502" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">group_members (join)</text>
+
+    <rect x="62" y="518" width="336" height="20" fill="#f1f5f9"/>
+    <text x="68" y="533" font-size="11" font-weight="700" fill="#334155">PK</text>
+    <text x="100" y="533" font-size="11" font-family="monospace" fill="#0f172a">id BIGSERIAL</text>
+
+    <text x="68" y="553" font-size="11" font-family="monospace" fill="#0f172a">FK group_id → groups(id) ON DELETE CASCADE</text>
+    <text x="68" y="570" font-size="11" font-family="monospace" fill="#0f172a">FK agent_id → agents(id) ON DELETE CASCADE</text>
+    <text x="68" y="587" font-size="11" font-family="monospace" fill="#0f172a">joined_at TIMESTAMPTZ</text>
+    <text x="68" y="604" font-size="10" font-style="italic" fill="#475569">UNIQUE (group_id, agent_id)</text>
+  </g>
+
+  <!-- ============== sessions table (center) ============== -->
+  <g>
+    <rect x="500" y="320" width="440" height="220" rx="8" fill="#ffffff" stroke="#059669" stroke-width="2"/>
+    <rect x="500" y="320" width="440" height="32" rx="8" fill="url(#sessionsGrad)"/>
+    <text x="720" y="342" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">sessions</text>
+
+    <rect x="502" y="358" width="436" height="20" fill="#d1fae5"/>
+    <text x="508" y="373" font-size="11" font-weight="700" fill="#065f46">PK</text>
+    <text x="540" y="373" font-size="11" font-family="monospace" fill="#0f172a">id UUID</text>
+
+    <text x="508" y="393" font-size="11" font-family="monospace" fill="#0f172a">type TEXT [group|private]</text>
+    <text x="508" y="410" font-size="11" font-family="monospace" fill="#0f172a">title TEXT DEFAULT ''</text>
+    <text x="508" y="427" font-size="11" font-family="monospace" fill="#0f172a">FK group_id → groups(id)  [type=group 时必填]</text>
+    <text x="508" y="444" font-size="11" font-family="monospace" fill="#0f172a">FK agent_id → agents(id)  [type=private 时关联]</text>
+    <text x="508" y="461" font-size="11" font-family="monospace" fill="#dc2626">long_term_context JSONB  (Pin 消息 + 压缩摘要)</text>
+    <text x="508" y="478" font-size="11" font-family="monospace" fill="#0f172a">is_deleted BOOLEAN / created_at / updated_at</text>
+    <text x="508" y="500" font-size="10" font-style="italic" fill="#065f46">上下文三层: 热(Redis 15-20 条) / 长期(JSONB) / 历史(FS 摘要)</text>
+    <text x="508" y="517" font-size="10" font-style="italic" fill="#065f46">idx_sessions_updated (updated_at DESC)</text>
+  </g>
+
+  <!-- ============== messages table (right) ============== -->
+  <g>
+    <rect x="1040" y="100" width="500" height="340" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+    <rect x="1040" y="100" width="500" height="32" rx="8" fill="url(#messagesGrad)"/>
+    <text x="1290" y="122" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">messages</text>
+
+    <rect x="1042" y="138" width="496" height="20" fill="#dbeafe"/>
+    <text x="1048" y="153" font-size="11" font-weight="700" fill="#1e40af">PK</text>
+    <text x="1080" y="153" font-size="11" font-family="monospace" fill="#0f172a">id UUID</text>
+
+    <text x="1048" y="173" font-size="11" font-family="monospace" fill="#0f172a">FK session_id → sessions(id)</text>
+    <text x="1048" y="190" font-size="11" font-family="monospace" fill="#0f172a">role TEXT [user|agent|system]</text>
+    <text x="1048" y="207" font-size="11" font-family="monospace" fill="#0f172a">agent_name TEXT</text>
+    <text x="1048" y="224" font-size="11" font-family="monospace" fill="#0f172a">content TEXT NOT NULL</text>
+    <text x="1048" y="241" font-size="11" font-family="monospace" fill="#0f172a">content_type [text|code_diff|preview_url|</text>
+    <text x="1048" y="258" font-size="11" font-family="monospace" fill="#0f172a">  deploy_status|task_plan|approval_request|</text>
+    <text x="1048" y="275" font-size="11" font-family="monospace" fill="#0f172a">  file_attachment|doc_preview|error]</text>
+    <text x="1048" y="292" font-size="11" font-family="monospace" fill="#0f172a">mentions TEXT[] / metadata JSONB</text>
+    <text x="1048" y="309" font-size="11" font-family="monospace" fill="#0f172a">reply_to → messages(id)  (self FK, optional)</text>
+    <text x="1048" y="326" font-size="11" font-family="monospace" fill="#0f172a">status [sending|sent|streaming|done|error]</text>
+    <text x="1048" y="343" font-size="11" font-family="monospace" fill="#dc2626">pinned BOOLEAN  (跨会话可见, B-1-P0-04 所有权校验)</text>
+    <text x="1048" y="360" font-size="11" font-family="monospace" fill="#0f172a">idempotency_key TEXT UNIQUE</text>
+    <text x="1048" y="377" font-size="11" font-family="monospace" fill="#0f172a">created_at TIMESTAMPTZ</text>
+    <text x="1048" y="400" font-size="10" font-style="italic" fill="#1e40af">idx_msg_session (session_id, created_at)</text>
+    <text x="1048" y="417" font-size="10" font-style="italic" fill="#1e40af">idx_te_idempotency (idempotency_key WHERE NOT NULL)</text>
+  </g>
+
+  <!-- ============== tasks table (bottom-center) ============== -->
+  <g>
+    <rect x="500" y="640" width="700" height="200" rx="8" fill="#ffffff" stroke="#dc2626" stroke-width="2"/>
+    <rect x="500" y="640" width="700" height="32" rx="8" fill="url(#tasksGrad)"/>
+    <text x="850" y="662" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">tasks</text>
+
+    <rect x="502" y="678" width="696" height="20" fill="#fee2e2"/>
+    <text x="508" y="693" font-size="11" font-weight="700" fill="#991b1b">PK</text>
+    <text x="540" y="693" font-size="11" font-family="monospace" fill="#0f172a">id UUID</text>
+
+    <text x="508" y="713" font-size="11" font-family="monospace" fill="#0f172a">title TEXT NOT NULL / description TEXT DEFAULT ''</text>
+    <text x="508" y="730" font-size="11" font-family="monospace" fill="#0f172a">status [pending|queued|running|awaiting_approval|paused|completed|failed|cancelled]</text>
+    <text x="508" y="747" font-size="11" font-family="monospace" fill="#0f172a">priority [critical|high|medium|low]</text>
+    <text x="508" y="764" font-size="11" font-family="monospace" fill="#0f172a">FK assignee_id → agents(id)  (assignee_type=[agent|group])</text>
+    <text x="508" y="781" font-size="11" font-family="monospace" fill="#0f172a">FK parent_task_id → tasks(id)  (self FK, 子任务嵌套)</text>
+    <text x="508" y="798" font-size="11" font-family="monospace" fill="#0f172a">FK session_id → sessions(id)  (来源会话, optional)</text>
+    <text x="508" y="815" font-size="11" font-family="monospace" fill="#0f172a">budget: tokens_used/budget_max_tokens · steps/budget_max_steps · budget_max_duration_secs</text>
+  </g>
+
+  <!-- ============== Relationships (clean, no overlap) ============== -->
+
+  <!-- group_members -> groups (N:1) -->
+  <line x1="170" y1="620" x2="170" y2="640" stroke="#0f172a" stroke-width="1.5" marker-end="url(#fk)"/>
+  <rect x="178" y="618" width="38" height="18" rx="3" fill="#ffffff"/>
+  <text x="197" y="632" text-anchor="middle" font-size="10" fill="#0f172a">N:1</text>
+
+  <!-- group_members -> agents (N:1) -->
+  <line x1="200" y1="480" x2="200" y2="420" stroke="#0f172a" stroke-width="1.5" marker-end="url(#fk)"/>
+  <rect x="208" y="438" width="38" height="18" rx="3" fill="#ffffff"/>
+  <text x="227" y="452" text-anchor="middle" font-size="10" fill="#0f172a">N:1</text>
+
+  <!-- sessions -> groups (N:0..1, type=group) -->
+  <line x1="500" y1="450" x2="400" y2="700" stroke="#0f172a" stroke-width="1.5" stroke-dasharray="6 3" marker-end="url(#fk)"/>
+  <rect x="430" y="540" width="76" height="18" rx="3" fill="#ffffff"/>
+  <text x="468" y="554" text-anchor="middle" font-size="10" fill="#0f172a">N:0..1</text>
+
+  <!-- sessions -> agents (N:0..1, type=private) -->
+  <line x1="500" y1="380" x2="400" y2="380" stroke="#0f172a" stroke-width="1.5" stroke-dasharray="6 3" marker-end="url(#fk)"/>
+  <rect x="408" y="362" width="76" height="18" rx="3" fill="#ffffff"/>
+  <text x="446" y="376" text-anchor="middle" font-size="10" fill="#0f172a">N:0..1</text>
+
+  <!-- messages -> sessions (N:1) -->
+  <line x1="1040" y1="380" x2="940" y2="400" stroke="#0f172a" stroke-width="1.5" marker-end="url(#fk)"/>
+  <rect x="950" y="370" width="38" height="18" rx="3" fill="#ffffff"/>
+  <text x="969" y="384" text-anchor="middle" font-size="10" fill="#0f172a">N:1</text>
+
+  <!-- tasks -> agents (assignee) (N:0..1) -->
+  <line x1="500" y1="720" x2="400" y2="450" stroke="#0f172a" stroke-width="1.5" stroke-dasharray="6 3" marker-end="url(#fk)"/>
+  <rect x="420" y="540" width="76" height="18" rx="3" fill="#ffffff"/>
+  <text x="458" y="554" text-anchor="middle" font-size="10" fill="#0f172a">N:0..1</text>
+
+  <!-- tasks -> sessions (N:0..1) -->
+  <line x1="700" y1="640" x2="700" y2="540" stroke="#0f172a" stroke-width="1.5" stroke-dasharray="6 3" marker-end="url(#fk)"/>
+  <rect x="710" y="568" width="76" height="18" rx="3" fill="#ffffff"/>
+  <text x="748" y="582" text-anchor="middle" font-size="10" fill="#0f172a">N:0..1</text>
+
+  <!-- ============== Legend ============== -->
+  <g>
+    <rect x="500" y="60" width="500" height="30" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+    <line x1="520" y1="75" x2="560" y2="75" stroke="#0f172a" stroke-width="1.5" marker-end="url(#fk)"/>
+    <text x="568" y="79" font-size="11" fill="#0f172a">实线: 强制 FK (NOT NULL)</text>
+    <line x1="720" y1="75" x2="760" y2="75" stroke="#0f172a" stroke-width="1.5" stroke-dasharray="6 3" marker-end="url(#fk)"/>
+    <text x="768" y="79" font-size="11" fill="#0f172a">虚线: 可选 FK (NULL)</text>
+    <line x1="920" y1="75" x2="960" y2="75" stroke="#dc2626" stroke-width="2"/>
+    <text x="968" y="79" font-size="11" fill="#0f172a">红色: 安全敏感字段</text>
+  </g>
+
+  <g>
+    <rect x="500" y="880" width="1040" height="120" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+    <text x="520" y="906" font-size="13" font-weight="700" fill="#0f172a">关系速查 (5 主表 + 1 连接表 + 2 自引用)</text>
+    <text x="520" y="932" font-size="11" fill="#0f172a">· agents → group_members: N:0..N (一个 Agent 可在多个群组；join 表 group_members 中间)</text>
+    <text x="520" y="952" font-size="11" fill="#0f172a">· groups → group_members: 1:N (一个群组多个成员；Coordinator 自动加入 + 不可移除)</text>
+    <text x="520" y="972" font-size="11" fill="#0f172a">· sessions → groups (type=group) / agents (type=private) — 单向引用，可选</text>
+    <text x="520" y="992" font-size="11" fill="#0f172a">· messages → sessions (1:N)；messages → messages (self reply_to)；tasks → agents/sessions/tasks (self parent_task_id)</text>
+  </g>
+
+  <text x="800" y="1014" text-anchor="middle" font-size="10" fill="#64748b">v4 PRD 简化前为 12 表; v4 后 5 主表 + 1 连接表; alembic 0001-0010 共 10 个 migration | 数据模型权威: docs/specs/03-data-model_数据模型.md</text>
+</svg>

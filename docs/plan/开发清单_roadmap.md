@@ -18,7 +18,7 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 | **M2** | 5/23-27 | 对话列表 + 1v1 聊天 + 流式 + 代码块渲染 | "需求→代码→预览"闭环可走通 | ✅ **完成**（董，per STATUS.md line 9）|
 | **M3** | 5/28-6/1 | 群聊创建 + @协调者/自动检测 + 任务拆解 + DAG 编译 + 并行调度 | 复杂任务自动拆解到 ≥2 Agent | ✅ **完成**（董，per STATUS.md line 9）|
 | **M4** | 6/2-5 | 网页预览卡片 + Diff 视图 + Pin + 自建 Agent（选系统+配模型） | 聊天流中预览、修改、确认产物 | ✅ **完成**（P0-1~P0-6 全 ✅，per §8.1 + 集成验证 6 E2E）|
-| **M5** | 6/6-9 | PRD 终稿 + 架构文档 + SPEC/Skill/Rules 沉淀 + 3min Demo | 5 个 Core User Stories 覆盖 | ⚠️ **部分**（5.1 UI 主题 ✅ / 5.2 任务看板 ✅ / 5.3 Token ⬜ / 5.4 E2E ⚠️ 10 screenshot + 11 单测 / 5.5 文档 ⚠️ / 5.6 Demo 视频 ✅ 但 v4 wallpaper 44.9% 残留待 v6 重录）|
+| **M5** | 6/6-9 | PRD 终稿 + 架构文档 + SPEC/Skill/Rules 沉淀 + 3min Demo | 5 个 Core User Stories 覆盖 | ⚠️ **部分→趋完成**（5.1 UI 主题 ✅ / 5.2 任务看板 ✅ / 5.3 Token ⬜ / 5.4 E2E ⚠️ 10 screenshot + 11 单测 / 5.5 文档 ✅ BDD 17 场景 + 架构图 + ER 图 + 命令 reference + Skill + Rules / 5.6 Demo 视频 ✅ 但 v4 wallpaper 44.9% 残留待 v6 重录）|
 | **M6** | 6/10 | 代码仓库整理、README 完善、最终提交 | 材料送达 | ⏳ **进行中**（5:50 凌晨冲刺已完成 5 task 收束；v6 录制 + M3/M4 inbox 视觉补待）|
 
 ---
@@ -92,7 +92,7 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 | 5.2 | 任务看板（列表/看板视图 + 筛选） | 8h | 聊天派发的任务在看板中可见 | ✅ **已做**（4 列 + 7 任务：待处理 3/进行中 2/阻塞 1/完成 1）| E2E F4 截图 |
 | 5.3 | Token 消耗监控 | 4h | 实时显示 | ⬜ 待办 | — |
 | 5.4 | E2E 测试（Playwright 覆盖 5 个 Story） | 8h | 全绿 | ⚠️ **部分**（10 个 E2E screenshot + 11 新单测 + vitest 47/47；未做 CI gate）| e2e-F1..F10 + vitest |
-| 5.5 | 文档终稿（PRD + 架构 + SPEC + Rules） | 8h | 完整 | ⚠️ **部分**（PRD ✅ + 架构 + SPEC + Rules 存在；Mavis 5:50 凌晨冲刺 + 今天 13:40 已补完 Mavis worklog + STATUS.md PRD 对照段）| STATUS.md 5 段 + worklogs/mavis/2 worklog |
+| 5.5 | 文档终稿（PRD + 架构 + SPEC + Rules） | 8h | 完整 | ✅ **已做**（PRD ✅ + 架构图 ✅ + ER 图 ✅ + 04-commands v2.2 §六 17 BDD 场景 ✅ + commands-reference.md ✅ + skills/agenthub-dev v1.0 ✅ + 05-testing v3.1 §二点五 BDD+TDD 双循环 ✅）| [architecture-diagram.png](../deliverables/architecture-diagram.png) + [er-diagram.png](../deliverables/er-diagram.png) + [commands-reference.md](../deliverables/commands-reference.md) + [04-commands §六](../specs/04-commands_命令接口.md) + [agenthub-dev SKILL](../../skills/agenthub-dev/SKILL.md) |
 | 5.6 | 3min Demo 视频 | 8h | 覆盖 5 个 Core User Stories | ✅ **已做**（200s 1920x1080 17.7MB）+ ⚠️ **v4 wallpaper 44.9% 残留**（v5 SetWindowPos crash 失败；v6 待重录）| `docs/deliverables/video/AgentHub-Demo-Video.mp4` |
 
 ---
@@ -137,6 +137,8 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 - **G1 群聊 P0-4/P0-5 修复**：`GroupMessageItem.tsx` + 类型 + 11 单测（commit `079cdca`）— 状态 P0-4/P0-5 实际覆盖率从"仅私聊"→ "私聊+群聊"
 - **G2 群组卡片整卡点击进群聊**：`GroupsListPage.tsx` article + onClick（commit `f41934b`）— UX 改进（不再依赖 hover icon 入口）
 - **vite dev container + volume mount**：`Dockerfile` + `docker-compose.yml` + `vite.config.ts`（commit `f0a2cb5`）— dev workflow 优化（改代码 HMR 实时刷新，不用 rebuild image）
+- **G3 BDD 17 场景全量沉淀 + M5 5.5 落档**（2026-06-07 14:26-15:00，commit `6ea00b6` + `63794e0` + `bfeceaf` + `5d14676` + `6ed92af` + `b9f7c99`）— M5 5.5 SPEC/Skill/Rules 沉淀✅，关联 [ADR-0012](../worklogs/decisions/0012-bdd-spec-comprehensive-precipitation.md) + [worklog](../worklogs/mavis/2026-06-07_BDD全量沉淀+M5-5.5落档.md)
+- **G4 M5 5.5 文档沉淀 + 架构图 + ER 图 + 命令 reference**（2026-06-07 15:30-17:00，本 session docs-writer 委派）— 5 必做落地（roadmap §▶ 接手指引 已对齐），关联 [ADR-0013](../worklogs/decisions/0013-mavis-team-delegation-p0-p1-p2.md) + [worklog](../worklogs/mavis/2026-06-07_创建团队委派.md) + [architecture-diagram.png](../deliverables/architecture-diagram.png) + [er-diagram.png](../deliverables/er-diagram.png) + [commands-reference.md](../deliverables/commands-reference.md)
 
 ### 8.3 MVP 不做（P2/P3，超出时间盒）
 
@@ -193,6 +195,8 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 | 2026-06-07 13:00-13:30 | **清理 + dev workflow 优化**（commits `811705d` / `43a7ff9` / `86b8317` / `0992270` / `25e4dd9` / `f0a2cb5`）— .harness reins 落档 + 5:50 凌晨产物落档 + rename + .gitignore 防御 + vite dev container + volume mount（HMR 实时刷新）| Mavis owner |
 | 2026-06-07 13:40-14:00 | **PRD 核心功能 vs 现状对照**（commit `c318b05` 改 roadmap §8.1/§8.2；STATUS.md 新增"🎯 PRD 核心功能 vs 现状对照"段）— 6 大功能子项状态表：✅ 完整 9 / ⚠️ 部分 6 / ❌ 未做 7 / 📋 计划 1| Mavis owner |
 | 2026-06-07 13:50-14:00 | **本 roadmap 大改**：§一总览加状态列 / §六 M5 子任务加状态 / §8.4 Demo 脚本替换 S5 Inbox 段 / §八.2.1 新增 user-driven 增量 / §▶接手指引更新（去掉"PR-01 闸门"过时的"计划已整理完毕"措辞）| Mavis owner |
+| 2026-06-07 14:26-15:00 | **BDD 17 场景全量沉淀 + M5 5.5 落档**（6 commit `6ea00b6` + `63794e0` + `bfeceaf` + `5d14676` + `6ed92af` + `b9f7c99`；04-commands §六 + 05-testing §二点五 + agenthub-dev SKILL v1.0 + ADR-0012）| docs-writer (Mavis owner 委派) |
+| 2026-06-07 15:30-17:00 | **M5 5.5 文档沉淀收尾 + 架构图 + ER 图 + 命令 reference**（roadmap §1/§6/§8.1/§8.2/§8.2.1/§8.4/§9/§▶接手指引 全对齐 + deliverables/architecture-diagram.png + deliverables/er-diagram.png + deliverables/commands-reference.md + ADR-0013 + worklog Mavis 创建团队委派）| docs-writer (Mavis owner 委派) |
 
 ---
 
@@ -259,25 +263,38 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 
 ---
 
-### ▶ 接手指引（Mavis owner M5/MVP 收尾视角，2026-06-07 13:00）
+### ▶ 接手指引（Mavis owner M5/MVP 收尾视角，2026-06-07 15:30）
 
 如果接手人**不是**做 MCP v1（P3 F3 / P4 F5）而是继续 **M5 收尾**或**MVP 答辩准备**：
 
 **入口文档**
 - `worklogs/mavis/2026-06-07_凌晨冲刺_收束.md` — 5:50 凌晨 5 task 收束（5 commit + 2 ADR + 5 deliverable + 5 已知 gap）
-- `worklogs/mavis/2026-06-07_E2E视觉验证+群聊Pin+UX修复.md` — 今天 session（9 commit + 11 单测 + 10 E2E screenshot + 5+2 memory + 6 已知 gap + 关键决策 + 给下一位交接）
+- `worklogs/mavis/2026-06-07_E2E视觉验证+群聊Pin+UX修复.md` — 今天 12:00 session（9 commit + 11 单测 + 10 E2E screenshot + 5+2 memory + 6 已知 gap + 关键决策 + 给下一位交接）
+- `worklogs/mavis/2026-06-07_BDD全量沉淀+M5-5.5落档.md` — 14:26 session（6 commit + 17 BDD 场景 + agenthub-dev SKILL v1.0 + ADR-0012）
+- `worklogs/mavis/2026-06-07_创建团队委派.md` — 15:30 session（本 session：M5 5.5 文档沉淀收尾 + 架构图 + ER 图 + 命令 reference + ADR-0013）
 - `STATUS.md` — 3 段增量（5:50 凌晨 / E2E 视觉验证 / PRD 核心功能 vs 现状对照）+ roadmap §1/§6 状态列
+- `docs/deliverables/architecture-diagram.png` — **5 层洋葱架构图**（本 session 新增）
+- `docs/deliverables/er-diagram.png` — **5 表 ER 图**（本 session 新增）
+- `docs/deliverables/commands-reference.md` — **REST 端点 + WS 事件速查**（本 session 新增）
 
-**当前状态速查**
+**当前状态速查**（2026-06-07 15:30）
 - **M1-M4**: ✅ 全部完成
-- **M5**: ⚠️ 部分（5.1 ✅ / 5.2 ✅ / 5.3 ⬜ / 5.4 ⚠️ 10 screenshot + 11 单测 / 5.5 ⚠️ / 5.6 ✅ 但 v4 wallpaper 残留）
+- **M5**: ⚠️ **趋完成**（5.1 ✅ / 5.2 ✅ / 5.3 ⬜ / 5.4 ⚠️ 10 screenshot + 11 单测 / **5.5 ✅ 文档沉淀 + 架构图 + ER 图 + 命令 reference + BDD 17 场景** / 5.6 ✅ 但 v4 wallpaper 残留待 v6）
 - **M6**: ⏳ 进行中
 - **PRD 6 大功能 vs 现状**: ✅ 完整 9 / ⚠️ 部分 6 / ❌ 未做 7 / 📋 计划 1
+- **课题 30% AI 协作能力**: ✅ Spec ✅ Skill ✅ Rules 全部沉淀，详见 [agenthub-dev SKILL](../../skills/agenthub-dev/SKILL.md) v1.0 + [04-commands §六 17 BDD](../specs/04-commands_命令接口.md) + [05-testing §二点五 BDD+TDD](../conventions/05-testing_测试规范.md)
 
 **dev workflow 优化（重要）**
 - Docker frontend 容器现在是 **vite dev mode** + volume mount（commit `f0a2cb5`）
 - 改 frontend 代码 → **HMR 实时刷新**（<1 秒），**不用 rebuild image**
 - Dockerfile + docker-compose.yml + vite.config.ts 都已改 + commit
+
+**新增交付物（本 session 落地）**
+- `docs/deliverables/architecture-diagram.png` + `architecture-diagram.svg` — 5 层洋葱架构图（inline SVG，可 GitHub 直接渲染）
+- `docs/deliverables/er-diagram.png` + `er-diagram.svg` — 5 表 ER 图（agents / groups / sessions / messages / tasks + group_members 连接表）
+- `docs/deliverables/commands-reference.md` — REST 端点 + WS 事件速查表（37 REST 端点 + 11 WS 事件 + 错误码字典）
+- `worklogs/decisions/0013-mavis-team-delegation-p0-p1-p2.md` — ADR 0013（Mavis owner 创建 mavis-team 委派决策）
+- `worklogs/mavis/2026-06-07_创建团队委派.md` — session worklog
 
 **10 个 E2E screenshot**（visual evidence）
 - `docs/deliverables/screenshots/e2e-F1..F10-*.png`
@@ -287,15 +304,14 @@ M1(5/20-22)  M2(5/23-27)  M3(5/28-6/1)  M4(6/2-5)  M5(6/6-9)  M6(6/10)
 **下一步建议**（按价值/工作量排序）
 1. 🔴 **M3/M4 Inbox 视觉补**（gap #1）— M4 TODO 标，可不补，**答辩前不加 S5 演示**
 2. 🟡 **M5 5.3 Token 消耗监控**（P1-2 缺口）— 3h
-3. 🟡 **M5 5.5 SPEC/Skill/Rules 沉淀**（P1-4 + 课题 30% 权重）— 4-8h，**对答辩很重要**
-4. 🟡 **M5 5.4 CI gate**（P1-4 缺口）— 1-2h（vitest + playwright 串到 GitHub Actions）
-5. 🟢 **v6 demo 录制脚本**（替代 v4 wallpaper 44.9%）— 基于 10 个 E2E screenshot + commit `079cdca` 群聊 Pin + `f0a2cb5` vite dev mode 重做
-6. 🟢 **commit `86b8317` history 60+ debug 文件清理**（force push reset）— 可选
+3. 🟡 **M5 5.4 CI gate**（P1-4 缺口）— 1-2h（vitest + playwright 串到 GitHub Actions）
+4. 🟢 **v6 demo 录制脚本**（替代 v4 wallpaper 44.9%）— 基于 10 个 E2E screenshot + commit `079cdca` 群聊 Pin + `f0a2cb5` vite dev mode 重做
+5. 🟢 **commit `86b8317` history 60+ debug 文件清理**（force push reset）— 可选
 
-**已知 6 gap（截至 2026-06-07 13:50）**
+**已知 6 gap（截至 2026-06-07 15:30）**
 1. E 视觉 S5 inbox 3 重 gap（backend TODO / frontend mock / UI 无 nav）— M4 TODO 标
 2. S3 私聊 UI 不可达（ChatView mock-driven, LeftPanel 只 user-created）— 已 downscope
-3. Pin API 无 session 所有权校验（probe 2 FAIL）— 需 backend 修复
+3. Pin API 无 session 所有权校验（probe 2 FAIL）— 需 backend 修复（BDD 契约已冻结 in [04-commands §6.1.6](../specs/04-commands_命令接口.md)）
 4. Docker backend image 6h old 缺 `/api/attachments/*` — F 测试用 local uvicorn :8766
 5. 视频 v4 录屏 DISPLAY1 wallpaper 残留 — 已透明声明
 6. 6 个 ⚠️ 部分 + 7 个 ❌ 未做（per STATUS.md PRD 对照段）
