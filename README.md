@@ -1,8 +1,16 @@
 # AgentHub
 
+[![CI](https://github.com/Hcre/AgentHub/actions/workflows/ci.yml/badge.svg)](https://github.com/Hcre/AgentHub/actions/workflows/ci.yml)
+[![Coverage Backend](https://img.shields.io/badge/backend%20cov-%E2%89%A580%25-brightgreen)](src/backend/pyproject.toml)
+[![Coverage Frontend](https://img.shields.io/badge/frontend%20cov-%E2%89%A570%25-brightgreen)](src/frontend/package.json)
+[![Conventional Commits](https://img.shields.io/badge/commits-conventional-blue)](CONTRIBUTING.md)
+[![License](https://img.shields.io/badge/license-MIT-lightgrey)](#)
+
 IM 聊天式多 Agent 协作平台。用户通过类飞书聊天界面与 AI Agent 对话，支持单聊、群聊（@mentions 多 Agent）、任务自动分解与并行调度。
 
-> 脚手架基于 `docs/plan/背景_PRD_AgentHub_统一方案.md` 与 `docs/specs/01b-architecture-design_分层与数据流.md` 生成。
+> 脚手架基于 `docs/plan/PRD_AgentHub_统一方案.md` 与 `docs/specs/01b-architecture-design_分层与数据流.md` 生成。
+>
+> 📘 **贡献者必读**：[CONTRIBUTING.md](CONTRIBUTING.md)（分支 / 提交 / PR / Review 规范）· [docs/CI-STATUS_CI状态说明.md](docs/CI-STATUS_CI状态说明.md)（CI workflow 详情）
 
 ## 架构
 
@@ -41,7 +49,7 @@ L1 Infrastructure  PG / Redis / Celery / LLM Adapter (src/backend/app/infrastruc
 
 ## 快速开始
 
-### Docker 一键启动（推荐）
+### 一行启动（Docker，推荐）
 
 ```bash
 cp .env.example .env            # 填入 LLM API Key
@@ -74,6 +82,31 @@ cp .env.example .env
 npm run dev
 ```
 
+### 5 分钟贡献者流程
+
+```bash
+# 1. 克隆 + 装钩子（首次必做）
+git clone https://github.com/Hcre/AgentHub.git
+cd AgentHub
+pre-commit install --hook-type pre-push && pre-commit install
+
+# 2. 切分支（格式 feature/<domain>/<desc>）
+git checkout -b feature/chat/ws-reconnect
+
+# 3. 改代码 + 写测试 + 写 worklog
+#    (worklogs/{你的名字}/YYYY-MM-DD_*.md + 更新 STATUS.md)
+
+# 4. 提交前校验
+scripts/verify.bat            # ruff + mypy + tsc + eslint + pytest + vitest
+
+# 5. commit + push + 开 PR（PR 模板在 .github/PULL_REQUEST_TEMPLATE.md）
+git commit -m "feat(chat): WS 重连后 message order 保持升序"
+git push -u origin feature/chat/ws-reconnect
+gh pr create --fill
+```
+
+> 详细规范见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
 ## 使用手册
 
 ### 服务与端口
@@ -102,12 +135,41 @@ docker compose -f src/docker/docker-compose.yml exec backend pytest -q
 > ⚠️ 若启动后见 postgres `Exited(127)` 或前端在 5173：是 Docker Desktop 开机自启的**重组前旧容器**。
 > `docker rm -f $(docker ps -aq --filter name=agenthub)` 清掉，再用上面命令重建。
 
+### 部署
+
+```bash
+# 一键部署到本地 Docker
+scripts/deploy.bat
+
+# 生产部署（Docker Compose + Nginx）
+docker compose -f src/docker/docker-compose.yml -f src/docker/docker-compose.prod.yml up -d --build
+```
+
+完整部署文档：[docs/DEPLOYMENT-GUIDE_部署测试指南.md](docs/DEPLOYMENT-GUIDE_部署测试指南.md)。
+
 ### 校验与提交
 
 ```bash
 scripts/verify.bat            # ruff + ruff-format + mypy + tsc + eslint（提交前必跑）
 pre-commit install --hook-type pre-push && pre-commit install   # 克隆后首装钩子
 ```
+
+### CI（GitHub Actions）
+
+| Job | 步骤 | 触发 |
+|-----|------|------|
+| `backend` | ruff + ruff format + mypy + pytest（含 cov ≥ 80%） | push / PR |
+| `frontend` | tsc + eslint + prettier + vitest + vite build | push / PR |
+| `e2e` | vite build + preview + playwright screenshot | push / PR（前两个成功后） |
+| `ci-status` | 汇总，required check | 上述之后 |
+
+- 工作流文件：[`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+- 详细步骤 + cache 策略 + 故障排查：[`docs/CI-STATUS_CI状态说明.md`](docs/CI-STATUS_CI状态说明.md)
+- PR 模板：[`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md)
+- Reviewer 路由：[`.github/CODEOWNERS`](.github/CODEOWNERS)
+- 实时状态：[GitHub Actions · AgentHub CI](https://github.com/Hcre/AgentHub/actions/workflows/ci.yml)
+
+> 推荐在 Settings → Branches → main 配置 required check（见 [docs/CI-STATUS_CI状态说明.md §九](docs/CI-STATUS_CI状态说明.md)）。
 
 ### 进度看板 dashboard
 
@@ -176,14 +238,26 @@ agenthub/
 ```bash
 cd src/backend && pytest          # 后端单测，覆盖率目标 80%
 cd src/frontend && npm run test   # 前端单测
+
+# E2E（Playwright，screenshot 抓取）
+cd src/frontend && npx playwright install --with-deps chromium
+node scripts/screenshot_p0_p1.cjs
 ```
+
+测试策略详见：[`docs/specs/05-testing-strategy_测试策略.md`](docs/specs/05-testing-strategy_测试策略.md) · [测试规范](docs/conventions/05-testing_测试规范.md)。
 
 ## 文档
 
 设计文档位于 `docs/`：
 
-- 产品需求：`docs/plan/背景_PRD_AgentHub_统一方案.md`
+- 产品需求：`docs/plan/PRD_AgentHub_统一方案.md`
 - 架构设计：`docs/specs/01b-architecture-design_分层与数据流.md`
 - 适配器接口契约：`docs/specs/04c-adapter-interface_适配器接口规范.md`
 - 技术探索索引：`docs/explore/README.md`
 - 项目演进日志：`docs/explore/EVOLUTION.md`
+- CI 状态说明：`docs/CI-STATUS_CI状态说明.md`
+- 贡献者手册：[CONTRIBUTING.md](CONTRIBUTING.md)
+
+## 贡献
+
+欢迎贡献。开始前请读 [CONTRIBUTING.md](CONTRIBUTING.md)（分支命名 / 提交规范 / PR 流程 / Review 规则）。流程红线全集见 [docs/conventions/10-process-rules_流程红线全集.md](docs/conventions/10-process-rules_流程红线全集.md)。

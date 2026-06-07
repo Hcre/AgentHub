@@ -1,0 +1,94 @@
+# AgentHub CODEOWNERS
+# 路径匹配最后一个规则胜出；越靠下优先级越高。
+# 详细规则见 https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# === 全局 fallback：CI 工程师 review 所有变更 ===
+*                                       @Hcre/ci-engineer
+
+# === 后端（L1-L4 FastAPI，5 层洋葱）===
+/src/backend/                          @Hcre/backend-developer @Hcre/ci-engineer
+/src/backend/app/api/                  @Hcre/backend-developer
+/src/backend/app/application/          @Hcre/backend-developer
+/src/backend/app/core/                 @Hcre/backend-developer
+/src/backend/app/domain/               @Hcre/backend-developer
+/src/backend/app/infrastructure/       @Hcre/backend-developer
+/src/backend/app/schemas/              @Hcre/backend-developer
+/src/backend/tests/                    @Hcre/backend-developer @Hcre/fullstack-tester
+/src/backend/alembic/                  @Hcre/backend-developer
+/src/backend/pyproject.toml            @Hcre/backend-developer
+/src/backend/requirements.txt          @Hcre/backend-developer
+/src/backend/Dockerfile                @Hcre/backend-developer @Hcre/ci-engineer
+
+# === 前端（React + TS + Vite）===
+/src/frontend/                         @Hcre/frontend-developer @Hcre/ci-engineer
+/src/frontend/src/                     @Hcre/frontend-developer
+/src/frontend/src/components/          @Hcre/frontend-developer
+/src/frontend/src/hooks/               @Hcre/frontend-developer
+/src/frontend/src/stores/              @Hcre/frontend-developer
+/src/frontend/src/api/                 @Hcre/frontend-developer
+/src/frontend/src/types/               @Hcre/frontend-developer
+/src/frontend/package.json             @Hcre/frontend-developer @Hcre/ci-engineer
+/src/frontend/vite.config.ts           @Hcre/frontend-developer
+/src/frontend/vitest.config.ts         @Hcre/frontend-developer
+/src/frontend/tsconfig*.json           @Hcre/frontend-developer
+/src/frontend/eslint.config.js         @Hcre/frontend-developer @Hcre/ci-engineer
+/src/frontend/Dockerfile               @Hcre/frontend-developer @Hcre/ci-engineer
+
+# === E2E 测试（playwright + screenshot 脚本）===
+/scripts/screenshot_*.cjs              @Hcre/fullstack-tester @Hcre/frontend-developer
+/scripts/probe_*.py                    @Hcre/fullstack-tester
+/scripts/e2e-*.py                      @Hcre/fullstack-tester
+
+# === 文档（conventions / specs / plan / reports / worklogs）===
+/docs/conventions/                     @Hcre/docs-writer
+/docs/conventions/CLAUDE-规范导航.md   @Hcre/docs-writer
+/docs/specs/                           @Hcre/docs-writer
+/docs/plan/                            @Hcre/docs-writer @Hcre/product-manager
+/docs/reports/                         @Hcre/docs-writer
+/docs/deliverables/                    @Hcre/docs-writer
+/docs/explore/                         @Hcre/docs-writer
+/docs/CODE-MAP_代码地图.md             @Hcre/docs-writer @Hcre/backend-developer
+/docs/DEPLOYMENT-GUIDE_部署测试指南.md @Hcre/docs-writer @Hcre/ci-engineer
+/docs/ci-status.md                     @Hcre/ci-engineer @Hcre/docs-writer
+/docs/templates/                       @Hcre/docs-writer
+/meta/                                 @Hcre/docs-writer
+
+# === Worklog（按人分子目录）===
+/worklogs/                             @Hcre/docs-writer
+/worklogs/decisions/                   @Hcre/docs-writer
+/worklogs/董/                          @Hcre/docs-writer
+/worklogs/黎/                          @Hcre/docs-writer
+/worklogs/袁/                          @Hcre/docs-writer
+
+# === CI 工程（workflows / lint 配置 / verify 脚本）===
+/.github/                              @Hcre/ci-engineer
+/.github/workflows/                    @Hcre/ci-engineer
+/.github/CODEOWNERS                    @Hcre/ci-engineer
+/.github/PULL_REQUEST_TEMPLATE.md      @Hcre/ci-engineer
+/.pre-commit-config.yaml               @Hcre/ci-engineer @Hcre/docs-writer
+/scripts/verify.bat                    @Hcre/ci-engineer @Hcre/backend-developer
+/scripts/verify.sh                     @Hcre/ci-engineer @Hcre/backend-developer
+/scripts/check_*.py                    @Hcre/ci-engineer @Hcre/docs-writer
+/scripts/gen_codegraph.py              @Hcre/backend-developer @Hcre/ci-engineer
+/scripts/start_server.py               @Hcre/ci-engineer
+
+# === 顶层入口与工程根 ===
+/README.md                             @Hcre/ci-engineer @Hcre/docs-writer
+/CONTRIBUTING.md                       @Hcre/ci-engineer @Hcre/docs-writer
+/STATUS.md                             @Hcre/product-manager @Hcre/docs-writer
+/CLAUDE.md                             @Hcre/docs-writer
+/dashboard.html                        @Hcre/frontend-developer @Hcre/docs-writer
+
+# === Docker / 部署 ===
+/src/docker/                           @Hcre/ci-engineer @Hcre/backend-developer
+/docker-compose*.yml                   @Hcre/ci-engineer
+
+# === 依赖管理（跨域变更需后端 + 前端双方 review）===
+/package.json                          @Hcre/frontend-developer @Hcre/ci-engineer
+/package-lock.json                     @Hcre/frontend-developer @Hcre/ci-engineer
+
+# === Skills / Harness（Agent 基础设施）===
+/skills/                               @Hcre/ci-engineer
+/.harness/                             @Hcre/ci-engineer @Hcre/docs-writer
+/.agenthub/                            @Hcre/ci-engineer
+/.agenthub/config.json                 @Hcre/ci-engineer
