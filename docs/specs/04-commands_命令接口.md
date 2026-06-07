@@ -1,8 +1,9 @@
 # AgentHub 命令接口
 
-> 版本: v2.2 | 基于 PRD v4.0 + 架构设计 v1.0 | 2026-06-07
+> 版本: v2.3 | 基于 PRD v4.0 + 架构设计 v1.0 | 2026-06-08
 > v2.1: 环境变量摘除 Celery/LiteLLM，新增 CLI 相关配置
 > v2.2: 新增 §六 BDD 验收场景（Given/When/Then），覆盖 PRD 6 大核心功能 + roadmap §8 P0-4/P1-2/P1-3 + 11 项 P2 缺口
+> v2.3: §6.1.6 B-1-P0-04 复写 M5 鉴权降级 — When-5/6/7 覆盖 401/403/204 三路径 + 22:00 E2E Pin 401 bug 修复契约
 
 ---
 
@@ -488,6 +489,12 @@ make lint           # ruff + eslint + tsc
 | **Then-3** | HTTP 422 `{error:{code:"E_MESSAGE_PIN_SESSION_MISMATCH",message:"..."}}` |
 | **When-4（取消）** | `DELETE /api/messages/M1/pin?session_id=S1` |
 | **Then-4** | HTTP 204 + `pinned_by_user_id=null, pinned_at=null` |
+| **When-5（**M5 鉴权降级 — 无 JWT + msg 有 user_id**）** | `POST /api/messages/M1/pin?session_id=S1`（无 Authorization header，M1.user_id=U1）|
+| **Then-5** | **HTTP 204** `{error:{code:null}}` + `pinned_by_user_id=M1.user_id`（dev mode auto-trust via msg.user_id, 22:00 E2E Pin 401 bug 修复）|
+| **When-6（**M5 鉴权降级 — 无 JWT + system message 无 user_id**）** | `POST /api/messages/M3/pin?session_id=S1`（无 JWT + M3.user_id=null, e.g. Coordinator 系统通知）|
+| **Then-6** | **HTTP 401** `{error:{code:"E_AUTH_REQUIRED",message:"..."}}`（无主可托, 真"无 auth"场景）|
+| **When-7（**非存在 message**）** | `POST /api/messages/<random-uuid>/pin?session_id=<random-uuid>` |
+| **Then-7** | HTTP 404 `{error:{code:"E_NOT_FOUND",message:"message not found: ..."}}` (M5 service 层先查 message 拿不到, 区别于 M5 之前的 401) |
 | **幂等** | 重复 `POST /api/messages/M1/pin?session_id=S1` → 204（不报错，不更新时间戳）|
 | **WS 推送** | 任意 Pin 状态变更 → WS 推 `{type:"message:pin_changed", payload:{message_id, session_id, pinned, pinned_by}}`，同会话所有客户端 ≤1s 收到 |
 | **UI 验收（Playwright）** | M1 hover → Pin 按钮 → click → M1 顶部出现图钉 icon + Pin 列表抽屉显示 M1；U2 私聊发新消息 → M1 出现在 M2 之前作为 pinned context |
