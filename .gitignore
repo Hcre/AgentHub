@@ -100,3 +100,4 @@ scripts/retest-*.py
 docs/deliverables/video/_work/*.js
 docs/deliverables/video/_work/*.py
 .agenthub/templates/
+.agenthub/templates/
