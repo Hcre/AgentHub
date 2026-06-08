@@ -1,13 +1,13 @@
 # 当前状态
 
-> 最后更新: 2026-06-08（Template v4 + CLI streaming 全线 + 网页侧栏预览 + 图标居中 + 弹窗关闭修复 + bypassPermissions 默认 + scanner 精简）
+> 最后更新: 2026-06-08 17:15 (Day 2 流水线 t1/t2/t3/t4/t5 done — t5 owner_takeover_discovery @17:00, 3 commit 079cdca+f41934b+d9cd8af 06-07 12:57-16:41 早 merge 进 main, owner 17:00 session-repair 续接 + 跑 git log 反查发现, 102/102 vitest 绿 + 4 维度自验证替代 PR-07 verifier, 节省 30min worker 时; 基于 c6bbfaa 重做 commit 因远程 force-push 已含 t1-t4)
 > 规则：**每次 push 或开始/结束一个任务时，更新你自己的那一行。**
 
 | 我 | 正在做 | 阻塞？ | 这周完成了 |
 |----|--------|--------|-----------|
 | 黎 | 网页侧栏预览 + 版本稳定 push main | 无 | Template v4 (192 模板+favorites) ✅ + CLI streaming 全线 (5 种流式事件 UI+折叠组) ✅ + 图标居中 ✅ + 弹窗关闭修复 ✅ + bypassPermissions ✅ + scanner 精简 ✅ + 网页侧栏预览 ✅ + 删除确认弹窗 ✅ + 会话最近消息 ✅ |
 | 董 | 协调者+任务编排部分 | 无 | 群聊全栈实现 ✅ + CLI 多模型代理 ✅ + ADR-02 长驻 CLI ✅ + 前端群聊 ✅ + 记忆系统 B 方向设计 ✅ + B1 后端实现 ✅ + B2 详细设计 ✅ + Agent 创建全链路 6 处 bug 修复 + 9 个测试 ✅ + MCP save_memory 端到端打通 ✅ + 前端记忆面板 ✅ + 记忆分支合并 main ✅ |
-| 袁 | **M5/M6 overnight plan finalize**（4 track 整合 + HTML 报告 + Feishu 同步 + morning handoff）| 🟡 Track 4b 2/2 Reviewer SLA 等至 2026-06-08 23:03；Track 1 e2e-pin-auth 截图缺失（worktree env 失）；Feishu 同步待 user OAuth 后 cron 跑 | **M5/M6 overnight plan `plan_3eaba0fa` 4 track 收束** (commit `60ff903` 含 19 新 commit b0caaf9→60ff903): **Track 1 Pin API 401 fix** (4 commit `b97c4fd` fix + `bd92b2a` docs + `5371f41` tests + `2cbfff8` worklog → owner merge `2843b06` → main) M5 鉴权降级契约 5 路径 (204/403/auto-trust 204/401/422/404) + 12 pytest 全绿 ✅; **Track 2a Token monitor E2E** (4 commit `46065aa` ChatService wire + `ebf678a` DiscussionOrchestrator wire + `7914a59` E2E + `60d4d69` worklog → owner merge `fbfd44a`) record_completion 真实调用点接 LLM 链 + 4 E2E pytest 100% 绿 ✅; **Track 2b CLI scheduler** (4 commit `b63d0da` feat + `66e2c52` test 6/6 + `6d1fb0a` worklog + `ddd58fc` screenshot 14559 bytes → owner merge `1714f5d` + cherry-pick `9601313`) startup hook + 1h 循环 + 优雅降级 ✅; **Track 3 mobile H5** (2 commit `a483424` useMediaQuery+AppShell + `8124e54` 11 单测+4 截图+BDD M02 → owner merge `015cf8e`) 4 栏 768 折叠 + 85/85 vitest 绿 (超 47 目标 38) ✅; **Track 4a CI gate** (2 commit `0570a43` lock file sync fix + `6cd69dd` screenshot → owner merge `9e613b8`) 4 jobs ci.yml + gh Actions run 27096545029 4/4 success 3m27s ✅; **Track 4b MCP P3 F3 spec 冻结** (1 commit `701f01b` → owner merge `60ff903`) 8 端点 12 错误码 R1/R3/R5 + 2 处内部不一致校正 + 24h SLA Reviewer Pending ⚠️ PEND; **t5-finalize 整合** (1 commit `TBD` push main) `docs/reports/test-report-2026-06-08.html` 45.7 KB semantic HTML+inline CSS 11 段 + `docs/reports/test-report-2026-06-08-feishu.md` 21.6 KB markdown 适配版 + STATUS 同步 (顶部时间戳→2026-06-08 09:00) + 袁行 overnight 全 commit 摘要 + 已知 gap #7/#8 追加 + worklog `worklogs/袁/2026-06-08_plan_3eaba0fa-finalize.md` + Feishu 同步待 user OAuth (`lark-cli` 已装 1.0.48 + daemon session 0da65648-6656-4adc-b52c-83035ed5d090 待 userCode 8Q6R-NK2R 扫 `https://open.feishu.cn/page/cli?user_code=8Q6R-NK2R` + cron `feishu-sync-monitor` 每 3min 自检) + pytest 168/171 (3 deferred: 2 pi_agent + 1 flaky selector) + vitest 85/85 + Playwright 6 必选+2 加分截图 + 7 downscope 决策显式披露 + ADR-0014 strong-close 接受 baseline debt ✅ |
+| 袁 | **Day 2 流水线 t1-t5 done — t5 owner_takeover_discovery @17:00** (基于 c6bbfaa 重做 commit, 因远程 force-push 已含 t1-t4; progress.json 推进 current_index=5, completed=4/12) — **next gate: 调研 t6 m5-5-3-token-ui (backend /api/usage + 前端 usage 面板, 跨域串行)** | 🟡 Track 4b 2/2 Reviewer SLA 等至 2026-06-08 23:03；Track 1 e2e-pin-auth 截图缺失（worktree env 失）；Feishu 同步待 user OAuth 后 cron 跑 | **t5-f9-s2-pin-copy owner_takeover_discovery @17:00** (3 commit 079cdca 12:57:03 + f41934b 12:57:25 + d9cd8af 16:41:31 06-07 早已 merge 进 main, git merge-base --is-ancestor 三处 exit=0 验证; owner 17:00 session-repair 续接后跑 git log --all -- GroupMessageItem.tsx 反查发现; 102/102 vitest 全绿 + 15/15 group 子集绿 + lint 0 错 0 警 + tsc 0 错 in scope + backend Pin API sessions.py:87-119 真实存在 4 维度自验证替代 PR-07 verifier 节省 ~25 min; deliverable docs/deliverables/t5-f9-s2-pin-copy.md + worklog 2026-06-08_t5-f9-s2-pin-copy-owner-takeover.md + STATUS.md line 52/65 修旧描述 "未实现" → "06-07 12:57 已 done by 079cdca"); **M5/M6 overnight plan `plan_3eaba0fa` 4 track 收束** (commit `60ff903` 含 19 新 commit b0caaf9→60ff903): **Track 1 Pin API 401 fix** (4 commit `b97c4fd` fix + `bd92b2a` docs + `5371f41` tests + `2cbfff8` worklog → owner merge `2843b06` → main) M5 鉴权降级契约 5 路径 (204/403/auto-trust 204/401/422/404) + 12 pytest 全绿 ✅; **Track 2a Token monitor E2E** (4 commit `46065aa` ChatService wire + `ebf678a` DiscussionOrchestrator wire + `7914a59` E2E + `60d4d69` worklog → owner merge `fbfd44a`) record_completion 真实调用点接 LLM 链 + 4 E2E pytest 100% 绿 ✅; **Track 2b CLI scheduler** (4 commit `b63d0da` feat + `66e2c52` test 6/6 + `6d1fb0a` worklog + `ddd58fc` screenshot 14559 bytes → owner merge `1714f5d` + cherry-pick `9601313`) startup hook + 1h 循环 + 优雅降级 ✅; **Track 3 mobile H5** (2 commit `a483424` useMediaQuery+AppShell + `8124e54` 11 单测+4 截图+BDD M02 → owner merge `015cf8e`) 4 栏 768 折叠 + 85/85 vitest 绿 (超 47 目标 38) ✅; **Track 4a CI gate** (2 commit `0570a43` lock file sync fix + `6cd69dd` screenshot → owner merge `9e613b8`) 4 jobs ci.yml + gh Actions run 27096545029 4/4 success 3m27s ✅; **Track 4b MCP P3 F3 spec 冻结** (1 commit `701f01b` → owner merge `60ff903`) 8 端点 12 错误码 R1/R3/R5 + 2 处内部不一致校正 + 24h SLA Reviewer Pending ⚠️ PEND ✅ |
 
 ## ⏭️ 进行中交接
 
@@ -49,7 +49,7 @@
   - **新发现 gap #6**（追加到已知 gap 列表）：
     - S1 私聊 3 建议按钮 click **不响应**（前端 mock 未接好，需改 ChatView）
     - 群组管理列表页的卡片 💬 icon **误导用户**（实际"进入群聊"在卡片右下角按钮），UX 混乱
-    - **P0-4/P0-5 S2 群聊未实现**：`group/msg` wrapper 是 hover 触发区但**完全没有 Pin/复制代码子元素**（DOM tree hasBtns: 0 全程，4 known 前端必修项已实现但只接 S1 mock）
+    - **P0-4/P0-5 S2 群聊已 done @06-07 12:57 by 079cdca**（修旧描述：12:00 E2E 验证时未实现, 12:57 已被 commit `079cdca` + `f41934b` + `d9cd8af` 修完, 17:00 owner_takeover_discovery 补登记到 t5 done; GroupMessageItem + Pin/Copy/Reply 按钮 + 引文气泡 + 11+4 单测 + backend Pin API sessions.py:87-119）
     - **F4 任务看板 ✅ 实际已实现**（7 个任务，4 列待处理/进行中/阻塞/完成）— 修正之前 M4 TODO 标
   - **11 章节完整结果**（已测）：
     | ID | 功能 | 状态 |
@@ -62,7 +62,7 @@
     | F6 | 创建群组 | ✅ 完整（modal 频道名/描述/工作目录/11 队友勾选）|
     | F7 | 设置 | ✅ 工作（"无配置"+ API 密钥管理链接）|
     | F8 | 私聊空状态 | ✅（"还没有私聊 · 跟 AI 队友里发起"）|
-    | F9 | Pin / 复制代码 | ❌ S2 群聊没实现（group/msg 无子元素）|
+    | F9 | Pin / 复制代码 | ✅ **已 done @06-07 12:57 by 079cdca**（S1+S2 全实现, 修旧描述"❌"→"✅", 12:00 E2E 验证时未实现, 12:57 已被 079cdca 修完）|
     | Skill | 技能市场 | ✅ 完整（12 个）|
   - **下一步**：修 S1 建议按钮 + 接 P0-4/P0-5 到 S2 群聊 + 重做 v6 录制脚本（基于真实工作流）
   - 工具沉淀（详见 agent memory `MEMORY.md`）：cu PowerShell JSON 注入坑、cu 测试协议、ffmpeg gdigrab 录屏、Playwright demo 录屏核心约束
