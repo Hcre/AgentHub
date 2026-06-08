@@ -551,6 +551,14 @@ class ClaudeCodeRuntime(AgentRuntime):
             for block in data.get("message", {}).get("content", []):
                 if block.get("type") == "tool_result":
                     is_error = block.get("is_error", False)
+                    raw_content = block.get("content")
+                    # content 可能是 string 或 list[{type,text}] → 统一转 string
+                    if isinstance(raw_content, list):
+                        raw_content = "\n".join(
+                            c.get("text", "") for c in raw_content if isinstance(c, dict) and c.get("type") == "text"
+                        )
+                    elif not isinstance(raw_content, str):
+                        raw_content = str(raw_content) if raw_content is not None else None
                     events.append(
                         StreamEvent(
                             type=StreamEventType.TOOL_RESULT,
@@ -558,8 +566,8 @@ class ClaudeCodeRuntime(AgentRuntime):
                             tool_result=ToolResult(
                                 call_id=block.get("tool_use_id", ""),
                                 success=not is_error,
-                                content=block.get("content") if not is_error else None,
-                                error=block.get("content") if is_error else None,
+                                content=raw_content if not is_error else None,
+                                error=raw_content if is_error else None,
                             ),
                         )
                     )

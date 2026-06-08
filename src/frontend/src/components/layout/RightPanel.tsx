@@ -281,6 +281,7 @@ function TabButton({
 
 function ActiveTabContent({ tab, onOpenFile }: { tab: PreviewTab; onOpenFile: (path: string) => void }) {
   if (tab.type === 'files') return <FilePreview workdir={tab.workdir} initialPath={tab.filePath} onOpenFile={onOpenFile} />
+  if (tab.type === 'webpage') return <WebPageView tab={tab} />
   return (
     <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted-foreground">
       <div>
@@ -288,6 +289,63 @@ function ActiveTabContent({ tab, onOpenFile }: { tab: PreviewTab; onOpenFile: (p
         <p>「{tab.label}」预览即将到来</p>
         <p className="mt-1 text-[11.5px]">快照工作目录：{tab.workdir ?? '未设置'}</p>
       </div>
+    </div>
+  )
+}
+
+function WebPageView({ tab }: { tab: PreviewTab }) {
+  const updateTabUrl = useUIStore((s) => s.updateTabUrl)
+  const [inputUrl, setInputUrl] = useState(tab.url ?? '')
+  const [navKey, setNavKey] = useState(0)
+
+  // 外部 url 变化（如从消息卡片推入、切换 tab）同步到输入框
+  useEffect(() => {
+    setInputUrl(tab.url ?? '')
+  }, [tab.url])
+
+  const handleGo = () => {
+    const u = inputUrl.trim()
+    if (!u) return
+    const withProto = /^https?:\/\//i.test(u) ? u : `https://${u}`
+    updateTabUrl(tab.id, withProto)
+    setInputUrl(withProto)
+    setNavKey((k) => k + 1)
+  }
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center gap-2 border-b border-border/70 px-2 py-1.5">
+        <Icon name="globe" className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+        <input
+          type="text"
+          value={inputUrl}
+          onChange={(e) => setInputUrl(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleGo()}
+          placeholder="输入网址…"
+          className="min-w-0 flex-1 bg-transparent text-[12px] outline-none placeholder:text-muted-foreground/50"
+        />
+        <button
+          onClick={handleGo}
+          title="加载网页"
+          className="grid h-6 w-6 flex-shrink-0 place-items-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          <Icon name="chevronRight" className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      {tab.url ? (
+        <iframe
+          key={navKey}
+          src={tab.url}
+          title={tab.label}
+          sandbox="allow-scripts allow-same-origin"
+          referrerPolicy="no-referrer"
+          className="min-h-0 flex-1 border-0"
+        />
+      ) : (
+        <div className="flex flex-1 items-center justify-center text-[12px] text-muted-foreground">
+          输入网址后按回车加载预览
+        </div>
+      )}
     </div>
   )
 }

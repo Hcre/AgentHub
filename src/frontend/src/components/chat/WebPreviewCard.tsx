@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
-import { Maximize2, X } from 'lucide-react'
-import { Dialog, DialogContent, Icon } from '../ui'
+import { useState } from 'react'
+import { Maximize2 } from 'lucide-react'
+import { Icon } from '../ui'
+import { useUIStore } from '../../stores/uiStore'
+import { uid } from '../../lib/id'
 import { getHost } from './webPreviewUrl'
 
 export interface WebPreviewCardProps {
@@ -32,21 +34,19 @@ function defaultFavicon(url: string): string {
 export function WebPreviewCard({ url, title, faviconUrl }: WebPreviewCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [faviconBroken, setFaviconBroken] = useState(false)
-  const [fullscreen, setFullscreen] = useState(false)
   const host = getHost(url)
   const display = title?.trim() || host
   const favicon = faviconBroken ? null : faviconUrl ?? defaultFavicon(url)
+  const addPreviewTab = useUIStore((s) => s.addPreviewTab)
+  const setActivePreviewTab = useUIStore((s) => s.setActivePreviewTab)
+  const setRightPanelCollapsed = useUIStore((s) => s.setRightPanelCollapsed)
 
-  // P1-3：ESC 键关全屏 Dialog（Dialog 自身没绑 ESC，这里手动监听）。
-  // 仅在 fullscreen 为 true 时挂监听，避免无谓占用 keydown。
-  useEffect(() => {
-    if (!fullscreen) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setFullscreen(false)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [fullscreen])
+  const handleFullscreen = () => {
+    const tabId = uid('web')
+    addPreviewTab({ id: tabId, type: 'webpage', label: display, url })
+    setActivePreviewTab(tabId)
+    setRightPanelCollapsed(false)
+  }
 
   return (
     <>
@@ -78,18 +78,17 @@ export function WebPreviewCard({ url, title, faviconUrl }: WebPreviewCardProps) 
               {url}
             </a>
           </div>
-          {/* P1-3 全屏预览：与「展开」并列，触发 Dialog 全屏 modal。
-              视觉上更突出（icon + 蓝色提示），方便右侧 panel 收折后用户仍能访问。 */}
+          {/* 侧栏查看：在右侧边栏打开网页 */}
           <button
             type="button"
             data-testid="fullscreen-btn"
-            onClick={() => setFullscreen(true)}
-            aria-label="全屏预览"
-            title="全屏预览（适合右侧面板收折后）"
-            className="flex flex-shrink-0 items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] font-medium text-blue-700 transition-colors hover:bg-accent hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-200"
+            onClick={handleFullscreen}
+            aria-label="侧栏查看"
+            title="在右侧边栏预览网页"
+            className="flex flex-shrink-0 items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-brand"
           >
-            <Maximize2 className="h-3 w-3" strokeWidth={1.75} />
-            全屏
+            <Icon name="panelRight" className="h-3 w-3" />
+            侧栏
           </button>
           <button
             type="button"
@@ -115,66 +114,6 @@ export function WebPreviewCard({ url, title, faviconUrl }: WebPreviewCardProps) 
         )}
       </div>
 
-      {/* P1-3 全屏 Dialog：90vh 高，宽 90vw，留 5vw 边距。
-          关闭：右上 X 按钮、backdrop 点击、ESC 键（useEffect 监听）。 */}
-      <Dialog
-        open={fullscreen}
-        onOpenChange={(o) => setFullscreen(o)}
-        data-testid="webpreview-fullscreen-dialog"
-      >
-        <DialogContent
-          className="h-[90vh] w-[90vw] max-w-[calc(100vw-2rem)]"
-          data-testid="webpreview-fullscreen-content"
-        >
-          <header className="flex items-center gap-2.5 border-b px-3 py-2">
-            {favicon && !faviconBroken ? (
-              <img
-                src={favicon}
-                alt=""
-                width={16}
-                height={16}
-                className="h-4 w-4 flex-shrink-0 rounded-sm"
-                onError={() => setFaviconBroken(true)}
-              />
-            ) : (
-              <span className="grid h-4 w-4 flex-shrink-0 place-items-center rounded-sm bg-muted text-[10px] text-muted-foreground">
-                🔗
-              </span>
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[13px] font-semibold text-foreground">
-                {display}
-              </div>
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block truncate font-mono text-[11px] text-muted-foreground hover:text-brand hover:underline"
-              >
-                {url}
-              </a>
-            </div>
-            <button
-              type="button"
-              data-testid="fullscreen-close-btn"
-              onClick={() => setFullscreen(false)}
-              aria-label="关闭全屏预览"
-              className="grid h-7 w-7 flex-shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </header>
-          <div className="min-h-0 flex-1">
-            <iframe
-              src={url}
-              title={display}
-              sandbox="allow-scripts allow-same-origin"
-              referrerPolicy="no-referrer"
-              className="h-full w-full"
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   )
 }

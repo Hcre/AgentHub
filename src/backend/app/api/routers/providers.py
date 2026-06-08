@@ -114,7 +114,7 @@ async def _ping_cli(system: str, binary: str, req: PingRequest) -> bool:
 
     if system == "pi_agent":
         env_key = _pi_env_for(req.provider)
-        if env_key:
+        if env_key and req.api_key:
             env[env_key] = req.api_key
         if req.base_url:
             env["OPENAI_BASE_URL"] = req.base_url
@@ -134,7 +134,8 @@ async def _ping_cli(system: str, binary: str, req: PingRequest) -> bool:
         # 不关 stdin — pi CLI 需要 stdin 保持打开才能运行
 
     elif system == "claude_code":
-        env["ANTHROPIC_API_KEY"] = req.api_key
+        if req.api_key:
+            env["ANTHROPIC_API_KEY"] = req.api_key
         if req.base_url:
             env["ANTHROPIC_BASE_URL"] = req.base_url
         cmd = [
@@ -177,19 +178,20 @@ async def _ping_cli(system: str, binary: str, req: PingRequest) -> bool:
 
     elif system == "opencode":
         env_key = _opencode_env_for(req.provider)
-        if env_key:
+        if env_key and req.api_key:
             env[env_key] = req.api_key
-        model = req.model or f"{req.provider}/default"
+        # opencode 需要 HOME 来找 ~/.config/opencode/opencode.json
+        if "HOME" not in env:
+            env["HOME"] = os.environ.get("USERPROFILE", "")
         cmd = [
             binary,
             "run",
             "--format",
             "json",
-            "--model",
-            model,
-            "--dangerously-skip-permissions",
-            "reply OK",
         ]
+        if req.model:
+            cmd.extend(["--model", req.model])
+        cmd.extend(["--dangerously-skip-permissions", "reply OK"])
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdin=asyncio.subprocess.DEVNULL,

@@ -66,6 +66,8 @@ interface UIState {
   addPreviewTab: (tab: PreviewTab) => void
   removePreviewTab: (id: string) => void
   setActivePreviewTab: (id: string | null) => void
+  /** 更新 webpage tab 的 url */
+  updateTabUrl: (id: string, url: string) => void
 }
 
 /** 预览 tab（RightPanel 内的 PreviewMode tab） */
@@ -76,6 +78,8 @@ export interface PreviewTab {
   workdir?: string
   /** 打开的具体文件路径（仅 type=files 时有效，右键栏顶层 tab 以文件名显示） */
   filePath?: string
+  /** 网页预览 URL（仅 type=webpage 时有效） */
+  url?: string
 }
 
 /**
@@ -145,6 +149,10 @@ export const useUIStore = create<UIState>()(
       return { previewTabs: next, activePreviewTabId: nextActive }
     }),
   setActivePreviewTab: (id) => set({ activePreviewTabId: id }),
+  updateTabUrl: (id, url) =>
+    set((s) => ({
+      previewTabs: s.previewTabs.map((t) => (t.id === id ? { ...t, url, label: url || t.label } : t)),
+    })),
     }),
     {
       name: 'agenthub-ui',

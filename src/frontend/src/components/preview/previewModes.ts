@@ -18,5 +18,5 @@ export const PREVIEW_MODES: PreviewModeDef[] = [
   { mode: 'files', icon: 'files', title: '项目文件', desc: '浏览项目文件', shortcut: 'Ctrl+P', enabled: true },
   { mode: 'diff', icon: 'diff', title: '审查 diff', desc: '对比代码变更', enabled: false, hint: '即将到来' },
   { mode: 'deploy', icon: 'rocket', title: '部署', desc: '发布到生产环境', enabled: false, hint: '即将到来' },
-  { mode: 'webpage', icon: 'globe', title: '网页', desc: '打开网页', enabled: false, hint: '即将到来' },
+  { mode: 'webpage', icon: 'globe', title: '网页', desc: '打开网页', enabled: true },
 ]
