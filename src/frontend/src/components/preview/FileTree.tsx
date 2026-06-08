@@ -211,7 +211,7 @@ function TreeNode({
           <span className="h-3 w-3 flex-shrink-0" />
         )}
         {!isDir && <span className="flex-shrink-0 text-[11px]">📄</span>}
-        <span className="text-[12px] whitespace-nowrap">{midTruncate(item.name)}</span>
+        <span className="truncate text-[12px]" title={item.name}>{midTruncate(item.name)}</span>
       </button>
       {isDir && isOpen && (
         <ul className="space-y-0.5">
