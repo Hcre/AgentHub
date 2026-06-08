@@ -262,10 +262,6 @@ class PiAgentRuntime(AgentRuntime):
         if self._thinking_level != "off":
             cmd.extend(["--thinking", self._thinking_level])
 
-        # 权限模式（可配置）
-        cmd.extend(["--permission-mode", self._permission_mode])
-        cmd.extend(["--max-turns", str(self._max_turns)])
-
         if sp:
             if self._agent_name:
                 sp = f"你的名字是{self._agent_name}。\n\n{sp}"
