@@ -49,7 +49,7 @@ export interface FsSearchResultItem {
 }
 
 export interface FsSearchOut {
-  results: FsSearchResultItem[]
+  items: FsSearchResultItem[]  // backend returns 'items' not 'results'
   truncated: boolean
   query?: string
   error?: string
