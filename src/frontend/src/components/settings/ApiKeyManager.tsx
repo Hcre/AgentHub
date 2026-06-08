@@ -124,7 +124,21 @@ export function ApiKeyManager() {
                   {/* 协调者星标：悬停时出现，点亮/取消 */}
                   <button
                     type="button"
-                    onClick={() => setCoordinator(isCoordinator ? null : k.id)}
+                    onClick={async () => {
+                      const nextId = isCoordinator ? null : k.id
+                      setCoordinator(nextId)
+                      // 同步到后端协调者 Agent
+                      if (nextId) {
+                        try {
+                          const r = await fetch('/api/settings/coordinator-credential', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ provider: k.provider, api_key: k.apiKey, model: k.model || '' }),
+                          })
+                          if (!r.ok) console.warn('coordinator credential sync failed:', r.status)
+                        } catch (e) { console.warn('coordinator credential sync error:', e) }
+                      }
+                    }}
                     title={isCoordinator ? '取消协调者凭证' : '设为协调者凭证'}
                     className={`flex-shrink-0 mt-1 transition-all duration-150 ${
                       isCoordinator ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'

@@ -108,6 +108,21 @@ class AgentService:
         agents = await self._repo.list(status=status, capability=capability)
         return [AgentResponse.from_domain(a) for a in agents]
 
+    async def update_coordinator_credential(
+        self, *, provider: str, api_key: str, model: str
+    ) -> int:
+        """将协调者凭证同步写入所有 is_system=true 的 Agent。返回更新行数。"""
+        agents = await self._repo.list()  # list all
+        count = 0
+        for a in agents:
+            if a.is_system:
+                a.api_key_encrypted = encrypt_secret(api_key)
+                a.provider = Provider(provider)
+                a.model = model
+                await self._repo.save(a)
+                count += 1
+        return count
+
     @staticmethod
     def _now() -> datetime:
         return datetime.now(UTC)
