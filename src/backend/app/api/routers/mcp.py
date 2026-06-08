@@ -16,10 +16,12 @@ from app.api.deps import (
     get_mcp_binding_service,
     get_mcp_install_service,
     get_mcp_market_service,
+    get_mcp_server_service,
 )
 from app.application.services.mcp_binding_service import McpBindingService
 from app.application.services.mcp_install_service import McpInstallService
 from app.application.services.mcp_market_service import McpMarketService
+from app.application.services.mcp_server_service import McpServerService
 from app.schemas.mcp import (
     McpBindingOut,
     McpBindRequest,
@@ -27,7 +29,9 @@ from app.schemas.mcp import (
     McpInstallRequest,
     McpMarketItemOut,
     McpMarketListOut,
+    McpServerCreateRequest,
     McpServerDetailOut,
+    McpServerOut,
     McpTemplateListOut,
     McpTemplateOut,
 )
@@ -37,6 +41,7 @@ router = APIRouter(prefix="/api/mcp", tags=["mcp"])
 MarketSvc = Annotated[McpMarketService, Depends(get_mcp_market_service)]
 InstallSvc = Annotated[McpInstallService, Depends(get_mcp_install_service)]
 BindingSvc = Annotated[McpBindingService, Depends(get_mcp_binding_service)]
+ServerSvc = Annotated[McpServerService, Depends(get_mcp_server_service)]
 
 _MAX_PAGE_SIZE = 100
 
@@ -142,3 +147,61 @@ async def unbind_mcp(
 ) -> Response:
     await svc.unbind(binding_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ── F3 创建（路径 A, owner 特批 @2026-06-08 23:03 SLA 落地）──
+
+
+@router.post(
+    "/servers",
+    response_model=McpServerOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_mcp_server(
+    body: McpServerCreateRequest,
+    svc: ServerSvc,
+    user: CurrentUser,
+) -> McpServerOut:
+    """04-commands §2.6 F3：创建 MCP server（draft）。dry_run 默认 True 走沙箱探针。"""
+    server, dry_run_result = await svc.create(
+        name=body.name,
+        slug=body.slug,
+        transport=body.transport,
+        config_json=body.config_json,
+        version=body.version,
+        description=body.description,
+        tags=body.tags,
+        template_id=body.template_id,
+        dry_run=body.dry_run,
+        created_by=user,
+    )
+    return McpServerOut.from_domain(server, dry_run_result=dry_run_result)
+
+
+# ── F3 创建（路径 A, owner 特批 @2026-06-08 23:03 SLA 落地）──
+
+
+@router.post(
+    "/servers",
+    response_model=McpServerOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_mcp_server(
+    body: McpServerCreateRequest,
+    svc: ServerSvc,
+    user: CurrentUser,
+) -> McpServerOut:
+    """04-commands §2.6 F3：创建 MCP server（draft）。dry_run 默认 True 走沙箱探针。"""
+    server, dry_run_result = await svc.create(
+        name=body.name,
+        slug=body.slug,
+        transport=body.transport,
+        config_json=body.config_json,
+        version=body.version,
+        description=body.description,
+        tags=body.tags,
+        template_id=body.template_id,
+        dry_run=body.dry_run,
+        created_by=user,
+    )
+    return McpServerOut.from_domain(server, dry_run_result=dry_run_result)

@@ -148,6 +148,12 @@ def get_mcp_market_service(
     return McpMarketService(repo)
 
 
+def get_mcp_server_service(
+    repo: Annotated[PostgresMcpServerRepository, Depends(get_mcp_server_repo)],
+) -> McpServerService:
+    return McpServerService(repo)
+
+
 @lru_cache
 def get_mcp_installer() -> LocalMcpInstaller:
     return LocalMcpInstaller()  # 无状态，进程级单例

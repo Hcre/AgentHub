@@ -7,6 +7,7 @@ from app.application.services.group_service import GroupService
 from app.application.services.mcp_binding_service import McpBindingService
 from app.application.services.mcp_install_service import McpInstallService
 from app.application.services.mcp_market_service import McpMarketService
+from app.application.services.mcp_server_service import McpServerService
 from app.application.services.memory_service import MemoryService
 from app.application.services.session_service import SessionService
 from app.application.services.template_service import TemplateService
@@ -20,6 +21,7 @@ __all__ = [
     "McpBindingService",
     "McpInstallService",
     "McpMarketService",
+    "McpServerService",
     "MemoryService",
     "SessionService",
     "TemplateService",
