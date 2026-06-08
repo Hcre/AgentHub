@@ -173,7 +173,33 @@ class ClaudeCodeRuntime(AgentRuntime):
                 break  # 收住了
             except TimeoutError:
                 continue  # 升级下一档
+        else:
+            # 三档全失败（Windows 常见），taskkill /F 兜底
+            if proc.returncode is None:
+                await self._force_kill_subprocess(proc)
         self._process = None
+
+    @staticmethod
+    async def _force_kill_subprocess(proc: asyncio.subprocess.Process) -> None:
+        """跨平台强制杀子进程。Windows 上 asyncio terminate/kill 可能无效时兜底。"""
+        pid = proc.pid
+        if pid is None:
+            return
+        import platform
+        import subprocess as _sub
+
+        if platform.system() == "Windows":
+            try:
+                _sub.run(
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    capture_output=True,
+                    timeout=10,
+                )
+            except Exception:
+                pass
+        else:
+            with suppress(Exception):
+                os.kill(pid, 9)
 
     # --- V1 长驻路径 ---
 
@@ -371,19 +397,43 @@ class ClaudeCodeRuntime(AgentRuntime):
 
         assert self._process.stdout is not None
         seq = 0
-        try:
-            async for line in self._read_lines_with_timeout(self._process.stdout):
-                events = self._parse_line(line, seq)
-                for evt in events:
-                    yield evt
-                    seq = evt.seq + 1
-        except TimeoutError:
+        watchdog_task: asyncio.Task[None] | None = None
+        timed_out = False
+
+        async def _watchdog() -> None:
+            nonlocal timed_out
+            try:
+                await asyncio.sleep(self._timeout)
+                timed_out = True
+                logger.warning(
+                    "Claude CLI 超时 (%ss)，强制终止子进程 pid=%s",
+                    self._timeout,
+                    self._process.pid if self._process else "?",
+                )
+                await self.stop()
+            except asyncio.CancelledError:
+                pass
+
+        if self._process and self._process.stdout:
+            watchdog_task = asyncio.create_task(_watchdog())
+            try:
+                async for line in self._read_lines(self._process.stdout):
+                    events = self._parse_line(line, seq)
+                    for evt in events:
+                        yield evt
+                        seq = evt.seq + 1
+            finally:
+                if watchdog_task and not watchdog_task.done():
+                    watchdog_task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await watchdog_task
+
+        if timed_out:
             yield StreamEvent(
                 type=StreamEventType.ERROR,
                 seq=seq,
-                content=f"Claude CLI 超时 ({self._timeout}s)",
+                content=f"Claude CLI 超时 ({self._timeout}s)，已强制终止。请重试。",
             )
-            await self.stop()
             return
 
         await self._process.wait()
@@ -500,17 +550,11 @@ class ClaudeCodeRuntime(AgentRuntime):
             return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{request.session_id}:{request.agent_id}"))
         return str(request.session_id)
 
-    async def _read_lines_with_timeout(self, stdout: asyncio.StreamReader) -> AsyncIterator[str]:
-        """逐行读取 stdout，带总超时。"""
-        deadline = asyncio.get_event_loop().time() + self._timeout
+    @staticmethod
+    async def _read_lines(stdout: asyncio.StreamReader) -> AsyncIterator[str]:
+        """读取 stdout 行，不做超时（超时由 watchdog task 杀进程 → EOF 来保证）。"""
         while True:
-            remaining = deadline - asyncio.get_event_loop().time()
-            if remaining <= 0:
-                raise TimeoutError
-            try:
-                line = await asyncio.wait_for(stdout.readline(), timeout=remaining)
-            except TimeoutError:
-                raise
+            line = await stdout.readline()
             if not line:
                 break
             decoded = line.decode(errors="replace").strip()
