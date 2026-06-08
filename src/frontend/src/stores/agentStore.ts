@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import { agentsApi } from '../api/agents'
 import { uid } from '../lib/id'
 import type { Agent, AgentColor, AgentProfile, ApiAgent, MemoryLevel } from '../types'
@@ -75,22 +76,24 @@ interface AgentState {
   updateConfig: (id: string, patch: Partial<AgentProfile['config']>) => void
 }
 
-export const useAgentStore = create<AgentState>((set, get) => ({
+export const useAgentStore = create<AgentState>()(
+  persist(
+    (set, get) => ({
   agents: [],
   profiles: {},
 
   loadAgents: async () => {
     try {
       const list = await agentsApi.list()
-      set((s) => {
-        const existing = new Set(s.agents.map((a) => a.id))
+      set(() => {
         const incoming = list
-          .filter((a) => !existing.has(a.id) && !a.is_system)
-          .map((a, i) => toUiAgent(a, s.agents.length + i))
-        return { agents: [...s.agents, ...incoming] }
+          .filter((a) => !a.is_system)
+          .map((a, i) => toUiAgent(a, i))
+        return { agents: incoming }
       })
-    } catch {
-      // 后端不可用 → 保持 seed mock
+    } catch (e) {
+      console.error('loadAgents failed, keeping current list:', e)
+      // 后端不可用 → 保持当前列表（不丢失已加载的）
     }
   },
 
@@ -163,4 +166,6 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       if (!p) return {}
       return { profiles: { ...s.profiles, [id]: { ...p, config: { ...p.config, ...patch } } } }
     }),
-}))
+  ),
+  { name: 'agenthub-agents', partialize: (s) => ({ agents: s.agents }) },
+))
