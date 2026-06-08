@@ -103,6 +103,35 @@ async def test_watermark_dangling_falls_back_to_seed(db_session) -> None:  # typ
 
 
 @pytest.mark.asyncio
+async def test_group_has_history_is_per_agent(db_session) -> None:  # type: ignore[no-untyped-def]
+    """群聊 has_history 必须按 sender_agent_id 判断，而非 session 级。
+
+    回归：AgentB 先回复后，AgentA 首次被触发。若按 session 级判断，has_history
+    会误判为 True → 对 AgentA 从未创建的 CLI session_key 执行 --resume → 卡死。
+    """
+    ctx, _ar, msg_repo, _l1, _wm, group, session, a, b = await _setup(db_session)
+
+    # AgentB 已回复（session 内存在 assistant 消息，但来源是 B 不是 A）
+    await msg_repo.save(
+        Message(
+            session_id=session.id,
+            role=MessageRole.ASSISTANT,
+            content="B 的回复",
+            sender_agent_id=b.id,
+        )
+    )
+
+    # AgentA 首次被触发 → 它自己从未回复过 → has_history 必须为 False
+    trigger = Message(session_id=session.id, role=MessageRole.USER, content="trigger")
+    req_a = await ctx.build_for_agent(session=session, group=group, target_agent=a, trigger=trigger)
+    assert req_a.has_history is False
+
+    # AgentB 再次被触发 → 它回复过 → has_history 为 True
+    req_b = await ctx.build_for_agent(session=session, group=group, target_agent=b, trigger=trigger)
+    assert req_b.has_history is True
+
+
+@pytest.mark.asyncio
 async def test_private_chat_bypasses_group_contract(db_session) -> None:  # type: ignore[no-untyped-def]
     """私聊路径：不注入 GROUP_CHAT_CONTRACT，messages 用 L1 窗口。"""
     agent_repo = PostgresAgentRepository(db_session)

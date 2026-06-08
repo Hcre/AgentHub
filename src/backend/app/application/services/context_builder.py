@@ -144,7 +144,12 @@ class ContextBuilder:
         # 6. L1 窗口仅作为辅助记忆传递（CLI Runtime 实际只用 system_prompt + 最后一条 user）
         window = await self._l1.get_window(session.id)
 
-        has_history = await self._messages.has_assistant_messages(session.id)
+        # 群聊：CLI session_key=uuid5(session:agent)，磁盘历史按 agent 隔离。
+        # 必须按 sender_agent_id 判断本 Agent 是否回复过，否则别的 Agent 先回复
+        # 会让 has_history 误判为 True，触发对不存在 session 的 --resume。
+        has_history = await self._messages.has_assistant_messages(
+            session.id, sender_agent_id=target_agent.id
+        )
         return AgentRequest(
             request_id=str(uuid.uuid4()),
             session_id=session.id,

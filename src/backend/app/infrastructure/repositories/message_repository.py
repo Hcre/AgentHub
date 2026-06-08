@@ -125,11 +125,16 @@ class PostgresMessageRepository(MessageRepository):
                 m.pinned_at = None
             await self._s.flush()
 
-    async def has_assistant_messages(self, session_id: UUID) -> bool:
-        stmt = select(exists().where(
+    async def has_assistant_messages(
+        self, session_id: UUID, *, sender_agent_id: UUID | None = None
+    ) -> bool:
+        conditions = [
             MessageModel.session_id == session_id,
             MessageModel.role == "assistant",
-        ))
+        ]
+        if sender_agent_id is not None:
+            conditions.append(MessageModel.sender_agent_id == sender_agent_id)
+        stmt = select(exists().where(*conditions))
         result = await self._s.execute(stmt)
         return bool(result.scalar())
 

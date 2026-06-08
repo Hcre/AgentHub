@@ -130,11 +130,19 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
         from app.infrastructure.llm.claude_code_runtime import ClaudeCodeRuntime
 
         s = agent.settings or {}
-        logger.info("Agent '%s' → ClaudeCodeRuntime (CLI 子进程)", agent.name)
+        # 有 base_url：BYOK，走本地 proxy 注入真实 key（CLI 只会 Anthropic 协议）。
+        # 无 base_url：用宿主机全局 claude 认证（global 模式），不设 ANTHROPIC_BASE_URL。
+        #   否则会被指向 proxy，而 proxy 见空 base_url 直接 400 —— agent 永远跑不通。
+        use_proxy = bool(agent.base_url)
+        logger.info(
+            "Agent '%s' → ClaudeCodeRuntime (CLI 子进程, %s)",
+            agent.name,
+            "proxy" if use_proxy else "global",
+        )
         return ClaudeCodeRuntime(
             model=agent.model,
             agent_id=str(agent.id),
-            proxy_base=settings.proxy_base_url,
+            proxy_base=settings.proxy_base_url if use_proxy else "",
             permission_mode=s.get("permission_mode", "bypassPermissions"),
             max_turns=s.get("max_turns", 10),
             timeout=s.get("cli_timeout", settings.claude_cli_timeout),

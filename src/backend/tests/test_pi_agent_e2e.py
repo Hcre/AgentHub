@@ -8,7 +8,6 @@
 """
 
 import asyncio
-import json
 import os
 import sys
 from pathlib import Path
@@ -30,9 +29,9 @@ os.environ.setdefault("SECRET_KEY", "test_key_for_e2e")
 
 async def test_factory_routing():
     """测试1: 工厂路由"""
-    from app.infrastructure.llm.factory import build_adapter_for_agent
     from app.domain.entities.agent import Agent
-    from app.domain.enums import AgentSystem, Provider, AgentStatus
+    from app.domain.enums import AgentStatus, AgentSystem, Provider
+    from app.infrastructure.llm.factory import build_adapter_for_agent
 
     agent = Agent(
         name="Pi测试助手",
@@ -110,8 +109,8 @@ async def test_rpc_protocol():
         print("  [SKIP] RPC communication test (needs ANTHROPIC_API_KEY)")
         return
 
-    from app.infrastructure.llm.pi_agent_runtime import PiAgentRuntime
     from app.domain.llm.protocol import AgentRequest
+    from app.infrastructure.llm.pi_agent_runtime import PiAgentRuntime
 
     runtime = PiAgentRuntime(
         model="claude-sonnet-4-20250514",

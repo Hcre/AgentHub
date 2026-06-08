@@ -34,8 +34,16 @@ class MessageRepository(ABC):
         ...
 
     @abstractmethod
-    async def has_assistant_messages(self, session_id: UUID) -> bool:
-        """session 内是否已有 assistant 消息（用于判断 CLI --resume vs --session-id）。"""
+    async def has_assistant_messages(
+        self, session_id: UUID, *, sender_agent_id: UUID | None = None
+    ) -> bool:
+        """是否已有 assistant 消息（用于判断 CLI --resume vs --session-id）。
+
+        sender_agent_id 为空时按 session 级判断；非空时仅统计该 Agent 发出的
+        assistant 消息。群聊里 CLI session_key 是 per-agent（uuid5），磁盘历史也
+        按 agent 隔离，故必须按 agent 过滤——否则别的 Agent 先回复就会误判本
+        Agent 有历史，触发对不存在 session 的 --resume（会 fallback 甚至撞锁僵死）。
+        """
         ...
 
     @abstractmethod

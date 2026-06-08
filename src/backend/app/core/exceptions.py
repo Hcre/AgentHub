@@ -27,3 +27,22 @@ class ValidationError(AgentHubError):
 
 class SyncError(AgentHubError):
     """外部同步失败（git clone/pull 失败、上游不可用），映射 502。"""
+
+
+# --- 协调者子系统（task_engine）---
+
+
+class CoordinatorError(DomainError):
+    """协调者子系统异常基类。"""
+
+
+class PlanParseError(CoordinatorError):
+    """LLM 输出 JSON 解析失败（容错+重试耗尽）。"""
+
+
+class PlanEmptyError(CoordinatorError):
+    """LLM 产出空 plan（0 任务），或群组无可用 Agent。"""
+
+
+class PlannerLLMError(CoordinatorError):
+    """LLM API 调用失败（超时/限流/key，退避重试耗尽）。"""

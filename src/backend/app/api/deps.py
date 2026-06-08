@@ -29,9 +29,7 @@ from app.application.services import (
     UsageService,
 )
 from app.application.services.context_builder import ContextBuilder
-from app.application.services.discussion_orchestrator import DiscussionOrchestrator
 from app.application.services.memory_selector import MemorySelector
-from app.application.services.selector import Selector
 from app.application.services.template_service import TemplateService
 from app.core.config import settings
 from app.core.events import EventBus, get_event_bus
@@ -234,22 +232,8 @@ def get_chat_service(
     wm = get_watermark_store()
     mem_selector = MemorySelector(memory_repo)
     ctx = ContextBuilder(
-        message_repo,
-        agent_repo,
-        l1,
-        wm,
-        memory_selector=mem_selector,
+        message_repo, agent_repo, l1, wm, memory_selector=mem_selector,
         mcp_resolver=binding_svc.build_request_mcp_servers,
-    )
-    discussion = DiscussionOrchestrator(
-        message_repo=message_repo,
-        agent_repo=agent_repo,
-        l1_memory=l1,
-        watermarks=wm,
-        context_builder=ctx,
-        selector=Selector(),
-        event_bus=bus,
-        usage_service=usage_svc,
     )
     return ChatService(
         session_repo,
@@ -259,7 +243,6 @@ def get_chat_service(
         l1,
         wm,
         ctx,
-        discussion,
         get_llm_adapter(),
         bus,
         usage_service=usage_svc,
@@ -292,16 +275,6 @@ async def build_chat_service_for_ws() -> AsyncIterator[ChatService]:
         bus = get_event_bus()
         usage_repo = PostgresUsageRepository(session)
         usage_svc = UsageService(usage_repo)
-        discussion = DiscussionOrchestrator(
-            message_repo=msg_repo,
-            agent_repo=agent_repo,
-            l1_memory=l1,
-            watermarks=wm,
-            context_builder=ctx,
-            selector=Selector(),
-            event_bus=bus,
-            usage_service=usage_svc,
-        )
         yield ChatService(
             PostgresSessionRepository(session),
             msg_repo,
@@ -310,7 +283,6 @@ async def build_chat_service_for_ws() -> AsyncIterator[ChatService]:
             l1,
             wm,
             ctx,
-            discussion,
             get_llm_adapter(),
             bus,
             usage_service=usage_svc,

@@ -56,17 +56,28 @@ class Settings(BaseSettings):
     max_delta_messages: int = 50  # ContextBuilder delta 上限，超过截断
     watermark_ttl_seconds: int = 604800  # Watermark Redis TTL (7天)
 
-    # --- 讨论模式 ---
-    max_discussion_rounds: int = 3  # DiscussionOrchestrator 硬上限
-    selector_model: str = "deepseek-chat"  # Selector 廉价模型（默认 DeepSeek V4 Flash）
-    selector_provider: Literal["anthropic", "deepseek", "openai"] = "deepseek"
+    # --- reactive 前门路由（ReactiveRouter，v4 R3 由 selector_* 改名）---
+    # max_discussion_rounds / selector_max_prompt_chars 已删（R3：无机械轮次上限；
+    # ReactiveRouter 用硬编码 _MAX_TRANSCRIPT/_PER_MSG_CHARS，无 selector_max_prompt_chars 消费者）。
+    reactive_model: str = "deepseek-v4-pro"  # reactive 决策模型
+    reactive_provider: Literal["anthropic", "deepseek", "openai"] = "deepseek"
     deepseek_api_key: str = ""  # DeepSeek API Key
-    selector_max_prompt_chars: int = 4000  # Selector prompt 总字符上限
+
+    # --- 任务编排（Coordinator / Planner）---
+    # Planner 的 LLM 完全可配置：provider + model + base_url + key 任意组合，不锁定单一模型。
+    coordinator_provider: Literal["anthropic", "openai", "deepseek"] = "deepseek"
+    coordinator_model: str = "deepseek-chat"  # Planner 默认用 DeepSeek
+    coordinator_base_url: str = ""  # openai 兼容自定义端点（deepseek/groq/vllm…）
+    coordinator_api_key: str = ""  # 空 → 回退 provider 默认 key（deepseek/openai/anthropic）
 
     # --- 记忆系统 MCP ---
     # MCP_MEMORY_URL 非空时，CLI spawn 注入 --mcp-config，Agent 可调用 save_memory tool
     # 路径 = 记忆协议服务端 mount 点（main.py /api/mcp-memory）+ /sse（与 /api/mcp REST 分离）
     mcp_memory_url: str = ""  # 例：http://127.0.0.1:8000/api/mcp-memory/sse
+
+    # --- 步骤终结工具 MCP (coordinator v3) ---
+    # MCP_STEP_TOOLS_URL 非空时，worker CLI spawn 注入 step-tools server（task_complete/ask）
+    mcp_step_tools_url: str = ""  # 例：http://127.0.0.1:8000/api/step-tools/sse
 
     # --- CORS ---
     cors_origins: str = "http://localhost:5173"

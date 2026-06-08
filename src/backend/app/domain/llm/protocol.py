@@ -55,6 +55,7 @@ class StreamEventType(StrEnum):
     TOOL_RESULT = "tool_result"
     REQUEST_APPROVAL = "request_approval"
     TASK_PLAN = "task_plan"
+    TASK_UPDATE = "task_update"  # 协调者任务状态变更（running/done/failed），WS 推前端进度
     ERROR = "error"
     DONE = "done"
 

@@ -24,6 +24,7 @@ import json
 import logging
 import os
 import re
+import signal
 import tempfile
 import uuid
 from collections.abc import AsyncIterator
@@ -123,10 +124,9 @@ class ClaudeCodeRuntime(AgentRuntime):
         prompt = self._extract_prompt(request)
         session_key = self._compute_session_key(request)
         resume = request.has_history
-        logger.info(
-            "Session %s has_history=%s → %s", session_key, resume, "resume" if resume else "new"
-        )
-        async for event in self._run_cli(prompt, request, session_key, resume=resume):
+        logger.info("Session %s has_history=%s → %s", session_key, resume, "resume" if resume else "new")
+        resume_gen = self._run_cli(prompt, request, session_key, resume=resume)
+        async for event in resume_gen:
             if resume and (
                 "No conversation found" in (event.content or "")
                 or (
@@ -134,24 +134,46 @@ class ClaudeCodeRuntime(AgentRuntime):
                     and "No conversation found" in str(event.metadata)
                 )
             ):
-                # 极端情况：CLI 磁盘数据丢失（清缓存/迁移环境），fallback 新建
+                # 极端情况：CLI 磁盘数据丢失（清缓存/迁移环境），fallback 新建。
+                # ① 先 kill 失败的 resume 进程 + 关闭被放弃的生成器：否则该进程泄漏、
+                #    且占着 session 文件锁，fallback 进程会撞锁僵死（不出输出、不超时前一直卡）。
+                # ② fallback 用全新 session-id，不复用刚损坏的那个（复用会再次撞坏 session）。
                 logger.warning("Session %s resume 失败（磁盘数据丢失），fallback 新建", session_key)
+                await self.stop()  # kill 泄漏的 resume 进程，释放锁
+                await resume_gen.aclose()  # 清理被放弃的生成器
+                fallback_key = str(uuid.uuid4())
+                logger.info("fallback 新 session-id=%s（不复用 %s）", fallback_key, session_key)
                 async for fallback_event in self._run_cli(
-                    prompt, request, session_key, resume=False
+                    prompt, request, fallback_key, resume=False
                 ):
                     yield fallback_event
                 return
             yield event
 
     async def stop(self) -> None:
-        """终止运行中的 CLI 进程（仅 V0 短驻进程；V1 长驻进程由进程池管理）。"""
-        if self._process and self._process.returncode is None:
-            self._process.kill()
+        """优雅阶梯终止 CLI 进程：SIGINT（Ctrl+C）→ SIGTERM → SIGKILL，每档给宽限。
+
+        先给进程机会优雅收尾（取消在飞 API 流），收不住才升级强杀。
+        （旧实现 kill() 先于 terminate()，顺序反了 = 直接 SIGKILL，已修。）
+        """
+        proc = self._process
+        if proc is None or proc.returncode is not None:
+            return
+        for send, grace in (
+            (lambda: proc.send_signal(signal.SIGINT), 2.0),  # Ctrl+C
+            (proc.terminate, 2.0),                            # SIGTERM
+            (proc.kill, 2.0),                                 # SIGKILL 兜底
+        ):
             try:
-                await asyncio.wait_for(self._process.wait(), timeout=5)
+                send()
+            except ProcessLookupError:
+                break  # 已退出
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=grace)
+                break  # 收住了
             except TimeoutError:
-                self._process.terminate()
-            self._process = None
+                continue  # 升级下一档
+        self._process = None
 
     # --- V1 长驻路径 ---
 
@@ -242,6 +264,8 @@ class ClaudeCodeRuntime(AgentRuntime):
             "--output-format",
             "stream-json",
             "--verbose",
+            # 隔离用户个人 MCP 配置，避免 CLI 启动等外部 MCP 初始化挂死（见 _build_cmd）
+            "--strict-mcp-config",
             "--permission-mode",
             self._permission_mode,
             "--max-turns",
@@ -386,6 +410,11 @@ class ClaudeCodeRuntime(AgentRuntime):
             "stream-json",
             "--verbose",
             "--print",
+            # 服务端 headless spawn：隔离用户个人 MCP 配置（~/.claude.json / 项目
+            # .mcp.json）。否则 CLI 启动时会拉起用户的 context7/fast-context 等 MCP
+            # server 并等其初始化完成才处理 prompt——npx 式按需下载会挂起，整个 CLI
+            # 卡在发 API 之前（do_epoll_wait）。strict 模式仅用 --mcp-config 指定的。
+            "--strict-mcp-config",
             "--permission-mode",
             self._permission_mode,
             "--max-turns",
@@ -397,12 +426,15 @@ class ClaudeCodeRuntime(AgentRuntime):
             cmd.extend(["--session-id", session_key])
         if request.system_prompt:
             cmd.extend(["--system-prompt", request.system_prompt])
-        # MCP 注入：记忆工具（settings.mcp_memory_url）+ P2 绑定的 MCP servers（请求携带）
+        # MCP 工具注入：memory + step-tools（协调者）+ P2 绑定的 MCP servers
         # ⚠️ --mcp-config flag 需在实际 CLI 版本中验证（claude --help | grep mcp）
         mcp_path = _write_mcp_config(
-            str(request.agent_id) if request.agent_id else "",
-            settings.mcp_memory_url,
-            request.mcp_servers,
+            agent_id=str(request.agent_id) if request.agent_id else "",
+            memory_url=settings.mcp_memory_url,
+            step_tools_url=settings.mcp_step_tools_url,
+            session_id=str(request.session_id) if request.session_id else "",
+            group_id=str(request.group_id) if request.group_id else "",
+            bound_servers=request.mcp_servers,
         )
         if mcp_path:
             cmd.extend(["--mcp-config", mcp_path])
@@ -533,6 +565,19 @@ class ClaudeCodeRuntime(AgentRuntime):
                         )
                     )
                     seq += 1
+                elif block_type == "thinking":
+                    # 扩展思考的内部推理块：不投递给用户（答案在随后的 text block）。
+                    # 预期行为，debug 级即可，不该用 warning 制造"数据丢失"错觉。
+                    logger.debug("跳过 thinking block (has_signature=%s)", bool(block.get("signature")))
+                else:
+                    # 真正未知的 block 类型才告警——可能是新协议字段，需排查。
+                    preview = block.get("text") or block
+                    logger.warning(
+                        "丢弃未知 assistant block type=%s keys=%s 预览=%s",
+                        block_type,
+                        list(block.keys()),
+                        str(preview)[:300],
+                    )
 
             usage = message.get("usage", {})
             if usage:
@@ -606,18 +651,34 @@ def _entry_to_claude(entry: dict) -> dict:
 
 
 def _write_mcp_config(
-    agent_id: str, mcp_url: str, bound_servers: list[dict] | None = None
+    agent_id: str,
+    memory_url: str = "",
+    step_tools_url: str = "",
+    session_id: str = "",
+    group_id: str = "",
+    bound_servers: list[dict] | None = None,
 ) -> str | None:
     """写临时 MCP 配置文件，返回路径。atexit 注册删除，崩溃时也清理。
 
-    合并：记忆工具（agenthub-memory，settings.mcp_memory_url）+ P2 绑定的 MCP servers
-    （请求携带 request.mcp_servers）。无任何 server 时返回 None（不传 --mcp-config）。
+    合并三种 MCP server 来源：
+    - memory_url     — agenthub-memory server（save_memory tool）
+    - step_tools_url — agenthub-step-tools server（task_complete/ask tools，coordinator）
+    - bound_servers  — P2 绑定的 MCP servers（请求携带 request.mcp_servers）
+    session_id/group_id — 注入 step-tools URL query param，供 ASGI wrapper 映射上下文
     """
-    # agent_id 通过 query param 传给服务端 ASGI wrapper；
-    # env 字段对 SSE 类型的 MCP 服务端无效（仅对 subprocess 类型有效）。
     servers: dict[str, dict] = {}
-    if mcp_url and agent_id:
-        servers["agenthub-memory"] = {"type": "sse", "url": f"{mcp_url}?agent_id={agent_id}"}
+    if memory_url and agent_id:
+        servers["agenthub-memory"] = {"type": "sse", "url": f"{memory_url}?agent_id={agent_id}"}
+    if step_tools_url and agent_id:
+        url = f"{step_tools_url}?agent_id={agent_id}"
+        if session_id:
+            url += f"&session_id={session_id}"
+        if group_id:
+            url += f"&group_id={group_id}"
+        servers["agenthub-step-tools"] = {
+            "type": "sse",
+            "url": url,
+        }
     for entry in bound_servers or []:
         name = entry.get("name")
         if name:

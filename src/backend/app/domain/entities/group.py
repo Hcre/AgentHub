@@ -22,8 +22,8 @@ def _now() -> datetime:
 class Group:
     """群组聚合根。coordinator_config 为按群模型/参数覆盖（M3 用），创建时不暴露。
 
-    群级 dispatch_mode 暂存 coordinator_config['dispatch_mode']（默认 AT_ROUTING），
-    避免本期新增 DB column；后续 M4 提取为独立字段。
+    群级 dispatch_mode 暂存 coordinator_config['dispatch_mode']（默认 DISCUSSION），
+    v4 R2 后降级为软偏好，不作为路由分支条件。
     """
 
     name: str
@@ -31,6 +31,7 @@ class Group:
     description: str = ""
     member_ids: list[UUID] = field(default_factory=list)
     coordinator_config: dict = field(default_factory=dict)
+    workspace_path: str = ""
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=_now)
     updated_at: datetime = field(default_factory=_now)

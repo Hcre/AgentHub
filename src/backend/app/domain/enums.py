@@ -1,6 +1,15 @@
 """领域枚举：跨实体共享的状态/类型定义。"""
 
-from enum import StrEnum
+import sys
+from enum import Enum
+
+# StrEnum 在 Python 3.11+ 提供；3.10 用 Enum + str
+if sys.version_info >= (3, 11):
+    from enum import StrEnum
+else:
+    class StrEnum(str, Enum):  # type: ignore[no-redef]
+        """Backward compatibility for Python 3.10."""
+        pass
 
 
 class AgentSystem(StrEnum):
@@ -62,11 +71,16 @@ class MessageStatus(StrEnum):
 
 
 class TaskStatus(StrEnum):
+    # v4 调度态（7 个，下限）。详见 coordinator-v4-R1 §8：
+    # 「两态」（DONE/NOT DONE）是 WorkerOutcome 维度，非 TaskStatus；
+    # not_done 的节点停在 RUNNING，不单列状态。
+    # 已删 QUEUED（串行下 RUNNING 前一瞬间，无观察窗口）、
+    # PAUSED（= RUNNING，worker 等回复和在跑没区别）、
+    # AWAITING_APPROVAL（死代码，无产出方）。
     PENDING = "pending"
-    QUEUED = "queued"
     RUNNING = "running"
-    AWAITING_APPROVAL = "awaiting_approval"
-    PAUSED = "paused"
+    VERIFYING = "verifying"  # worker 报完成，验证闸门进行中（COMPLETED = 已验证）
+    BLOCKED = "blocked"  # 上游 FAILED 导致不可达；上游修复后回 PENDING
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"

@@ -8,28 +8,36 @@
 
 群聊路由：
   - 用户 @ Agent → V1 串行执行（list[Agent]）
-  - 群组 dispatch_mode == DISCUSSION 且无 @ → 进入讨论循环（Phase 6 接入）
-  - 其余 → 死群静默（仅广播用户消息）
+  - 无 @ 无广播 → 统一路由循环 decide → relay/task/replan/done
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import re
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 
 from app.application.commands import SendMessageCommand
 from app.application.services.context_builder import ContextBuilder
-from app.application.services.discussion_orchestrator import DiscussionOrchestrator
+from app.application.services.coordinator_run import (
+    CoordinatorRegistry,
+    CoordinatorRun,
+    build_default_orchestrator,
+    post_system_background,
+)
+from app.application.services.reactive_router import ReactiveRouter
+from app.application.services.session_state import SessionState
 from app.application.services.usage_service import UsageService
+from app.core.config import settings
 from app.core.events import EventBus
 from app.core.exceptions import NotFoundError
 from app.domain.entities.agent import Agent
 from app.domain.entities.group import Group
 from app.domain.entities.message import Message
 from app.domain.entities.session import Session
-from app.domain.enums import DispatchMode, MessageRole, MessageStatus, SessionType
+from app.domain.enums import MessageRole, MessageStatus, SessionType
 from app.domain.events import (
     MessageSent,
     StreamingCompleted,
@@ -43,11 +51,47 @@ from app.domain.repositories import (
     MessageRepository,
     SessionRepository,
 )
+from app.domain.task_engine.orchestrator import Orchestrator, ReplanDiff
 from app.infrastructure.cache.memory_l1 import L1MemoryStore
 from app.infrastructure.cache.watermark_store import WatermarkStore
 from app.infrastructure.llm.factory import build_adapter_for_agent
 
 logger = logging.getLogger(__name__)
+
+
+# v3 步1 前门机械反射（零 LLM）。control 从 CoordinatorGate 迁入；broadcast 从 Selector L1.5 提升。
+_CONTROL_RE = re.compile(
+    r"^(取消|停止|停下来?|暂停|停)(?![车站])|^(cancel|stop|abort)\b", re.IGNORECASE
+)
+_BROADCAST_RE = re.compile(r"大家|各位|所有人|全员|全体|在座的|你们都说说|都来说说")
+
+# v4 R5：破坏性 replan 的确认词（零 LLM 反射，跟 control 同级）。确认词在开头、后面跟什么都算
+# ——中文 \b 不可靠（依赖 \w），用 [\s\S]*$。
+_CONFIRM_RE = re.compile(
+    r"^(继续|确认|行|可以|ok|yes|好|嗯|对|搞|干|做|没问题|来吧|开始|执行|没错|是的|"
+    r"对的|同意|当然|好的|行吧|好吧)[\s\S]*$",
+    re.IGNORECASE,
+)
+
+# v4 R3：多轮讨论无机械上限（防循环只靠 LLM 判 done）。仅软观察口——
+# 超过此轮数打 warning 供运维发现异常，绝不截断正常讨论。
+_DISCUSS_SOFT_LIMIT = 10
+
+# Phase 5 接线：可注入的协作者组装器 + 后台系统消息 sink（生产默认在 coordinator_run）
+OrchestratorBuilder = Callable[..., Awaitable[Orchestrator]]
+SystemMessageSink = Callable[[uuid.UUID, str], Awaitable[None]]
+
+
+def _format_replan_confirmation(diff: ReplanDiff, requirement: str) -> str:
+    """破坏性 replan 确认文案。running 才是需确认的；completed 仅信息（成果保留）。"""
+    lines = [f"⚠️ 计划变更「{requirement}」将影响："]
+    if diff.running:
+        lines.append(f"- 正在进行的会被打断并取消：{', '.join(diff.running)}")
+    if diff.completed:
+        lines.append(f"- 已完成的成果保留在仓库，但不再属于新计划：{', '.join(diff.completed)}")
+    lines.append(f"- 新计划共 {diff.new_count} 项")
+    lines.append("回复「继续」确认变更，或直接说新的想法。")
+    return "\n".join(lines)
 
 
 def _load_skill_content(skill_names: list[str], skills_dir: str | None = None) -> str:
@@ -82,9 +126,11 @@ class ChatService:
         l1_memory: L1MemoryStore,
         watermarks: WatermarkStore,
         context_builder: ContextBuilder,
-        discussion: DiscussionOrchestrator,
         llm: UnifiedAgent,
         event_bus: EventBus,
+        reactive_router: ReactiveRouter | None = None,
+        orchestrator_builder: OrchestratorBuilder = build_default_orchestrator,
+        system_message_sink: SystemMessageSink = post_system_background,
         usage_service: UsageService | None = None,
     ) -> None:
         self._sessions = session_repo
@@ -94,9 +140,13 @@ class ChatService:
         self._l1 = l1_memory
         self._wm = watermarks
         self._ctx = context_builder
-        self._discussion = discussion
         self._llm = llm  # 全局默认，per-agent 覆盖时优先
         self._bus = event_bus
+        # v3 统一前门路由（步1）：取代 CoordinatorGate + Selector L3
+        self._router = reactive_router or ReactiveRouter()
+        self._registry = CoordinatorRegistry()  # 薄包装，共享进程级 registry
+        self._build_orch = orchestrator_builder
+        self._coord_post = system_message_sink  # 后台系统消息（独立 session）
         self._usage = usage_service  # P1-2 token 监控；None 时降级为 no-op
 
     async def send_and_stream(self, cmd: SendMessageCommand) -> AsyncIterator[StreamEvent]:
@@ -158,17 +208,207 @@ class ChatService:
                     yield evt
             return
 
-        # 无 @：根据群组模式决定
-        mode = group.dispatch_mode
-        if mode == DispatchMode.DISCUSSION:
-            async for evt in self._discussion.run_discussion(
-                session=session, group=group, trigger=trigger
-            ):
-                yield evt
+        # --- v4 R2 统一前门：机械反射 → 一次 reactive decide → dispatch ---
+        text = trigger.content or ""
+        run = self._registry.get(session.id)
+
+        # 反射②：control（执行态零 LLM 取消；无 run 时空操作）。命令，不是路由，先于 decide。
+        if self._is_control(text):
+            if run is not None:
+                await self._cancel_coordinator(session, run)
             return
 
-        # AT_ROUTING / 其他：死群静默（设计决策见实施计划 §六）
-        logger.debug("群组 %s 无 @ 提及，静默处理", group.id)
+        # 反射②b：破坏性 replan 待确认（零 LLM）。确认 → 执行换图；非确认 → 不清不吞，
+        # fall through 到统一循环（用户可能在改新需求，或闲聊两句后再回来确认）。
+        if run is not None and run.pending_replan is not None and self._is_confirmation(text):
+            pending = run.pending_replan
+            run.clear_pending_replan()
+            await run.replan(pending.new_tasks, force=True)
+            await self._post_system_sync(session, f"✅ 计划已变更：{pending.requirement}。")
+            return
+
+        members = await self._group_members(group)
+
+        # 反射③：全体意图 → 全员（零 LLM）。
+        if self._is_broadcast(trigger):
+            for target in members:
+                async for evt in self._stream_one_agent(
+                    session=session, group=group, target=target, trigger=trigger
+                ):
+                    yield evt
+            return
+
+        # ── 统一路由循环（design §4「一扇门，一条路」；§2.3 零模式）──
+        # active_plan 是 decide 的输入字段，不是分支条件。
+        # 唯一的 if action== 是对 decide 输出的分发：
+        rounds = 0
+        while True:
+            active_plan = run.plan_view() if run is not None else None
+            state = await SessionState.from_session(
+                session_id=session.id, members=members,
+                message_repo=self._messages, window=settings.l1_window_size,
+                active_plan=active_plan,
+            )
+            decision = await self._router.decide(state)
+            rounds += 1
+            logger.info(
+                "decide session=%s round=%d action=%s who=%s has_plan=%s reason=%s",
+                session.id, rounds, decision.action, decision.who,
+                active_plan is not None, decision.reason,
+            )
+
+            if decision.action == "task":
+                if active_plan is not None:
+                    # 已有 DAG 在跑 → 新任务降级 note（单 Orchestrator/session，design §7）
+                    logger.info("执行态 decide=task，降级 note session=%s", session.id)
+                    run.enqueue_note(text)
+                else:
+                    await self._start_coordinator(session, group, trigger)
+                return
+
+            if decision.action == "replan":
+                if run is None:
+                    # 纯对话态误判 replan（无任务在跑）→ 当新任务起
+                    await self._start_coordinator(session, group, trigger)
+                else:
+                    await self._handle_replan(session, group, run, decision.requirement or text)
+                return
+
+            if decision.action == "relay":
+                active_workers = (
+                    {s.worker for s in active_plan.steps if s.status == "running"}
+                    if active_plan else set()
+                )
+                streamed_idle = False
+                for w in decision.who:
+                    if run is not None and w in active_workers:
+                        # 在干活 → 投递层：in-flight 进桶 / parked 当答复 resume
+                        await run.relay(w, text)
+                    else:
+                        member = next((m for m in members if m.name == w), None)
+                        if member is None:
+                            continue  # 幻觉名 → 跳过
+                        streamed_idle = True
+                        async for evt in self._stream_one_agent(
+                            session=session, group=group, target=member, trigger=trigger
+                        ):
+                            yield evt
+                if not streamed_idle:
+                    return  # 纯后台投递（全是在干活的成员）→ 不回环
+                if rounds >= _DISCUSS_SOFT_LIMIT:
+                    logger.warning(
+                        "讨论 session=%s 已达 %d 轮仍未收敛（仅观察，不截断）", session.id, rounds
+                    )
+                continue  # 回完群聊讨论 → 再 decide（多轮）
+
+            # done → 收敛退出
+            return
+
+    # --- v3 前门反射 + 轻执行（步1）---
+
+    @staticmethod
+    def _is_control(text: str) -> bool:
+        """执行态控制消息（取消/停止），零 LLM。从 CoordinatorGate 迁入。"""
+        return bool(_CONTROL_RE.match(text.strip()))
+
+    @staticmethod
+    def _is_broadcast(trigger: Message) -> bool:
+        """全体意图（大家/各位…），仅用户消息触发。从 Selector L1.5 提升。"""
+        if trigger.sender_agent_id is not None:
+            return False
+        return bool(_BROADCAST_RE.search(trigger.content or ""))
+
+    @staticmethod
+    def _is_confirmation(text: str) -> bool:
+        """破坏性 replan 的确认词（零 LLM）。"""
+        return bool(_CONFIRM_RE.match(text.strip()))
+
+    async def _group_members(self, group: Group) -> list[Agent]:
+        """群成员 Agent 列表（decide 候选 + broadcast 目标）。"""
+        return [
+            a for mid in group.member_ids if (a := await self._agents.get_by_id(mid)) is not None
+        ]
+
+    # --- 任务编排接线（Phase 5）---
+
+    async def _start_coordinator(
+        self, session: Session, group: Group, trigger: Message
+    ) -> None:
+        """收 decompose → 起后台 Orchestrator。fire-and-forget，异常不上抛。"""
+        run = CoordinatorRun(session_id=session.id)
+        if not self._registry.try_reserve(session.id, run):  # 同步占位，先于任何 await
+            await self._post_system_sync(session, "已有任务执行中，请等待或发送「取消」")
+            return
+        try:
+            members = [
+                a
+                for mid in group.member_ids
+                if (a := await self._agents.get_by_id(mid)) is not None
+            ]
+            orchestrator = await self._build_orch(
+                task=trigger.content or "", members=members, session=session, group=group
+            )
+        except Exception as exc:
+            self._registry.release(session.id)
+            logger.exception("Coordinator 组装失败 session=%s", session.id)
+            await self._post_system_sync(session, f"任务启动失败: {exc}")
+            return
+
+        run.start(
+            orchestrator,
+            on_done=lambda r: self._coord_post(
+                session.id, r.summary or f"任务结束: {r.reason}"
+            ),
+            on_error=lambda e: self._coord_post(session.id, f"任务执行失败: {e}"),
+            registry=self._registry,
+        )
+        logger.info("Coordinator 启动 run=%s session=%s", run.run_id, session.id)
+
+    async def _cancel_coordinator(self, session: Session, run: CoordinatorRun) -> None:
+        await run.cancel()
+        self._registry.release(session.id)
+        await self._post_system_sync(session, "已取消当前任务（已完成的成果保留）")
+
+    # --- v4 R5：replan（DAG 手术 + 破坏性确认）---
+
+    async def _handle_replan(
+        self, session: Session, group: Group, run: CoordinatorRun, requirement: str
+    ) -> None:
+        """执行期改方案：重分解 → diff → 破坏性发确认/非破坏性直接换图。"""
+        try:
+            planned = await run.plan_replan(requirement)
+        except Exception as exc:
+            logger.exception("replan 重分解失败 session=%s", session.id)
+            await self._post_system_sync(session, f"计划变更失败：{exc}")
+            return
+        if planned is None:
+            return
+        new_tasks, diff = planned
+
+        if diff.is_destructive:
+            await self._post_system_sync(session, _format_replan_confirmation(diff, requirement))
+            run.stash_replan(requirement, new_tasks, diff)
+            logger.info("replan 破坏性，等待确认 session=%s running=%s", session.id, diff.running)
+            return
+
+        await run.replan(new_tasks)
+        await self._post_system_sync(session, f"✅ 计划已更新：新计划 {diff.new_count} 项。")
+        logger.info("replan 非破坏性，直接换图 session=%s", session.id)
+
+    async def _post_system_sync(self, session: Session, content: str) -> None:
+        """请求作用域内落系统消息（用本请求的 repo/bus）。后台路径用 _coord_post。"""
+        msg = Message(
+            session_id=session.id, role=MessageRole.SYSTEM, content=content
+        )
+        await self._messages.save(msg)
+        await self._bus.publish(
+            MessageSent(
+                session_id=session.id,
+                message_id=msg.id,
+                role="system",
+                content_type="text",
+            )
+        )
 
     async def _resolve_mentions(self, mention_names: list[str], group: Group) -> list[Agent]:
         """按 @name 解析为 Agent 实体（跳过不存在 / 不在群成员的）。"""

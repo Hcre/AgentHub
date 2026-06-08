@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.mcp_memory import get_mcp_asgi
+from app.api.mcp_step_tools import get_mcp_step_tools_asgi
 from app.api.routers import (
     agents,
     attachments,
@@ -128,6 +129,9 @@ app.include_router(ws_router)
 _mcp_asgi = get_mcp_asgi()
 if _mcp_asgi is not None:
     app.mount("/api/mcp-memory", _mcp_asgi)
+_step_tools_asgi = get_mcp_step_tools_asgi()
+if _step_tools_asgi is not None:
+    app.mount("/api/step-tools", _step_tools_asgi)
 
 
 @app.get("/health", tags=["health"])

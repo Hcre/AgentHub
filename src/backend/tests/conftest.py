@@ -11,6 +11,13 @@ os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("LLM_ADAPTER_MODE", "mock")
 os.environ.setdefault("ENV", "test")
 
+# 测试必须 hermetic：强制清空所有 LLM 凭据，杜绝真实/计费调用。
+# 用 "=" 强制覆盖（os.environ 优先级高于 .env），即使 backend/.env 配了真 key 也不泄漏进测试。
+os.environ["ANTHROPIC_API_KEY"] = ""
+os.environ["OPENAI_API_KEY"] = ""
+os.environ["DEEPSEEK_API_KEY"] = ""
+os.environ["COORDINATOR_API_KEY"] = ""
+
 from collections.abc import AsyncIterator
 
 import pytest_asyncio
