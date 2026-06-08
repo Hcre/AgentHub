@@ -247,6 +247,7 @@ export function CreateAgentModal({
   const [favSaving, setFavSaving] = useState(false)
   const [favError, setFavError] = useState('')
   const [toast, setToast] = useState<string | null>(null)
+  const [favManageOpen, setFavManageOpen] = useState(false)
 
   // -- Template store favorites --
   const favorites = useTemplateStore((s) => s.favorites)
@@ -780,6 +781,48 @@ export function CreateAgentModal({
                   )
                 })}
               </div>
+
+              {/* -- 常用模板（favorites） -- */}
+              {favorites.length > 0 && (
+                <>
+                  <div className="flex items-center justify-between border-t border-border/60 pt-3">
+                    <span className="text-[13px] text-muted-foreground">常用模板</span>
+                    <button
+                      type="button"
+                      onClick={() => setFavManageOpen(true)}
+                      className="text-[11px] text-brand hover:underline"
+                    >
+                      管理常用模板 →
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {favorites.map((fav) => {
+                      const favPicked = selectedTemplateId === fav.id && !isCustom
+                      return (
+                        <button
+                          key={fav.id}
+                          type="button"
+                          onClick={async () => {
+                            setPickedIndex(null)
+                            setSelectedTemplateId(fav.id)
+                            const detail = await loadTemplateDetail(fav.id)
+                            setSelectedTemplateData(detail)
+                          }}
+                          data-picked={favPicked ? 'true' : undefined}
+                          className="flex flex-col gap-1 rounded-lg border p-3 text-left transition-colors hover:border-brand/40 data-[picked=true]:border-brand data-[picked=true]:bg-brand/5"
+                        >
+                          <span className="text-[13px] font-medium">
+                            {fav.favorite_name || fav.display_name_zh || fav.name}
+                          </span>
+                          <span className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
+                            {fav.favorite_description || fav.description_zh || fav.description || '暂无描述'}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
 
               {/* -- 自定义 -- */}
               <button

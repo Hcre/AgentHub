@@ -69,9 +69,18 @@ async function safeJson(r: Response) {
   }
 }
 
+export interface LoadTemplatesOptions {
+  q?: string
+  page?: number
+  page_size?: number
+}
+
 interface TemplateState {
   templates: TemplateData[]
   total: number
+  page: number
+  pageSize: number
+  searchQuery: string
   loading: boolean
   error: string
   sourceStatus: SourceStatus | null
@@ -88,7 +97,7 @@ interface TemplateState {
   favoritesLoading: boolean
 
   // Primary actions (Agent 1 naming convention, matching agentStore pattern)
-  loadTemplates: (q?: string) => Promise<void>
+  loadTemplates: (opts?: LoadTemplatesOptions) => Promise<void>
   syncSource: () => Promise<SyncResult>
   createTemplate: (data: TemplateCreateInput) => Promise<TemplateData>
   updateTemplate: (id: string, data: Partial<TemplateCreateInput>) => Promise<TemplateData>
@@ -115,6 +124,9 @@ interface TemplateState {
 export const useTemplateStore = create<TemplateState>((set, get) => ({
   templates: [],
   total: 0,
+  page: 1,
+  pageSize: 50,
+  searchQuery: '',
   loading: false,
   error: '',
   sourceStatus: null,
@@ -125,12 +137,16 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
   favorites: [],
   favoritesLoading: false,
 
-  loadTemplates: async (q) => {
-    set({ loading: true, error: '' })
+  loadTemplates: async (opts) => {
+    const q = opts?.q ?? get().searchQuery
+    const page = opts?.page ?? get().page
+    const pageSize = opts?.page_size ?? get().pageSize
+    set({ loading: true, error: '', searchQuery: q, page, pageSize })
     try {
       const params = new URLSearchParams()
       if (q) params.set('q', q)
-      params.set('page_size', '100')
+      params.set('page', String(page))
+      params.set('page_size', String(pageSize))
       const r = await fetch(`/api/templates/?${params}`)
       const data = await safeJson(r)
       if (!r.ok) throw new Error(data.detail || '加载模板失败')
@@ -141,7 +157,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
   },
 
   // Compatibility alias
-  fetchTemplates: (q) => get().loadTemplates(q),
+  fetchTemplates: (q) => get().loadTemplates(q ? { q } : undefined),
 
   syncSource: async () => {
     set({ syncing: true, error: '' })

@@ -167,6 +167,10 @@ export interface TemplateManagementTabProps {
 
 export function TemplateManagementTab({ onUseTemplate }: TemplateManagementTabProps) {
   const templates = useTemplateStore((s) => s.templates)
+  const total = useTemplateStore((s) => s.total)
+  const page = useTemplateStore((s) => s.page)
+  const pageSize = useTemplateStore((s) => s.pageSize)
+  const searchQuery = useTemplateStore((s) => s.searchQuery)
   const loading = useTemplateStore((s) => s.loading)
   const error = useTemplateStore((s) => s.error)
   const sourceStatus = useTemplateStore((s) => s.sourceStatus)
@@ -179,12 +183,26 @@ export function TemplateManagementTab({ onUseTemplate }: TemplateManagementTabPr
   const [toast, setToast] = useState<string | null>(null)
   const [favOpen, setFavOpen] = useState(false)
   const [favTemplate, setFavTemplate] = useState<TemplateData | null>(null)
+  const [searchInput, setSearchInput] = useState(searchQuery)
+
+  // Total pages
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   // Load data on mount
   useEffect(() => {
     loadTemplates()
     getSourceStatus()
   }, [loadTemplates, getSourceStatus])
+
+  // Debounced search: flush 300ms after user stops typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchInput !== searchQuery) {
+        loadTemplates({ q: searchInput, page: 1 })
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchInput, searchQuery, loadTemplates])
 
   const handleSync = useCallback(async () => {
     try {
@@ -197,8 +215,8 @@ export function TemplateManagementTab({ onUseTemplate }: TemplateManagementTabPr
     }
   }, [syncSource])
 
-  // Only show templates from wshobson/agents (synced from GitHub)
-  const ghTemplates = templates.filter((t) => t.source !== 'local')
+  // Show all templates (GitHub + local) with server-side search/pagination
+  const displayTemplates = templates
 
   const handleOpenWeb = (t: TemplateData) => {
     window.open(buildGitHubUrl(t), '_blank', 'noopener,noreferrer')
@@ -221,13 +239,25 @@ export function TemplateManagementTab({ onUseTemplate }: TemplateManagementTabPr
     <div className="flex h-full flex-col min-h-0 overflow-hidden">
       {/* Top bar */}
       <div className="flex items-center justify-between gap-3 border-b border-border/70 px-5 py-3.5">
-        <div className="flex items-center gap-2">
-          <h2 className="text-[15px] font-semibold">模板管理</h2>
-          <span className="rounded bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground tabular-nums">
-            {ghTemplates.length}
-          </span>
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <h2 className="text-[15px] font-semibold shrink-0">模板管理</h2>
+          <div className="relative flex-1 max-w-[320px]">
+            <Icon
+              name="search"
+              className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+            />
+            <input
+              className="h-8 w-full rounded-lg border border-border/60 bg-background/40 pl-9 pr-3 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              placeholder="搜索模板名称或描述…"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[11px] text-muted-foreground tabular-nums">
+            共 {total} 个
+          </span>
           <Button
             variant="outline"
             size="sm"
@@ -296,7 +326,7 @@ export function TemplateManagementTab({ onUseTemplate }: TemplateManagementTabPr
           <div className="flex items-center justify-center py-20">
             <span className="text-[13px] text-muted-foreground">加载中…</span>
           </div>
-        ) : ghTemplates.length === 0 ? (
+        ) : displayTemplates.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Icon name="files" className="mb-2 h-8 w-8 text-muted-foreground/30" />
             <p className="text-[13px] text-muted-foreground">暂无模板</p>
@@ -306,7 +336,7 @@ export function TemplateManagementTab({ onUseTemplate }: TemplateManagementTabPr
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-            {ghTemplates.map((t) => {
+            {displayTemplates.map((t) => {
               const displayName = t.display_name_zh || t.name
               const displayDesc = t.description_zh || t.description || '暂无描述'
               const tierColor = getTierColor(t.model_tier)
@@ -394,6 +424,33 @@ export function TemplateManagementTab({ onUseTemplate }: TemplateManagementTabPr
                 </article>
               )
             })}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {!loading && totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 pt-2 pb-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => loadTemplates({ page: page - 1 })}
+              disabled={page <= 1}
+            >
+              <Icon name="chevronLeft" className="h-3.5 w-3.5" />
+              上一页
+            </Button>
+            <span className="text-[12px] text-muted-foreground tabular-nums px-2">
+              {page} / {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => loadTemplates({ page: page + 1 })}
+              disabled={page >= totalPages}
+            >
+              下一页
+              <Icon name="chevronRight" className="h-3.5 w-3.5" />
+            </Button>
           </div>
         )}
       </div>

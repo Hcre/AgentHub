@@ -98,9 +98,8 @@ class CodexRuntime(AgentRuntime):
         cmd = [binary, "exec", "--json"]
         if self._model:
             cmd.extend(["-c", f'model="{self._model}"'])
-        # 权限模式 + 最大轮次
-        cmd.extend(["--approval-mode", self._permission_mode])
-        cmd.extend(["--max-turns", str(self._max_turns)])
+        if self._max_turns > 0:
+            cmd.extend(["--max-turns", str(self._max_turns)])
 
         # stdin 传 prompt；codex exec 用 `-` 表示从 stdin 读
         cmd.append("-")
