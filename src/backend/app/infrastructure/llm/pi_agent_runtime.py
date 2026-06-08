@@ -17,6 +17,7 @@ import re
 import shutil
 from collections.abc import AsyncIterator
 from contextlib import suppress
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.domain.llm.protocol import (
@@ -27,6 +28,7 @@ from app.domain.llm.protocol import (
     ToolCall,
     ToolResult,
 )
+from app.infrastructure.llm.cli_logger import get_log_path, spawn_visible_terminal
 
 logger = logging.getLogger(__name__)
 
@@ -124,22 +126,22 @@ class PiAgentRuntime(AgentRuntime):
         if request.group_delta_text:
             sp = "\n\n".join(filter(None, [sp, request.group_delta_text]))
 
-        logger.info(
-            "Pi Agent request_id=%s session=%s provider=%s model=%s",
-            request.request_id,
-            request.session_id,
-            self._provider,
-            self._model,
-        )
-
         prompt = self._extract_prompt(request)
         if not prompt:
             yield StreamEvent(type=StreamEventType.ERROR, seq=0, content="Pi Agent: 无用户消息")
             return
 
-        # 群聊：uuid5(session_id:agent_id) 确定性映射，避免跨 agent 会话污染
+        # 群聊：agent_id 后缀确定性映射，避免跨 agent 会话污染
         session_key = self._compute_session_key(request)
         session_file = str(Path(self._session_dir) / f"{session_key}.jsonl")
+
+        logger.info(
+            "Pi Agent request_id=%s session_key=%s provider=%s model=%s",
+            request.request_id,
+            session_key,
+            self._provider,
+            self._model,
+        )
 
         cmd = self._build_cmd(session_file, request, sp)
         env = self._build_env()
@@ -169,6 +171,29 @@ class PiAgentRuntime(AgentRuntime):
                 content=f"⚠️ pi CLI 未安装或路径不存在: {cwd or '当前目录'}",
             )
             return
+        except OSError as exc:
+            yield StreamEvent(
+                type=StreamEventType.ERROR,
+                seq=0,
+                content=f"⚠️ pi CLI 启动失败: {exc}",
+            )
+            return
+
+        # 尝试打开可见终端用于调试；失败静默回退 headless 模式
+        ok = spawn_visible_terminal(cmd, env, cwd, session_key, prompt)
+        if not ok:
+            logger.debug("Visible terminal unavailable for session=%s, continuing headless", session_key)
+
+        prompt_json = json.dumps({"type": "prompt", "message": prompt}) + "\n"
+        from app.infrastructure.llm.process_registry import save_spawn_info
+
+        save_spawn_info(
+            str(request.session_id),
+            cmd=cmd,
+            env=env,
+            cwd=cwd,
+            prompt_text=prompt_json,
+        )
         assert self._process.stdin is not None
         assert self._process.stdout is not None
 
@@ -201,7 +226,7 @@ class PiAgentRuntime(AgentRuntime):
         if self._process and self._process.stdout:
             watchdog_task = asyncio.create_task(_watchdog())
             try:
-                async for line in self._read_lines(self._process.stdout):
+                async for line in self._read_lines(self._process.stdout, str(request.session_id)):
                     events = self._parse_line(line, seq)
                     for evt in events:
                         yield evt
@@ -376,15 +401,29 @@ class PiAgentRuntime(AgentRuntime):
         return str(request.session_id)
 
     @staticmethod
-    async def _read_lines(stdout: asyncio.StreamReader) -> AsyncIterator[str]:
-        """读取 stdout 行，不做超时（超时由 watchdog task 杀进程 → EOF 来保证）。"""
-        while True:
-            line = await stdout.readline()
-            if not line:
-                break
-            decoded = line.decode(errors="replace").strip()
-            if decoded:
-                yield decoded
+    async def _read_lines(stdout: asyncio.StreamReader, session_id: str = "") -> AsyncIterator[str]:
+        """读取 stdout 行，不做超时（超时由 watchdog task 杀进程 → EOF 来保证）。
+        同时将输出写入 cli_logger 日志文件。"""
+        log_fh = None
+        if session_id:
+            log_path = get_log_path(session_id)
+            log_fh = open(log_path, "a", encoding="utf-8", errors="replace")
+            log_fh.write(f"\n=== Pi Agent {datetime.now(UTC).isoformat()} ===\n")
+            log_fh.flush()
+        try:
+            while True:
+                line = await stdout.readline()
+                if not line:
+                    break
+                decoded = line.decode(errors="replace").strip()
+                if decoded:
+                    if log_fh:
+                        log_fh.write(decoded + "\n")
+                        log_fh.flush()
+                    yield decoded
+        finally:
+            if log_fh:
+                log_fh.close()
 
     def _parse_line(self, line: str, seq: int) -> list[StreamEvent]:
         """解析一行 Pi RPC JSONL 输出，映射为 StreamEvent 列表。

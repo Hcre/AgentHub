@@ -14,8 +14,6 @@ from app.domain.events.base import DomainEvent
 class AgentCreated(DomainEvent):
     agent_id: UUID
     name: str
-    provider: str
-    model: str
 
 
 @dataclass(frozen=True, kw_only=True)

@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useUIStore } from '../../stores/uiStore'
 import { useAgentStore } from '../../stores/agentStore'
-import { useApiKeyStore, PROVIDER_LABELS } from '../../stores/apiKeyStore'
 import { Icon } from '../ui'
 
 // ── 假数据（API 有数据后自动替换） ─────────────────────────────
@@ -134,13 +132,54 @@ function TokenDashboard() {
   )
 }
 
+// ── Provider 选项 ────────────────────────────────────────────────
+
+const PROVIDERS = [
+  { value: 'deepseek', label: 'DeepSeek' },
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'openai', label: 'OpenAI' },
+]
+
+// ── CLI 配置路径 ─────────────────────────────────────────────────
+
+const CLI_CONFIG_PATHS = [
+  { label: 'Claude Code', path: '~/.claude/settings.json' },
+  { label: 'OpenCode', path: '~/.config/opencode/config.yaml' },
+  { label: 'Codex CLI', path: '~/.codex/config.yaml' },
+  { label: 'Pi Agent', path: '~/.pi-agent/config.yaml' },
+]
+
 // ── 设置主页 ──────────────────────────────────────────────────────
 
 export function SettingsPage() {
-  const setSection = useUIStore((s) => s.setSection)
-  const keys = useApiKeyStore((s) => s.keys)
-  const coordinatorId = useApiKeyStore((s) => s.coordinatorCredentialId)
-  const coordinatorKey = keys.find((k) => k.id === coordinatorId)
+  // 协调者凭证表单
+  const [provider, setProvider] = useState('deepseek')
+  const [model, setModel] = useState('')
+  const [apiKey, setApiKey] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [feedback, setFeedback] = useState<'idle' | 'saved' | 'error'>('idle')
+
+  // CLI 配置面板
+  const [showCliConfig, setShowCliConfig] = useState(false)
+
+  const handleSave = async () => {
+    if (!apiKey.trim()) return
+    setSaving(true)
+    setFeedback('idle')
+    try {
+      const r = await fetch('/api/agents/coordinator/credential', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, api_key: apiKey, model }),
+      })
+      if (!r.ok) throw new Error(`${r.status}`)
+      setFeedback('saved')
+    } catch {
+      setFeedback('error')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="glass-panel flex h-full flex-col overflow-hidden rounded-2xl border shadow-sm">
@@ -156,26 +195,97 @@ export function SettingsPage() {
           <TokenDashboard />
         </section>
 
-        {/* ── 凭证管理 ── */}
+        {/* ── 协调者凭证 ── */}
         <section>
-          <h3 className="mb-3 text-[13px] font-medium text-muted-foreground">凭证管理</h3>
+          <h3 className="mb-3 text-[13px] font-medium text-muted-foreground">协调者凭证</h3>
+          <div className="rounded-lg border border-border/60 glass-soft p-4 space-y-3">
+            {/* Provider */}
+            <div>
+              <label className="block mb-1 text-[11px] text-muted-foreground">Provider</label>
+              <select
+                value={provider}
+                onChange={(e) => setProvider(e.target.value)}
+                className="w-full rounded-md border border-border/60 bg-background px-3 py-1.5 text-[13px] text-foreground outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/20"
+              >
+                {PROVIDERS.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Model */}
+            <div>
+              <label className="block mb-1 text-[11px] text-muted-foreground">Model</label>
+              <input
+                type="text"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                placeholder="如 deepseek-chat"
+                className="w-full rounded-md border border-border/60 bg-background px-3 py-1.5 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-brand/50 focus:ring-1 focus:ring-brand/20"
+              />
+            </div>
+
+            {/* API Key */}
+            <div>
+              <label className="block mb-1 text-[11px] text-muted-foreground">API Key</label>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="sk-..."
+                className="w-full rounded-md border border-border/60 bg-background px-3 py-1.5 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-brand/50 focus:ring-1 focus:ring-brand/20"
+              />
+            </div>
+
+            {/* Save button + feedback */}
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                onClick={handleSave}
+                disabled={saving || !apiKey.trim()}
+                className="inline-flex items-center gap-1.5 rounded-md bg-brand px-4 py-1.5 text-[13px] font-medium text-brand-foreground shadow-sm transition-colors hover:bg-brand/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Icon name="check" className="h-3.5 w-3.5" />
+                {saving ? '保存中…' : '保存'}
+              </button>
+              {feedback === 'saved' && (
+                <span className="text-[12px] text-green-600 dark:text-green-400">已保存</span>
+              )}
+              {feedback === 'error' && (
+                <span className="text-[12px] text-destructive">保存失败，请重试</span>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* ── CLI 配置 ── */}
+        <section>
+          <h3 className="mb-3 text-[13px] font-medium text-muted-foreground">CLI 配置</h3>
           <button
-            onClick={() => setSection('api-keys')}
+            onClick={() => setShowCliConfig(!showCliConfig)}
             className="flex w-full items-center gap-4 rounded-lg border border-border/60 glass-soft p-4 text-left transition-colors hover:bg-accent/40"
           >
             <div className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg bg-muted/60">
-              <Icon name="shieldCheck" className="h-5 w-5 text-muted-foreground" />
+              <Icon name="folderOpen" className="h-5 w-5 text-muted-foreground" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-medium">Provider 配置</div>
+              <div className="text-[13px] font-medium">CLI 配置文件路径</div>
               <div className="mt-0.5 text-[11px] text-muted-foreground">
-                {keys.length > 0
-                  ? `${keys.length} 个已保存${coordinatorKey ? ` · 协调者: ${coordinatorKey.name}` : ' · 未指定协调者凭证'}`
-                  : '还未保存 Provider 配置'}
+                Claude Code · OpenCode · Codex CLI · Pi Agent
               </div>
             </div>
-            <Icon name="chevronRight" className="h-4 w-4 text-muted-foreground" />
+            <Icon name={showCliConfig ? 'chevronUp' : 'chevronDown'} className="h-4 w-4 text-muted-foreground" />
           </button>
+
+          {showCliConfig && (
+            <div className="mt-2 rounded-lg border border-border/60 glass-soft p-4 space-y-2">
+              {CLI_CONFIG_PATHS.map((c) => (
+                <div key={c.label} className="flex items-center justify-between text-[12px]">
+                  <span className="text-muted-foreground">{c.label}</span>
+                  <code className="font-mono text-[11px] text-foreground/70">{c.path}</code>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </div>

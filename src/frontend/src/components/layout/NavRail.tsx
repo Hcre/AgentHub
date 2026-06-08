@@ -112,8 +112,8 @@ export function NavRail() {
             onClick={() => setSection('settings')}
             title="设置"
             aria-label="设置"
-            aria-current={section === 'settings' || section === 'api-keys' ? 'page' : undefined}
-            data-active={section === 'settings' || section === 'api-keys' ? 'true' : undefined}
+            aria-current={section === 'settings' ? 'page' : undefined}
+            data-active={section === 'settings' ? 'true' : undefined}
             className={cn(
               'group relative grid h-[clamp(36px,2.6vw,44px)] w-[clamp(36px,2.6vw,44px)] place-items-center rounded-lg text-muted-foreground transition-colors',
               'hover:bg-accent hover:text-foreground',
@@ -121,13 +121,13 @@ export function NavRail() {
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background',
             )}
           >
-            {(section === 'settings' || section === 'api-keys') && (
+            {section === 'settings' && (
               <span
                 aria-hidden
                 className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-brand"
               />
             )}
-            <Icon name="settings" className="h-[clamp(14px,1.1vw,18px)] w-[clamp(14px,1.1vw,18px)]" strokeWidth={section === 'settings' || section === 'api-keys' ? 2.25 : 1.75} />
+            <Icon name="settings" className="h-[clamp(14px,1.1vw,18px)] w-[clamp(14px,1.1vw,18px)]" strokeWidth={section === 'settings' ? 2.25 : 1.75} />
           </button>
         </div>
       </aside>

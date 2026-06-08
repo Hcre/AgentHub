@@ -45,6 +45,7 @@ from app.infrastructure.llm.claude_code_process_pool import (
     shutdown_pool,
     start_pool_sweeper,
 )
+from app.infrastructure.llm.process_registry import kill_all
 
 
 @asynccontextmanager
@@ -58,6 +59,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # CLI PATH 扫描调度器：启动时立即扫一次 + 后台每 1h 扫一次（P1-3，best-effort）
     await startup_cli_scheduler()
     yield
+    await kill_all()
     await shutdown_cli_scheduler()
     await shutdown_pool()
     await client.aclose()

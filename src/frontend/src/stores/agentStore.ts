@@ -8,11 +8,6 @@ export interface CreateAgentInput {
   role: string
   /** 运行时：自动检测的 CLI (opencode/claude_code/pi_agent/codex/gemini/cursor_agent) 或 mock */
   agentSystem: string
-  provider: string
-  model: string
-  /** claude_code 经 proxy 透传的目标端点 */
-  baseUrl?: string
-  apiKey: string
   /** 头像（首字母/emoji），留空则用名称首字母合成 */
   avatar?: string
   skills: string[]
@@ -54,8 +49,8 @@ function buildProfile(input: CreateAgentInput): AgentProfile {
     capabilities: input.skills,
     memoryByLevel: DEFAULT_MEMORY,
     config: {
-      provider: input.provider,
-      model: input.model,
+      provider: '',
+      model: '',
       maxTokens: 4096,
       concurrency: 1,
       temperature: 0.5,
@@ -103,10 +98,6 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         avatar,
         role: input.role,
         agent_system: input.agentSystem,
-        provider: input.provider,
-        model: input.model,
-        base_url: input.baseUrl,
-        api_key: input.apiKey,
         skills: input.skills,
         capability_tags: input.capabilityTags,
         system_prompt: input.systemPrompt,

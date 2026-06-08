@@ -12,8 +12,10 @@ import logging
 import os
 import re
 import shutil
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import suppress
+from datetime import UTC, datetime
 
 from app.domain.llm.protocol import (
     AgentRequest,
@@ -23,10 +25,12 @@ from app.domain.llm.protocol import (
     ToolCall,
     ToolResult,
 )
+from app.infrastructure.llm.cli_logger import get_log_path, spawn_visible_terminal
+from app.infrastructure.llm.process_registry import save_spawn_info
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_TIMEOUT = 120  # 秒
+_DEFAULT_TIMEOUT = 300  # 秒
 _DEFAULT_MAX_TURNS = 10
 _DEFAULT_PERMISSION_MODE = "bypassPermissions"
 
@@ -129,7 +133,11 @@ class CodexRuntime(AgentRuntime):
         elif self._api_key:
             env["OPENAI_API_KEY"] = self._api_key
 
-        logger.info("Codex spawn: %s (model=%s)", " ".join(cmd), self._model or "default")
+        session_key = self._compute_session_key(request)
+        logger.info(
+            "Codex spawn: %s session_key=%s model=%s",
+            " ".join(cmd), session_key, self._model or "default",
+        )
 
         try:
             self._process = await asyncio.create_subprocess_exec(
@@ -139,9 +147,16 @@ class CodexRuntime(AgentRuntime):
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
             )
-        except FileNotFoundError:
+        except (FileNotFoundError, OSError):
             yield StreamEvent(type=StreamEventType.ERROR, seq=0, content="Codex CLI not found")
             return
+
+        save_spawn_info(str(request.session_id), cmd=cmd, env=env, cwd=None, prompt_text=prompt)
+
+        # 尝试打开可见终端用于调试；失败静默回退 headless 模式
+        ok = spawn_visible_terminal(cmd, env, cwd, session_key, prompt)
+        if not ok:
+            logger.debug("Visible terminal unavailable for session=%s, continuing headless", session_key)
 
         assert self._process.stdin is not None
         self._process.stdin.write(prompt.encode())
@@ -169,7 +184,7 @@ class CodexRuntime(AgentRuntime):
         if self._process and self._process.stdout:
             watchdog_task = asyncio.create_task(_watchdog())
             try:
-                async for line in self._read_lines(self._process.stdout):
+                async for line in self._read_lines(self._process.stdout, str(request.session_id)):
                     events = self._parse_line(line, seq)
                     for evt in events:
                         yield evt
@@ -239,6 +254,13 @@ class CodexRuntime(AgentRuntime):
                 os.kill(pid, 9)
 
     @staticmethod
+    def _compute_session_key(request: AgentRequest) -> str:
+        """会话键：群聊使用 uuid5(session_id:agent_id) 避免跨 agent 污染（对齐 ClaudeCode）。"""
+        if request.is_group_chat and request.agent_id is not None:
+            return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{request.session_id}:{request.agent_id}"))
+        return str(request.session_id)
+
+    @staticmethod
     def _extract_prompt(request: AgentRequest) -> str:
         for msg in reversed(request.messages):
             if msg.get("role") == "user":
@@ -246,15 +268,25 @@ class CodexRuntime(AgentRuntime):
         return ""
 
     @staticmethod
-    async def _read_lines(stdout: asyncio.StreamReader) -> AsyncIterator[str]:
-        """读取 stdout 行，不做超时（超时由 watchdog task 杀进程 → EOF 来保证）。"""
-        while True:
-            line = await stdout.readline()
-            if not line:
-                break
-            decoded = line.decode(errors="replace").strip()
-            if decoded:
-                yield decoded
+    async def _read_lines(stdout: asyncio.StreamReader, session_id: str) -> AsyncIterator[str]:
+        """读取 stdout 行，不做超时（超时由 watchdog task 杀进程 → EOF 来保证）。
+
+        每行实时写入 CLI 日志文件（~/.agenthub/cli-logs/{session_id}.log），
+        前端可通过 API 获取路径进行 tail 查看。
+        """
+
+        log_path = get_log_path(session_id)
+        with open(log_path, "a", encoding="utf-8", errors="replace") as log_fh:
+            while True:
+                line = await stdout.readline()
+                if not line:
+                    break
+                decoded = line.decode(errors="replace").strip()
+                if decoded:
+                    ts = datetime.now(UTC).isoformat()
+                    log_fh.write(f"[{ts}] {decoded}\n")
+                    log_fh.flush()
+                    yield decoded
 
     @staticmethod
     def _parse_line(line: str, seq: int) -> list[StreamEvent]:

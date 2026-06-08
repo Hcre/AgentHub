@@ -255,7 +255,6 @@ function sectionTitle(section: string): string {
     case 'calendar':
       return '日历'
     case 'settings':
-    case 'api-keys':
       return '设置'
     default:
       return 'AgentHub'

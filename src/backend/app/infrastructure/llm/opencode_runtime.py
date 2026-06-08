@@ -32,6 +32,8 @@ from app.domain.llm.protocol import (
     ToolCall,
     ToolResult,
 )
+from app.infrastructure.llm.cli_logger import get_log_path, spawn_visible_terminal
+from app.infrastructure.llm.process_registry import save_spawn_info
 
 logger = logging.getLogger(__name__)
 
@@ -182,14 +184,18 @@ class OpenCodeRuntime(AgentRuntime):
             cmd.extend(["--session", oc_session])
         # 权限：始终跳过权限检查（对齐 Claude Code bypassPermissions）
         cmd.append("--dangerously-skip-permissions")
+        # 工作目录通过 --dir 传给 opencode CLI（不用子进程 cwd）
+        if cwd:
+            cmd.extend(["--dir", cwd])
 
         # system_prompt 拼进完整 prompt，通过 stdin 传入（避免 Windows 命令行长度限制）
         if sp:
             prompt = f"{sp}\n\n---\n\n{prompt}"
 
         logger.info(
-            "OpenCode spawn: %s (provider=%s, oc_session=%s, permission=%s)",
+            "OpenCode spawn: %s session_key=%s provider=%s oc_session=%s permission=%s",
             " ".join(cmd),
+            session_key,
             self._provider,
             oc_session or "new",
             self._permission_mode,
@@ -208,9 +214,22 @@ class OpenCodeRuntime(AgentRuntime):
             if self._process.stdin:
                 self._process.stdin.write(prompt.encode())
                 self._process.stdin.write_eof()
+            save_spawn_info(str(request.session_id), cmd=cmd, env=env, cwd=cwd, prompt_text=prompt)
         except FileNotFoundError:
             yield StreamEvent(type=StreamEventType.ERROR, seq=0, content="OpenCode CLI 启动失败")
             return
+        except OSError as exc:
+            yield StreamEvent(
+                type=StreamEventType.ERROR,
+                seq=0,
+                content=f"OpenCode CLI 启动失败: {exc}",
+            )
+            return
+
+        # 尝试打开可见终端用于调试；失败静默回退 headless 模式
+        ok = spawn_visible_terminal(cmd, env, cwd, session_key, prompt)
+        if not ok:
+            logger.debug("Visible terminal unavailable for session=%s, continuing headless", session_key)
 
         assert self._process.stdout is not None
 
@@ -235,7 +254,7 @@ class OpenCodeRuntime(AgentRuntime):
         if self._process and self._process.stdout:
             watchdog_task = asyncio.create_task(_watchdog())
             try:
-                async for line in self._read_lines(self._process.stdout):
+                async for line in self._read_lines(self._process.stdout, str(request.session_id)):
                     # 从首个事件中提取 opencode sessionID
                     if not oc_session:
                         sid = _extract_session_id(line)
@@ -360,15 +379,19 @@ class OpenCodeRuntime(AgentRuntime):
         return False
 
     @staticmethod
-    async def _read_lines(stdout: asyncio.StreamReader) -> AsyncIterator[str]:
-        """读取 stdout 行，不做超时（超时由 watchdog task 杀进程 → EOF 来保证）。"""
-        while True:
-            line = await stdout.readline()
-            if not line:
-                break
-            decoded = line.decode(errors="replace").strip()
-            if decoded:
-                yield decoded
+    async def _read_lines(stdout: asyncio.StreamReader, session_id: str) -> AsyncIterator[str]:
+        """读取 stdout 行，同时写入 cli_logger。不做超时（超时由 watchdog task 杀进程 → EOF 来保证）。"""
+        log_path = get_log_path(session_id)
+        with open(log_path, "a", encoding="utf-8") as log_f:
+            while True:
+                line = await stdout.readline()
+                if not line:
+                    break
+                decoded = line.decode(errors="replace").strip()
+                if decoded:
+                    log_f.write(decoded + "\n")
+                    log_f.flush()
+                    yield decoded
 
     def _parse_line(self, line: str, seq: int) -> list[StreamEvent]:
         try:
@@ -461,7 +484,9 @@ class OpenCodeRuntime(AgentRuntime):
                 )
             )
         elif event_type == "step_start":
-            # 开始处理一个新 step → 发 THINKING 状态，避免前端空白等待
+            # 新 step 开始：重置 text 标记（用于区分中间 step_finish 和终态）
+            # 同时发 THINKING 状态，避免前端空白等待
+            self._text_seen = False
             draft_text = part.get("drafting") or part.get("status") or ""
             if not draft_text:
                 draft_text = "正在处理…"
@@ -510,10 +535,6 @@ class OpenCodeRuntime(AgentRuntime):
                     content=_s("message") or _s("error") or "OpenCode error",
                 )
             )
-        elif event_type == "step_start":
-            # 新 step 开始，重置 text 标记（用于区分中间 step_finish 和终态）
-            self._text_seen = False
-            pass
         else:
             text = _s("text") or _s("content")
             if text:
