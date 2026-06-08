@@ -178,22 +178,49 @@ class PiAgentRuntime(AgentRuntime):
         await self._process.stdin.drain()
 
         # 读取并解析 stdout JSONL
+        # Windows 上 asyncio.wait_for 无法取消子进程管道 readline（底层 I/O 不支持 cancellation），
+        # 所以用并行 watchdog task：超时后 force-kill 子进程 → stdout 关闭 → readline 返回 EOF。
         seq = 0
-        try:
-            async for line in self._read_lines_with_timeout(self._process.stdout):
-                events = self._parse_line(line, seq)
-                for evt in events:
-                    yield evt
-                    seq = evt.seq + 1
-                if events and events[-1].type in (StreamEventType.DONE, StreamEventType.ERROR):
-                    break
-        except TimeoutError:
+        watchdog_task: asyncio.Task[None] | None = None
+        timed_out = False
+
+        async def _watchdog() -> None:
+            nonlocal timed_out
+            try:
+                await asyncio.sleep(self._timeout)
+                timed_out = True
+                logger.warning(
+                    "Pi Agent 超时 (%ss)，强制终止子进程 pid=%s",
+                    self._timeout,
+                    self._process.pid if self._process else "?",
+                )
+                await self.stop()
+            except asyncio.CancelledError:
+                pass  # 正常完成，取消 watchdog
+
+        if self._process and self._process.stdout:
+            watchdog_task = asyncio.create_task(_watchdog())
+            try:
+                async for line in self._read_lines(self._process.stdout):
+                    events = self._parse_line(line, seq)
+                    for evt in events:
+                        yield evt
+                        seq = evt.seq + 1
+                    if events and events[-1].type in (StreamEventType.DONE, StreamEventType.ERROR):
+                        break
+            finally:
+                # 确保 watchdog 被取消（正常完成或异常退出）
+                if watchdog_task and not watchdog_task.done():
+                    watchdog_task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await watchdog_task
+
+        if timed_out:
             yield StreamEvent(
                 type=StreamEventType.ERROR,
                 seq=seq,
-                content=f"Pi Agent 超时 ({self._timeout}s)",
+                content=f"Pi Agent 超时 ({self._timeout}s)，已强制终止。请重试或简化任务。",
             )
-            await self.stop()
             return
 
         # 关闭 stdin 并等待退出
@@ -231,7 +258,35 @@ class PiAgentRuntime(AgentRuntime):
                 await asyncio.wait_for(self._process.wait(), timeout=5)
             except TimeoutError:
                 self._process.kill()
+                try:
+                    await asyncio.wait_for(self._process.wait(), timeout=3)
+                except TimeoutError:
+                    await self._force_kill_subprocess()
             self._process = None
+
+    async def _force_kill_subprocess(self) -> None:
+        """跨平台强制杀子进程 — Windows taskkill / Unix kill -9。
+        在 asyncio wait_for 无法取消 Windows 子进程管道 I/O 时兜底。"""
+        if self._process is None:
+            return
+        pid = self._process.pid
+        if pid is None:
+            return
+        import platform
+        import subprocess as _sub
+
+        if platform.system() == "Windows":
+            try:
+                _sub.run(
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    capture_output=True,
+                    timeout=10,
+                )
+            except Exception:
+                pass
+        else:
+            with suppress(Exception):
+                os.kill(pid, 9)
 
     # --- 内部方法 ---
 
@@ -320,16 +375,11 @@ class PiAgentRuntime(AgentRuntime):
             return f"{request.session_id}_{request.agent_id}"
         return str(request.session_id)
 
-    async def _read_lines_with_timeout(self, stdout: asyncio.StreamReader) -> AsyncIterator[str]:
-        deadline = asyncio.get_event_loop().time() + self._timeout
+    @staticmethod
+    async def _read_lines(stdout: asyncio.StreamReader) -> AsyncIterator[str]:
+        """读取 stdout 行，不做超时（超时由 watchdog task 杀进程 → EOF 来保证）。"""
         while True:
-            remaining = deadline - asyncio.get_event_loop().time()
-            if remaining <= 0:
-                raise TimeoutError
-            try:
-                line = await asyncio.wait_for(stdout.readline(), timeout=remaining)
-            except TimeoutError:
-                raise
+            line = await stdout.readline()
             if not line:
                 break
             decoded = line.decode(errors="replace").strip()
