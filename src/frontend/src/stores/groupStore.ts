@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { groupsApi, type CreateGroupInput } from '../api/groups'
 import { sessionsApi, type MessageOut } from '../api/sessions'
 import { nowStamp, uid } from '../lib/id'
-import type { ApiGroup, Group, GroupMessage, ReplyRef, StreamEvent } from '../types'
+import type { ApiGroup, ApprovalRequestData, Group, GroupMessage, ReplyRef, StreamEvent, TaskPlanData, ToolCallEntry, ToolResultEntry } from '../types'
 
 export interface SendGroupOptions {
   requiresApproval?: boolean
@@ -226,7 +226,151 @@ export const useGroupStore = create<GroupState>((set, get) => ({
         return { messagesByGroup: { ...s.messagesByGroup, [groupId]: next } }
       }
 
-      // thinking / tool_* / request_approval / task_plan：MVP 不渲染
+      // ── thinking：累积模型推理过程 ──
+      if (event.type === 'thinking') {
+        const chunk = event.content ?? ''
+        const idx = list.findIndex((m) => m.id === sentinelId)
+        if (idx >= 0) {
+          const cur = list[idx]!
+          const next = [...list]
+          next[idx] = { ...cur, thinking: (cur.thinking ?? '') + chunk }
+          return { messagesByGroup: { ...s.messagesByGroup, [groupId]: next } }
+        }
+        const seeded: GroupMessage = {
+          id: sentinelId,
+          from: 'agent',
+          who: senderId,
+          time: nowStamp(),
+          thinking: chunk,
+          streaming: true,
+        }
+        return { messagesByGroup: { ...s.messagesByGroup, [groupId]: [...list, seeded] } }
+      }
+
+      // ── tool_call：记录工具调用 ──
+      if (event.type === 'tool_call') {
+        const tc = event.tool_call
+        if (!tc) return {}
+        const entry: ToolCallEntry = {
+          id: uid('tc'),
+          callId: tc.call_id,
+          name: tc.name,
+          args: tc.arguments ?? {},
+          status: 'pending',
+        }
+        const idx = list.findIndex((m) => m.id === sentinelId)
+        if (idx >= 0) {
+          const cur = list[idx]!
+          const next = [...list]
+          next[idx] = { ...cur, toolCalls: [...(cur.toolCalls ?? []), entry] }
+          return { messagesByGroup: { ...s.messagesByGroup, [groupId]: next } }
+        }
+        const seeded: GroupMessage = {
+          id: sentinelId,
+          from: 'agent',
+          who: senderId,
+          time: nowStamp(),
+          toolCalls: [entry],
+          streaming: true,
+        }
+        return { messagesByGroup: { ...s.messagesByGroup, [groupId]: [...list, seeded] } }
+      }
+
+      // ── tool_result：记录工具执行结果 ──
+      if (event.type === 'tool_result') {
+        const tr = event.tool_result
+        if (!tr) return {}
+        const resultEntry: ToolResultEntry = {
+          id: uid('tr'),
+          callId: tr.call_id,
+          content: tr.content ?? (tr.error ?? ''),
+          isError: !tr.success,
+        }
+        const idx = list.findIndex((m) => m.id === sentinelId)
+        if (idx >= 0) {
+          const cur = list[idx]!
+          const updatedCalls = (cur.toolCalls ?? []).map((c) =>
+            c.callId === tr.call_id
+              ? { ...c, status: (tr.success ? 'success' : 'error') as 'success' | 'error' }
+              : c,
+          )
+          const next = [...list]
+          next[idx] = {
+            ...cur,
+            toolCalls: updatedCalls,
+            toolResults: [...(cur.toolResults ?? []), resultEntry],
+          }
+          return { messagesByGroup: { ...s.messagesByGroup, [groupId]: next } }
+        }
+        const seeded: GroupMessage = {
+          id: sentinelId,
+          from: 'agent',
+          who: senderId,
+          time: nowStamp(),
+          toolResults: [resultEntry],
+          streaming: true,
+        }
+        return { messagesByGroup: { ...s.messagesByGroup, [groupId]: [...list, seeded] } }
+      }
+
+      // ── request_approval：审批请求卡 ──
+      if (event.type === 'request_approval') {
+        const deniedOps = event.metadata?.denied_ops as unknown[]
+        const desc = (event.content ?? '以下操作需要你的确认')
+          + (deniedOps?.length ? `\n\n${JSON.stringify(deniedOps, null, 2)}` : '')
+        const arData: ApprovalRequestData = {
+          id: uid('ar'),
+          action: 'approve_operations',
+          description: desc,
+          metadata: event.metadata ?? {},
+          status: 'pending',
+        }
+        const idx = list.findIndex((m) => m.id === sentinelId)
+        if (idx >= 0) {
+          const cur = list[idx]!
+          const next = [...list]
+          next[idx] = { ...cur, approvalRequest: arData }
+          return { messagesByGroup: { ...s.messagesByGroup, [groupId]: next } }
+        }
+        const seeded: GroupMessage = {
+          id: sentinelId,
+          from: 'agent',
+          who: senderId,
+          time: nowStamp(),
+          approvalRequest: arData,
+          streaming: true,
+        }
+        return { messagesByGroup: { ...s.messagesByGroup, [groupId]: [...list, seeded] } }
+      }
+
+      // ── task_plan：任务计划 ──
+      if (event.type === 'task_plan') {
+        const tpData: TaskPlanData = event.task_plan ?? (() => {
+          try {
+            return event.content ? JSON.parse(event.content) : { summary: event.content ?? '', steps: [] }
+          } catch {
+            return { summary: event.content ?? '', steps: [] }
+          }
+        })()
+        const idx = list.findIndex((m) => m.id === sentinelId)
+        if (idx >= 0) {
+          const cur = list[idx]!
+          const next = [...list]
+          next[idx] = { ...cur, taskPlan: tpData }
+          return { messagesByGroup: { ...s.messagesByGroup, [groupId]: next } }
+        }
+        const seeded: GroupMessage = {
+          id: sentinelId,
+          from: 'agent',
+          who: senderId,
+          time: nowStamp(),
+          taskPlan: tpData,
+          streaming: true,
+        }
+        return { messagesByGroup: { ...s.messagesByGroup, [groupId]: [...list, seeded] } }
+      }
+
+      // 未知事件类型：静默忽略（forward-compat）
       return {}
     })
   },

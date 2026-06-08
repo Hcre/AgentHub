@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { nowStamp, uid } from '../lib/id'
 import type {
+  ApprovalRequestData,
   Attachment,
   ChatMessage,
   Conversation,
@@ -10,6 +11,9 @@ import type {
   StageTask,
   StageStatus,
   StreamEvent,
+  TaskPlanData,
+  ToolCallEntry,
+  ToolResultEntry,
 } from '../types'
 
 /** 会话键：agentId:conversationId */
@@ -163,7 +167,187 @@ export const useChatStore = create<ChatState>()(
           ...bumpUnread(),
         }
       }
-      // thinking / tool_* / task_plan / request_approval：MVP 暂不渲染
+      // ── thinking：累积模型推理过程（ThinkingBlock 渲染）──
+      if (event.type === 'thinking') {
+        const chunk = event.content ?? ''
+        const idx = list.findIndex((m) => m.id === streamingId(key))
+        if (idx >= 0) {
+          const cur = list[idx]!
+          const next = [...list]
+          next[idx] = { ...cur, thinking: (cur.thinking ?? '') + chunk }
+          return {
+            messages: { ...s.messages, [key]: next },
+            typing: { ...s.typing, [key]: false },
+          }
+        }
+        const seeded: ChatMessage = {
+          id: streamingId(key),
+          from: 'agent',
+          time: nowStamp(),
+          text: '',
+          thinking: chunk,
+          streaming: true,
+        }
+        return {
+          messages: { ...s.messages, [key]: [...list, seeded] },
+          typing: { ...s.typing, [key]: false },
+          ...bumpUnread(),
+        }
+      }
+
+      // ── tool_call：记录工具调用（ToolCallBlock 渲染）──
+      if (event.type === 'tool_call') {
+        const tc = event.tool_call
+        if (!tc) return {}
+        const entry: ToolCallEntry = {
+          id: uid('tc'),
+          callId: tc.call_id,
+          name: tc.name,
+          args: tc.arguments ?? {},
+          status: 'pending',
+        }
+        const idx = list.findIndex((m) => m.id === streamingId(key))
+        if (idx >= 0) {
+          const cur = list[idx]!
+          const next = [...list]
+          next[idx] = { ...cur, toolCalls: [...(cur.toolCalls ?? []), entry] }
+          return {
+            messages: { ...s.messages, [key]: next },
+            typing: { ...s.typing, [key]: false },
+          }
+        }
+        const seeded: ChatMessage = {
+          id: streamingId(key),
+          from: 'agent',
+          time: nowStamp(),
+          text: '',
+          toolCalls: [entry],
+          streaming: true,
+        }
+        return {
+          messages: { ...s.messages, [key]: [...list, seeded] },
+          typing: { ...s.typing, [key]: false },
+          ...bumpUnread(),
+        }
+      }
+
+      // ── tool_result：记录工具执行结果（ToolResultBlock 渲染）──
+      if (event.type === 'tool_result') {
+        const tr = event.tool_result
+        if (!tr) return {}
+        const resultEntry: ToolResultEntry = {
+          id: uid('tr'),
+          callId: tr.call_id,
+          content: tr.content ?? (tr.error ?? ''),
+          isError: !tr.success,
+        }
+        const idx = list.findIndex((m) => m.id === streamingId(key))
+        if (idx >= 0) {
+          const cur = list[idx]!
+          // 更新匹配的 ToolCallEntry 状态
+          const updatedCalls = (cur.toolCalls ?? []).map((c) =>
+            c.callId === tr.call_id
+              ? { ...c, status: (tr.success ? 'success' : 'error') as 'success' | 'error' }
+              : c,
+          )
+          const next = [...list]
+          next[idx] = {
+            ...cur,
+            toolCalls: updatedCalls,
+            toolResults: [...(cur.toolResults ?? []), resultEntry],
+          }
+          return {
+            messages: { ...s.messages, [key]: next },
+            typing: { ...s.typing, [key]: false },
+          }
+        }
+        const seeded: ChatMessage = {
+          id: streamingId(key),
+          from: 'agent',
+          time: nowStamp(),
+          text: '',
+          toolResults: [resultEntry],
+          streaming: true,
+        }
+        return {
+          messages: { ...s.messages, [key]: [...list, seeded] },
+          typing: { ...s.typing, [key]: false },
+          ...bumpUnread(),
+        }
+      }
+
+      // ── request_approval：审批请求卡（ApprovalRequestBlock 渲染）──
+      if (event.type === 'request_approval') {
+        const deniedOps = event.metadata?.denied_ops as unknown[]
+        const desc = (event.content ?? '以下操作需要你的确认')
+          + (deniedOps?.length ? `\n\n${JSON.stringify(deniedOps, null, 2)}` : '')
+        const arData: ApprovalRequestData = {
+          id: uid('ar'),
+          action: 'approve_operations',
+          description: desc,
+          metadata: event.metadata ?? {},
+          status: 'pending',
+        }
+        const idx = list.findIndex((m) => m.id === streamingId(key))
+        if (idx >= 0) {
+          const cur = list[idx]!
+          const next = [...list]
+          next[idx] = { ...cur, approvalRequest: arData }
+          return {
+            messages: { ...s.messages, [key]: next },
+            typing: { ...s.typing, [key]: false },
+          }
+        }
+        const seeded: ChatMessage = {
+          id: streamingId(key),
+          from: 'agent',
+          time: nowStamp(),
+          text: '',
+          approvalRequest: arData,
+          streaming: true,
+        }
+        return {
+          messages: { ...s.messages, [key]: [...list, seeded] },
+          typing: { ...s.typing, [key]: false },
+          ...bumpUnread(),
+        }
+      }
+
+      // ── task_plan：任务计划（TaskPlanBlock 渲染）──
+      if (event.type === 'task_plan') {
+        const tpData: TaskPlanData = event.task_plan ?? (() => {
+          try {
+            return event.content ? JSON.parse(event.content) : { summary: event.content ?? '', steps: [] }
+          } catch {
+            return { summary: event.content ?? '', steps: [] }
+          }
+        })()
+        const idx = list.findIndex((m) => m.id === streamingId(key))
+        if (idx >= 0) {
+          const cur = list[idx]!
+          const next = [...list]
+          next[idx] = { ...cur, taskPlan: tpData }
+          return {
+            messages: { ...s.messages, [key]: next },
+            typing: { ...s.typing, [key]: false },
+          }
+        }
+        const seeded: ChatMessage = {
+          id: streamingId(key),
+          from: 'agent',
+          time: nowStamp(),
+          text: '',
+          taskPlan: tpData,
+          streaming: true,
+        }
+        return {
+          messages: { ...s.messages, [key]: [...list, seeded] },
+          typing: { ...s.typing, [key]: false },
+          ...bumpUnread(),
+        }
+      }
+
+      // 未知事件类型：静默忽略（forward-compat）
       return {}
     })
   },
