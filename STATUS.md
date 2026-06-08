@@ -1,11 +1,19 @@
 # 当前状态
 
+<<<<<<< HEAD
 > 最后更新: 2026-06-08 16:30（CLI 4/4 全线 E2E 打通 + Agent 数据模型 template_name + 创建流程重构 + 删除确认弹窗）
+=======
+> 最后更新: 2026-06-08（Template v4 + CLI streaming 全线：5 种流式事件 UI 不再丢弃，bypassPermissions 默认，工具调用折叠组，删除确认弹窗）
+>>>>>>> feature/template/template-system-v4
 > 规则：**每次 push 或开始/结束一个任务时，更新你自己的那一行。**
 
 | 我 | 正在做 | 阻塞？ | 这周完成了 |
 |----|--------|--------|-----------|
+<<<<<<< HEAD
 | 黎 | CLI 4/4 E2E + Agent 数据模型 + 创建流程重构 PR push | 无 | merge 39 commits ✅ + CLI PATH 扫描 ✅ + ProviderKeyResolver ✅ + Step 2 重设计 ✅ + OpenCode v1.15 集成 ✅ + PiAgentRuntime 修正 ✅ + Key 管理简化 ✅ + 工作目录 E2E ✅ + bug 修复 9 个 ✅ + 本地全栈部署 ✅ + 桌面 App 可行性讨论→决策 Tauri 2 ✅ + ADR-0007 ✅ + Template 系统 v4 ✅ + **CLI Runtime 4/4 全线 E2E 打通 ✅ (claude_code/pi_agent/opencode/codex) + Agent 数据模型 template_name ✅ + 创建流程重构 (名字→身份模板→CLI) ✅ + 8 真实模板 (wshobson-agents) ✅ + 删除确认弹窗 ✅ + 图标居中 ✅ + reply_to/skills_dir/stderr 死锁 等 bug 修复 6 个 ✅** |
+=======
+| 黎 | 流式事件 UI + 权限默认 bypass + 会话最近消息 PR push | 无 | merge 39 commits ✅ + Template 系统 v4 (192 wshobson 模板+favorites+plugin skill 发现) ✅ + **CLI streaming 全线: 5 种流式事件 UI (Thinking/ToolCall/ToolResult/Approval/TaskPlan) 不再丢弃 ✅ + ToolCallsGroup 折叠组 ✅ + bypassPermissions 默认 ✅ + 删除确认弹窗 (群组+Skill) ✅ + 会话列表最近消息 ✅ + skill 批量勾选右上角 ✅** |
+>>>>>>> feature/template/template-system-v4
 | 董 | 协调者+任务编排部分 | 无 | 群聊全栈实现 ✅ + CLI 多模型代理 ✅ + ADR-02 长驻 CLI ✅ + 前端群聊 ✅ + 记忆系统 B 方向设计 ✅ + B1 后端实现 ✅ + B2 详细设计 ✅ + Agent 创建全链路 6 处 bug 修复 + 9 个测试 ✅ + MCP save_memory 端到端打通 ✅ + 前端记忆面板 ✅ + 记忆分支合并 main ✅ |
 | 袁 | **M5/M6 overnight plan finalize**（4 track 整合 + HTML 报告 + Feishu 同步 + morning handoff）| 🟡 Track 4b 2/2 Reviewer SLA 等至 2026-06-08 23:03；Track 1 e2e-pin-auth 截图缺失（worktree env 失）；Feishu 同步待 user OAuth 后 cron 跑 | **M5/M6 overnight plan `plan_3eaba0fa` 4 track 收束** (commit `60ff903` 含 19 新 commit b0caaf9→60ff903): **Track 1 Pin API 401 fix** (4 commit `b97c4fd` fix + `bd92b2a` docs + `5371f41` tests + `2cbfff8` worklog → owner merge `2843b06` → main) M5 鉴权降级契约 5 路径 (204/403/auto-trust 204/401/422/404) + 12 pytest 全绿 ✅; **Track 2a Token monitor E2E** (4 commit `46065aa` ChatService wire + `ebf678a` DiscussionOrchestrator wire + `7914a59` E2E + `60d4d69` worklog → owner merge `fbfd44a`) record_completion 真实调用点接 LLM 链 + 4 E2E pytest 100% 绿 ✅; **Track 2b CLI scheduler** (4 commit `b63d0da` feat + `66e2c52` test 6/6 + `6d1fb0a` worklog + `ddd58fc` screenshot 14559 bytes → owner merge `1714f5d` + cherry-pick `9601313`) startup hook + 1h 循环 + 优雅降级 ✅; **Track 3 mobile H5** (2 commit `a483424` useMediaQuery+AppShell + `8124e54` 11 单测+4 截图+BDD M02 → owner merge `015cf8e`) 4 栏 768 折叠 + 85/85 vitest 绿 (超 47 目标 38) ✅; **Track 4a CI gate** (2 commit `0570a43` lock file sync fix + `6cd69dd` screenshot → owner merge `9e613b8`) 4 jobs ci.yml + gh Actions run 27096545029 4/4 success 3m27s ✅; **Track 4b MCP P3 F3 spec 冻结** (1 commit `701f01b` → owner merge `60ff903`) 8 端点 12 错误码 R1/R3/R5 + 2 处内部不一致校正 + 24h SLA Reviewer Pending ⚠️ PEND; **t5-finalize 整合** (1 commit `TBD` push main) `docs/reports/test-report-2026-06-08.html` 45.7 KB semantic HTML+inline CSS 11 段 + `docs/reports/test-report-2026-06-08-feishu.md` 21.6 KB markdown 适配版 + STATUS 同步 (顶部时间戳→2026-06-08 09:00) + 袁行 overnight 全 commit 摘要 + 已知 gap #7/#8 追加 + worklog `worklogs/袁/2026-06-08_plan_3eaba0fa-finalize.md` + Feishu 同步待 user OAuth (`lark-cli` 已装 1.0.48 + daemon session 0da65648-6656-4adc-b52c-83035ed5d090 待 userCode 8Q6R-NK2R 扫 `https://open.feishu.cn/page/cli?user_code=8Q6R-NK2R` + cron `feishu-sync-monitor` 每 3min 自检) + pytest 168/171 (3 deferred: 2 pi_agent + 1 flaky selector) + vitest 85/85 + Playwright 6 必选+2 加分截图 + 7 downscope 决策显式披露 + ADR-0014 strong-close 接受 baseline debt ✅ |
 

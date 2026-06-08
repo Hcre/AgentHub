@@ -76,8 +76,53 @@ TemplateService
 - [ ] 8 个常用模板的 source_path 依赖上游 wshobson/agents 仓库结构不变；若上游重命名文件需手动同步 `_DEFAULT_FAVORITES` 列表
 - [ ] 首次 sync_source 克隆仓库 ~30s 需网络 + git，考虑在 docker-compose 启动后 pre-warm
 
+---
+
+## 追加 (2026-06-08 晚)：CLI 流式事件 UI + 权限 + 会话最近消息
+
+### 流式事件不再丢弃
+
+**问题**：chatStore/groupStore 对所有非 TEXT/DONE 事件直接 `return {}`，用户看不到 AI 的思考过程、工具调用、权限阻断等。
+
+**产出**：
+- **5 个新 UI 组件**：
+  - `ThinkingBlock.tsx` — 琥珀色折叠块，Brain 图标，流式时展开+脉冲
+  - `ToolCallBlock.tsx` — 锌色卡片，spinner/绿勾/红叉状态
+  - `ToolResultBlock.tsx` — 默认折叠，2000 字截断+展开
+  - `ApprovalRequestBlock.tsx` — 琥珀双线边框，批准/拒绝按钮（Phase 1 本地状态）
+  - `TaskPlanBlock.tsx` — 靛蓝色，编号步骤+依赖+预估时间
+- **ToolCallsGroup.tsx** — 所有工具调用+结果收成一行 `🔧 工具调用 (N)`，点击展开
+- **chatStore.ts + groupStore.ts** — 5 种事件不再丢弃，写入 streaming message 字段
+- **types/index.ts** — 新增 ToolCallEntry、ToolResultEntry、ApprovalRequestData、TaskPlanData 接口
+
+### 权限默认 bypassPermissions
+
+- `claude_code_runtime.py` `_DEFAULT_PERMISSION_MODE` → `"bypassPermissions"`
+- `factory.py` 默认 fallback → `"bypassPermissions"`
+- 现有 Agent settings 修复脚本 `scripts/fix_permissions.py`
+
+### 会话列表最近消息
+
+- `LeftPanel.tsx` DM 列表从 `messages[convKey]` 取最后一条 `text`，fallback `conv.subtitle`
+
+### 删除确认弹窗
+
+- `ConfirmDialog.tsx` 通用组件
+- 群组删除 (LeftPanel) + Skill 单个/批量删除 (SkillMarketplacePage) 替换 window.confirm
+
+### 架构文档
+
+- `docs/plan/template-system-design_模板系统设计计划书.md`
+- `docs/plan/cli-streaming-architecture_流式输出架构设计.md`
+
+### 分支
+
+`feature/template/template-system-v4` → PR #17
+
+---
+
 ## 给下一位的交接
 
-> 常用模板系统已完整落地。后续如需调整精选列表，修改 `TemplateService._DEFAULT_FAVORITES` 类变量即可（`src/backend/app/application/services/template_service.py:286-327`）。
-> 8 个模板的 source_path 均已在 `wshobson/agents` 仓库中验证存在（`.agenthub/templates/sources/wshobson-agents/` 下有实际文件）。
-> 前端常用模板 UI 在 `CreateAgentModal` Step 1 和 `TemplateManagementTab` 卡片操作中均可用。
+> 常用模板系统已完整落地。后续如需调整精选列表，修改 `TemplateService._DEFAULT_FAVORITES` 类变量即可。
+> 流式事件 UI 已全覆盖（thinking/tool_call/tool_result/request_approval/task_plan），Phase 2 需接 ApprovalRequestBlock 的批准/拒绝后端接口。
+> 权限默认 `bypassPermissions`，如需恢复审批流程，改回 `_DEFAULT_PERMISSION_MODE = "acceptEdits"`。
