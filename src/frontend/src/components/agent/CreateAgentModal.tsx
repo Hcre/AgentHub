@@ -152,28 +152,24 @@ interface CliCardData {
   model: string | null
 }
 
-const DEFAULT_RUNTIMES: CliCardData[] = [
-  { id: 'claude_code', label: 'Claude Code', version: null, available: false, model: null },
-  { id: 'pi_agent', label: 'Pi Agent', version: null, available: false, model: null },
-  { id: 'mock', label: 'Mock', version: null, available: false, model: null },
-]
-
 function buildCards(
   scanned: ProviderInfo[] | null,
   scanning: boolean,
   loadedDefaults: Record<string, DefaultConfig>,
 ): CliCardData[] {
-  // 扫描中或未扫描 → 显示默认列表（灰色未检测状态）
-  if (!scanned || scanning) return DEFAULT_RUNTIMES
-  // 扫描完成 → 合并扫描结果到默认列表（已检测到的更新状态，未检测到的保留灰色卡片）
-  const scannedMap = new Map(scanned.map((p) => [p.name, p]))
-  return DEFAULT_RUNTIMES.map((d) => {
-    const found = scannedMap.get(d.id)
-    if (found && found.available) {
-      return { ...d, version: found.version, available: true, model: loadedDefaults[d.id]?.model ?? null }
-    }
-    return d
-  })
+  if (scanning) return []
+  if (scanned) {
+    return scanned
+      .filter((p) => p.available && p.name !== 'mock')
+      .map((p) => ({
+        id: p.name,
+        label: p.display_name,
+        version: p.version,
+        available: true,
+        model: loadedDefaults[p.name]?.model ?? null,
+      }))
+  }
+  return []
 }
 
 export function CreateAgentModal({
