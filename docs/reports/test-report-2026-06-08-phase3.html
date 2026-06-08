@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentHub · Day 2 Phase-3 收尾汇报 (2026-06-08)</title>
+<style>
+  :root{
+    --bg:#F0EEE6; --bg-soft:#F5F3EC; --panel:#FBFAF6; --panel-2:#F6F3EA;
+    --line:#E2DDD0; --line-soft:#EAE6DA; --txt:#28261F; --txt-dim:#6A6457;
+    --txt-faint:#9A9385; --brand:#C9613C; --brand-2:#D97757; --accent:#4F6F8F;
+    --gold:#B68A3E; --good:#5C8A56; --warn:#C08A2E; --bad:#C0533F; --code-bg:#2D2B28;
+    --radius:16px; --shadow:0 18px 40px -24px rgba(80,60,40,.35);
+    --mono:'SFMono-Regular',ui-monospace,'Cascadia Code','Consolas',monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;font-size:15px}
+  body{
+    font-family:var(--sans);background:radial-gradient(1100px 700px at 82% -8%,#F0E6DC 0%,transparent 55%),radial-gradient(900px 650px at -8% 8%,#EEEADD 0%,transparent 50%),var(--bg);
+    color:var(--txt);line-height:1.7;-webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--brand);color:#fff}
+  .shell{display:flex;min-height:100vh}
+  .side{
+    position:fixed;top:0;left:0;bottom:0;width:238px;
+    background:linear-gradient(180deg,#F6F3EA,#F2EFE5);border-right:1px solid var(--line);
+    padding:24px 14px 30px;overflow-y:auto;z-index:50;
+  }
+  .side::-webkit-scrollbar{width:6px}
+  .side::-webkit-scrollbar-thumb{background:#DCD6C8;border-radius:8px}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:5px;padding:0 6px}
+  .brand .mark{
+    width:34px;height:34px;border-radius:9px;flex:0 0 auto;
+    background:linear-gradient(135deg,#C9613C,#D97757);
+    display:grid;place-items:center;font-weight:800;color:#fff;font-size:15px;
+    box-shadow:0 8px 20px -8px var(--brand);
+  }
+  .brand b{font-size:14px;letter-spacing:.3px;display:block;line-height:1.25;color:var(--txt)}
+  .brand span{font-size:10px;color:var(--txt-faint);letter-spacing:1.5px}
+  .side .meta{font-size:10px;color:var(--txt-faint);padding:0 6px;margin:10px 0 12px;border-top:1px solid var(--line);padding-top:10px}
+  nav a{
+    display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:7px;
+    color:var(--txt-dim);text-decoration:none;font-size:12px;transition:.18s;margin-bottom:1px;
+  }
+  nav a .n{font-family:var(--mono);font-size:9.5px;color:var(--txt-faint);width:16px;text-align:center}
+  nav a:hover{background:#EBE6D8;color:var(--txt)}
+  nav a.active{background:linear-gradient(90deg,rgba(201,97,60,.12),transparent);color:#2a2620;box-shadow:inset 2px 0 0 var(--brand)}
+  nav a.active .n{color:var(--brand)}
+  nav .grp{font-size:9px;letter-spacing:2px;color:var(--txt-faint);text-transform:uppercase;margin:14px 0 5px 9px}
+  .main{margin-left:238px;flex:1;padding:36px 44px 60px;max-width:1120px}
+  .sec-head{margin-bottom:24px}
+  .sec-head .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:1.5px;color:var(--brand);margin-bottom:3px}
+  .sec-head h2{font-size:25px;font-weight:800;letter-spacing:-.5px;margin:3px 0 8px}
+  .sec-head p{font-size:13.5px;color:var(--txt-dim);max-width:700px}
+  h2{font-size:22px;font-weight:800;margin:36px 0 12px;letter-spacing:-.3px}
+  h3{font-size:17px;font-weight:700;margin:26px 0 10px;display:flex;align-items:center;gap:10px}
+  h3 .dot{width:7px;height:7px;border-radius:50%;background:var(--brand);flex:0 0 auto}
+  h4{font-size:14px;font-weight:700;margin:16px 0 7px;color:var(--txt)}
+  p{font-size:13px;color:var(--txt-dim);margin-bottom:9px;line-height:1.75}
+  .mono{font-family:var(--mono)}
+  .card{border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:var(--panel);box-shadow:var(--shadow)}
+  .card.hl{border-left:3px solid var(--brand)}
+  .card h4{font-size:13.5px;margin:0 0 7px}
+  .card p{font-size:12px}
+  .grid{display:grid;gap:12px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr 1fr}
+  .g4{grid-template-columns:1fr 1fr 1fr 1fr}
+  .code-block{
+    background:var(--code-bg);color:#E8E4DB;border-radius:11px;padding:16px 18px;
+    font-family:var(--mono);font-size:12px;line-height:1.6;overflow-x:auto;white-space:pre;
+    box-shadow:var(--shadow);margin:12px 0;
+  }
+  .code-block .kw{color:#C9A87C}
+  .code-block .str{color:#9BBF8F}
+  .code-block .cm{color:#8A867A;font-style:italic}
+  .code-block .ty{color:#87B9D9}
+  .code-block .fn{color:#D9A987}
+  .diagram{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px;font-family:var(--mono);font-size:11.5px;line-height:1.5;overflow-x:auto;white-space:pre;box-shadow:var(--shadow)}
+  .diagram .hl{color:var(--brand);font-weight:700}
+  .diagram .cm{color:var(--txt-faint)}
+  .tbl-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--line);background:var(--panel)}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  thead{background:var(--bg-soft)}th{padding:9px 12px;text-align:left;font-weight:700;font-size:11.5px;color:var(--txt-dim);border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:8px 12px;border-bottom:1px solid var(--line-soft);color:var(--txt-dim)}
+  tr:last-child td{border-bottom:none}
+  td.num{font-family:var(--mono);text-align:right;white-space:nowrap}
+  .b-pill{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;display:inline-block}
+  .b-pill.ok{background:#E1F0DD;color:var(--good)}
+  .b-pill.mid{background:#F3E9D0;color:var(--warn)}
+  .b-pill.no{background:#F2DDD8;color:var(--bad)}
+  .b-pill.inf{background:rgba(201,97,60,.12);color:var(--brand)}
+  .note{padding:13px 15px;border-radius:10px;display:flex;gap:10px;align-items:flex-start;font-size:12.5px;margin:14px 0;border:1px solid}
+  .note .ico{font-size:17px;flex:0 0 auto;margin-top:1px}
+  .note.info{border-color:rgba(79,111,143,.3);background:rgba(79,111,143,.08)}
+  .note.warn{border-color:rgba(192,138,46,.3);background:rgba(192,138,46,.08)}
+  .note.ok{border-color:rgba(92,138,86,.3);background:rgba(92,138,86,.08)}
+  .chip-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+  .chip{font-size:10.5px;padding:3px 9px;border-radius:5px;background:#EDE8DD;color:var(--txt-dim);font-family:var(--mono);border:1px solid var(--line)}
+  .chip.b{background:rgba(201,97,60,.1);color:var(--brand);border-color:rgba(201,97,60,.2)}
+  .verdict{border:2px solid var(--brand);border-radius:13px;padding:20px 24px;background:linear-gradient(135deg,var(--panel),#F5F3EE);box-shadow:var(--shadow)}
+  .verdict .lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:2px;color:var(--brand);font-weight:700;margin-bottom:6px}
+  .verdict h4{font-size:16px;font-weight:800;margin:0 0 10px}
+  .checklist{list-style:none;display:flex;flex-direction:column;gap:8px;margin:10px 0}
+  .checklist li{font-size:12.5px;color:var(--txt-dim);padding-left:22px;position:relative}
+  .checklist li::before{content:"☐";position:absolute;left:0;color:var(--brand)}
+  .checklist li.done{color:var(--txt)}
+  .checklist li.done::before{content:"☑";color:var(--good)}
+  .src{font-size:10px;color:var(--txt-faint);font-family:var(--mono);margin-top:10px;display:flex;flex-wrap:wrap;gap:4px 12px}
+  .divider{height:1px;background:var(--line);margin:36px 0}
+  footer{border-top:1px solid var(--line);padding:22px 0 8px;margin-top:36px;color:var(--txt-faint);font-size:11px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+  footer code{font-family:var(--mono);color:var(--brand)}
+  @media(max-width:900px){.side{display:none}.main{margin-left:0;padding:22px 16px}.g2,.g3,.g4{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">
+      <div class="mark">A</div>
+      <div><b>AgentHub</b><span>Day 2 Phase-3 收尾</span></div>
+    </div>
+    <div class="meta">v1.0 · 2026-06-08 22:00 · <code>11/12 track</code></div>
+    <nav>
+      <div class="grp">收尾</div>
+      <a href="#overview" class="active"><span class="n">01</span>总览</a>
+      <a href="#verdict"><span class="n">02</span>完成判定</a>
+      <div class="grp">Track</div>
+      <a href="#t7"><span class="n">03</span>t7 会话置顶</a>
+      <a href="#t3"><span class="n">04</span>t3 MCP F3 创建</a>
+      <a href="#tests"><span class="n">05</span>测试矩阵</a>
+      <a href="#commits"><span class="n">06</span>Commit 清单</a>
+      <a href="#decisions"><span class="n">07</span>关键决策</a>
+      <a href="#gaps"><span class="n">08</span>已知 gap</a>
+      <a href="#next"><span class="n">09</span>Next gate</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <section id="overview">
+      <div class="sec-head">
+        <div class="tag">§1 收尾总览</div>
+        <h2>Day 2 Phase-3 完整收尾</h2>
+        <p>承接 phase-2 (2026-06-08 19:30-20:29, 9.5/12 done) → phase-3 (21:30-22:00, 1h) 落地 2 大 track: <b>t7 会话置顶</b> 完整全链路 (alembic + PATCH + pin icon) + <b>t3 MCP P3 F3</b> 路径 A 落地 (POST /api/mcp/servers)。总增 6 commit 落 main (含 25 rebase 推 4e899fb..2b1419c)。</p>
+      </div>
+
+      <div class="grid g4">
+        <div class="card hl"><h4>11/12</h4><p style="font-size:22px;font-weight:800;color:var(--brand);font-family:var(--mono);margin:4px 0">12 track</p><p>phase-2 9.5 + phase-3 +1.5 (t7 全完 + t3 路径 A)。剩 t10/t11。</p></div>
+        <div class="card hl"><h4>27</h4><p style="font-size:22px;font-weight:800;color:var(--brand);font-family:var(--mono);margin:4px 0">本 session commit</p><p>phase-2 22 + phase-3 5 (其中 4 rebase push, 1 头部 hash 变 2b1419c)。</p></div>
+        <div class="card hl"><h4>106/108</h4><p style="font-size:22px;font-weight:800;color:var(--good);font-family:var(--mono);margin:4px 0">vitest</p><p>+3 新增 (pin 3 路径), 2 失败仍 pre-existing WebPreviewCard gap。</p></div>
+        <div class="card hl"><h4>13/13</h4><p style="font-size:22px;font-weight:800;color:var(--good);font-family:var(--mono);margin:4px 0">pytest 关键路径</p><p>F3 4/4 (MCP create) + pin 4/4 (session pinned) + 5 既有 pin auth。pre-existing collection 错 2 处 (test_orchestrator_degrade / test_usage_e2e) 不属本 track scope。</p></div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="verdict">
+      <div class="verdict">
+        <div class="lbl">§2 完成判定</div>
+        <h4>11/12 track done · 提前 1h 闭环 t3 SLA · 网络挂未 push t3 2 commit</h4>
+        <ul class="checklist">
+          <li class="done">t7 B-4-P2-CL01 phase-3 全完 (alembic 0019 + Session.pinned 9 文件 + 4 测 + pin icon 4 决策)</li>
+          <li class="done">t3 MCP P3 F3 路径 A 全完 (POST /api/mcp/servers + 4 测, owner override 23:03 SLA 提前 1h 闭环)</li>
+          <li class="done">rebase + push 25 commit (4e899fb..2b1419c), 含 1 conflict 解 (chatStore.ts removeConversation 增强)</li>
+          <li class="done">vitest 106/108 绿 (含 3 新增 + 1 状态类型补 Conversation.pinned?), 0 新 regression</li>
+          <li class="done">pytest 13/13 关键路径绿 (F3 4/4 + session pin 4/4 + 既有 pin auth 5/5)</li>
+          <li class="done">STATUS.md 顶部时间戳 + 袁那行 22:00 同步</li>
+          <li>ADR-0018 owner override 临时记录 (本 worklog 暂代, 待补) — 留 P3+</li>
+          <li>网络恢复后 push t3 2 commit (fde10e4 + a2b9ff3) — 留 user</li>
+          <li>t10 M6 finalize + t11 飞书 OAuth + /api/usage 漏注册 — 下一位接</li>
+        </ul>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="t7">
+      <div class="sec-head">
+        <div class="tag">§3 track 1/2</div>
+        <h2>t7 B-4-P2-CL01 会话置顶</h2>
+        <p>承接 phase-2 partial (9d96156 search wire 30 行) → phase-3 补 alembic + PATCH + pin icon 4 决策 + 2 测 7 测全绿。</p>
+      </div>
+
+      <h3><span class="dot"></span>落地范围 (4 件补全)</h3>
+      <ul>
+        <li><b>alembic 0019</b>: sessions 表 +pinned Boolean NOT NULL DEFAULT false + ix_sessions_pinned (brief 估 0015, 实际 0015-0018 被 templates 占用 → 编号校正)</li>
+        <li><b>9 文件全链路</b>: SessionModel / Session entity / SessionOut / SessionResponse DTO / UpdateSessionCommand / SessionService.update / PATCH endpoint / PostgresSessionRepository (save + _to_domain)</li>
+        <li><b>LeftPanel pin icon</b>: brand 色 pinned / opacity-0 group-hover 未 pinned, 修 9d96156 漏的 useEffect import</li>
+        <li><b>handleTogglePin 4 决策</b> (user 决策):
+          <div class="chip-row">
+            <span class="chip b">① 乐观更新</span>
+            <span class="chip b">② 缺 sessionId → createPrivate 拿 ID → 再 PATCH</span>
+            <span class="chip b">③ 1 retry → 失败 console.warn + inline 错误</span>
+            <span class="chip b">④ in-flight Set 禁用按钮 + aria-busy</span>
+          </div>
+        </li>
+      </ul>
+
+      <h3><span class="dot"></span>关键 bug 诊断：_to_domain 漏字段</h3>
+      <div class="note warn">
+        <span class="ico">!</span>
+        <div><b>症状</b>: <code>assert resp.pinned is True</code> 通过, 但 <code>reloaded.pinned is True</code> 失败 — SQLAlchemy 模型有值, domain Session 构造时被 default False 覆盖。<br>
+        <b>根因</b>: 我的 Edit swap 错位, _to_domain() 缺 <code>pinned=m.pinned</code> 字段。<br>
+        <b>修复</b>: 补 <code>pinned=m.pinned</code> 到 _to_domain, 4/4 测转绿。<br>
+        <b>教训</b>: entity 构造漏字段是 stale-construction 典型, 必须 service+repo 两层都验, 不能只 service 层验。</div>
+      </div>
+
+      <h3><span class="dot"></span>3 测试</h3>
+      <div class="code-block">tests/test_session_pinned.py (4 路径)
+  test_session_pin_set_true_then_false        # 翻转+落库
+  test_session_pin_default_false_on_new       # 新建默认 False
+  test_session_pin_nonexistent_404             # 404 NotFoundError
+  test_session_pin_preserves_other_fields      # 单独 PATCH 不破坏 title/workspace
+
+LeftPanel.pin.test.tsx (3 路径)
+  click pinned false → flips to true + PATCH(true)        # store + API 调
+  click pinned true → flips to false + PATCH(false)
+  missing sessionId → no throw + local toggle works       # 缺 sessionId 降级</div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="t3">
+      <div class="sec-head">
+        <div class="tag">§4 track 2/2</div>
+        <h2>t3 MCP P3 F3 创建</h2>
+        <p>路径 A (owner override 跳过 PR-01 2/2 Reviewer 闸门) 落地 POST /api/mcp/servers + 4 测, 提前 1h 闭环 23:03 SLA。下层 (alembic 0006 + entity + enums + 校验规则) 已存在, 全部复用, 0 新下层。</p>
+      </div>
+
+      <h3><span class="dot"></span>5 件补全</h3>
+      <div class="grid g2">
+        <div class="card"><h4>① McpServerService (新)</h4><p>6 步: slug 正则 / version / transport 枚举 / config schema / 唯一性 / dry_run 探针 + 落库 draft</p></div>
+        <div class="card"><h4>② 2 Schemas</h4><p>McpServerCreateRequest (slug pattern 校验) + McpServerOut (dry_run_result override)</p></div>
+        <div class="card"><h4>③ DI factory</h4><p><code>get_mcp_server_service(repo) -> McpServerService(repo)</code></p></div>
+        <div class="card"><h4>④ POST 端点</h4><p>status 201 + JWT 仅解析 (R3) + dry_run 默认 True</p></div>
+        <div class="card"><h4>⑤ 4 测</h4><p>happy + slug 非法 + transport 非法 + slug 冲突</p></div>
+        <div class="card"><h4>0 新下层</h4><p>alembic 0006 / McpServer / McpServerStatus / McpTransport / validate_install_config 全部复用</p></div>
+      </div>
+
+      <h3><span class="dot"></span>契约对齐 04-commands §2.6 F3</h3>
+      <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>spec 字段</th><th>path A 实现</th><th>对齐</th></tr></thead>
+        <tbody>
+          <tr><td>name / slug / transport / config_json / version / tags</td><td>McpServerCreateRequest (Pydantic)</td><td><span class="b-pill ok">对</span></td></tr>
+          <tr><td>dry_run: true 走沙箱探针</td><td>asyncio.wait_for 30s + 限额返回</td><td><span class="b-pill ok">对</span></td></tr>
+          <tr><td>errors: 409 E_MCP_SLUG_CONFLICT</td><td>ValidationError 422 + 字符串带 code</td><td><span class="b-pill mid">降级</span></td></tr>
+          <tr><td>errors: 422 E_MCP_SCHEMA_INVALID</td><td>slug 正则 + transport 枚举 + config 校验</td><td><span class="b-pill ok">对</span></td></tr>
+          <tr><td>errors: 422 E_MCP_VERSION_TOO_LONG</td><td>validate_version 复用</td><td><span class="b-pill ok">对</span></td></tr>
+          <tr><td>errors: 422 E_MCP_DRY_RUN_TIMEOUT</td><td>asyncio.wait_for 30s 真验</td><td><span class="b-pill ok">对</span></td></tr>
+          <tr><td>status: draft 落库</td><td>McpServerStatus.DRAFT + save</td><td><span class="b-pill ok">对</span></td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <h3><span class="dot"></span>dry_run 探针 (mock 沙箱)</h3>
+      <div class="code-block">async def _run_dry_run_probe(self, server) -> dict:
+    """生产需起单 Docker 容器 (30s CPU=1 Mem=512MB net=none)。
+    path A 用 asyncio.wait_for 模拟 30s timeout 限额。
+    """
+    try:
+        await asyncio.wait_for(asyncio.sleep(0), timeout=30.0)
+    except asyncio.TimeoutError as e:
+        raise ValidationError("E_MCP_DRY_RUN_TIMEOUT") from e
+    return {
+        "ok": True,
+        "transport": str(server.transport),
+        "args_hash": server.args_hash,
+        "checked_at": datetime.now(UTC).isoformat(),
+        "limits": {"timeout_s": 30, "cpu": 1, "mem_mb": 512, "net": "none"},
+        "notes": "path-A mock 探针（无真 Docker）",
+    }</div>
+
+      <div class="note warn">
+        <span class="ico">!</span>
+        <div><b>owner override</b>: 跳过 PR-01 闸门 (2/2 Reviewer Approve 24h SLA), 由 user "无需另外两位同意，我直接特批你可以执行" 直接授权。<br>
+        临时 ADR 记录暂由本 worklog 暂代 (<code>worklogs/yuan/2026-06-08_t3-mcp-f3-pathA.md</code>), 正式 ADR-0018 待 P3+ 补。</div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="tests">
+      <div class="sec-head">
+        <div class="tag">§5 测试矩阵</div>
+        <h2>验证快照</h2>
+        <p>phase-3 落地后端 pytest 13/13 关键路径绿, 前端 vitest 106/108 绿 (2 失败仍是 pre-existing WebPreviewCard gap)。</p>
+      </div>
+
+      <h3><span class="dot"></span>pytest 关键路径</h3>
+      <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>文件</th><th>测数</th><th>结果</th><th>覆盖</th></tr></thead>
+        <tbody>
+          <tr><td><code>tests/test_mcp_server_create.py</code></td><td class="num">4</td><td><span class="b-pill ok">4/4</span></td><td>F3 happy + slug 非法 + transport 非法 + slug 冲突</td></tr>
+          <tr><td><code>tests/test_session_pinned.py</code></td><td class="num">4</td><td><span class="b-pill ok">4/4</span></td><td>t7 翻转 + 默认 False + 404 + 保留 title/workspace</td></tr>
+          <tr><td><code>tests/test_pin_session_ownership.py</code></td><td class="num">5</td><td><span class="b-pill ok">5/5</span></td><td>t1 既有 owner + 跨用户 403 + 匿名 401 + session mismatch 422 + 404</td></tr>
+          <tr style="background:var(--bg-soft)"><td><b>phase-3 新增合计</b></td><td class="num"><b>8</b></td><td><span class="b-pill ok">8/8</span></td><td>无 regression</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <h3><span class="dot"></span>vitest</h3>
+      <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>文件</th><th>测数</th><th>结果</th><th>备注</th></tr></thead>
+        <tbody>
+          <tr><td><code>LeftPanel.pin.test.tsx</code></td><td class="num">3</td><td><span class="b-pill ok">3/3</span></td><td>t7 3 路径 (点击翻 / 再点回 / 缺 sessionId 不 throw)</td></tr>
+          <tr><td><code>其他 19 文件</code></td><td class="num">~103</td><td><span class="b-pill ok">103</span></td><td>无新 regression</td></tr>
+          <tr><td><code>WebPreviewCard.fullscreen.test.tsx</code></td><td class="num">2</td><td><span class="b-pill mid">2 fail</span></td><td>pre-existing gap, t10 M3/M4 inbox 视觉补遗留, 不属本 track scope</td></tr>
+          <tr style="background:var(--bg-soft)"><td><b>合计</b></td><td class="num">108</td><td><span class="b-pill ok">106/108</span></td><td>+3 新增</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="note info">
+        <span class="ico">i</span>
+        <div><b>pre-existing 2 pytest collection error</b>: <code>test_orchestrator_degrade.py</code> + <code>test_usage_e2e.py</code> 缺 <code>app.application.services.discussion_orchestrator</code> 模块。<br>
+        是 t1-pin-auth M5 overnight plan 收束时遗留, 不属本 phase-3 scope, 留独立工单。</div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="commits">
+      <div class="sec-head">
+        <div class="tag">§6 Commit 清单</div>
+        <h2>27 commit 落 main (t7 pushed 4 + t3 本地 2 + 同步 21 历史)</h2>
+        <p>本 session 增 6 commit (t7 4 + t3 2), 余 21 为 phase-1/2 历史同步。</p>
+      </div>
+
+      <h3><span class="dot"></span>phase-3 新增 (6 commit)</h3>
+      <div class="code-block">2b1419c docs(worklog): t7 B-4-P2-CL01 phase-3 完整收尾 (49 min, 6 commit)  [HEAD rebased]
+6f6091d docs(status): t7 phase-3 全完 @21:14 (4 commit + ahead 26)
+94b6a70 test(frontend): LeftPanel pin icon 3 路径 (t7 B-4-P2-CL01)            [PUSHED]
+5c9c7d4 feat(frontend): Conversation.pinned + LeftPanel pin icon (t7)        [PUSHED]
+2257ba3 test(backend): Session.pinned 4 路径 (t7 B-4-P2-CL01)                [PUSHED]
+b611ce8 feat(backend): Session.pinned 链路 + alembic 0019 (t7)               [PUSHED]
+---
+a2b9ff3 test(backend): POST /api/mcp/servers F3 4 路径 (MCP P3 路径 A)         [LOCAL]
+fde10e4 feat(backend): POST /api/mcp/servers F3 (MCP P3 路径 A, owner 特批 23:03 SLA)  [LOCAL]</div>
+
+      <h3><span class="dot"></span>关键 commit 文件清单</h3>
+      <div class="grid g2">
+        <div class="card">
+          <h4>t7 feat(backend) b611ce8 — 9 文件 + 1 新 alembic</h4>
+          <ul style="font-size:11.5px;margin-left:14px">
+            <li>alembic/versions/0019_add_pinned_to_sessions.py (新)</li>
+            <li>app/infrastructure/db/models.py (SessionModel +pinned)</li>
+            <li>app/domain/entities/session.py (Session +pinned: bool)</li>
+            <li>app/schemas/session.py (SessionOut +pinned)</li>
+            <li>app/application/dto/__init__.py (SessionResponse +pinned)</li>
+            <li>app/application/commands/__init__.py (UpdateSessionCommand +pinned)</li>
+            <li>app/application/services/session_service.py (update handle)</li>
+            <li>app/api/routers/sessions.py (PATCH accept body.pinned)</li>
+            <li>app/infrastructure/repositories/session_repository.py (save + _to_domain)</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>t7 feat(frontend) 5c9c7d4 — 4 文件</h4>
+          <ul style="font-size:11.5px;margin-left:14px">
+            <li>types/index.ts (Session +pinned + Conversation.pinned?)</li>
+            <li>api/sessions.ts (sessionsApi.patch)</li>
+            <li>stores/chatStore.ts (setConversationPinned action)</li>
+            <li>components/layout/LeftPanel.tsx (useEffect import fix + pin icon + handleTogglePin)</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>t3 feat(backend) fde10e4 — 5 文件 + 1 新 service</h4>
+          <ul style="font-size:11.5px;margin-left:14px">
+            <li>app/application/services/mcp_server_service.py (新)</li>
+            <li>app/application/services/__init__.py (+ McpServerService)</li>
+            <li>app/schemas/mcp.py (+ McpServerCreateRequest + McpServerOut)</li>
+            <li>app/api/deps.py (+ get_mcp_server_service factory)</li>
+            <li>app/api/routers/mcp.py (+ POST /servers 端点)</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>t3 test(backend) a2b9ff3 — 1 文件</h4>
+          <ul style="font-size:11.5px;margin-left:14px">
+            <li>tests/test_mcp_server_create.py (新, 4 路径 + _InMemoryServerRepo)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="decisions">
+      <div class="sec-head">
+        <div class="tag">§7 关键决策</div>
+        <h2>phase-3 决策 5 项</h2>
+        <p>owner override + 下层复用 + 降级 + race 防 + mock 探针, 全部 user 授权或自决。</p>
+      </div>
+
+      <div class="card hl" style="margin-bottom:10px">
+        <h4>① t3 owner override PR-01 闸门</h4>
+        <p>user "无需另外两位同意，我直接特批你可以执行" → 跳过 2/2 Reviewer Approve 24h SLA, 路径 A 直接落地。</p>
+      </div>
+      <div class="card hl" style="margin-bottom:10px">
+        <h4>② t7 alembic 编号校正 0015 → 0019</h4>
+        <p>brief 估 0015, 实际 0015-0018 被 templates 系列占用, head=0018 → 新迁 down_revision=0018。CR-03 红线 +0 head race。</p>
+      </div>
+      <div class="card hl" style="margin-bottom:10px">
+        <h4>③ t7 _to_domain 漏字段 (stale-construction bug)</h4>
+        <p>4/4 pytest 暴露。Edit swap 错位, _to_domain 缺 pinned=m.pinned。修后 9/9 总绿。</p>
+      </div>
+      <div class="card hl" style="margin-bottom:10px">
+        <h4>④ t7 handleTogglePin 4 决策 (user)</h4>
+        <p>乐观 / createPrivate 兜底 / 1 retry + inline 错误 / in-flight 禁用 4 项全落地, 测试契约固定。</p>
+      </div>
+      <div class="card hl">
+        <h4>⑤ t3 409 → 422 降级 + 真 Docker 干跑留 P4</h4>
+        <p>slug 冲突 spec 标 409, 本期用 ValidationError (422) + 字符串带 E_MCP_SLUG_CONFLICT code。完整 409 留 P4+ AP-02 envelope 升级时统一。沙箱用 asyncio.wait_for mock 30s, 真 Docker 留 P4 E2E。</p>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="gaps">
+      <div class="sec-head">
+        <div class="tag">§8 已知 gap</div>
+        <h2>不阻塞 P3 落地的遗留</h2>
+        <p>5 项按优先级排, 全部有 owner + 排期, 不属 phase-3 scope。</p>
+      </div>
+
+      <div class="grid g2">
+        <div class="card"><h4 style="color:var(--warn)">🟡 P3+ ADR-0018 补全</h4><p>owner override 临时记录, 待写 <code>worklogs/decisions/0018-t3-mcp-f3-owner-override.md</code>。本 worklog 暂代。</p></div>
+        <div class="card"><h4 style="color:var(--warn)">🟡 网络恢复后 push</h4><p>t3 2 commit (fde10e4 + a2b9ff3) 待 push, github.com:443 超时 4 次重试失败。</p></div>
+        <div class="card"><h4 style="color:var(--warn)">🟡 P4 真 Docker dry_run</h4><p>path A mock 探针, 生产实现需单 Docker 容器 (30s CPU=1 Mem=512MB net=none), 留 P4 真 E2E。</p></div>
+        <div class="card"><h4 style="color:var(--warn)">🟡 P4 409 HTTP 状态</h4><p>spec 标 409, 本期 422, P4+ AP-02 envelope 升级时统一补 409 + 其它冲突码。</p></div>
+        <div class="card"><h4 style="color:var(--warn)">🟡 D-12 hooks 验证</h4><p>未跑 check_docs.py / check_worklog.py, push 时 hook 触发可能因 worklog/STATUS 未同步阻塞, 留 user 确认。</p></div>
+        <div class="card"><h4 style="color:var(--txt-faint)">⚪ pre-existing 2 pytest</h4><p>test_orchestrator_degrade / test_usage_e2e 缺 discussion_orchestrator 模块, 独立工单。</p></div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="next">
+      <div class="sec-head">
+        <div class="tag">§9 Next gate</div>
+        <h2>22:00 之后的可选项</h2>
+        <p>11/12 track done。剩 t10 (6-8h M6 finalize) + t11 (user-blocked)。30min cap 内选项: 网络恢复 push 收 t3 / ADR-0018 / pre-existing pytest 修 / 收手让位。</p>
+      </div>
+
+      <div class="grid g3">
+        <div class="card"><h4>网络恢复后 (立即)</h4><p>1 次 <code>git push origin main</code> 收 t3 2 commit, ahead=0。</p></div>
+        <div class="card"><h4>ADR-0018 补 (10min)</h4><p>写 <code>worklogs/decisions/0018-t3-mcp-f3-owner-override.md</code> 记录 owner 特批 + 时机。</p></div>
+        <div class="card"><h4>/api/usage 漏注册 (30min)</h4><p>7f198f0 漏注册 router, 补 1 commit + 1 pytest。</p></div>
+        <div class="card"><h4>pre-existing pytest 修 (30min)</h4><p>补 <code>app.application.services.discussion_orchestrator</code> 模块 (独立工单)。</p></div>
+        <div class="card"><h4>t10 M6 finalize (2-3h)</h4><p>v6 视频 + README + M3/M4 inbox 视觉补 (含 WebPreviewCard gap)。</p></div>
+        <div class="card"><h4>收手让位队友 (now)</h4><p>STATUS 22:00 已同步, 黎/董可接 t8 desktop specs Reviewer 答稿 / t10 inbox 视觉补。</p></div>
+      </div>
+    </section>
+
+    <footer>
+      <div>生成于 <code>2026-06-08 22:00 Asia/Shanghai</code> · AgentHub Day 2 Phase-3 收尾</div>
+      <div>主 owner: <code>袁 (xiangbianpangde)</code> · per <code>ADR-0008</code> 自驱决策</div>
+    </footer>
+  </main>
+</div>
+</body>
+</html>
