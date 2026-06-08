@@ -26,6 +26,7 @@ from app.api.routers import (
     skills,
     tasks,
     templates,
+    usage,
 )
 from app.api.routers.skills import FS_ROUTER
 from app.api.ws import router as ws_router
@@ -120,6 +121,7 @@ app.include_router(tasks.router)
 app.include_router(skills.router)
 app.include_router(templates.router)  # Agent 模板系统
 app.include_router(attachments.router)  # 附件上传/下载（P0-3）
+app.include_router(usage.router)  # Token 消耗监控（P1-2，t9 track）
 app.include_router(FS_ROUTER)
 app.include_router(inbox.router)
 app.include_router(mcp.router)  # MCP 市场/安装/绑定 REST（/api/mcp/*，§2.6 冻结契约）
