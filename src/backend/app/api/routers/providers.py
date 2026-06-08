@@ -189,7 +189,7 @@ async def _ping_cli(system: str, binary: str, req: PingRequest) -> bool:
         ]
         if req.model:
             cmd.extend(["--model", req.model])
-        cmd.extend(["--dangerously-skip-permissions", "reply OK"])
+        # opencode 无 --dangerously-skip-permissions flag，权限由 opencode.json 配置控制
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdin=asyncio.subprocess.DEVNULL,

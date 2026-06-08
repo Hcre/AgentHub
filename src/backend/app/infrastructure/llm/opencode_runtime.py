@@ -182,11 +182,8 @@ class OpenCodeRuntime(AgentRuntime):
         cmd = [binary, "run", "--format", "json", "--pure"]
         if oc_session:
             cmd.extend(["--session", oc_session])
-        # 权限：始终跳过权限检查（对齐 Claude Code bypassPermissions）
-        cmd.append("--dangerously-skip-permissions")
-        # 工作目录通过 --dir 传给 opencode CLI（不用子进程 cwd）
-        if cwd:
-            cmd.extend(["--dir", cwd])
+        # 工作目录通过子进程 cwd 传入（--dir 会触发 opencode coding-agent 流水线卡死，
+        # 详见 docs/explore/黎/opencode-issue-log.md；--pure 模式下用 cwd 即可）。
 
         # system_prompt 拼进完整 prompt，通过 stdin 传入（避免 Windows 命令行长度限制）
         if sp:
@@ -299,14 +296,25 @@ class OpenCodeRuntime(AgentRuntime):
         self._process = None
 
     async def stop(self) -> None:
+        """3-tier graceful stop: SIGINT → SIGTERM → SIGKILL（对齐 ClaudeCodeRuntime）。"""
         if self._process and self._process.returncode is None:
-            self._process.terminate()
+            import signal
+
             try:
-                await asyncio.wait_for(self._process.wait(), timeout=5)
-            except TimeoutError:
+                self._process.send_signal(signal.SIGINT)
+                await asyncio.wait_for(self._process.wait(), timeout=2)
+            except (TimeoutError, ProcessLookupError):
+                pass
+            if self._process.returncode is None:
+                self._process.terminate()
+                try:
+                    await asyncio.wait_for(self._process.wait(), timeout=2)
+                except (TimeoutError, ProcessLookupError):
+                    pass
+            if self._process.returncode is None:
                 self._process.kill()
                 try:
-                    await asyncio.wait_for(self._process.wait(), timeout=3)
+                    await asyncio.wait_for(self._process.wait(), timeout=2)
                 except TimeoutError:
                     await self._force_kill_subprocess()
             self._process = None

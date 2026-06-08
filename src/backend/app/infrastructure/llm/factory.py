@@ -83,10 +83,15 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
         from app.infrastructure.llm.pi_agent_runtime import PiAgentRuntime
 
         s = agent.settings or {}
-        logger.info("Agent '%s' → PiAgentRuntime (CLI)", agent.name)
+        api_key = decrypt_secret(agent.api_key_encrypted) if agent.api_key_encrypted else ""
+        logger.info("Agent '%s' → PiAgentRuntime (CLI, provider=%s, model=%s)", agent.name, agent.provider, agent.model)
         return PiAgentRuntime(
             agent_id=str(agent.id),
             agent_name=agent.name,
+            model=agent.model or "",
+            provider=agent.provider or "anthropic",
+            api_key=api_key,
+            proxy_base=settings.proxy_base_url or "",
             timeout=s.get("cli_timeout", settings.claude_cli_timeout),
             thinking_level=s.get("thinking_level", "off"),
             permission_mode=s.get("permission_mode", "bypassPermissions"),
@@ -100,9 +105,14 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
         from app.infrastructure.llm.opencode_runtime import OpenCodeRuntime
 
         s = agent.settings or {}
-        logger.info("Agent '%s' → OpenCodeRuntime (CLI)", agent.name)
+        api_key = decrypt_secret(agent.api_key_encrypted) if agent.api_key_encrypted else ""
+        logger.info("Agent '%s' → OpenCodeRuntime (CLI, provider=%s, model=%s)", agent.name, agent.provider, agent.model)
         return OpenCodeRuntime(
             agent_id=str(agent.id),
+            model=agent.model or "",
+            provider=agent.provider or "deepseek",
+            api_key=api_key,
+            proxy_base=settings.proxy_base_url or "",
             timeout=s.get("cli_timeout", settings.claude_cli_timeout),
             permission_mode=s.get("permission_mode", "bypassPermissions"),
             max_turns=s.get("max_turns", 10),
@@ -115,9 +125,13 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
         from app.infrastructure.llm.codex_runtime import CodexRuntime
 
         s = agent.settings or {}
-        logger.info("Agent '%s' → CodexRuntime (CLI)", agent.name)
+        api_key = decrypt_secret(agent.api_key_encrypted) if agent.api_key_encrypted else ""
+        logger.info("Agent '%s' → CodexRuntime (CLI, model=%s)", agent.name, agent.model)
         return CodexRuntime(
             agent_id=str(agent.id),
+            model=agent.model or "",
+            api_key=api_key,
+            proxy_base=settings.proxy_base_url or "",
             workspace=s.get("workspace_path"),
             timeout=s.get("cli_timeout", settings.claude_cli_timeout),
             permission_mode=s.get("permission_mode", "bypassPermissions"),

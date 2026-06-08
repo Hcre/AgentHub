@@ -373,6 +373,30 @@ export const useGroupStore = create<GroupState>((set, get) => ({
         return { messagesByGroup: { ...s.messagesByGroup, [groupId]: [...list, seeded] } }
       }
 
+      // ── task_update：协调者任务进度更新（orchestrator 推送）──
+      if (event.type === 'task_update') {
+        const updateText = event.content ?? '任务进度更新'
+        const idx = list.findIndex((m) => m.id === sentinelId)
+        if (idx >= 0) {
+          const cur = list[idx]!
+          const next = [...list]
+          next[idx] = {
+            ...cur,
+            thinking: (cur.thinking ?? '') + '\n🔄 ' + updateText,
+          }
+          return { messagesByGroup: { ...s.messagesByGroup, [groupId]: next } }
+        }
+        const seeded: GroupMessage = {
+          id: sentinelId,
+          from: 'agent',
+          who: senderId,
+          time: nowStamp(),
+          thinking: '🔄 ' + updateText,
+          streaming: true,
+        }
+        return { messagesByGroup: { ...s.messagesByGroup, [groupId]: [...list, seeded] } }
+      }
+
       // 未知事件类型：静默忽略（forward-compat）
       return {}
     })

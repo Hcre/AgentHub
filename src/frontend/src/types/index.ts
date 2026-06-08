@@ -519,6 +519,7 @@ export type StreamEventType =
   | 'tool_result'
   | 'request_approval'
   | 'task_plan'
+  | 'task_update'
   | 'error'
   | 'done'
 

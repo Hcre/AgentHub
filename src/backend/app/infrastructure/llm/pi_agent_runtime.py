@@ -184,7 +184,7 @@ class PiAgentRuntime(AgentRuntime):
         if not ok:
             logger.debug("Visible terminal unavailable for session=%s, continuing headless", session_key)
 
-        prompt_json = json.dumps({"type": "prompt", "message": prompt}) + "\n"
+        prompt_cmd = json.dumps({"type": "prompt", "message": prompt}) + "\n"
         from app.infrastructure.llm.process_registry import save_spawn_info
 
         save_spawn_info(
@@ -192,13 +192,12 @@ class PiAgentRuntime(AgentRuntime):
             cmd=cmd,
             env=env,
             cwd=cwd,
-            prompt_text=prompt_json,
+            prompt_text=prompt_cmd,
         )
         assert self._process.stdin is not None
         assert self._process.stdout is not None
 
         # 发送 prompt command
-        prompt_cmd = json.dumps({"type": "prompt", "message": prompt}) + "\n"
         self._process.stdin.write(prompt_cmd.encode())
         await self._process.stdin.drain()
 
@@ -321,10 +320,18 @@ class PiAgentRuntime(AgentRuntime):
         pi = shutil.which("pi")
         if pi:
             return pi
-        # fallback: 检查本地 clone
-        local = Path(__file__).parent.parent.parent.parent.parent.parent / "pi-agent" / "pi-test.sh"
-        if local.exists():
-            return str(local)
+        # fallback: 检查本地 clone（跨平台脚本）
+        import platform
+        local_dir = Path(__file__).parent.parent.parent.parent.parent.parent / "pi-agent"
+        if platform.system() == "Windows":
+            for ext in (".cmd", ".bat", ".ps1", ".sh"):
+                local = local_dir / f"pi-test{ext}"
+                if local.exists():
+                    return str(local)
+        else:
+            local = local_dir / "pi-test.sh"
+            if local.exists():
+                return str(local)
         return "pi"  # 最后 fallback
 
     def _build_cmd(self, session_file: str, request: AgentRequest, sp: str | None = None) -> list[str]:
@@ -339,17 +346,34 @@ class PiAgentRuntime(AgentRuntime):
         pi_provider = _PROVIDER_MAP.get(self._provider, "anthropic")
         cmd.extend(["--provider", pi_provider])
 
+        # 模型选择：通过 --model CLI flag（PI_MODEL 环境变量无效，pi 不读取）
+        if self._model:
+            cmd.extend(["--model", self._model])
+
         if self._thinking_level != "off":
             cmd.extend(["--thinking", self._thinking_level])
+
+        # 无界面服务器模式：禁用上下文文件 + 用户扩展，确保确定性行为
+        cmd.extend(["--no-context-files", "--no-extensions"])
 
         if sp:
             if self._agent_name:
                 sp = f"你的名字是{self._agent_name}。\n\n{sp}"
+            # Windows 命令行长度限制 8191 字符：长 system_prompt 有风险，记录警告
+            if len(sp) > 7000:
+                logger.warning(
+                    "Pi Agent system_prompt 长度 %s 接近 Windows 命令行限制 8191，可能被截断",
+                    len(sp),
+                )
             cmd.extend(["--system-prompt", sp])
 
         # API key：代理模式下不暴露在命令行（由 _build_env 注入环境变量）
         if self._api_key and not self._proxy_url:
             cmd.extend(["--api-key", self._api_key])
+
+        # 工具允许列表映射（如果上游支持 --tools flag）
+        if request.available_tools:
+            cmd.extend(["--tools", ",".join(request.available_tools)])
 
         # NB-02: MCP 注入 seam — blocked on upstream pi CLI MCP support（见 ADR-06 §2.3 / RT-MCP §3）
         # 解除条件：确认 pi CLI 的 MCP config 或 extension 通道存在 → 按 ADR-06 统一原则把
@@ -360,22 +384,26 @@ class PiAgentRuntime(AgentRuntime):
     def _build_env(self) -> dict[str, str]:
         """构造 CLI 子进程环境变量。
 
-        - 任意模式：注入 model（让 CLI 知道用什么模型）
-        - 代理模式（proxy_url 非空）：额外注入 API key / base URL
-          把请求重定向到 AgentHub 代理（认证/限流）
+        - 代理模式（proxy_url 非空）：通过 provider-specific 环境变量注入 API key
+          和 base URL，把请求重定向到 AgentHub 代理（认证/限流）
         - 全局模式：不覆盖 API key / base URL，CLI 沿用自身配置
         """
         env = os.environ.copy()
-        # 注入模型：通过 provider 对应的 env var（如 ANTHROPIC_MODEL、DEEPSEEK_API_KEY 等）
-        if self._model:
-            env["PI_MODEL"] = self._model
         if self._proxy_url:
             # 代理模式：API key 通过环境变量注入（不在命令行暴露）
             env_key = _PROVIDER_ENV_KEY.get(self._provider, "")
             if env_key:
-                env[env_key] = "agenthub-proxy"
+                # 占位 key：代理服务端会替换为真实 key
+                env[env_key] = self._proxy_url + "/key" if env_key else ""
             # 注入代理 base URL
-            env["PI_BASE_URL"] = self._proxy_url
+            base_env_keys = {
+                "anthropic": "ANTHROPIC_BASE_URL",
+                "openai": "OPENAI_BASE_URL",
+                "deepseek": "DEEPSEEK_BASE_URL",
+            }
+            base_key = base_env_keys.get(self._provider)
+            if base_key:
+                env[base_key] = self._proxy_url
         elif self._api_key:
             # 非代理模式：如果有 API key，注入环境变量
             env_key = _PROVIDER_ENV_KEY.get(self._provider, "")
@@ -431,12 +459,20 @@ class PiAgentRuntime(AgentRuntime):
         Pi RPC 事件 → StreamEventType:
         - message_update.text_delta    → TEXT
         - message_update.thinking_delta → THINKING
+        - message_update.toolcall_delta → (累积，最终由 toolcall_end 产出 TOOL_CALL)
         - message_update.toolcall_end  → TOOL_CALL
         - message_update.done          → DONE (turn 结束)
         - message_update.error         → ERROR
+        - tool_execution_start         → (无事件产出)
+        - tool_execution_update        → TEXT（流式工具输出增量）
         - tool_execution_end           → TOOL_RESULT
+        - agent_start                  → THINKING（前端显示忙碌指示器）
         - agent_end                    → DONE (流结束)
         - extension_ui_request         → REQUEST_APPROVAL
+        - extension_error              → ERROR
+        - compaction_start/end         → THINKING（进度指示）
+        - auto_retry_start             → THINKING（进度指示）
+        - auto_retry_end               → ERROR（最终失败时）
         """
         try:
             data = json.loads(line)
@@ -466,17 +502,57 @@ class PiAgentRuntime(AgentRuntime):
                 else:
                     events = self._extract_message_content(msg, seq)
 
+        elif event_type == "agent_start":
+            # Agent 启动 → THINKING 事件，让前端显示忙碌指示器
+            events = [
+                StreamEvent(
+                    type=StreamEventType.THINKING,
+                    seq=seq,
+                    content="Pi Agent 正在启动…",
+                )
+            ]
+
         elif event_type == "tool_execution_start":
-            pass  # 不产出事件，等待 tool_execution_end
+            pass  # 不产出事件，等待 tool_execution_update / tool_execution_end
+
+        elif event_type == "tool_execution_update":
+            # 流式工具输出增量 → 作为 TEXT 事件递送（实时显示工具输出）
+            delta = data.get("delta", data.get("output", ""))
+            if delta:
+                call_id = data.get("toolCallId", "")
+                events = [
+                    StreamEvent(
+                        type=StreamEventType.TEXT,
+                        seq=seq,
+                        content=f"[工具输出] {delta}" if call_id else delta,
+                    )
+                ]
 
         elif event_type == "tool_execution_end":
             te = data
             is_error = te.get("isError", False)
             raw = te.get("result")
+            # RPC 规范：result 是对象 { content: [{type, text}...], details: {truncation, fullOutputPath} }
+            content_str = ""
             if isinstance(raw, dict):
-                raw = json.dumps(raw, ensure_ascii=False)
-            elif not isinstance(raw, str):
-                raw = str(raw) if raw is not None else ""
+                content_arr = raw.get("content", [])
+                if isinstance(content_arr, list):
+                    parts = []
+                    for c in content_arr:
+                        if isinstance(c, dict) and c.get("type") == "text":
+                            parts.append(c.get("text", ""))
+                    content_str = "\n".join(parts)
+                # 截断提示：如果输出被截断，附加提示
+                details = raw.get("details", {})
+                if isinstance(details, dict) and details.get("truncation"):
+                    full_path = details.get("fullOutputPath", "")
+                    content_str += f"\n\n[输出已截断，完整内容: {full_path}]" if full_path else "\n\n[输出已截断]"
+                if not content_str:
+                    content_str = json.dumps(raw, ensure_ascii=False)
+            elif isinstance(raw, str):
+                content_str = raw
+            elif raw is not None:
+                content_str = str(raw)
             events = [
                 StreamEvent(
                     type=StreamEventType.TOOL_RESULT,
@@ -484,9 +560,72 @@ class PiAgentRuntime(AgentRuntime):
                     tool_result=ToolResult(
                         call_id=te.get("toolCallId", ""),
                         success=not is_error,
-                        content=raw if not is_error else None,
-                        error=raw if is_error else None,
+                        content=content_str if not is_error else None,
+                        error=content_str if is_error else None,
                     ),
+                )
+            ]
+
+        elif event_type == "compaction_start":
+            # 上下文压缩开始 → THINKING（进度指示）
+            logger.info("Pi Agent 压缩中 (session=%s)", data.get("sessionId", "?"))
+            events = [
+                StreamEvent(
+                    type=StreamEventType.THINKING,
+                    seq=seq,
+                    content="正在压缩上下文…",
+                )
+            ]
+
+        elif event_type == "compaction_end":
+            # 压缩完成：检查是否有错误
+            if not data.get("success", True):
+                err = data.get("error", "压缩失败")
+                logger.warning("Pi Agent 压缩失败: %s", err)
+                events = [
+                    StreamEvent(
+                        type=StreamEventType.ERROR,
+                        seq=seq,
+                        content=f"上下文压缩失败: {err}",
+                    )
+                ]
+            else:
+                logger.debug("Pi Agent 压缩完成")
+
+        elif event_type == "auto_retry_start":
+            attempt = data.get("attempt", 1)
+            max_attempts = data.get("maxAttempts", "?")
+            events = [
+                StreamEvent(
+                    type=StreamEventType.THINKING,
+                    seq=seq,
+                    content=f"正在重试 ({attempt}/{max_attempts})…",
+                )
+            ]
+
+        elif event_type == "auto_retry_end":
+            if not data.get("success", True):
+                err = data.get("error", "重试耗尽")
+                logger.warning("Pi Agent 自动重试失败: %s", err)
+                events = [
+                    StreamEvent(
+                        type=StreamEventType.ERROR,
+                        seq=seq,
+                        content=f"自动重试失败: {err}",
+                    )
+                ]
+            else:
+                logger.debug("Pi Agent 自动重试成功")
+
+        elif event_type == "extension_error":
+            ext_name = data.get("extensionName", data.get("name", "unknown"))
+            err_msg = data.get("error", data.get("message", "扩展错误"))
+            logger.warning("Pi 扩展错误 [%s]: %s", ext_name, err_msg)
+            events = [
+                StreamEvent(
+                    type=StreamEventType.ERROR,
+                    seq=seq,
+                    content=f"扩展 [{ext_name}] 错误: {err_msg}",
                 )
             ]
 
@@ -600,6 +739,10 @@ class PiAgentRuntime(AgentRuntime):
                     content=delta.get("delta", ""),
                 )
             )
+
+        elif delta_type == "toolcall_delta":
+            # 工具调用参数增量 — 暂不单独产出事件，最终由 toolcall_end 产出完整 TOOL_CALL
+            logger.debug("Pi toolcall_delta: call_id=%s delta_len=%s", delta.get("id", "?"), len(delta.get("delta", "")))
 
         elif delta_type == "toolcall_end":
             tc = delta.get("toolCall", {})

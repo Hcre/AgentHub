@@ -7,6 +7,7 @@ import { useWebSocket } from '../../hooks/useWebSocket'
 import { Composer, type ComposerHandle } from './Composer'
 import { MessageBubble } from './MessageBubble'
 import { TypingIndicator } from './TypingIndicator'
+import { TerminalPanel } from './TerminalPanel'
 import { Icon } from '../ui'
 import type { Agent, ChatMessage, ReplyRef } from '../../types'
 
@@ -26,9 +27,7 @@ export function ChatView({ agent }: { agent: Agent }) {
   const [isAtBottom, setIsAtBottom] = useState(true)
   // 用户主动滚走后，新消息到来的计数（点 ↓ 时清零）
   const [pendingCount, setPendingCount] = useState(0)
-  // 终端按钮状态：null = idle, 'loading' | 'ok' | 'no-log' | 'error'
-  const [terminalStatus, setTerminalStatus] = useState<null | 'loading' | 'ok' | 'no-log' | 'error'>(null)
-  const [terminalMessage, setTerminalMessage] = useState('')
+  const [showTerminal, setShowTerminal] = useState(false)
 
   const key = activeConversationId ? convKey(agent.id, activeConversationId) : null
   const list = key ? (messages[key] ?? []) : []
@@ -184,50 +183,21 @@ export function ChatView({ agent }: { agent: Agent }) {
             )}
           </div>
           {sessionId && (
-            <div className="flex items-center gap-1.5">
-              {terminalMessage && (
-                <span className={`truncate text-[11px] ${terminalStatus === 'error' ? 'text-red-500' : terminalStatus === 'ok' ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
-                  {terminalMessage}
-                </span>
-              )}
-              <button
-                type="button"
-                disabled={terminalStatus === 'loading'}
-                onClick={async () => {
-                  setTerminalStatus('loading')
-                  setTerminalMessage('Opening terminal...')
-                  try {
-                    const r = await fetch(`/api/sessions/${sessionId}/open-terminal`, { method: 'POST' })
-                    if (!r.ok) {
-                      const detail = await r.text().catch(() => '')
-                      throw new Error(detail || `HTTP ${r.status}`)
-                    }
-                    const data = await r.json()
-                    setTerminalStatus('ok')
-                    setTerminalMessage(data.path ? 'CLI terminal opened.' : 'Terminal opened.')
-                  } catch (err: unknown) {
-                    setTerminalStatus('error')
-                    const msg = err instanceof Error ? err.message : 'Unknown error'
-                    setTerminalMessage(`Failed to open terminal: ${msg}`)
-                  }
-                  // Clear feedback after 8 seconds
-                  setTimeout(() => {
-                    setTerminalStatus(null)
-                    setTerminalMessage('')
-                  }, 8000)
-                }}
-                title="打开 CLI 日志终端"
-                className="flex items-center gap-1 rounded px-2 py-0.5 text-[11px] text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
-              >
-                <Icon name="terminal" className={`h-3 w-3 ${terminalStatus === 'loading' ? 'animate-pulse' : ''}`} />
-                终端
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowTerminal(!showTerminal)}
+              title="toggle CLI log terminal"
+              className="flex items-center gap-1 rounded px-2 py-0.5 text-[11px] text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Icon name="terminal" className="h-3 w-3" />
+              终端
+            </button>
           )}
         </div>
       </div>
 
       <Composer ref={composerRef} agent={agent} onSend={onSend} onCreateSkill={handleCreateSkill} />
+      {showTerminal && sessionId && <TerminalPanel sessionId={sessionId} onClose={() => setShowTerminal(false)} />}
     </div>
   )
 }
