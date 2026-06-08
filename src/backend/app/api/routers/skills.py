@@ -816,11 +816,14 @@ async def fs_browse(path: str = "") -> dict:
             letters = [d.rstrip("\\").rstrip("/") for d in drives]
         else:
             letters = [f"{c}:\\" for c in "CDEFGHIJKLMNOPQRSTUVWXYZ" if _os.path.isdir(f"{c}:\\")]
-        return {
-            "path": "",
-            "parent": "",
-            "items": [{"name": l, "path": l, "type": "drive"} for l in letters],
-        }
+        # Linux/macOS fallback：无盘符 → 浏览根目录
+        if letters:
+            return {
+                "path": "",
+                "parent": "",
+                "items": [{"name": l, "path": l, "type": "drive"} for l in letters],
+            }
+        path = "/"
     real = _resolve_path(path)
     if not _os.path.isdir(real):
         raise HTTPException(status_code=404, detail=f"目录不存在：{real}")
