@@ -188,6 +188,7 @@ async def _ping_cli(system: str, binary: str, req: PingRequest) -> bool:
             "run",
             "--format",
             "json",
+            "--pure",
         ]
         if req.model:
             cmd.extend(["--model", req.model])
