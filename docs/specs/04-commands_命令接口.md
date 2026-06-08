@@ -619,6 +619,23 @@ make lint           # ruff + eslint + tsc
 | **失败（构建错）** | index.html 引用不存在的 script.js → build_logs 报错 + status="failed" + deploy_card 标 ❌ |
 | **UI 验收（Playwright）** | 选 M3 部署 → 选 static_site → 进度条更新 → 完成显示 URL → 点击 URL 打开预览 iframe |
 
+#### 6.4.5 预览模式 4 种全部启用（**B-6-P2-T1 最高优先级 bug fix**）
+
+| 项 | 内容 |
+|----|------|
+| **场景 ID** | `B-4-P2-PV01` 预览模式全部启用 |
+| **对应任务** | Day 2 用户图片直接指出 3 模式（diff / deploy / webpage）`enabled: false` 应改为 `true`（`src/frontend/src/components/preview/previewModes.ts` line 19-21）|
+| **API 端点** | 无新端点；纯前端常量数组 |
+| **Given** | `src/frontend/src/components/preview/previewModes.ts` 导出 `PREVIEW_MODES: PreviewModeDef[]`，4 项（files / diff / deploy / webpage）|
+| **When-1（常量定义）** | 加载 `previewModes.ts` 模块，读取 `PREVIEW_MODES` |
+| **Then-1** | 4 项 `.enabled` 全部为 `true`（无 `hint: "即将到来"`）|
+| **When-2（RightPanel dropdown UI）** | U1 私聊/群聊 + 右栏 empty state → 点 + 按钮 |
+| **Then-2** | (a) dropdown 列出 4 项（files / diff / deploy / webpage），全部可点击（无 disabled 灰态）；(b) 每项不再显示「即将到来」hint chip；(c) 点 diff / deploy / webpage 任意一项 → 立即在右栏新建对应 tab + 激活（虽然 tab 内容是「即将到来」占位，但 tab 创建路径必须通）|
+| **When-3（回归保护）** | 任何后续 PR 误改 `enabled: false` |
+| **Then-3** | vitest `previewModes.test.ts` 单测直接红（`expect(m.enabled).toBe(true)` fail）|
+| **UI 验收（Playwright）** | 打开 `http://localhost:5174/` → 进任意私聊 → 点右栏 + → 截图 dropdown 4 项全 enabled，保存 `docs/deliverables/screenshots/e2e-t1-preview-modes-2026-06-09.png` |
+| **测试** | `src/frontend/src/components/preview/__tests__/previewModes.test.ts` 5 个 it（files/diff/deploy/webpage 各 1 + dropdown 渲染 1）|
+
 ### 6.5 多端支持（PRD §6 P2）
 
 #### 6.5.1 移动端 H5
