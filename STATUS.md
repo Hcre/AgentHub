@@ -1,6 +1,6 @@
 # 当前状态
 
-> 最后更新: 2026-06-08 19:48 (session phase-2 收尾 done @19:48, 96a76e2 phase-2 summary worklog; 11 commit 本 session, ahead of origin/main by 20 commit; 9/12 track done [t1/t2/t3/t4/t5/t6/t8/t9/t12 = 75%], 剩 t7 60min downscope + t10 大工作量 + t11 user-blocked; t3 SLA 至 23:03 闸门本质已过 path B docs-only; phase-3 接手起点: worklog 2026-06-08_session-phase2-summary.md §7)
+> 最后更新: 2026-06-08 20:29 (t7 partial: 9d96156 search wire 30 行落地, 置顶/pin/alembic 0015 留 phase-3; 13 commit 本 session, ahead of origin/main by 22 commit; 9.5/12 track done; vitest 103/105 绿无新 regression; t3 SLA 至 23:03; t11 user-blocked)
 > 规则：**每次 push 或开始/结束一个任务时，更新你自己的那一行。**
 
 | 我 | 正在做 | 阻塞？ | 这周完成了 |
