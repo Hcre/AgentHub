@@ -79,7 +79,7 @@ _DISCUSS_SOFT_LIMIT = 10
 
 # Phase 5 接线：可注入的协作者组装器 + 后台系统消息 sink（生产默认在 coordinator_run）
 OrchestratorBuilder = Callable[..., Awaitable[Orchestrator]]
-SystemMessageSink = Callable[[uuid.UUID, str], Awaitable[None]]
+SystemMessageSink = Callable[..., Awaitable[None]]
 
 
 def _format_replan_confirmation(diff: ReplanDiff, requirement: str) -> str:
@@ -272,6 +272,7 @@ class ChatService:
                         type=StreamEventType.TEXT,
                         seq=0,
                         content="✅ 任务已受理，正在规划…",
+                        sender_agent_id=group.coordinator_id,  # 协调者身份，避免前端 unknown
                     )
                     await self._start_coordinator(session, group, trigger)
                 return
@@ -382,9 +383,11 @@ class ChatService:
         run.start(
             orchestrator,
             on_done=lambda r: self._coord_post(
-                session.id, r.summary or f"任务结束: {r.reason}"
+                session.id, r.summary or f"任务结束: {r.reason}", group.coordinator_id
             ),
-            on_error=lambda e: self._coord_post(session.id, f"任务执行失败: {e}"),
+            on_error=lambda e: self._coord_post(
+                session.id, f"任务执行失败: {e}", group.coordinator_id
+            ),
             registry=self._registry,
         )
         logger.info("Coordinator 启动 run=%s session=%s", run.run_id, session.id)

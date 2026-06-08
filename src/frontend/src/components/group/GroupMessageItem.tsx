@@ -3,6 +3,7 @@ import { Copy, Pin, Reply } from 'lucide-react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
+import { cn } from '../../lib/cn'
 import { Avatar, Badge, Button, Icon } from '../ui'
 import { CoordinatorPlan } from './CoordinatorPlan'
 import { lookupActor } from './actors'
@@ -172,8 +173,38 @@ export function GroupMessageItem({
     onReply?.(msg)
   }
 
+  // R4 里程碑消息：进度通报 → 轻量分隔线，不在聊天流中抢戏。
+  const text = msg.text ?? ''
+  const isMilestone =
+    isCoordinator &&
+    !msg.taskPlan &&
+    !msg.plan &&
+    !msg.thinking &&
+    !msg.toolCalls?.length &&
+    !msg.approvalRequest &&
+    (text.startsWith('✅ ') ||
+      text.startsWith('❌ ') ||
+      text.startsWith('⚠️ ') ||
+      text.startsWith('开始执行') ||
+      text.startsWith('全部完成'))
+  if (isMilestone) {
+    const colorClass =
+      text.startsWith('✅ ') ? 'text-emerald-600 dark:text-emerald-400' :
+      text.startsWith('❌ ') ? 'text-red-600 dark:text-red-400' :
+      text.startsWith('⚠️ ') ? 'text-amber-600 dark:text-amber-400' :
+      'text-muted-foreground'
+    return (
+      <div className="flex items-center gap-3 py-1">
+        <hr className="flex-1 border-border/40" />
+        <span className={cn('shrink-0 text-[11px]', colorClass)}>{text}</span>
+        <hr className="flex-1 border-border/40" />
+      </div>
+    )
+  }
+
   return (
     <div
+      data-msg-id={msg.id}
       className="group/msg -mx-2 flex gap-3 rounded-lg px-2 py-1.5 transition-all duration-150 hover:bg-muted/40 hover:shadow-sm hover:ring-1 hover:ring-border/60 animate-[var(--animate-fade-in)]"
     >
       <div className="pt-0.5">

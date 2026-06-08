@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { groupsApi, type CreateGroupInput } from '../api/groups'
 import { sessionsApi, type MessageOut } from '../api/sessions'
 import { nowStamp, uid } from '../lib/id'
-import type { ApiGroup, ApprovalRequestData, Group, GroupMessage, ReplyRef, StreamEvent, TaskPlanData, ToolCallEntry, ToolResultEntry } from '../types'
+import type { ApiGroup, ApprovalRequestData, CoordinatorPlan, DAGLivePlan, Group, GroupMessage, LivePlanStep, ReplyRef, StepStatus, StreamEvent, TaskPlanData, ToolCallEntry, ToolResultEntry } from '../types'
 
 export interface SendGroupOptions {
   requiresApproval?: boolean
@@ -65,6 +65,8 @@ interface GroupState {
   connected: boolean
   /** WS 未 OPEN 时入队的 JSON payload，按 groupId 隔离；onopen 后 flushPending 回放。 */
   pendingByGroup: Record<string, string[]>
+  /** task_plan + task_update 驱动的 live DAG 投影；null = 纯聊天。 */
+  activePlanByGroup: Record<string, DAGLivePlan | null>
 
   // CRUD
   fetchGroups: () => Promise<void>
@@ -76,6 +78,8 @@ interface GroupState {
   setGroupSession: (groupId: string, sessionId: string) => void
   loadGroupHistory: (groupId: string) => Promise<void>
   applyGroupStreamEvent: (groupId: string, event: StreamEvent) => void
+  /** 手动关闭某群的 live 任务卡（× 按钮）。 */
+  dismissActivePlan: (groupId: string) => void
   setWs: (ws: WebSocket | null) => void
   setConnected: (v: boolean) => void
   /** WS 刚 OPEN 时调用，把某个 group 的待发队列冲到当前 ws。 */
@@ -92,6 +96,7 @@ export const useGroupStore = create<GroupState>((set, get) => ({
   ws: null,
   connected: false,
   pendingByGroup: {},
+  activePlanByGroup: {},
 
   fetchGroups: async () => {
     try {
@@ -187,6 +192,13 @@ export const useGroupStore = create<GroupState>((set, get) => ({
       if (event.type === 'text') {
         const chunk = event.content ?? ''
         if (!chunk) return {}
+        // 后台完整发言（worker 报到/交卷、协调者里程碑）：直接 append 独立完成消息，不走流式哨兵
+        if (event.metadata?.final) {
+          const finalMsg: GroupMessage = {
+            id: uid('gm'), from: 'agent', who: senderId, time: nowStamp(), text: chunk,
+          }
+          return { messagesByGroup: { ...s.messagesByGroup, [groupId]: [...list, finalMsg] } }
+        }
         const idx = list.findIndex((m) => m.id === sentinelId)
         if (idx >= 0) {
           const cur = list[idx]!
@@ -346,7 +358,7 @@ export const useGroupStore = create<GroupState>((set, get) => ({
         return { messagesByGroup: { ...s.messagesByGroup, [groupId]: [...list, seeded] } }
       }
 
-      // ── task_plan：任务计划 ──
+      // ── task_plan：任务计划 → message + activePlan ──
       if (event.type === 'task_plan') {
         const tpData: TaskPlanData = event.task_plan ?? (() => {
           try {
@@ -355,28 +367,109 @@ export const useGroupStore = create<GroupState>((set, get) => ({
             return { summary: event.content ?? '', steps: [] }
           }
         })()
+        // 从 metadata.plan 取 live steps（含 status）；fallback 到 task_plan.steps
+        const rawSteps: LivePlanStep[] =
+          (event.metadata?.plan as { steps?: LivePlanStep[] } | undefined)?.steps?.map(
+            (s: LivePlanStep) => ({ ...s, status: s.status || 'pending' }),
+          ) ??
+          tpData.steps.map((s) => ({ ...s, who: s.id, status: 'pending' as StepStatus })) ??
+          []
+        const dagPlan: DAGLivePlan = { steps: rawSteps, coordinatorId: senderId }
+        // 聊天内嵌用橙色「分发方案」卡（CoordinatorPlan），不用靛蓝 TaskPlanBlock
+        const msgPlan: CoordinatorPlan = {
+          summary: tpData.summary,
+          steps: rawSteps.map((s) => ({
+            id: s.id, who: s.who, label: s.label, eta: s.eta ?? 0, depends: s.depends,
+          })),
+          watchouts: [],
+        }
         const idx = list.findIndex((m) => m.id === sentinelId)
-        if (idx >= 0) {
-          const cur = list[idx]!
-          const next = [...list]
-          next[idx] = { ...cur, taskPlan: tpData }
-          return { messagesByGroup: { ...s.messagesByGroup, [groupId]: next } }
+        const seed = (m: Partial<GroupMessage>): GroupMessage => ({
+          id: sentinelId, from: 'agent', who: senderId, time: nowStamp(),
+          kind: 'plan', plan: msgPlan, streaming: true, ...m,
+        })
+        const msgs = idx >= 0
+          ? (() => { const n = [...list]; n[idx] = { ...list[idx]!, kind: 'plan', plan: msgPlan }; return n })()
+          : [...list, seed({})]
+        return {
+          messagesByGroup: { ...s.messagesByGroup, [groupId]: msgs },
+          activePlanByGroup: { ...s.activePlanByGroup, [groupId]: dagPlan },
         }
-        const seeded: GroupMessage = {
-          id: sentinelId,
-          from: 'agent',
-          who: senderId,
-          time: nowStamp(),
-          taskPlan: tpData,
-          streaming: true,
+      }
+
+      // ── task_update：就地更新 step 状态 ──
+      // 后端 _emit_update 发 running/done/failed，需映射到前端 StepStatus。
+      if (event.type === 'task_update') {
+        const taskId = event.metadata?.taskId as string | undefined
+        const raw = event.metadata?.status as string | undefined
+        const reason = event.metadata?.reason as string | undefined
+        if (!taskId || !raw) return {}
+        const STATUS_MAP: Record<string, StepStatus> = {
+          pending: 'pending',
+          queued: 'pending',
+          running: 'running',
+          done: 'completed',
+          completed: 'completed',
+          failed: 'failed',
+          blocked: 'blocked',
         }
-        return { messagesByGroup: { ...s.messagesByGroup, [groupId]: [...list, seeded] } }
+        const status = STATUS_MAP[raw]
+        if (!status) return {}
+        const cur = s.activePlanByGroup[groupId]
+        if (!cur) return {}
+        const nextSteps = cur.steps.map(
+          (st): LivePlanStep => (st.id === taskId ? { ...st, status, reason: reason ?? st.reason } : st),
+        )
+        // 不自动清空：保留卡片让用户看到最终结果，新任务的 task_plan 会覆盖。
+        return {
+          activePlanByGroup: { ...s.activePlanByGroup, [groupId]: { ...cur, steps: nextSteps } },
+        }
+      }
+
+      // ── task_activity：worker 实时活动 → 归到步骤 feed ──
+      if (event.type === 'task_activity') {
+        const taskId = event.metadata?.taskId as string | undefined
+        const kind = event.metadata?.kind as string | undefined
+        if (!taskId || !kind) return {}
+        const cur = s.activePlanByGroup[groupId]
+        if (!cur) return {}
+        const nextSteps = cur.steps.map((st): LivePlanStep => {
+          if (st.id !== taskId) return st
+          const feed = [...(st.activity ?? [])]
+          if (kind === 'text') {
+            const text = (event.metadata?.text as string) ?? ''
+            const last = feed[feed.length - 1]
+            if (last && last.kind === 'text') {
+              feed[feed.length - 1] = { ...last, text: (last.text ?? '') + text }
+            } else {
+              feed.push({ kind: 'text', text })
+            }
+          } else if (kind === 'tool_call') {
+            feed.push({
+              kind: 'tool',
+              callId: event.metadata?.callId as string | undefined,
+              name: event.metadata?.name as string | undefined,
+            })
+          } else if (kind === 'tool_result') {
+            const callId = event.metadata?.callId as string | undefined
+            const ok = event.metadata?.ok as boolean | undefined
+            const idx = feed.findIndex((a) => a.kind === 'tool' && a.callId === callId)
+            if (idx >= 0) feed[idx] = { ...feed[idx]!, ok }
+          }
+          return { ...st, activity: feed }
+        })
+        return {
+          activePlanByGroup: { ...s.activePlanByGroup, [groupId]: { ...cur, steps: nextSteps } },
+        }
       }
 
       // 未知事件类型：静默忽略（forward-compat）
       return {}
     })
   },
+
+  dismissActivePlan: (groupId) =>
+    set((s) => ({ activePlanByGroup: { ...s.activePlanByGroup, [groupId]: null } })),
 
   setWs: (ws) => set({ ws }),
   setConnected: (v) => set({ connected: v }),
