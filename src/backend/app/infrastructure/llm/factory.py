@@ -135,7 +135,7 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
             model=agent.model,
             agent_id=str(agent.id),
             proxy_base=settings.proxy_base_url,
-            permission_mode=s.get("permission_mode", "acceptEdits"),
+            permission_mode=s.get("permission_mode", "bypassPermissions"),
             max_turns=s.get("max_turns", 10),
             timeout=s.get("cli_timeout", settings.claude_cli_timeout),
         )
