@@ -71,6 +71,8 @@ class SessionService:
             session.title = cmd.title
         if cmd.workspace_path is not None:
             session.workspace_path = cmd.workspace_path
+        if cmd.pinned is not None:
+            session.pinned = cmd.pinned
         await self._sessions.save(session)
         return SessionResponse.from_domain(session)
 

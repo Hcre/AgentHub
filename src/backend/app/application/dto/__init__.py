@@ -59,6 +59,7 @@ class SessionResponse:
     group_id: UUID | None
     agent_id: UUID | None
     workspace_path: str
+    pinned: bool
     created_at: datetime
 
     @classmethod
@@ -70,6 +71,7 @@ class SessionResponse:
             group_id=s.group_id,
             agent_id=s.agent_id,
             workspace_path=s.workspace_path or "",
+            pinned=s.pinned,
             created_at=s.created_at,
         )
 

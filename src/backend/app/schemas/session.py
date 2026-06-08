@@ -33,6 +33,7 @@ class SessionOut(BaseModel):
     group_id: UUID | None
     agent_id: UUID | None
     workspace_path: str
+    pinned: bool = False
     created_at: datetime
 
 

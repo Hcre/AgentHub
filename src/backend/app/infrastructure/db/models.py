@@ -70,6 +70,7 @@ class SessionModel(Base):
     group_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True, index=True)
     agent_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True, index=True)
     workspace_path: Mapped[str] = mapped_column(Text, default="")
+    pinned: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now

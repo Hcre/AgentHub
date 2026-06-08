@@ -67,6 +67,7 @@ async def update_session(session_id: UUID, body: dict, svc: ServiceDep) -> Sessi
             session_id=session_id,
             title=body.get("title"),
             workspace_path=body.get("workspace_path"),
+            pinned=body.get("pinned"),
         )
     )
     return SessionOut(**resp.__dict__)

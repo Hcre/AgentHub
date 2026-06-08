@@ -133,6 +133,7 @@ class UpdateSessionCommand:
     session_id: UUID
     title: str | None = None
     workspace_path: str | None = None
+    pinned: bool | None = None  # t7 B-4-P2-CL01：会话置顶开关
 
 
 # === Task Commands ===
