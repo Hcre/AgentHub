@@ -1,5 +1,6 @@
-import { type MouseEvent, useMemo, useState } from 'react'
+import { type MouseEvent, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../lib/cn'
+import { sessionsApi } from '../../api/sessions'
 import { useAgentStore } from '../../stores/agentStore'
 import { useChatStore, convKey } from '../../stores/chatStore'
 import { useGroupStore } from '../../stores/groupStore'
@@ -84,6 +85,9 @@ export function LeftPanel() {
   const [dmSelected, setDmSelected] = useState<Set<string>>(() => new Set())
   const [dmBatchDeleteConfirm, setDmBatchDeleteConfirm] = useState(false)
   const removeConversations = useChatStore((s) => s.removeConversations)
+  const setConversationPinned = useChatStore((s) => s.setConversationPinned)
+  const sessionIds = useChatStore((s) => s.sessionIds)
+  const setSessionId = useChatStore((s) => s.setSessionId)
   // t7 B-4-P2-CL01：搜索（300ms debounce）+ 置顶
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -91,6 +95,51 @@ export function LeftPanel() {
     const t = setTimeout(() => setDebouncedQuery(searchQuery.trim().toLowerCase()), 300)
     return () => clearTimeout(t)
   }, [searchQuery])
+  // in-flight pin requests（按 convKey 跟踪）— 请求中禁用按钮防 race
+  const [inFlightPins, setInFlightPins] = useState<Set<string>>(() => new Set())
+  // 最近一次 pin 错误（与 MessageBubble.copyStatus 同 pattern：inline 显示，不引 toast 库）
+  const [pinError, setPinError] = useState<string | null>(null)
+
+  // t7 B-4-P2-CL01：4 trade-off 实现（user 决策：乐观 + createPrivate 兜底 + 1 retry + in-flight 禁用 + inline 错误）
+  const handleTogglePin = async (
+    agentId: string,
+    convId: string,
+    nextPinned: boolean,
+  ): Promise<void> => {
+    const key = convKey(agentId, convId)
+    if (inFlightPins.has(key)) return // in-flight 防 race
+    setInFlightPins((prev) => new Set(prev).add(key))
+    setPinError(null)
+    // (1) 乐观更新：local 立即翻
+    setConversationPinned(agentId, convId, nextPinned)
+    try {
+      // (2) 缺 sessionId → 先 createPrivate 拿 ID
+      let sid = sessionIds[key]
+      if (!sid) {
+        const sess = await sessionsApi.createPrivate(agentId)
+        sid = sess.id
+        setSessionId(key, sid)
+      }
+      // (3) PATCH with 1 retry on failure
+      const doPatch = () => sessionsApi.patch(sid!, { pinned: nextPinned })
+      try {
+        await doPatch()
+      } catch (err1) {
+        console.warn('[pin] PATCH failed, retrying once', err1)
+        await doPatch()
+      }
+    } catch (err) {
+      // (4) 错误：console.warn + inline 提示（不 rollback — user 决定）
+      console.warn('[pin] toggle failed', err)
+      setPinError(`置顶失败：${(err as Error).message ?? '网络错误'}`)
+    } finally {
+      setInFlightPins((prev) => {
+        const next = new Set(prev)
+        next.delete(key)
+        return next
+      })
+    }
+  }
 
   const exitDmBatch = () => {
     setDmBatchMode(false)
@@ -212,9 +261,7 @@ export function LeftPanel() {
               const msgs = messagesByGroup[g.id] ?? []
               const lastMsg = msgs[msgs.length - 1]
               const lastText =
-                lastMsg?.kind === 'plan'
-                  ? '📋 分发方案'
-                  : lastMsg?.text?.trim() || '暂无消息'
+                lastMsg?.kind === 'plan' ? '📋 分发方案' : lastMsg?.text?.trim() || '暂无消息'
               return (
                 <button
                   key={g.id}
@@ -243,11 +290,7 @@ export function LeftPanel() {
         )}
 
         {/* 私聊（扁平） */}
-        <SectionHeader
-          label="私聊"
-          collapsed={!openDM}
-          onToggle={() => setOpenDM((v) => !v)}
-        />
+        <SectionHeader label="私聊" collapsed={!openDM} onToggle={() => setOpenDM((v) => !v)} />
         {openDM && (
           <div className="space-y-px">
             {dmList.length === 0 ? (
@@ -257,7 +300,9 @@ export function LeftPanel() {
             ) : (
               filteredDmList.map(({ agent, conv, key }) => {
                 const isActive =
-                  section === 'chat' && activeAgentId === agent.id && activeConversationId === conv.id
+                  section === 'chat' &&
+                  activeAgentId === agent.id &&
+                  activeConversationId === conv.id
                 const selected = dmSelected.has(key)
                 // 最近一条消息
                 const msgKey = convKey(agent.id, conv.id)
@@ -276,17 +321,19 @@ export function LeftPanel() {
                     }}
                     data-active={isActive ? 'true' : undefined}
                     className={cn(
-                      'flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+                      'group flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
                       'data-[active=true]:bg-brand/10 data-[active=true]:text-foreground',
                     )}
                   >
                     {dmBatchMode && (
-                      <div className={cn(
-                        'mt-1 grid h-4 w-4 flex-shrink-0 place-items-center rounded border-2 transition-colors',
-                        selected
-                          ? 'border-brand bg-brand text-brand-foreground'
-                          : 'border-muted-foreground/30',
-                      )}>
+                      <div
+                        className={cn(
+                          'mt-1 grid h-4 w-4 flex-shrink-0 place-items-center rounded border-2 transition-colors',
+                          selected
+                            ? 'border-brand bg-brand text-brand-foreground'
+                            : 'border-muted-foreground/30',
+                        )}
+                      >
                         {selected && <Icon name="check" className="h-2.5 w-2.5" />}
                       </div>
                     )}
@@ -307,6 +354,38 @@ export function LeftPanel() {
                         {lastText}
                       </div>
                     </div>
+                    {/* t7 B-4-P2-CL01：pin 图标（置顶/取消置顶 + in-flight 禁用 + 错误标记） */}
+                    <span
+                      role="button"
+                      tabIndex={-1}
+                      aria-busy={inFlightPins.has(convKey(agent.id, conv.id))}
+                      onClick={(e: MouseEvent) => {
+                        e.stopPropagation()
+                        handleTogglePin(agent.id, conv.id, !conv.pinned)
+                      }}
+                      data-testid={`pin-conv-${conv.id}`}
+                      data-pinned={conv.pinned ? 'true' : 'false'}
+                      data-error={pinError ? 'true' : 'false'}
+                      title={
+                        inFlightPins.has(convKey(agent.id, conv.id))
+                          ? '处理中…'
+                          : conv.pinned
+                            ? '取消置顶'
+                            : '置顶会话'
+                      }
+                      className={cn(
+                        'flex-shrink-0 rounded p-0.5 transition-all',
+                        inFlightPins.has(convKey(agent.id, conv.id)) && 'cursor-not-allowed opacity-50',
+                        pinError && !conv.pinned && 'text-destructive opacity-100',
+                        conv.pinned && !inFlightPins.has(convKey(agent.id, conv.id))
+                          ? 'text-brand opacity-100'
+                          : !conv.pinned && !pinError
+                            ? 'text-muted-foreground/40 opacity-0 group-hover:opacity-100 hover:bg-accent/50 hover:text-muted-foreground'
+                            : '',
+                      )}
+                    >
+                      <Icon name="pin" className="h-3 w-3" />
+                    </span>
                   </button>
                 )
               })
@@ -324,9 +403,7 @@ export function LeftPanel() {
             )}
             {dmBatchMode && (
               <div className="flex items-center justify-between rounded-md px-2 py-2">
-                <span className="text-[11px] text-muted-foreground">
-                  已选 {dmSelected.size} 个
-                </span>
+                <span className="text-[11px] text-muted-foreground">已选 {dmSelected.size} 个</span>
                 <div className="flex gap-1.5">
                   <button
                     type="button"
@@ -378,7 +455,8 @@ export function LeftPanel() {
       />
       {menu && (
         <ContextMenu
-          x={menu.x} y={menu.y}
+          x={menu.x}
+          y={menu.y}
           onClose={() => setMenu(null)}
           items={
             [
@@ -386,7 +464,10 @@ export function LeftPanel() {
                 icon: 'pencil',
                 label: '重命名',
                 onClick: () => {
-                  const name = window.prompt('新名称', groups.find((g) => g.id === menu.groupId)?.name ?? '')
+                  const name = window.prompt(
+                    '新名称',
+                    groups.find((g) => g.id === menu.groupId)?.name ?? '',
+                  )
                   if (name && name.trim()) renameGroup(menu.groupId, name.trim())
                 },
               },

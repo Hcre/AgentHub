@@ -51,6 +51,8 @@ export interface Conversation {
   subtitle: string
   /** 「看看我的项目」模式下选的工作目录；空 = 随便聊聊。 */
   workdir?: string
+  /** t7 B-4-P2-CL01：会话置顶 — true 时排在列表最前。 */
+  pinned?: boolean
 }
 
 export interface CenterTab {
@@ -503,6 +505,7 @@ export interface Session {
   group_id: string | null
   agent_id: string | null
   workspace_path: string
+  pinned: boolean
   created_at: string
 }
 
@@ -525,7 +528,13 @@ export interface StreamEvent {
   /** 后端 model_dump(mode="json") 序列化 ToolCall：{ call_id, name, arguments } */
   tool_call?: { call_id: string; name: string; arguments: Record<string, unknown> } | null
   /** 后端 model_dump(mode="json") 序列化 ToolResult：{ call_id, success, content, error, artifact } */
-  tool_result?: { call_id: string; success: boolean; content: string | null; error: string | null; artifact?: string | null } | null
+  tool_result?: {
+    call_id: string
+    success: boolean
+    content: string | null
+    error: string | null
+    artifact?: string | null
+  } | null
   /** 后端 model_dump(mode="json") 序列化 task_plan dict */
   task_plan?: TaskPlanData | null
   metadata?: Record<string, unknown>
