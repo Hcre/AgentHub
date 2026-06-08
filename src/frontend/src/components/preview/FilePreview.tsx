@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import hljs from 'highlight.js'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -10,9 +10,6 @@ import { useUIStore } from '../../stores/uiStore'
 
 /** 文件树固定宽度（与 AppShell 全局拖拽的右栏宽度解耦） */
 const TREE_WIDTH = 140
-
-/** 轮询间隔（毫秒） */
-const POLL_INTERVAL_MS = 3000
 
 // ── 文件类型检测 ─────────────────────────────────────────────────
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'])
@@ -45,43 +42,25 @@ export function FilePreview({ workdir, initialPath, onOpenFile }: FilePreviewPro
   const [file, setFile] = useState<FileState | null>(null)
   const [flashKey, setFlashKey] = useState(0)
   const fileTreeCollapsed = useUIStore((s) => s.fileTreeCollapsed)
+  const fileRef = useRef<FileState | null>(null)
+  fileRef.current = file
 
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  /** 停止轮询 */
-  const stopPoll = useCallback(() => {
-    if (pollRef.current !== null) {
-      clearInterval(pollRef.current)
-      pollRef.current = null
-    }
-  }, [])
-
-  /** 开始轮询：每 3 秒检查文件是否有变更 */
-  const startPoll = useCallback((path: string) => {
-    stopPoll()
-    pollRef.current = setInterval(async () => {
-      try {
-        const data = await fsApi.readFile(path)
-        setFile((prev) => {
-          if (!prev || prev.path !== path) return prev
-          if (prev.content !== data.content) {
-            // 内容变更 → 自动刷新 + 触发闪动指示
-            setFlashKey((k) => k + 1)
-            return { ...prev, content: data.content, size: data.size, error: null }
-          }
-          return prev
-        })
-      } catch {
-        // 轮询失败静默忽略（文件可能被删除等）
-      }
-    }, POLL_INTERVAL_MS)
-  }, [stopPoll])
-
-  /** 卸载时停止轮询 */
+  /** AI 工具操作文件后刷新当前打开的文件 */
   useEffect(() => {
-    return () => {
-      if (pollRef.current !== null) clearInterval(pollRef.current)
+    const onFileChanged = () => {
+      const f = fileRef.current
+      if (!f) return
+      fsApi.readFile(f.path).then((data) => {
+        if (f.content !== data.content) {
+          setFlashKey((k) => k + 1)
+          setFile((prev) => prev?.path === f.path
+            ? { ...prev, content: data.content, size: data.size, error: null }
+            : prev)
+        }
+      }).catch(() => {})
     }
+    window.addEventListener('file-changed', onFileChanged)
+    return () => window.removeEventListener('file-changed', onFileChanged)
   }, [])
 
   useEffect(() => {
@@ -105,7 +84,6 @@ export function FilePreview({ workdir, initialPath, onOpenFile }: FilePreviewPro
 
     // 图片：跳过 API（后端 /read 返回 415），用 /raw 端点直接渲染
     if (IMAGE_EXTS.has(ext)) {
-      stopPoll()
       setFile({ path, name, content: '', size: 0, loading: false, error: null })
       return
     }
@@ -114,7 +92,6 @@ export function FilePreview({ workdir, initialPath, onOpenFile }: FilePreviewPro
     try {
       const data = await fsApi.readFile(path)
       setFile({ path, name, content: data.content, size: data.size, loading: false, error: null })
-      startPoll(path)
     } catch (e) {
       setFile((prev) => prev?.path === path
         ? { ...prev, loading: false, error: e instanceof Error ? e.message : '读取失败' }
