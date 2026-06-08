@@ -102,6 +102,11 @@ export function LeftPanel() {
   const confirmDmBatchDelete = () => {
     // Group by agent, then delete
     const byAgent: Record<string, string[]> = {}
+    const deletedKeys = new Set(dmSelected)
+    let currentWasDeleted = false
+    if (activeAgentId && activeConversationId) {
+      currentWasDeleted = deletedKeys.has(`${activeAgentId}:${activeConversationId}`)
+    }
     for (const key of dmSelected) {
       const [agentId, convId] = key.split(':')
       if (!byAgent[agentId]) byAgent[agentId] = []
@@ -109,6 +114,13 @@ export function LeftPanel() {
     }
     for (const [agentId, convIds] of Object.entries(byAgent)) {
       removeConversations(agentId, convIds)
+    }
+    // 如果删除的是当前会话，切换到下一个
+    if (currentWasDeleted && activeAgentId) {
+      const remaining = conversations[activeAgentId]?.filter((c) => !deletedKeys.has(`${activeAgentId}:${c.id}`)) ?? []
+      if (remaining.length > 0) {
+        openConversation(activeAgentId, remaining[remaining.length - 1].id)
+      }
     }
     setDmBatchDeleteConfirm(false)
     exitDmBatch()
