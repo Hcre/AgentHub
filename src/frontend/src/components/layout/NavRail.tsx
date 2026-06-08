@@ -6,8 +6,9 @@ import { useChatStore } from '../../stores/chatStore'
 import { Avatar, Icon } from '../ui'
 import type { IconName } from '../../types'
 import { HelpModal } from '../settings/HelpModal'
+import { TokenMonitorPanel } from '../settings/TokenMonitorPanel'
 
-/** 4 个主功能 + 1 个设置入口。help 不映射到 section，弹模态。 */
+/** 4 个主功能 + 1 个用量入口。help/usage 不映射到 section，弹模态。 */
 interface RailItem {
   key: string
   icon: IconName
@@ -21,12 +22,14 @@ const RAIL_ITEMS: RailItem[] = [
   { key: 'agent', icon: 'users', label: 'AI 队友', section: 'agent-detail' },
   { key: 'group', icon: 'channels', label: '群组', section: 'groups' },
   { key: 'skill', icon: 'lock', label: 'Skill', section: 'skills-market' },
+  { key: 'usage', icon: 'activity', label: '用量' },
 ]
 
 export function NavRail() {
   const { section, setSection, theme, toggleTheme } = useUIStore()
   const unreadByConv = useChatStore((s) => s.unreadByConv)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [usageOpen, setUsageOpen] = useState(false)
   // 总未读（任意会话有新消息）—— 给 chat 入口加红点
   const totalUnread = Object.values(unreadByConv).reduce((a, b) => a + b, 0)
 
@@ -41,15 +44,20 @@ export function NavRail() {
           <Avatar initial={user.initial} color="neutral" size={32} online />
         </div>
 
-        {/* ── 中部：4 个主功能 ── */}
+        {/* ── 中部：主功能 + 用量入口 ── */}
         <nav className="mt-4 flex flex-1 flex-col items-center gap-1">
           {RAIL_ITEMS.map((item) => {
             const active = !!item.section && section === item.section
             const showUnread = item.key === 'chat' && totalUnread > 0
+            const onClick = item.section
+              ? () => setSection(item.section!)
+              : item.key === 'usage'
+                ? () => setUsageOpen(true)
+                : undefined
             return (
               <button
                 key={item.key}
-                onClick={() => item.section && setSection(item.section)}
+                onClick={onClick}
                 title={item.label}
                 aria-label={item.label}
                 aria-current={active ? 'page' : undefined}
@@ -131,6 +139,7 @@ export function NavRail() {
       </aside>
 
       <HelpModal open={helpOpen} onOpenChange={setHelpOpen} />
+      <TokenMonitorPanel open={usageOpen} onOpenChange={setUsageOpen} />
     </>
   )
 }
