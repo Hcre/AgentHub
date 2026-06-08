@@ -1,6 +1,6 @@
 # 当前状态
 
-> 最后更新: 2026-06-08 19:43 (t12 e2e-pin-auth 兜底 done: 1f15f7f evidence .md (5 path pytest + 4 commit 引用 + 修复代码) 替代 Playwright 截图, downscope 5min 远低于 30min cap; ahead of origin/main by 16 commit; next gate: t7 conversation list 搜索/置顶/归档 downscope 60min; t10 M6 finalize 未启动; t3 SLA 至 23:03; t11 user-blocked)
+> 最后更新: 2026-06-08 19:48 (session phase-2 收尾 done @19:48, 96a76e2 phase-2 summary worklog; 11 commit 本 session, ahead of origin/main by 20 commit; 9/12 track done [t1/t2/t3/t4/t5/t6/t8/t9/t12 = 75%], 剩 t7 60min downscope + t10 大工作量 + t11 user-blocked; t3 SLA 至 23:03 闸门本质已过 path B docs-only; phase-3 接手起点: worklog 2026-06-08_session-phase2-summary.md §7)
 > 规则：**每次 push 或开始/结束一个任务时，更新你自己的那一行。**
 
 | 我 | 正在做 | 阻塞？ | 这周完成了 |
