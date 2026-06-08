@@ -636,6 +636,24 @@ make lint           # ruff + eslint + tsc
 | **UI 验收（Playwright）** | 打开 `http://localhost:5174/` → 进任意私聊 → 点右栏 + → 截图 dropdown 4 项全 enabled，保存 `docs/deliverables/screenshots/e2e-t1-preview-modes-2026-06-09.png` |
 | **测试** | `src/frontend/src/components/preview/__tests__/previewModes.test.ts` 5 个 it（files/diff/deploy/webpage 各 1 + dropdown 渲染 1）|
 
+#### 6.4.6 CreateAgentModal 502 优雅空状态（**B-6-P2-T2 最高优先级 bug fix**）
+
+| 项 | 内容 |
+|----|------|
+| **场景 ID** | `B-4-P2-AG01` 创建 Agent 失败时优雅空状态 |
+| **对应任务** | Day 2 用户图片直接指出 502 错误未翻译，nginx 错误页 HTML 漏给用户 |
+| **API 端点** | 复用 `/api/agents` POST |
+| **Given** | 用户填写完 agent name + system + model + apiKey + skills 等所有必填项，点「创建」 |
+| **When-1（5xx 错误）** | 后端返回 502/503/504（nginx 上游不通）|
+| **Then-1** | 错误块文案：「后端服务未启动或网络不通 — 请检查 AgentHub 后端进程（`docker compose ps backend` 或 `uvicorn :8000`）」 + 「重试」按钮 + 隐藏原始 nginx HTML |
+| **When-2（4xx 错误）** | 后端返回 4xx（user config 错：缺 key/错 model）|
+| **Then-2** | 错误块文案：保留现有 detail 显示（用户需要看到「API key 无效」之类的具体反馈）|
+| **When-3（网络错误）** | `fetch` 抛 TypeError（断网）|
+| **Then-3** | 错误块文案：「网络连接失败 — 请检查网络」 + 重试按钮 |
+| **实现位置** | 抽离 `src/frontend/src/lib/createAgentError.ts`（纯函数 `classifyCreateAgentError(e: unknown): string`），`CreateAgentModal.tsx` line 680-685 catch block 改为调用之 |
+| **UI 验收（Playwright）** | 打开 `http://localhost:5174/` → 进 AI 队友 → 创建 Agent → 故意填错 apiKey 让 4xx 触发 → 截图保存 `docs/deliverables/screenshots/e2e-t2-createagent-502-2026-06-09.png`（部署后兜底）|
+| **测试** | `src/frontend/src/components/agent/__tests__/CreateAgentModal.test.tsx` 5 个 it (5xx/4xx/network/length/unknown 各 1) |
+
 ### 6.5 多端支持（PRD §6 P2）
 
 #### 6.5.1 移动端 H5

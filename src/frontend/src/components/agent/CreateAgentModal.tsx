@@ -17,6 +17,48 @@ import { StartChatModal } from '../chat/StartChatModal'
 const SELECT_CLS =
   'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
+// =================================================================
+// B-4-P2-AG01：createAgent() 错误三段式分类（详见 docs/specs/04-commands §6.4.6）
+//
+// 触发场景（来自用户截图）：后端 502 时老逻辑只剥了 "API 502: " 前缀就显示，
+//   结果用户看到 nginx 默认错误页的 HTML 片段。新逻辑直接给
+//   「后端服务未启动或网络不通」+ 排查命令；4xx 保留 detail；其他给「网络连接失败」。
+//
+// 抽离成可测试的纯函数 export 出去，测试在 __tests__/CreateAgentModal.test.tsx。
+// =================================================================
+const FIVE_HUNDRED_MSG =
+  '后端服务未启动或网络不通 — 请检查 AgentHub 后端进程（docker compose ps backend 或 uvicorn :8000）'
+const NETWORK_MSG = '网络连接失败 — 请检查网络'
+const GENERIC_MSG = '创建失败，请检查配置'
+
+/** 暴露给单测；不要在 UI 直接调用 — 用 classifyCreateAgentError() 即可。 */
+// eslint-disable-next-line react-refresh/only-export-components
+export function classifyCreateAgentError(e: unknown): string {
+  let raw: string
+  if (e instanceof Error) {
+    raw = e.message || '创建失败'
+  } else if (typeof e === 'string') {
+    raw = e
+  } else if (e == null) {
+    return FIVE_HUNDRED_MSG
+  } else {
+    raw = String(e)
+  }
+  const m = raw.match(/^API (\d{3}):/)
+  if (m) {
+    const code = parseInt(m[1] ?? '', 10)
+    if (Number.isFinite(code) && code >= 500) {
+      return FIVE_HUNDRED_MSG
+    }
+    if (Number.isFinite(code) && code >= 400) {
+      const detail = raw.replace(/^API \d+:\s*/, '').trim()
+      if (detail.length === 0) return GENERIC_MSG
+      return detail.length < 200 ? detail : GENERIC_MSG
+    }
+  }
+  return NETWORK_MSG
+}
+
 // --- Step 1 模板（旧版硬编码兜底，API 不可用时显示） ---
 interface LegacyTemplate {
   name: string
@@ -668,9 +710,8 @@ export function CreateAgentModal({
       }, 800)
     } catch (e) {
       setStatus('error')
-      const msg = e instanceof Error ? e.message : '创建失败'
-      const detail = msg.replace(/^API \d+: /, '')
-      setErrorMsg(detail.length < 200 ? detail : '创建失败，请检查配置')
+      // B-4-P2-AG01：5xx 隐藏 nginx HTML；4xx 保留 detail；网络错误给「请检查网络」
+      setErrorMsg(classifyCreateAgentError(e))
     }
   }
 
