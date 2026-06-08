@@ -328,10 +328,54 @@ Rust 端(`src-tauri/Cargo.toml`)依赖随 Tauri scaffold 生成的 `[dependencie
 
 ## 十二、待 Review 项(PR-01 必须答完)
 
-1. **Q5-1**:原生通知是否在 v0.1 范围?(建议降级 v0.2)
-2. **Q5-2**:Web 端用户与桌面端用户身份是否打通?(建议走同一 JWT 体系,后端零改)
-3. **Q7-1**:首次发布 tag 命名为 `v0.1.0-desktop-preview` 还是直接 `v0.1.0`?
-4. **Q11-1**:遇到 Tauri 2 bug 时,降级方案是 Capacitor 还是 Electron?
+> **状态**: 4 Q 已由袁(owner per ADR-0008)答完(2026-06-08 17:45),待董/黎二审转正式。
+> **关联**: t8-desktop-specs-4q track ([docs/plan/day2-pipeline-v2/](../../plan/day2-pipeline-v2/) §3)。
+
+### Q5-1 答:原生通知降级到 v0.2,v0.1 留 stub
+- **v0.1 (首次发布)**: 通知 UI 留 stub(设置页有"通知"开关但 disabled,置灰 + tooltip "v0.2 启用");不发任何通知
+- **v0.2**: 接 `tauri-plugin-notification` 真实实现,触发条件按 §五(@用户/私聊 + 主窗口最小化/隐藏)
+- **理由**: Tauri 2 通知 plugin 仍在快速迭代,v0.1 锁定具体小版本 + 推迟到 v0.2 减少首次发布兼容性风险
+- **关联 AC**: 暂不写 AC,v0.2 spec 阶段补
+
+### Q5-2 答:Web 端 + 桌面端走同一 JWT 体系,桌面端不存 token
+- **JWT 体系**: 与 web 端完全一致(同 issuer + 同 secret + 同 TTL 7 天),后端零改动
+- **桌面端 token 存储**: 不存到磁盘;只在内存中(`tauri-plugin-store` 写 encrypted 但仅存 `refresh_token` 用于无感续期;`access_token` 内存)
+- **登录流程**: 桌面 App 启动 → 打开内置 WebView 走 web 端 `/login` → 登录成功后从 web 端 cookie 拿 token → 内存注入
+- **不引入新实体**: 用户表、session 表、refresh_token 表均沿用 web 端 schema;桌面端不新建 `desktop_users` / `desktop_sessions` 表
+- **关联 AC**:
+  - AC-5.2.1 桌面 App 启动 → 自动打开登录 WebView → 登录成功后自动跳主窗口
+  - AC-5.2.2 token 过期(7 天)→ 自动用 refresh_token 续期;续期失败 → 跳登录
+  - AC-5.2.3 关闭 App → 内存中 token 释放;下次启动重新走登录
+
+### Q7-1 答:首次发布 tag = `v0.1.0-desktop-preview`
+- **首次发布**: tag `v0.1.0-desktop-preview`,GitHub Release 标 "Pre-release",README 写"非稳定,建议测试用"
+- **正式版**: tag `v0.1.0`,与 web 端首次稳定版同步;要求 desktop 至少跑过 30 天 preview 期
+- **版本号规则**: 严格 semver(major.minor.patch),从 `0.1.0` 起;minor 0.2 / 0.3 ...;patch 0.1.1 / 0.1.2 ...
+- **与 web 端 version 字段关系**: 桌面端 `package.json` 继承根 `package.json` 的 `version` 字段(§7.3 已冻结),但 tag 命名独立(带 `-desktop-preview` 后缀)
+- **关联 AC**:
+  - AC-7.1.1 首次 `gh release create` tag 必为 `v0.1.0-desktop-preview`,不直接 `v0.1.0`
+  - AC-7.1.2 30 天 preview 期后 owner 决策 → `gh release create v0.1.0` 转正式版
+  - AC-7.1.3 任何 patch release(bug fix)→ `v0.1.1-desktop-preview` → `v0.1.1`(preview → 正式版两步走)
+
+### Q11-1 答:Tauri 2 bug 时降级 = PWA 模式(不动 Capacitor / Electron)
+- **降级路径**: PWA 模式(web 端部署到 `https://app.agenthub.dev` + 用户在浏览器中"添加到主屏幕")
+- **不选 Capacitor**: Capacitor 是 WebView 包装但无 Rust 后端访问能力,无法实现本地 `tauri-plugin-fs` / `tauri-plugin-store` 等 desktop 能力;等于"用 web 端阉割版"
+- **不选 Electron**: 切换到 Electron 需重写所有 §三 §四 §五 §六 节的 Tauri 集成代码,6-8 周工作量 + 推翻 ADR-0007 决策
+- **PWA 降级触发条件**(自动):
+  - Tauri 2 检测到严重 bug(启动崩溃 / 关键功能不可用)→ 在设置页加"PWA 模式"提示按钮 + 跳到 `https://app.agenthub.dev`
+  - 自动检测:`tauri::api::process` 检查 `app.healthy()` 返回 false → 弹提示
+- **关联 AC**:
+  - AC-11.1.1 启动后 5s 内 `app.healthy()` 返回 false → 设置页"PWA 模式"按钮高亮
+  - AC-11.1.2 PWA 模式跳 `https://app.agenthub.dev` → 走 web 端登录 → 仅损失 desktop 独占能力(通知/本地存储),其余功能(聊天/任务/预览)正常
+
+### 给 Reviewer 的话
+- 4 Q 答完 ≠ PR-01 Approve;仍需董/黎二审才能转正式
+- 本节如 Reviewer 不同意任一条,可在本文件加 inline comment(`<!-- reviewer: ... -->`)后重答
+- 走 ADR-0007 决策 → Tauri 2 路径不变;Q11-1 已固化降级 = PWA,避免重选 Capacitor/Electron
+
+### 决策日志
+- 2026-06-08 17:45: 袁 owner 答完 4 Q(本 commit)
+- 2026-06-08 17:50: 同步 worklog `worklogs/黎/2026-06-08_桌面specs-4q-answered.md` 交接
 
 ---
 
