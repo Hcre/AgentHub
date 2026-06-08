@@ -316,7 +316,17 @@ class ChatService:
                     )
                 continue  # 回完群聊讨论 → 再 decide（多轮）
 
-            # done → 收敛退出
+            # done → 收敛退出。但如果原因是路由错误（LLM 失败/非法 action），
+            # 必须告知用户，不能静默吞掉。
+            if decision.reason and (
+                decision.reason.startswith("llm error")
+                or decision.reason.startswith("invalid action")
+            ):
+                yield StreamEvent(
+                    type=StreamEventType.TEXT,
+                    seq=0,
+                    content="⚠️ 消息路由暂时不可用，请稍后重试或 @ 指定成员。",
+                )
             return
 
     # --- v3 前门反射 + 轻执行（步1）---

@@ -76,12 +76,14 @@ export function ApiKeyManager() {
   const setSection = useUIStore((s) => s.setSection)
   const keys = useApiKeyStore((s) => s.keys)
   const removeKey = useApiKeyStore((s) => s.removeKey)
+  const coordinatorId = useApiKeyStore((s) => s.coordinatorCredentialId)
+  const setCoordinator = useApiKeyStore((s) => s.setCoordinatorCredential)
   const [dialogOpen, setDialogOpen] = useState(false)
 
   return (
     <div className="flex h-full flex-col bg-background">
       <header className="flex items-center gap-3 border-b px-4 py-3">
-        <Button variant="ghost" size="iconSm" onClick={() => setSection('chat')}>
+        <Button variant="ghost" size="iconSm" onClick={() => setSection('settings')}>
           <Icon name="chevronLeft" className="h-4 w-4" />
         </Button>
         <div className="flex-1">
@@ -105,20 +107,40 @@ export function ApiKeyManager() {
           </div>
         ) : (
           <div className="mx-auto max-w-xl space-y-2">
-            {keys.map((k) => (
-              <div key={k.id} className="flex items-start gap-3 rounded-lg border-2 border-border bg-card p-3.5 shadow-sm">
-                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-muted text-[13px]">🔑</div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-medium">{k.name}</div>
-                  <div className="mt-0.5 text-[11px] text-muted-foreground">
-                    {PROVIDER_LABELS[k.provider] ?? k.provider}{' · '}{k.keyPrefix}****
+            {keys.map((k) => {
+              const isCoordinator = coordinatorId === k.id
+              return (
+                <div
+                  key={k.id}
+                  className="group flex items-start gap-3 rounded-lg border-2 border-border bg-card p-3.5 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-muted text-[13px]">🔑</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-medium">{k.name}</div>
+                    <div className="mt-0.5 text-[11px] text-muted-foreground">
+                      {PROVIDER_LABELS[k.provider] ?? k.provider}{' · '}{k.keyPrefix}****
+                    </div>
                   </div>
+                  {/* 协调者星标：悬停时出现，点亮/取消 */}
+                  <button
+                    type="button"
+                    onClick={() => setCoordinator(isCoordinator ? null : k.id)}
+                    title={isCoordinator ? '取消协调者凭证' : '设为协调者凭证'}
+                    className={`flex-shrink-0 mt-1 transition-all duration-150 ${
+                      isCoordinator ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                    }`}
+                  >
+                    <Icon
+                      name={isCoordinator ? 'sparkle' : 'sparkle'}
+                      className={`h-4 w-4 transition-colors ${isCoordinator ? 'text-brand' : 'text-muted-foreground/40 hover:text-brand'}`}
+                    />
+                  </button>
+                  <Button variant="ghost" size="iconSm" onClick={() => removeKey(k.id)} className="text-muted-foreground hover:text-red-500 flex-shrink-0">
+                    <Icon name="x" className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
-                <Button variant="ghost" size="iconSm" onClick={() => removeKey(k.id)} className="text-muted-foreground hover:text-red-500 flex-shrink-0">
-                  <Icon name="x" className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
