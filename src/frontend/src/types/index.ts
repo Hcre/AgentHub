@@ -269,6 +269,37 @@ export interface CoordinatorPlan {
   watchouts: string[]
 }
 
+/** 单步运行时状态（live DAG 面板用，来自 task_update 事件）。 */
+export type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'blocked'
+
+/** 步骤实时活动条目（task_activity 事件累积，点开步骤卡片可见的 Claude Code 风格进度）。 */
+export interface StepActivity {
+  kind: 'text' | 'tool'
+  /** kind==='text'：worker 旁白 */
+  text?: string
+  /** kind==='tool'：工具调用 */
+  callId?: string
+  name?: string
+  /** 工具结果：true 成功 / false 失败 / undefined 仍在执行 */
+  ok?: boolean
+}
+
+/** PlanStep + 运行时状态 = live DAG 面板的一行。 */
+export interface LivePlanStep extends PlanStep {
+  status: StepStatus
+  /** 失败/卡死原因（task_update.reason 写入），仅 failed/blocked 有。 */
+  reason?: string
+  /** 实时活动 feed（task_activity 累积）。 */
+  activity?: StepActivity[]
+}
+
+/** 群聊 active DAG 的 live 投影（task_plan 创建 + task_update 就地更新）。 */
+export interface DAGLivePlan {
+  steps: LivePlanStep[]
+  /** 协调者 sender_agent_id，面板定位用。 */
+  coordinatorId: string
+}
+
 /**
  * 群聊消息。`who` 取值：agentId（含协调者 UUID）| 'user' | 'unknown'。
  * `kind === 'plan'` 时带结构化分发方案 `plan`。
@@ -517,6 +548,8 @@ export type StreamEventType =
   | 'tool_result'
   | 'request_approval'
   | 'task_plan'
+  | 'task_update'
+  | 'task_activity'
   | 'error'
   | 'done'
 

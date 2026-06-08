@@ -8,6 +8,7 @@ import { Icon } from '../ui'
 import { GroupComposer } from './GroupComposer'
 import { GroupMembersStrip } from './GroupMembersStrip'
 import { GroupMessageItem } from './GroupMessageItem'
+import { LivePlanPanel } from './LivePlanPanel'
 import type { GroupMessage, ReplyRef } from '../../types'
 
 /**
@@ -88,6 +89,14 @@ export function GroupChatView() {
     groupComposerRef.current?.setReplyTo(ref)
   }
 
+  // LivePlanPanel「查看 TA 的发言」：滚动到该 worker 在聊天里的最后一条消息
+  const handleLocateWorker = (who: string) => {
+    const last = [...msgs].reverse().find((m) => m.who === who)
+    if (!last) return
+    const el = scrollRef.current?.querySelector(`[data-msg-id="${last.id}"]`)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
   if (!group) {
     return (
       <div className="glass-panel flex h-full flex-col items-center justify-center rounded-2xl border text-muted-foreground shadow-sm">
@@ -137,6 +146,8 @@ export function GroupChatView() {
           <span className="text-[12px] text-brand-deep">{group.pinnedTask}</span>
         </div>
       )}
+
+      <LivePlanPanel group={group} onLocateWorker={handleLocateWorker} />
 
       {/* 消息区 */}
       <div ref={scrollRef} className={cn('min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5')}>
