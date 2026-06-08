@@ -66,7 +66,12 @@ def check_file(path: Path) -> list[str]:
 def main() -> int:
     all_errors = []
     for f in ROOT.rglob("*"):
-        if f.is_dir() or any(d in f.parts for d in SKIP_DIRS):
+        try:
+            if f.is_dir():
+                continue
+        except OSError:
+            continue
+        if any(d in f.parts for d in SKIP_DIRS):
             continue
         if f.suffix in (".py", ".ts", ".tsx", ".js", ".json", ".jsonc", ".yaml", ".yml", ".toml", ".sh", ".env"):
             if is_allowed(f):

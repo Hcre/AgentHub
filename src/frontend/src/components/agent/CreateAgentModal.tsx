@@ -163,23 +163,17 @@ function buildCards(
   scanning: boolean,
   loadedDefaults: Record<string, DefaultConfig>,
 ): CliCardData[] {
-  // 还没扫描过 → 显示硬编码兜底
+  // 扫描中或未扫描 → 显示默认列表（灰色未检测状态）
   if (!scanned || scanning) return DEFAULT_RUNTIMES
-  // 扫描完成 → 只显示实际检测到的 CLI + mock 兜底
-  const list: CliCardData[] = scanned
-    .filter((p) => p.available)
-    .map((p) => ({
-      id: p.name,
-      label: p.display_name,
-      version: p.version,
-      available: true,
-      model: loadedDefaults[p.name]?.model ?? null,
-    }))
-  // 始终保留 mock 作为兜底
-  if (!list.find((r) => r.id === 'mock')) {
-    list.push({ id: 'mock', label: 'Mock', version: null, available: false, model: null })
-  }
-  return list.length > 0 ? list : DEFAULT_RUNTIMES
+  // 扫描完成 → 合并扫描结果到默认列表（已检测到的更新状态，未检测到的保留灰色卡片）
+  const scannedMap = new Map(scanned.map((p) => [p.name, p]))
+  return DEFAULT_RUNTIMES.map((d) => {
+    const found = scannedMap.get(d.id)
+    if (found && found.available) {
+      return { ...d, version: found.version, available: true, model: loadedDefaults[d.id]?.model ?? null }
+    }
+    return d
+  })
 }
 
 export function CreateAgentModal({
