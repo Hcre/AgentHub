@@ -305,6 +305,9 @@ class ReactiveRouter:
             client = AsyncOpenAI(api_key=settings.openai_api_key)
         system, prompt = self._build_prompts(state)
         ant = self._tool_schema()
+        extra = {}
+        if self._provider == "deepseek":
+            extra["extra_body"] = {"thinking": {"type": "disabled"}}
         resp = await client.chat.completions.create(
             model=self._model,
             messages=[{"role": "system", "content": system}, {"role": "user", "content": prompt}],
@@ -313,6 +316,7 @@ class ReactiveRouter:
             }}],
             tool_choice={"type": "function", "function": {"name": "route_message"}},
             max_tokens=512,
+            **extra,
         )
         tcs = resp.choices[0].message.tool_calls
         if not tcs:

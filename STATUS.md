@@ -1,12 +1,12 @@
 # 当前状态
 
-> 最后更新: 2026-06-08 20:29 (t7 partial: 9d96156 search wire 30 行落地, 置顶/pin/alembic 0015 留 phase-3; 13 commit 本 session, ahead of origin/main by 22 commit; 9.5/12 track done; vitest 103/105 绿无新 regression; t3 SLA 至 23:03; t11 user-blocked)
+> 最后更新: 2026-06-08 — 协调者 v4 后端全落 main，接下来做前端可见性
 > 规则：**每次 push 或开始/结束一个任务时，更新你自己的那一行。**
 
 | 我 | 正在做 | 阻塞？ | 这周完成了 |
 |----|--------|--------|-----------|
 | 黎 | 网页侧栏预览 + 版本稳定 push main | 无 | Template v4 (192 模板+favorites) ✅ + CLI streaming 全线 (5 种流式事件 UI+折叠组) ✅ + 图标居中 ✅ + 弹窗关闭修复 ✅ + bypassPermissions ✅ + scanner 精简 ✅ + 网页侧栏预览 ✅ + 删除确认弹窗 ✅ + 会话最近消息 ✅ |
-| 董 | 协调者+任务编排部分 | 无 | 群聊全栈实现 ✅ + CLI 多模型代理 ✅ + ADR-02 长驻 CLI ✅ + 前端群聊 ✅ + 记忆系统 B 方向设计 ✅ + B1 后端实现 ✅ + B2 详细设计 ✅ + Agent 创建全链路 6 处 bug 修复 + 9 个测试 ✅ + MCP save_memory 端到端打通 ✅ + 前端记忆面板 ✅ + 记忆分支合并 main ✅ |
+| 董 | 任务编排前端：live DAG 面板 + 里程碑入聊天 + 组员开工报到 | 无 | 群聊全栈 ✅ + CLI 多模型代理 ✅ + ADR-02 长驻 CLI ✅ + 记忆系统全链路 ✅ + MCP save_memory ✅ + **协调者 v4 后端全落 main ✅**：v4 设计 7 篇 + 代码 R0→R5 + abort，1541 行测试全绿 + Agent 创建全链路 6 处 bug + 9 测试 ✅ |
 | 袁 | **t7 B-4-P2-CL01 phase-3 全完 @21:14** (4 commit: b611ce8 feat(backend) + 2257ba3 test(backend) + 5c9c7d4 feat(frontend) + 94b6a70 test(frontend); alembic 0019 (原 brief 估 0015, 实际 0015-0018 被 templates 占用, head=0018→新 0019) + Session.pinned 9 文件全链路 + 4 pytest + Conversation.pinned + LeftPanel pin icon + handleTogglePin 4 决策 (乐观+createPrivate 兜底+1 retry+in-flight 禁用) + 3 vitest 绿; 顺手修 9d96156 漏的 useEffect import) — **next gate: t10 M6 finalize (v6 视频 + README + M3/M4 inbox) 或 黎 桌面 specs Reviewer 答稿** | 🟡 t3 SLA 至 23:03；t10/t11 未启动；Feishu 同步待 user OAuth | **t7 phase-3 全完 @21:14** (4 commit 见上); **t7 partial @20:29** (9d96156 search wire 30 行); **t12 e2e-pin-auth 兜底 @19:43** (1f15f7f); **t6 @19:38** (3 commit); **t1/t2/t4 @19:18** (3 commit); **t8+t9 @18:45** (58465e0 + ca7e33f) |
 
 ## ⏭️ 进行中交接

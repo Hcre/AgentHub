@@ -85,21 +85,20 @@ def build_task_request(
       同一 worker resume 同一会话天然命中，无需额外传 step_key（MVP 串行保证单活跃 step）。
     """
     system_prompt = "\n\n".join(filter(None, [agent.system_prompt, TASK_EXEC_CONTRACT]))
-    is_resume = node.pending_answer is not None
-    if is_resume:
+    # 始终 --resume：Agent 在群聊 relay 时已有 CLI session，coordinator 任务续进去投放，
+    # 不另建 session（避免 "Session ID already in use" 冲突）。
+    # 若 session 还未创建（首次），runtime 自带 fallback 新建。
+    has_pending = node.pending_answer is not None
+    if has_pending:
         content = (
             f"针对你之前的问题，用户回复如下：\n\n{node.pending_answer}\n\n"
             "请基于此回复继续完成任务。完成后调用 task_complete；仍需确认则直接以文本说出来再结束。"
         )
-        # resume 时也注入队列消息（她在 paused 期间的旁路补充）
-        notes = node.pending_notes or []
-        if notes:
-            content += "\n\n## 用户执行期补充（请注意以下约束）\n" + "\n".join(f"- {n}" for n in notes)
     else:
         content = build_task_instruction(node)
-        notes = node.pending_notes or []
-        if notes:
-            content += "\n\n## 用户执行期补充（请注意以下约束）\n" + "\n".join(f"- {n}" for n in notes)
+    notes = node.pending_notes or []
+    if notes:
+        content += "\n\n## 用户执行期补充（请注意以下约束）\n" + "\n".join(f"- {n}" for n in notes)
     return AgentRequest(
         request_id=str(uuid4()),
         session_id=session_id,
@@ -110,7 +109,7 @@ def build_task_request(
         agent_id=agent.id,
         group_id=group_id,
         is_group_chat=True,
-        has_history=is_resume,  # resume → CLI --resume 复原上下文
+        has_history=True,  # 始终 --resume：投放任务到已有 CLI session，不新建冲突
     )
 
 

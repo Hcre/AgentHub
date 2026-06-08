@@ -262,13 +262,28 @@ class ChatService:
                     # 已有 DAG 在跑 → 新任务降级 note（单 Orchestrator/session，design §7）
                     logger.info("执行态 decide=task，降级 note session=%s", session.id)
                     run.enqueue_note(text)
+                    yield StreamEvent(
+                        type=StreamEventType.TEXT,
+                        seq=0,
+                        content="📋 已追加到当前任务队列",
+                    )
                 else:
+                    yield StreamEvent(
+                        type=StreamEventType.TEXT,
+                        seq=0,
+                        content="✅ 任务已受理，正在规划…",
+                    )
                     await self._start_coordinator(session, group, trigger)
                 return
 
             if decision.action == "replan":
                 if run is None:
                     # 纯对话态误判 replan（无任务在跑）→ 当新任务起
+                    yield StreamEvent(
+                        type=StreamEventType.TEXT,
+                        seq=0,
+                        content="✅ 已受理，正在重新规划…",
+                    )
                     await self._start_coordinator(session, group, trigger)
                 else:
                     await self._handle_replan(session, group, run, decision.requirement or text)
