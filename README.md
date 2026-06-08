@@ -109,21 +109,39 @@ gh pr create --fill
 
 ## 使用手册
 
+### 部署架构
+
+| 组件 | 位置 | 端口 |
+|------|------|------|
+| PostgreSQL | Docker | 5432 |
+| Redis | Docker | 6379 |
+| 后端 | 本机 | 8000 |
+| 前端 | 本机 | 5173 |
+
 ### 服务与端口
 
 | 服务 | 端口 | 说明 |
 |------|------|------|
-| frontend | http://localhost:5174 | React 静态站（nginx 托管） |
+| frontend | http://localhost:5173 | Vite dev server |
 | backend | http://localhost:8000 | FastAPI；`/docs` Swagger、`/health` 健康检查 |
 | postgres | 5432 | pgvector |
-| redis | 6379 | 缓存 + Celery broker |
+| redis | 6379 | 缓存 |
 
-### 日常运维（Docker）
+### 日常运维
 
 ```bash
-# 启动 / 重建 / 停止
-docker compose -f src/docker/docker-compose.yml up -d --build
-docker compose -f src/docker/docker-compose.yml ps
+# 启动数据库
+docker compose -f src/docker/docker-compose.yml up -d postgres redis
+
+# 启动后端（本机，需要访问 CLI 扫描）
+cd src/backend
+DATABASE_URL=postgresql+asyncpg://agenthub:agenthub_dev_pwd@localhost:5432/agenthub REDIS_URL=redis://localhost:6379/0 uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+# 启动前端（本机）
+cd src/frontend && npm run dev
+
+# 停止
+docker compose -f src/docker/docker-compose.yml down
 docker compose -f src/docker/docker-compose.yml logs -f backend
 docker compose -f src/docker/docker-compose.yml down
 

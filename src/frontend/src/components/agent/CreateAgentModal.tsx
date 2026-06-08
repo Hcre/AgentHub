@@ -534,23 +534,28 @@ export function CreateAgentModal({
     setAgentSystem(id)
     setLoadDefaultError(null)
     setTestStatus('idle')
-    // mock 没有 default-config，端点会返 null/null，直接清空即可
+    // mock 没有 default-config，直接清空
     if (id === 'mock') {
       setModel('')
       setBaseUrl('')
       setApiKey('')
-      setProviderId('deepseek')
+      setProviderId('system')
       return
     }
     setLoadingDefault(id)
     try {
       const cfg = await providersApi.getDefaultConfig(id)
       setLoadedDefaults((prev) => ({ ...prev, [id]: cfg }))
-      setModel(cfg.model ?? '')
-      setBaseUrl(cfg.base_url ?? '')
-      // provider / api_key 有就读；没读到就不动，让用户自己选/填
-      if (cfg.provider) setProviderId(cfg.provider)
-      if (cfg.api_key) setApiKey(cfg.api_key)
+      // CLI 运行时自带认证和模型配置，不把本地 CLI 的 config 填进表单
+      // 表单留空 = 让 CLI 自己读 ~/.claude/settings.json 等配置文件
+      setModel('')
+      setBaseUrl('')
+      setApiKey('')
+      // 已知 provider 才设置，未知的（如 opencode 的 "xx"）用默认 deepseek
+      const knownProviders = new Set(['anthropic','openai','deepseek','azure','minimax','mimo','chatgpt','system'])
+      if (cfg.provider && knownProviders.has(cfg.provider)) {
+        setProviderId(cfg.provider)
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : '加载默认配置失败'
       setLoadDefaultError(msg)

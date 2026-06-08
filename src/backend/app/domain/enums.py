@@ -33,6 +33,8 @@ class Provider(StrEnum):
     AZURE = "azure"
     MINIMAX = "minimax"
     MIMO = "mimo"
+    CHATGPT = "chatgpt"  # OpenAI Codex CLI OAuth 登录
+    XX = "xx"  # OpenCode 本地配置默认 provider
     SYSTEM = "system"  # 协调者使用
 
 

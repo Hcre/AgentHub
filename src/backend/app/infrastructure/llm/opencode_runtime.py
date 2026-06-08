@@ -63,6 +63,7 @@ class OpenCodeRuntime(AgentRuntime):
         self._api_key = api_key
         self._timeout = timeout
         self._process: asyncio.subprocess.Process | None = None
+        self._text_seen = False  # step 内是否已产出 text（区分中间 step_finish 和终态）
 
     async def stream(self, request: AgentRequest) -> AsyncIterator[StreamEvent]:
         prompt = self._extract_prompt(request)
@@ -251,25 +252,44 @@ class OpenCodeRuntime(AgentRuntime):
         if event_type in ("text", "content", "message"):
             text = _s("text") or _s("content") or _s("message")
             if text:
+                self._text_seen = True
                 events.append(StreamEvent(type=StreamEventType.TEXT, seq=seq, content=text))
         elif event_type == "thinking":
             text = _s("text") or _s("content") or _s("thinking")
             if text:
                 events.append(StreamEvent(type=StreamEventType.THINKING, seq=seq, content=text))
         elif event_type in ("tool_call", "tool_use"):
+            # opencode v1.15 tool_use 格式：part.tool=工具名，part.callID=调用ID
+            call_id = str(part.get("callID") or part.get("id") or data.get("call_id") or data.get("id", ""))
+            tool_name = str(part.get("tool") or part.get("name") or data.get("name", ""))
+            tool_args = part.get("state", {}).get("input") or part.get("arguments") or data.get("arguments") or data.get("args") or {}
             events.append(
                 StreamEvent(
                     type=StreamEventType.TOOL_CALL,
                     seq=seq,
                     tool_call=ToolCall(
-                        call_id=str(data.get("id", data.get("call_id", part.get("id", "")))),
-                        name=str(part.get("name", data.get("name", ""))),
-                        arguments=part.get(
-                            "arguments", data.get("arguments", data.get("args", {}))
-                        ),
+                        call_id=call_id,
+                        name=tool_name,
+                        arguments=tool_args,
                     ),
                 )
             )
+            seq += 1
+            # opencode 内部执行工具，tool_use 已包含结果 → 直接发 ToolResult
+            state = part.get("state", {})
+            if state.get("status") == "completed":
+                output = state.get("output", "")
+                events.append(
+                    StreamEvent(
+                        type=StreamEventType.TOOL_RESULT,
+                        seq=seq,
+                        tool_result=ToolResult(
+                            call_id=call_id,
+                            success=True,
+                            content=str(output)[:2000] if output else None,
+                        ),
+                    )
+                )
         elif event_type == "tool_result":
             tr_content = part.get("content", data.get("content", data.get("result", "")))
             if not isinstance(tr_content, str):
@@ -290,14 +310,16 @@ class OpenCodeRuntime(AgentRuntime):
                 StreamEvent(type=StreamEventType.DONE, seq=seq, metadata={"model": self._model})
             )
         elif event_type == "step_finish":
-            # 单步完成（无 tool_use 时 step_finish 即为终态）；产生 DONE 并终止循环
-            events.append(
-                StreamEvent(
-                    type=StreamEventType.DONE,
-                    seq=seq,
-                    metadata={"model": self._model, "status": "step_finish"},
+            # 仅当 step 内产出过 text 时才视为终态；
+            # 工具调用后的 step_finish（无 text）是中间态，不结束流
+            if self._text_seen:
+                events.append(
+                    StreamEvent(
+                        type=StreamEventType.DONE,
+                        seq=seq,
+                        metadata={"model": self._model, "status": "step_finish"},
+                    )
                 )
-            )
         elif event_type == "error":
             events.append(
                 StreamEvent(
@@ -307,7 +329,8 @@ class OpenCodeRuntime(AgentRuntime):
                 )
             )
         elif event_type == "step_start":
-            # 仅提取 sessionID，不产生用户可见事件
+            # 新 step 开始，重置 text 标记（用于区分中间 step_finish 和终态）
+            self._text_seen = False
             pass
         else:
             text = _s("text") or _s("content")

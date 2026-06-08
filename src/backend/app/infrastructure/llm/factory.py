@@ -210,6 +210,7 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
         from app.infrastructure.llm.codex_runtime import CodexRuntime
 
         api_key = _resolve_api_key(agent)
+        s = agent.settings or {}
         logger.info(
             "Agent '%s' → CodexRuntime (CLI, model=%s)", agent.name, agent.model or "default"
         )
@@ -217,6 +218,7 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
             model=agent.model or "",
             agent_id=str(agent.id),
             api_key=api_key,
+            workspace=s.get("workspace_path"),
         )
 
     # GEMINI / CURSOR_AGENT — CLI 适配器待实现，暂走 HTTP API

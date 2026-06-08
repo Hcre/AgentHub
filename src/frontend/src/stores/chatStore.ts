@@ -409,31 +409,35 @@ export const useChatStore = create<ChatState>()(
   },
 
   removeConversation: (agentId, conversationId) => {
+    const key = convKey(agentId, conversationId)
     set((s) => {
       const existing = s.conversations[agentId] ?? []
       const filtered = existing.filter((c) => c.id !== conversationId)
-      const next = { ...s.conversations }
-      if (filtered.length > 0) {
-        next[agentId] = filtered
-      } else {
-        delete next[agentId]
-      }
-      return { conversations: next }
+      const nextConv = { ...s.conversations }
+      if (filtered.length > 0) { nextConv[agentId] = filtered } else { delete nextConv[agentId] }
+      const nextMsgs = { ...s.messages }; delete nextMsgs[key]
+      const nextSessions = { ...s.sessionIds }; delete nextSessions[key]
+      const nextTyping = { ...s.typing }; delete nextTyping[key]
+      const nextUnread = { ...s.unreadByConv }; delete nextUnread[key]
+      return { conversations: nextConv, messages: nextMsgs, sessionIds: nextSessions, typing: nextTyping, unreadByConv: nextUnread }
     })
   },
 
   removeConversations: (agentId, conversationIds) => {
-    const ids = new Set(conversationIds)
     set((s) => {
       const existing = s.conversations[agentId] ?? []
-      const filtered = existing.filter((c) => !ids.has(c.id))
-      const next = { ...s.conversations }
-      if (filtered.length > 0) {
-        next[agentId] = filtered
-      } else {
-        delete next[agentId]
+      const filtered = existing.filter((c) => !new Set(conversationIds).has(c.id))
+      const nextConv = { ...s.conversations }
+      if (filtered.length > 0) { nextConv[agentId] = filtered } else { delete nextConv[agentId] }
+      const nextMsgs = { ...s.messages }
+      const nextSessions = { ...s.sessionIds }
+      const nextTyping = { ...s.typing }
+      const nextUnread = { ...s.unreadByConv }
+      for (const cid of conversationIds) {
+        const k = convKey(agentId, cid)
+        delete nextMsgs[k]; delete nextSessions[k]; delete nextTyping[k]; delete nextUnread[k]
       }
-      return { conversations: next }
+      return { conversations: nextConv, messages: nextMsgs, sessionIds: nextSessions, typing: nextTyping, unreadByConv: nextUnread }
     })
   },
 

@@ -35,11 +35,13 @@ class CodexRuntime(AgentRuntime):
         agent_id: str = "",
         api_key: str = "",
         timeout: int = _DEFAULT_TIMEOUT,
+        workspace: str | None = None,
     ) -> None:
         self._model = model
         self._agent_id = agent_id
         self._api_key = api_key
         self._timeout = timeout
+        self._workspace = workspace
         self._process: asyncio.subprocess.Process | None = None
 
     async def stream(self, request: AgentRequest) -> AsyncIterator[StreamEvent]:
@@ -67,6 +69,19 @@ class CodexRuntime(AgentRuntime):
 
         logger.info("Codex spawn: %s (model=%s)", " ".join(cmd), self._model or "default")
 
+        # 工作目录：从请求动态取（会话 workspace），fallback 构造函数参数
+        cwd = None
+        wd = getattr(request, 'working_directory', None) or self._workspace
+        if wd:
+            import re as _re
+            wd = wd.strip()
+            if _re.match(r"^[A-Za-z]:", wd) and os.path.exists(wd):
+                cwd = wd
+            elif os.path.exists(wd):
+                cwd = wd
+            else:
+                logger.warning("Codex workspace 路径不存在: %s", wd)
+
         try:
             self._process = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -74,6 +89,7 @@ class CodexRuntime(AgentRuntime):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
+                cwd=cwd,
             )
         except FileNotFoundError:
             yield StreamEvent(type=StreamEventType.ERROR, seq=0, content="Codex CLI not found")
