@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
 import { agentsApi } from '../api/agents'
 import { uid } from '../lib/id'
 import type { Agent, AgentColor, AgentProfile, ApiAgent, MemoryLevel } from '../types'
@@ -76,9 +75,7 @@ interface AgentState {
   updateConfig: (id: string, patch: Partial<AgentProfile['config']>) => void
 }
 
-export const useAgentStore = create<AgentState>()(
-  persist(
-    (set, get) => ({
+export const useAgentStore = create<AgentState>((set, get) => ({
   agents: [],
   profiles: {},
 
@@ -166,6 +163,4 @@ export const useAgentStore = create<AgentState>()(
       if (!p) return {}
       return { profiles: { ...s.profiles, [id]: { ...p, config: { ...p.config, ...patch } } } }
     }),
-  ),
-  { name: 'agenthub-agents', partialize: (s) => ({ agents: s.agents }) },
-))
+}))
