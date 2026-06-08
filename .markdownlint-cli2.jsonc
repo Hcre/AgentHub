@@ -1,0 +1,30 @@
+{
+  // globs: string[] of glob patterns to scan. Restrict to STATUS.md only.
+  //
+  // Why STATUS.md specifically: it is the "live status" doc that historically
+  // bloated to 30KB / 198 lines. Lean structure is enforced via pre-push
+  // markdownlint-cli2 hook. Aligns with docs/conventions/07-汇报 §一
+  // "STATUS = 当前进度/阻塞/技术债" + Git映射.
+  //
+  // Strict rules (per 袁 2026-06-08 决策):
+  //   - MD024 no-duplicate-heading (no siblings_only relax)
+  //   - MD036 no-emphasis-as-heading
+  //   - MD041 first-line-h1
+  // DISABLED:
+  //   - MD013 line-length: 袁 2026-06-08 决策"不要瘦身"——长表格 cell
+  //     (PRD 6 大功能 25 子功能对照) + 长 bullet (MCP F1/F2/P3/P4 决策链
+  //     + 6/8 overnight 4-track 详解) 合法需要，强制 200 字符会冲突
+  //   - 其他 markdownlint 默认规则 (MD009/MD012/MD022/MD031/MD032 等)：
+  //     不在用户清单，2026-06-09 决定仅 3 规则严，避免噪音
+  //
+  // Per-file restriction: markdownlint-cli2 v0.13.0 doesn't support
+  // {globPattern, config} objects. We use `globs: ["STATUS.md"]` to scan
+  // only this file. docs/conventions/ etc. are NOT scanned.
+  "globs": ["STATUS.md"],
+  "config": {
+    "default": false,
+    "MD024": true,
+    "MD036": true,
+    "MD041": true
+  }
+}

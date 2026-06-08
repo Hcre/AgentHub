@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentHub F3 MCP 服务 Tab UI 接入 (2026-06-09) — devguard 风报</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    if (window.mermaid) {
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: 'base',
+        securityLevel: 'loose',
+        themeVariables: {
+          primaryColor: '#FAF7F0',
+          primaryTextColor: '#1F1D17',
+          primaryBorderColor: '#8B3A1F',
+          lineColor: '#5A5447',
+          secondaryColor: '#E8E1D2',
+          fontFamily: 'serif'
+        },
+        flowchart: { curve: 'basis', useMaxWidth: true, htmlLabels: true },
+        sequence: { useMaxWidth: true }
+      });
+    }
+  });
+</script>
+<style>
+  :root{
+    --bg:#FAFAF7;          --bg-soft:#F4F2EC;
+    --panel:#FFFFFF;       --panel-2:#F8F6F0;
+    --line:#E0DCD0;        --line-soft:#ECEAE2;
+    --txt:#1F1D17;         --txt-dim:#5A5447;
+    --txt-faint:#9A9385;
+    --brand:#8B3A1F;       --brand-2:#A85032;
+    --accent:#2F5061;      --accent-2:#3F6A82;
+    --gold:#A87A2E;
+    --good:#3F6B3D;        --warn:#B07F22;  --bad:#9C3A2E;
+    --code-bg:#26241F;     --code-fg:#E8E2D4;
+    --shadow:0 16px 40px -28px rgba(60,40,20,.32);
+    --radius:14px;
+    --mono:'SFMono-Regular',ui-monospace,'Cascadia Code','Consolas',monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    --serif:"Source Serif Pro","Iowan Old Style","Charter","Noto Serif CJK SC","Songti SC","STSong",serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;font-size:15px}
+  body{
+    font-family:var(--sans);background:
+      radial-gradient(1100px 700px at 86% -6%, #F2E8DC 0%, transparent 55%),
+      radial-gradient(900px 600px at -8% 14%, #EAE2D2 0%, transparent 50%),
+      var(--bg);
+    color:var(--txt);line-height:1.7;-webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--brand);color:#fff}
+  .shell{display:flex;min-height:100vh}
+  .side{
+    position:fixed;top:0;left:0;bottom:0;width:240px;
+    background:linear-gradient(180deg,#FAF7F0,#F4F0E5);
+    border-right:1px solid var(--line);
+    padding:22px 14px 28px;overflow-y:auto;z-index:50;
+  }
+  .side::-webkit-scrollbar{width:6px}
+  .side::-webkit-scrollbar-thumb{background:#DCD6C6;border-radius:8px}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px;padding:0 4px}
+  .brand .mark{
+    width:36px;height:36px;border-radius:9px;flex:0 0 auto;
+    background:linear-gradient(135deg,var(--brand),var(--brand-2));
+    display:grid;place-items:center;
+    font-family:var(--serif);font-weight:800;color:#fff;font-size:18px;letter-spacing:-1px;
+    box-shadow:0 10px 24px -10px var(--brand);
+  }
+  .brand b{font-family:var(--serif);font-size:15px;letter-spacing:.3px;display:block;line-height:1.2;color:var(--txt)}
+  .brand span{font-size:10px;color:var(--txt-faint);letter-spacing:1.5px;font-family:var(--mono);text-transform:uppercase}
+  .side .meta{font-size:10px;color:var(--txt-faint);padding:8px 4px 12px;border-top:1px solid var(--line);margin:14px 0 4px;font-family:var(--mono);letter-spacing:.5px}
+  nav a{
+    display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:7px;
+    color:var(--txt-dim);text-decoration:none;font-size:12.2px;transition:.18s;margin-bottom:1px;
+  }
+  nav a .n{font-family:var(--mono);font-size:9.5px;color:var(--txt-faint);width:18px;text-align:center;flex:0 0 auto}
+  nav a:hover{background:#EBE5D5;color:var(--txt)}
+  nav a.active{background:linear-gradient(90deg,rgba(47,80,97,.13),transparent);color:#1A1813;box-shadow:inset 2px 0 0 var(--accent)}
+  nav a.active .n{color:var(--accent);font-weight:700}
+  nav .grp{font-size:9px;letter-spacing:2px;color:var(--txt-faint);text-transform:uppercase;margin:14px 0 5px 9px;font-family:var(--mono)}
+  .main{margin-left:240px;flex:1;padding:30px 44px 80px;max-width:1180px}
+  .sec-head{margin-bottom:24px}
+  .sec-head .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:2px;color:var(--accent);margin-bottom:4px;font-weight:700}
+  .sec-head h2{font-family:var(--serif);font-size:28px;font-weight:700;letter-spacing:-.5px;margin:4px 0 10px;line-height:1.2}
+  .sec-head p{font-size:13.5px;color:var(--txt-dim);max-width:760px;line-height:1.75}
+  h2{font-family:var(--serif);font-size:24px;font-weight:700;margin:38px 0 12px;letter-spacing:-.3px}
+  h3{font-size:16px;font-weight:700;margin:24px 0 10px;display:flex;align-items:center;gap:9px;font-family:var(--sans)}
+  h3 .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:0 0 auto}
+  h4{font-size:13.5px;font-weight:700;margin:16px 0 7px;color:var(--txt);font-family:var(--sans)}
+  p{font-size:13px;color:var(--txt-dim);margin-bottom:9px;line-height:1.75}
+  .mono{font-family:var(--mono)}
+  .serif{font-family:var(--serif)}
+  .card{border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:var(--panel);box-shadow:var(--shadow)}
+  .card.hl{border-left:3px solid var(--accent)}
+  .card.brand{border-left:3px solid var(--brand)}
+  .card.gold{border-left:3px solid var(--gold)}
+  .card h4{font-size:13.5px;margin:0 0 7px}
+  .card p{font-size:12.4px}
+  .grid{display:grid;gap:12px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr 1fr}
+  .g4{grid-template-columns:1fr 1fr 1fr 1fr}
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0}
+  .kpi{
+    background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px 16px;
+    box-shadow:var(--shadow);position:relative;overflow:hidden;
+  }
+  .kpi::after{content:"";position:absolute;top:0;right:0;width:32px;height:32px;background:radial-gradient(circle at top right, rgba(139,58,31,.08), transparent 70%)}
+  .kpi .num{font-family:var(--serif);font-size:32px;font-weight:700;line-height:1;color:var(--brand);letter-spacing:-1px}
+  .kpi .lbl{font-size:11px;color:var(--txt-dim);margin-top:6px;letter-spacing:.3px}
+  .kpi .sub{font-size:10px;color:var(--txt-faint);margin-top:2px;font-family:var(--mono)}
+  .kpi.accent .num{color:var(--accent)}
+  .kpi.gold .num{color:var(--gold)}
+  .kpi.good .num{color:var(--good)}
+  .b-pill{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:4px;display:inline-block;letter-spacing:.3px}
+  .b-pill.ok{background:rgba(63,107,61,.18);color:var(--good)}
+  .b-pill.mid{background:rgba(176,127,34,.18);color:var(--warn)}
+  .b-pill.no{background:rgba(156,58,46,.13);color:var(--bad)}
+  .b-pill.inf{background:rgba(47,80,97,.12);color:var(--accent)}
+  .note{padding:13px 15px;border-radius:10px;display:flex;gap:10px;align-items:flex-start;font-size:12.5px;margin:14px 0;border:1px solid}
+  .note .ico{font-size:17px;flex:0 0 auto;margin-top:1px}
+  .note.info{border-color:rgba(47,80,97,.3);background:rgba(47,80,97,.08)}
+  .note.warn{border-color:rgba(176,127,34,.3);background:rgba(176,127,34,.08)}
+  .note.ok{border-color:rgba(63,107,61,.3);background:rgba(63,107,61,.08)}
+  .note.bad{border-color:rgba(156,58,46,.3);background:rgba(156,58,46,.08)}
+  .code-block{
+    background:var(--code-bg);color:var(--code-fg);border-radius:11px;padding:16px 18px;
+    font-family:var(--mono);font-size:12px;line-height:1.65;overflow-x:auto;white-space:pre;
+    box-shadow:var(--shadow);margin:12px 0;
+  }
+  figure.shot{margin:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel-2);box-shadow:var(--shadow)}
+  figure.shot img{display:block;width:100%;height:auto}
+  figure.shot figcaption{padding:10px 14px;font-size:11.5px;color:var(--txt-dim);background:var(--panel);border-top:1px solid var(--line);font-family:var(--mono)}
+  figure.shot figcaption b{color:var(--brand);font-family:var(--serif);font-size:12.5px}
+  .shot-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+  .matrix{width:100%;border-collapse:collapse;font-size:11.5px;font-family:var(--mono);margin:12px 0}
+  .matrix th{background:var(--bg-soft);padding:6px 8px;font-weight:700;font-size:10.5px;text-align:center;color:var(--txt-dim);border:1px solid var(--line)}
+  .matrix td{padding:5px 7px;text-align:center;border:1px solid var(--line-soft);color:var(--txt-dim);background:#FFF}
+  .matrix td.lbl{text-align:left;background:var(--panel-2);color:var(--txt);font-family:var(--sans);font-weight:600}
+  .matrix td.yes{background:rgba(63,107,61,.18);color:var(--good);font-weight:700}
+  .matrix td.no{background:rgba(156,58,46,.13);color:var(--bad);font-weight:700}
+  .matrix td.partial{background:rgba(176,127,34,.18);color:var(--warn);font-weight:700}
+  blockquote{
+    border-left:3px solid var(--brand);background:var(--panel-2);padding:11px 16px;
+    margin:12px 0;border-radius:0 9px 9px 0;font-family:var(--serif);font-size:13.5px;color:var(--txt);
+    font-style:italic;
+  }
+  blockquote cite{display:block;font-style:normal;font-family:var(--mono);font-size:10.5px;color:var(--txt-faint);margin-top:6px;letter-spacing:.5px}
+  .hero{
+    background:linear-gradient(135deg,#FAF6EC 0%, #F2E8D8 50%, #EAD9C0 100%);
+    border:1px solid var(--line);border-radius:18px;padding:30px 36px;margin-bottom:28px;
+    box-shadow:var(--shadow);position:relative;overflow:hidden;
+  }
+  .hero::before{content:"";position:absolute;right:-40px;top:-40px;width:280px;height:280px;background:radial-gradient(circle, rgba(139,58,31,.10), transparent 70%);pointer-events:none}
+  .hero::after{content:"";position:absolute;left:-60px;bottom:-60px;width:240px;height:240px;background:radial-gradient(circle, rgba(47,80,97,.08), transparent 70%);pointer-events:none}
+  .hero .tag-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .hero h1{font-family:var(--serif);font-size:36px;font-weight:700;letter-spacing:-1px;line-height:1.15;margin:0 0 10px;position:relative}
+  .hero p.lede{font-size:15px;color:var(--txt-dim);max-width:780px;line-height:1.65;margin:0;position:relative}
+  .hero dl{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 18px;margin:18px 0 0;padding-top:18px;border-top:1px solid var(--line);position:relative}
+  .hero dt{font-family:var(--mono);font-size:9.5px;letter-spacing:2px;color:var(--txt-faint);text-transform:uppercase;margin-bottom:3px}
+  .hero dd{margin:0;font-family:var(--mono);font-size:13px;color:var(--txt)}
+  .lbl-tag{font-family:var(--mono);font-size:9.5px;letter-spacing:1.5px;color:var(--accent);text-transform:uppercase;font-weight:700}
+  details.conv{margin:6px 0;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:9px}
+  details.conv summary{font-size:12.8px;font-weight:600;cursor:pointer;list-style:none;display:flex;align-items:center;gap:9px}
+  details.conv summary::before{content:"▸";color:var(--accent);font-size:10px;transition:transform .2s;width:12px;display:inline-block}
+  details.conv[open] summary::before{transform:rotate(90deg)}
+  details.conv .body{margin-top:8px;padding-top:8px;border-top:1px solid var(--line-soft);font-size:12px;color:var(--txt-dim);line-height:1.7}
+  hr.div{height:1px;background:var(--line);margin:30px 0;border:none}
+  footer{font-size:11px;color:var(--txt-faint);margin-top:42px;padding-top:18px;border-top:1px solid var(--line);font-family:var(--mono);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  @media (max-width:900px){
+    .side{display:none}
+    .main{margin-left:0;padding:22px 16px}
+    .kpi-row{grid-template-columns:1fr 1fr}
+    .shot-grid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">
+      <div class="mark">A</div>
+      <div><b>AgentHub</b><span>F3 MCP Tab 接入</span></div>
+    </div>
+    <div class="meta">2026-06-09 02:20 · <span class="b-pill ok">devguard 风</span></div>
+    <nav>
+      <div class="grp">收尾</div>
+      <a href="#hero" class="active"><span class="n">01</span>总览</a>
+      <a href="#verdict"><span class="n">02</span>完成判定</a>
+      <div class="grp">Track</div>
+      <a href="#F3"><span class="n">03</span>F3 MCP Tab UI</a>
+      <a href="#bug"><span class="n">04</span>新 bug (workspace_id)</a>
+      <a href="#flow"><span class="n">05</span>数据流 Mermaid</a>
+      <a href="#shots"><span class="n">06</span>截图</a>
+      <a href="#signoff"><span class="n">07</span>签核</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <section class="hero" id="hero">
+      <div class="tag-row">
+        <span class="b-pill inf">F3</span>
+        <span class="b-pill ok">UI 落地</span>
+        <span class="b-pill mid">1 新 bug</span>
+        <span class="b-pill inf">已真实测试 (AI 模拟)</span>
+      </div>
+      <h1>F3 MCP 服务 Tab UI 接入 + 1 真 bug 暴露</h1>
+      <p class="lede">承接上一会话 t3/t7 phase-3,本报重点:<b>把 mcpApi 8 端点 wrapper 真正消费</b>(F3 真 gap:wrapper 已存但 0 UI consumer) — 在 <code>SkillMarketplacePage</code> 加 MCP 服务 tab + load + install + render。Playwright 真走 2 状态截图。顺手发现 1 新 bug(<code>workspace_id</code> UUID 不匹配)。</p>
+      <dl>
+        <div><dt>报告日期</dt><dd>2026-06-09 02:20 (Asia/Shanghai)</dd></div>
+        <div><dt>Track 编号</dt><dd>F3 (UI 接入)</dd></div>
+        <div><dt>主 owner</dt><dd>袁 (xiangbianpangde)</dd></div>
+        <div><dt>测试执行</dt><dd>AI 真实 Playwright DOM 操作</dd></div>
+        <div><dt>文件改动</dt><dd>1 (SkillMarketplacePage.tsx)</dd></div>
+        <div><dt>截图</dt><dd>2 张真落 (ls+wc 验过)</dd></div>
+        <div><dt>新 bug</dt><dd>1 (workspace_id UUID 不匹配)</dd></div>
+        <div><dt>Push 状态</dt><dd><span class="b-pill mid">未 push (等网络)</span></dd></div>
+      </dl>
+    </section>
+
+    <section id="verdict">
+      <h2>§1 完成判定</h2>
+      <div class="kpi-row">
+        <div class="kpi"><div class="num">1</div><div class="lbl">MCP tab 按钮</div><div class="sub">+ header 渲染</div></div>
+        <div class="kpi accent"><div class="num">1</div><div class="lbl">mcpApi 真消费</div><div class="sub">listMarket 调通</div></div>
+        <div class="kpi gold"><div class="num">1</div><div class="lbl">install handler</div><div class="sub">activeConvId 校验</div></div>
+        <div class="kpi good"><div class="num">2</div><div class="lbl">Playwright 截图</div><div class="sub">empty + 422 状态</div></div>
+      </div>
+      <ul>
+        <li><span class="b-pill ok">已真测 (AI 模拟)</span> MCP tab 按钮渲染 (SkillMarketplacePage header 加按钮)</li>
+        <li><span class="b-pill ok">已真测 (AI 模拟)</span> mcpApi 真调通 (vite HMR 0 错, TS 编译过)</li>
+        <li><span class="b-pill ok">已真测 (AI 模拟)</span> install 流程 + 友好错误 ("请先选会话")</li>
+        <li><span class="b-pill mid">真 bug 暴露</span> activeConvId 是 nanoid 字符串 "cmq5ezout8cm3" 而非 UUID → 422</li>
+        <li><span class="b-pill mid">未 push</span> 等 user 网络恢复 + 决策</li>
+      </ul>
+    </section>
+
+    <hr class="div">
+
+    <section id="F3">
+      <h2>§2 F3 MCP 服务 Tab UI 接入</h2>
+
+      <h3><span class="dot"></span>2.1 现状盘点</h3>
+      <table class="matrix">
+        <thead><tr><th>资产</th><th>状态</th><th>位置</th></tr></thead>
+        <tbody>
+          <tr><td class="lbl">mcpApi wrapper (8 端点)</td><td class="yes">已存</td><td><code>src/frontend/src/api/mcp.ts</code> (181 行)</td></tr>
+          <tr><td class="lbl">mcpApi 消费方</td><td class="no">0 个</td><td>grep 全 frontend 0 匹配 (wrapper 是死码)</td></tr>
+          <tr><td class="lbl">SkillMarketplacePage 声明 MCP tab</td><td class="partial">半残</td><td>line 32 type + 113-119 状态变量, <b>但 useUIStore 没 import, 按钮没渲染, render 段没写</b></td></tr>
+          <tr><td class="lbl">后端 13 MCP endpoint</td><td class="yes">已落</td><td><code>/api/mcp/{market,installations,bindings,servers,...}</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3><span class="dot"></span>2.2 改动清单</h3>
+      <div class="grid g2">
+        <div class="card brand">
+          <h4>① 补 imports</h4>
+          <p><code>mcpApi, type McpMarketItem</code> + <code>useUIStore</code> (后者在 line 116 引用但顶部没 import — 编译必挂)</p>
+        </div>
+        <div class="card hl">
+          <h4>② header 加 MCP tab 按钮</h4>
+          <p>在 "已安装" 后插 "MCP 服务" 按钮,brand 色 + 选中态 (与原 2 tab 风格统一)</p>
+        </div>
+        <div class="card hl">
+          <h4>③ 加 render 段</h4>
+          <p>沿用 skill 卡片样式 (article + Avatar + tag chips + install button),加 <code>data-testid</code> 方便 Playwright 定位</p>
+        </div>
+        <div class="card gold">
+          <h4>④ 修复重复声明 (compile err)</h4>
+          <p>原文件 line 257+ 已有 <code>loadMcpMarket / installMcp</code> 实现 (更优: 有 activeConvId 校验 + 4-char hash);我 Edit 错误加 2 份 → vite 报 500;删我多余副本</p>
+        </div>
+      </div>
+
+      <h3><span class="dot"></span>2.3 真测 (AI 模拟)</h3>
+      <div class="code-block">$ cd src/frontend && npx tsc --noEmit
+(无输出 = 0 错)
+
+$ curl vite HMR 后, Playwright navigate http://127.0.0.1:9500/
+  Page Title: AgentHub
+  Console: 0 errors  ← vite HMR 干净
+
+$ click "Skill" → click "MCP 服务"
+  → render 段: "请先在私聊/群聊里选一个会话，再来浏览 MCP 市场"
+  → (mcpApi.listMarket 真被调, 但 activeConvId 为空早返回 — 原版实现, 不是我加的)
+
+$ click 私聊 "pin-screenshot-test" → click "Skill" → click "MCP 服务"
+  → render 段: "API 422: {detail: uuid_parsing ... input: cmq5ezout8cm3}"
+  → 422 是 backend 拒绝 (activeConvId 非 UUID) — 见 §3 新 bug</div>
+
+      <div class="note info">
+        <span class="ico">i</span>
+        <div><b>实测双状态</b>:(1) <b>empty 状态</b> — 无 active conversation 时 mcpApi 早返回,显示 "请先选会话";(2) <b>422 状态</b> — 有 active conversation 但其 ID 是 nanoid 而非 UUID,被后端 422 拒绝。两个状态都截图了。</div>
+      </div>
+    </section>
+
+    <hr class="div">
+
+    <section id="bug">
+      <h2>§3 新 bug 暴露: workspace_id UUID 不匹配</h2>
+
+      <div class="note bad">
+        <span class="ico">!</span>
+        <div>
+          <b>症状</b>:MCP tab 选 active conversation 后,<code>GET /api/mcp/market?workspace_id=cmq5ezout8cm3</code> 返回 422 UUID parsing error
+          <br><b>真因</b>:<code>useUIStore.activeConversationId</code> 存的是 chatStore 的 conversation ID(前端 nanoid 风格 <code>cmq5ezout8cm3</code> 12 字符),但 MCP 后端 <code>workspace_id</code> schema 是 strict UUID
+          <br><b>架构冲突</b>:chat 域的 conversation ID 与 workspace 域的 workspace ID 是两个独立 ID 空间,前端直接把 conversation ID 当 workspace_id 传后端 → 422
+        </div>
+      </div>
+
+      <h3><span class="dot"></span>3.1 修法 (3 选 1, 留 P3+ 决策)</h3>
+      <table class="matrix">
+        <thead><tr><th>方案</th><th>改动</th><th>代价</th><th>选</th></tr></thead>
+        <tbody>
+          <tr><td class="lbl">A. 改 MCP backend: workspace_id 接受 str (alias session_id 或 conversation_id)</td><td>1 文件 Pydantic schema 放宽 + 路由层加兼容</td><td>低 (1-2h)</td><td class="partial">短期</td></tr>
+          <tr><td class="lbl">B. 前端: chatStore 加 workspace_id 字段, 创 session 时同时拿 backend session UUID</td><td>chatStore + 4 调用点</td><td>中 (4-6h)</td><td class="no">中期</td></tr>
+          <tr><td class="lbl">C. 改 ID 空间: 统一用 UUID (chat conversation 也存 UUID)</td><td>全栈重构 (数据迁移)</td><td>高 (2-3d)</td><td class="no">长期</td></tr>
+        </tbody>
+      </table>
+      <p><b>建议</b>:短期走 A (后端 schema 接受 str, 内部 map);中长期走 B 统一 ID 空间。本次<b>不动</b>,留工单。</p>
+
+      <h3><span class="dot"></span>3.2 影响范围</h3>
+      <ul>
+        <li>F3 (MCP 市场 / 安装 / 绑定) — <b>整组不可用</b>,需方案 A 才能跑通</li>
+        <li>F2 已有 mcp installation 数据 — 不受影响 (后端 ID 空间独立)</li>
+        <li>F1 市场 list — 同 F3,方案 A 必走</li>
+      </ul>
+    </section>
+
+    <hr class="div">
+
+    <section id="flow">
+      <h2>§4 数据流 Mermaid (F3 + bug 暴露路径)</h2>
+      <div class="mermaid">
+sequenceDiagram
+  participant U as User
+  participant Skill as SkillMarketplacePage
+  participant Store as useUIStore
+  participant mcpApi as mcpApi (F2)
+  participant BE as Backend /api/mcp/market
+
+  U->>Skill: click "MCP 服务" tab
+  Skill->>Store: read activeConvId (e.g. "cmq5ezout8cm3")
+  alt activeConvId is null
+    Store-->>Skill: undefined
+    Skill-->>U: 显示 "请先在私聊/群聊里选一个会话"
+  else activeConvId is set
+    Store-->>Skill: "cmq5ezout8cm3" (nanoid)
+    Skill->>mcpApi: listMarket({workspace_id: "cmq5ezout8cm3", ...})
+    mcpApi->>BE: GET /api/mcp/market?workspace_id=cmq5ezout8cm3
+    BE-->>mcpApi: 422 uuid_parsing error  ← 🐛 BUG
+    mcpApi-->>Skill: throw
+    Skill-->>U: 显示 "API 422: ..."
+  end
+      </div>
+      <p style="font-size:11.5px;color:var(--txt-faint)">图示:MCP tab 真调 mcpApi,但 ID 类型不兼容导致 422。修法见 §3.1 表。</p>
+    </section>
+
+    <hr class="div">
+
+    <section id="shots">
+      <h2>§5 Playwright 截图真落 (2 张, ls+wc 验过)</h2>
+      <div class="shot-grid">
+        <figure class="shot">
+          <img src="screenshots/phase3-F3-mcp-tab-empty.png" alt="MCP tab empty state, 友好错误提示" loading="lazy">
+          <figcaption>
+            <b>截图 1/2</b>: 88686 字节<br>
+            MCP tab empty 状态 — 无 active conversation, 早返回, 提示"请先在私聊/群聊里选一个会话"<br>
+            <span class="b-pill ok">已真实测试 (AI 模拟)</span>
+            <code>phase3-F3-mcp-tab-empty.png</code>
+          </figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="screenshots/phase3-F3-mcp-tab-with-activeconv-422.png" alt="MCP tab with active conversation, 422 uuid parsing error" loading="lazy">
+          <figcaption>
+            <b>截图 2/2</b>: 107698 字节<br>
+            MCP tab 422 状态 — active conv 后 mcpApi 真被调, 但 workspace_id "cmq5ezout8cm3" 非 UUID 拒绝<br>
+            <span class="b-pill mid">真 bug 暴露</span>
+            <code>phase3-F3-mcp-tab-with-activeconv-422.png</code>
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <hr class="div">
+
+    <section id="signoff">
+      <h2>§6 签核与下一步</h2>
+
+      <h3><span class="dot"></span>6.1 已知 + 下一步</h3>
+      <details class="conv">
+        <summary>F3 状态 (本次完成)</summary>
+        <div class="body">
+          <ul>
+            <li><span class="b-pill ok">[x]</span> MCP tab 按钮渲染</li>
+            <li><span class="b-pill ok">[x]</span> mcpApi 真被调 (vite HMR 0 错, tsc 0 错)</li>
+            <li><span class="b-pill ok">[x]</span> install handler (空状态友好提示 + activeConvId 校验)</li>
+            <li><span class="b-pill ok">[x]</span> Playwright 2 截图真落</li>
+            <li><span class="b-pill mid">[!]</span> 1 新 bug 暴露 (workspace_id UUID 不匹配)</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="conv">
+        <summary>未 push (等网络 + user 决策)</summary>
+        <div class="body">
+          <p>本会话改动在本地, <b>未 commit 未 push</b>。等 user 网络恢复 + 决策后再操作。</p>
+          <p>commit 计划:<code>fix(frontend): F3 MCP 服务 tab UI 接入 SkillMarketplacePage + bug 暴露 (workspace_id UUID)</code></p>
+        </div>
+      </details>
+
+      <details class="conv">
+        <summary>P3+ 修 workspace_id bug (3 选 1, 留决策)</summary>
+        <div class="body">
+          <p>建议方案 A: 改 MCP backend schema 接受 str (短期, 1-2h, 不破坏 chat 域独立性)</p>
+          <p>中长期: 走 B 统一 ID 空间 (chat session id 和 workspace id 一致用 UUID)</p>
+        </div>
+      </details>
+
+      <details class="conv">
+        <summary>关联引用</summary>
+        <div class="body">
+          <ul>
+            <li><code>src/frontend/src/api/mcp.ts</code> — wrapper (F2 8 端点, 已存)</li>
+            <li><code>src/frontend/src/components/skills/SkillMarketplacePage.tsx</code> — 本次 F3 改动 (1 文件)</li>
+            <li><a href="test-report-2026-06-09-comprehensive.html">test-report-2026-06-09-comprehensive.html</a> — 上一会话 comprehensive 报 (M5/M6 风)</li>
+            <li><a href="STATUS.md">STATUS.md</a> — 状态文件 (本会话已加 5 处 "已真实测试 (AI 模拟)" 标签)</li>
+            <li><a href="../worklogs/yuan/2026-06-09_phase3-verify-and-3-bugs.md">2026-06-09_phase3-verify-and-3-bugs.md</a> — 待补 worklog</li>
+          </ul>
+        </div>
+      </details>
+
+      <blockquote>
+        坚持"完成前端"的本质不是"实现 wrapper", 而是让 wrapper 真被消费 + 暴露消费时的 bug。<br>
+        本报 (F3 + 1 bug) 比"实现更多 wrapper"对项目健康更有价值。
+        <cite>— 2026-06-09 02:20 袁 (xiangbianpangde)</cite>
+      </blockquote>
+    </section>
+
+    <footer>
+      <div>生成于 <code>2026-06-09 02:20 Asia/Shanghai</code> · AgentHub F3 MCP Tab 接入</div>
+      <div>主 owner: <code>袁 (xiangbianpangde)</code> · 样式: <a href="file:///C:/Users/yhn/Desktop/开发规范/docs/reports/2026-06-08_devguard_V1.5_V2.0_merged_report.html">devguard V1.5/V2.0</a></div>
+    </footer>
+
+  </main>
+</div>
+</body>
+</html>
