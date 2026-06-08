@@ -3,6 +3,18 @@ import { cn } from '../../lib/cn'
 import { fsApi, type FsItem, type FsSearchResultItem } from '../../api/fs'
 import { Icon } from '../ui'
 
+/** 中间省略文件名：保留首尾和后缀 */
+function midTruncate(name: string, max = 22): string {
+  if (name.length <= max) return name
+  const dot = name.lastIndexOf('.')
+  const ext = dot > 0 && dot > name.length - 8 ? name.slice(dot) : ''
+  const base = ext ? name.slice(0, dot) : name
+  const avail = max - ext.length - 1
+  if (avail < 4) return name.slice(0, max - 1) + '…'
+  const half = Math.floor(avail / 2)
+  return base.slice(0, avail - half) + '…' + base.slice(-half) + ext
+}
+
 interface FileTreeProps {
   /** 根目录（workdir） */
   root: string
@@ -197,7 +209,7 @@ function TreeNode({
           <span className="h-3 w-3 flex-shrink-0" />
         )}
         {!isDir && <span className="flex-shrink-0 text-[11px]">📄</span>}
-        <span className="truncate text-[12px]">{item.name}</span>
+        <span className="text-[12px] whitespace-nowrap">{midTruncate(item.name)}</span>
       </button>
       {isDir && isOpen && (
         <ul className="space-y-0.5">
@@ -310,8 +322,8 @@ function SearchResults({
                     {r.type !== 'dir' && (
                       <span className="flex-shrink-0 text-[11px]">📄</span>
                     )}
-                    <span className="flex-shrink-0 text-foreground">{r.name}</span>
-                    <span className="flex-1 truncate text-muted-foreground/70">{rel}</span>
+                    <span className="flex-shrink-0 whitespace-nowrap text-foreground">{midTruncate(r.name)}</span>
+                    <span className="flex-1 truncate text-muted-foreground/70" title={rel}>{rel}</span>
                   </button>
                 </li>
               )

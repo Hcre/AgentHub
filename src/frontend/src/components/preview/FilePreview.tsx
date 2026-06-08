@@ -9,7 +9,7 @@ import { FileTree } from './FileTree'
 import { useUIStore } from '../../stores/uiStore'
 
 /** 文件树固定宽度（与 AppShell 全局拖拽的右栏宽度解耦） */
-const TREE_WIDTH = 140
+const TREE_WIDTH = 200
 
 // ── 文件类型检测 ─────────────────────────────────────────────────
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'])
