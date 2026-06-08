@@ -673,6 +673,21 @@ make lint           # ruff + eslint + tsc
 | **实现位置** | `src/frontend/src/components/chat/ChatView.tsx` EmptyChatState 提升为 export + `PROMPTS_DEFAULT` 提为 top-level const（与 brief 「T2 收尾: 在 component 文件顶层 export 纯函数」模式一致）|
 | **测试** | `src/frontend/src/components/chat/__tests__/ChatView.suggestion.test.tsx` 4 个 it (render 3 卡 + 3 click 各 1：call onPick with right text)|
 
+#### 6.4.8 全平台 Token 监控 UI 暴露（**B-4-P2-T6 实施 P1-2**）
+
+| 项 | 内容 |
+|----|------|
+| **场景 ID** | `B-4-P2-T6` 全平台 Token 监控 1h/24h/7d 窗口 + top N agent |
+| **对应任务** | Day 2 t6-m5-5-3-token-ui: M5 5.3 Token 监控 UI 暴露（roadmap §6 M5 必修）|
+| **入口** | NavRail 用量入口（左侧导航第 5 项，「activity」图标 + 「用量」标签），点击弹 `<TokenMonitorPanel />` |
+| **Given** | 后端有 N 个 agent + M 个 session 各自产生 usage_records |
+| **When** | GET `/api/usage/global?window={1h\|24h\|7d}&top_n=10` |
+| **Then-1** | 200 + JSON `{window, since, prompt_tokens, completion_tokens, total_tokens, by_agent: [{agent_id, total_tokens}] top N 排序降序}` |
+| **Then-2** | 3 卡片（1h/24h/7d）展示对应 total_tokens + prompt / completion 拆分；footer 显示 top 1 agent_id 前 8 字符 |
+| **Then-3** | 任何 window 不在 `^(1h\|24h\|7d)$` 模式 → 422 |
+| **实现位置** | backend: `src/backend/app/api/routers/usage.py` GET /global + `UsageService.aggregate_global()` + `PostgresUsageRepository.sum_global/group_by_agent_global`；frontend: `src/frontend/src/components/settings/TokenMonitorPanel.tsx` + `NavRail.tsx` line 23-25 加 'usage' RAIL_ITEM |
+| **测试** | backend `tests/test_usage_global.py` 3 it (1h window/total + 12 agents top 10 + window=invalid 422) + frontend `components/settings/__tests__/TokenMonitorPanel.test.tsx` 3 it (renders 3 cards / fetches 3 windows / displays total_tokens) |
+
 ### 6.5 多端支持（PRD §6 P2）
 
 #### 6.5.1 移动端 H5
