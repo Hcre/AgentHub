@@ -1,6 +1,6 @@
 # AgentHub — AI 协作入口
 
-> **⚠️ 仅供 AI Agent 读取**，新会话自动加载。人类请读 `README.md`。
+> **[WARN] 仅供 AI Agent 读取**，新会话自动加载。人类请读 `README.md`。
 > 读完本文档再开始任何工作，约 2 分钟。每个功能点完成后更新「当前状态」。
 
 ---
@@ -29,7 +29,7 @@ AgentHub/
 │   ├── plan/                         #   PRD / 路线图 / 任务分配
 │   ├── specs/                        #   功能规格（含 domains/）
 │   ├── design/                       #   复杂功能设计（群聊系列）
-│   ├── templates/                    #   ★模板权威（给新项目复制用）
+│   ├── templates/                    #   *模板权威（给新项目复制用）
 │   ├── reports/                      #   汇报产出 + HTML 渲染
 │   ├── research/                     #   调研
 │   ├── explore/                      #   技术探索 + EVOLUTION 演进日志
@@ -249,7 +249,7 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 - **规范**：v3.0（按通用开发规范模板对齐 + AgentHub 特化红线）
 - **ADR**：`worklogs/decisions/`（0001 CLI 优先 / 0002 长驻 CLI / 0003 MCP URL+AP-05 暂缓 / 0004 MCP F1 落地口径+安装探针）
 - **协作**：董 / 黎 / 袁 三人 + Claude Agent，按业务域分支
-- **🚧 MCP 接入（进行中，下一会话做代码开发）**：计划已整理冻结草案（2026-06-03，docs-only，分支 `feature/mcp/pr01-freeze-and-plan-cleanup`，未 push）。**接手起点 + 落地约定 → `docs/plan/开发清单_roadmap.md` §十「▶ 接手指引」**。前置红线：`docs/specs/04-commands` §2.6 需 2 人 Review Approve（PR-01）后才能写代码。
+- **[TODO] MCP 接入（进行中，下一会话做代码开发）**：计划已整理冻结草案（2026-06-03，docs-only，分支 `feature/mcp/pr01-freeze-and-plan-cleanup`，未 push）。**接手起点 + 落地约定 → `docs/plan/开发清单_roadmap.md` §十「▶ 接手指引」**。前置红线：`docs/specs/04-commands` §2.6 需 2 人 Review Approve（PR-01）后才能写代码。
 
 ---
 
@@ -279,7 +279,7 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 
 ---
 
-## 🚧 Phase-3 接手起点（2026-06-08 22:30 收束, 下一会话先做"完整真实测试"再写报告）
+## [TODO] Phase-3 接手起点（2026-06-08 22:30 收束, 下一会话先做"完整真实测试"再写报告）
 
 > **作者**: 袁 (`xiangbianpangde`, owner per ADR-0008)
 > **worklog 索引**: `worklogs/yuan/2026-06-08_t7-phase3-complete.md` + `2026-06-08_t3-mcp-f3-pathA.md` + `2026-06-08_session-phase2-summary.md`
@@ -292,11 +292,11 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 ### 真实测试证据 (按证据分级 — 必看, 下个会话据此补)
 | 测试 | pytest in-memory | live curl | 截图 | 备注 |
 |------|:-----------------:|:---------:|:----:|------|
-| t3 F3 4 路径 | ✅ 4/4 | ⚠️ 2/4 (422 校验链) | N/A | 路径 1/4 持续 500 根因**未查** |
-| t7 session pin | ✅ 4/4 | 缺 | ⚠️ 0 张 | 真实截图一张都没截 |
-| t1 既有 pin auth | ✅ 5/5 | 缺 | 缺 | pytest only |
+| t3 F3 4 路径 | [OK] 4/4 | [WARN] 2/4 (422 校验链) | N/A | 路径 1/4 持续 500 根因**未查** |
+| t7 session pin | [OK] 4/4 | 缺 | [WARN] 0 张 | 真实截图一张都没截 |
+| t1 既有 pin auth | [OK] 5/5 | 缺 | 缺 | pytest only |
 
-### ⚠️ 前一会话失信记录 (下个会话先修)
+### [WARN] 前一会话失信记录 (下个会话先修)
 1. **HTML 报告 "Playwright 截图" 段落** — 写得像 `docs/deliverables/screenshots/e2e-...png` 已落, **实际文件不存在** (真截图目录只有 18 张上一期 + phase-1/2 留的, 0 张 t7/t3)
 2. **"4 路径 curl 实测"** — 实际只 2/4 跑过, 路径 1/4 (happy + slug 冲突) 持续 500 未查根因
 3. **AskUserQuestion "全做 25min"** 措辞包装得像已做

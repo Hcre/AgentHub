@@ -104,9 +104,9 @@
   .verdict h4{font-size:16px;font-weight:800;margin:0 0 10px}
   .checklist{list-style:none;display:flex;flex-direction:column;gap:8px;margin:10px 0}
   .checklist li{font-size:12.5px;color:var(--txt-dim);padding-left:22px;position:relative}
-  .checklist li::before{content:"☐";position:absolute;left:0;color:var(--brand)}
+  .checklist li::before{content:"[ ]";position:absolute;left:0;color:var(--brand)}
   .checklist li.done{color:var(--txt)}
-  .checklist li.done::before{content:"☑";color:var(--good)}
+  .checklist li.done::before{content:"[x]";color:var(--good)}
   .src{font-size:10px;color:var(--txt-faint);font-family:var(--mono);margin-top:10px;display:flex;flex-wrap:wrap;gap:4px 12px}
   .divider{height:1px;background:var(--line);margin:36px 0}
   footer{border-top:1px solid var(--line);padding:22px 0 8px;margin-top:36px;color:var(--txt-faint);font-size:11px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
@@ -426,12 +426,12 @@ fde10e4 feat(backend): POST /api/mcp/servers F3 (MCP P3 路径 A, owner 特批 2
       </div>
 
       <div class="grid g2">
-        <div class="card"><h4 style="color:var(--warn)">🟡 P3+ ADR-0018 补全</h4><p>owner override 临时记录, 待写 <code>worklogs/decisions/0018-t3-mcp-f3-owner-override.md</code>。本 worklog 暂代。</p></div>
-        <div class="card"><h4 style="color:var(--warn)">🟡 网络恢复后 push</h4><p>t3 2 commit (fde10e4 + a2b9ff3) 待 push, github.com:443 超时 4 次重试失败。</p></div>
-        <div class="card"><h4 style="color:var(--warn)">🟡 P4 真 Docker dry_run</h4><p>path A mock 探针, 生产实现需单 Docker 容器 (30s CPU=1 Mem=512MB net=none), 留 P4 真 E2E。</p></div>
-        <div class="card"><h4 style="color:var(--warn)">🟡 P4 409 HTTP 状态</h4><p>spec 标 409, 本期 422, P4+ AP-02 envelope 升级时统一补 409 + 其它冲突码。</p></div>
-        <div class="card"><h4 style="color:var(--warn)">🟡 D-12 hooks 验证</h4><p>未跑 check_docs.py / check_worklog.py, push 时 hook 触发可能因 worklog/STATUS 未同步阻塞, 留 user 确认。</p></div>
-        <div class="card"><h4 style="color:var(--txt-faint)">⚪ pre-existing 2 pytest</h4><p>test_orchestrator_degrade / test_usage_e2e 缺 discussion_orchestrator 模块, 独立工单。</p></div>
+        <div class="card"><h4 style="color:var(--warn)">[MED] P3+ ADR-0018 补全</h4><p>owner override 临时记录, 待写 <code>worklogs/decisions/0018-t3-mcp-f3-owner-override.md</code>。本 worklog 暂代。</p></div>
+        <div class="card"><h4 style="color:var(--warn)">[MED] 网络恢复后 push</h4><p>t3 2 commit (fde10e4 + a2b9ff3) 待 push, github.com:443 超时 4 次重试失败。</p></div>
+        <div class="card"><h4 style="color:var(--warn)">[MED] P4 真 Docker dry_run</h4><p>path A mock 探针, 生产实现需单 Docker 容器 (30s CPU=1 Mem=512MB net=none), 留 P4 真 E2E。</p></div>
+        <div class="card"><h4 style="color:var(--warn)">[MED] P4 409 HTTP 状态</h4><p>spec 标 409, 本期 422, P4+ AP-02 envelope 升级时统一补 409 + 其它冲突码。</p></div>
+        <div class="card"><h4 style="color:var(--warn)">[MED] D-12 hooks 验证</h4><p>未跑 check_docs.py / check_worklog.py, push 时 hook 触发可能因 worklog/STATUS 未同步阻塞, 留 user 确认。</p></div>
+        <div class="card"><h4 style="color:var(--txt-faint)">[LOW] pre-existing 2 pytest</h4><p>test_orchestrator_degrade / test_usage_e2e 缺 discussion_orchestrator 模块, 独立工单。</p></div>
       </div>
     </section>
 

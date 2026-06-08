@@ -25,15 +25,15 @@
 
 ## 2. 完成判定
 
-- ✅ t7 B-4-P2-CL01 phase-3 全完 (alembic 0019 + Session.pinned 9 文件 + 4 测 + pin icon 4 决策)
-- ✅ t3 MCP P3 F3 路径 A 全完 (POST /api/mcp/servers + 4 测, owner override 23:03 SLA 提前 1h 闭环)
-- ✅ rebase + push 25 commit, 1 conflict 解
-- ✅ vitest 106/108 绿 (含 3 新增 + 1 状态类型补 Conversation.pinned?)
-- ✅ pytest 13/13 关键路径绿
-- ✅ STATUS.md 顶部时间戳 + 袁那行 22:00 同步
-- ⏳ ADR-0018 owner override 临时记录 (本 worklog 暂代, 待补)
-- ⏳ 网络恢复后 push t3 2 commit
-- ⏳ t10 M6 finalize + t11 飞书 OAuth + /api/usage 漏注册
+- [OK] t7 B-4-P2-CL01 phase-3 全完 (alembic 0019 + Session.pinned 9 文件 + 4 测 + pin icon 4 决策)
+- [OK] t3 MCP P3 F3 路径 A 全完 (POST /api/mcp/servers + 4 测, owner override 23:03 SLA 提前 1h 闭环)
+- [OK] rebase + push 25 commit, 1 conflict 解
+- [OK] vitest 106/108 绿 (含 3 新增 + 1 状态类型补 Conversation.pinned?)
+- [OK] pytest 13/13 关键路径绿
+- [OK] STATUS.md 顶部时间戳 + 袁那行 22:00 同步
+- [WAIT] ADR-0018 owner override 临时记录 (本 worklog 暂代, 待补)
+- [WAIT] 网络恢复后 push t3 2 commit
+- [WAIT] t10 M6 finalize + t11 飞书 OAuth + /api/usage 漏注册
 
 ---
 
@@ -71,13 +71,13 @@
 
 | spec 字段 | path A 实现 | 对齐 |
 |-----------|-------------|------|
-| name / slug / transport / config_json / version / tags | McpServerCreateRequest | ✅ |
-| dry_run: true 走沙箱探针 | asyncio.wait_for 30s + 限额返回 | ✅ |
-| errors: 409 E_MCP_SLUG_CONFLICT | ValidationError 422 + 字符串带 code | ⚠️ 降级 |
-| errors: 422 E_MCP_SCHEMA_INVALID | slug 正则 + transport 枚举 + config 校验 | ✅ |
-| errors: 422 E_MCP_VERSION_TOO_LONG | validate_version 复用 | ✅ |
-| errors: 422 E_MCP_DRY_RUN_TIMEOUT | asyncio.wait_for 30s 真验 | ✅ |
-| status: draft 落库 | McpServerStatus.DRAFT + save | ✅ |
+| name / slug / transport / config_json / version / tags | McpServerCreateRequest | [OK] |
+| dry_run: true 走沙箱探针 | asyncio.wait_for 30s + 限额返回 | [OK] |
+| errors: 409 E_MCP_SLUG_CONFLICT | ValidationError 422 + 字符串带 code | [WARN] 降级 |
+| errors: 422 E_MCP_SCHEMA_INVALID | slug 正则 + transport 枚举 + config 校验 | [OK] |
+| errors: 422 E_MCP_VERSION_TOO_LONG | validate_version 复用 | [OK] |
+| errors: 422 E_MCP_DRY_RUN_TIMEOUT | asyncio.wait_for 30s 真验 | [OK] |
+| status: draft 落库 | McpServerStatus.DRAFT + save | [OK] |
 
 ### dry_run 探针 (mock 沙箱)
 
@@ -111,19 +111,19 @@ async def _run_dry_run_probe(self, server) -> dict:
 
 | 文件 | 测数 | 结果 | 覆盖 |
 |------|------|------|------|
-| `tests/test_mcp_server_create.py` | 4 | 4/4 ✅ | F3 happy + slug 非法 + transport 非法 + slug 冲突 |
-| `tests/test_session_pinned.py` | 4 | 4/4 ✅ | t7 翻转 + 默认 False + 404 + 保留 title/workspace |
-| `tests/test_pin_session_ownership.py` | 5 | 5/5 ✅ | t1 既有 owner + 跨用户 403 + 匿名 401 + session mismatch 422 + 404 |
-| **phase-3 新增合计** | **8** | **8/8 ✅** | 无 regression |
+| `tests/test_mcp_server_create.py` | 4 | 4/4 [OK] | F3 happy + slug 非法 + transport 非法 + slug 冲突 |
+| `tests/test_session_pinned.py` | 4 | 4/4 [OK] | t7 翻转 + 默认 False + 404 + 保留 title/workspace |
+| `tests/test_pin_session_ownership.py` | 5 | 5/5 [OK] | t1 既有 owner + 跨用户 403 + 匿名 401 + session mismatch 422 + 404 |
+| **phase-3 新增合计** | **8** | **8/8 [OK]** | 无 regression |
 
 ### vitest
 
 | 文件 | 测数 | 结果 | 备注 |
 |------|------|------|------|
-| `LeftPanel.pin.test.tsx` | 3 | 3/3 ✅ | t7 3 路径 |
-| 其他 19 文件 | ~103 | 103 ✅ | 无新 regression |
-| `WebPreviewCard.fullscreen.test.tsx` | 2 | 2 fail ⚠️ | pre-existing gap, t10 M3/M4 inbox 视觉补遗留 |
-| **合计** | **108** | **106/108 ✅** | +3 新增 |
+| `LeftPanel.pin.test.tsx` | 3 | 3/3 [OK] | t7 3 路径 |
+| 其他 19 文件 | ~103 | 103 [OK] | 无新 regression |
+| `WebPreviewCard.fullscreen.test.tsx` | 2 | 2 fail [WARN] | pre-existing gap, t10 M3/M4 inbox 视觉补遗留 |
+| **合计** | **108** | **106/108 [OK]** | +3 新增 |
 
 ### 已知 pre-existing
 
@@ -201,12 +201,12 @@ slug 冲突 spec 标 409, 本期用 ValidationError (422) + 字符串带 E_MCP_S
 
 | 优先级 | 项 | 描述 |
 |--------|----|------|
-| 🟡 P3+ | ADR-0018 补全 | owner override 临时记录, 待写 `worklogs/decisions/0018-t3-mcp-f3-owner-override.md` |
-| 🟡 网络 | push t3 2 commit | github.com:443 超时 4 次重试失败, 等网络恢复后 push |
-| 🟡 P4 | 真 Docker dry_run | path A mock 探针, 生产实现需单 Docker 容器 (30s CPU=1 Mem=512MB net=none) |
-| 🟡 P4 | 409 HTTP 状态 | spec 标 409, 本期 422, P4+ AP-02 envelope 升级时统一 |
-| 🟡 push | D-12 hooks 验证 | 未跑 check_docs.py / check_worklog.py, 留 user 确认 |
-| ⚪ 独立 | pre-existing 2 pytest | test_orchestrator_degrade / test_usage_e2e 缺 discussion_orchestrator 模块 |
+| [MED] P3+ | ADR-0018 补全 | owner override 临时记录, 待写 `worklogs/decisions/0018-t3-mcp-f3-owner-override.md` |
+| [MED] 网络 | push t3 2 commit | github.com:443 超时 4 次重试失败, 等网络恢复后 push |
+| [MED] P4 | 真 Docker dry_run | path A mock 探针, 生产实现需单 Docker 容器 (30s CPU=1 Mem=512MB net=none) |
+| [MED] P4 | 409 HTTP 状态 | spec 标 409, 本期 422, P4+ AP-02 envelope 升级时统一 |
+| [MED] push | D-12 hooks 验证 | 未跑 check_docs.py / check_worklog.py, 留 user 确认 |
+| [LOW] 独立 | pre-existing 2 pytest | test_orchestrator_degrade / test_usage_e2e 缺 discussion_orchestrator 模块 |
 
 ---
 
