@@ -248,6 +248,7 @@ export function CreateAgentModal({
   const [favError, setFavError] = useState('')
   const [toast, setToast] = useState<string | null>(null)
   const [favManageOpen, setFavManageOpen] = useState(false)
+  const [favCheckedIds, setFavCheckedIds] = useState<Set<string>>(new Set())
 
   // -- Template store favorites --
   const favorites = useTemplateStore((s) => s.favorites)
@@ -366,7 +367,7 @@ export function CreateAgentModal({
         model: null,
       }
     }
-    if (hasDynamicTemplates && selectedTemplateData && selectedTemplateId !== '__custom__') {
+    if (selectedTemplateData && selectedTemplateId !== '__custom__') {
       return apiDetailToUnified(selectedTemplateData)
     }
     if (pickedIndex !== null && pickedIndex < LEGACY_TEMPLATES.length) {
@@ -1341,6 +1342,88 @@ export function CreateAgentModal({
           <Button variant="brand" size="sm" onClick={handleSaveFavorite} disabled={favSaving || !favName.trim()}>
             {favSaving ? '保存中…' : '确认'}
           </Button>
+        </footer>
+      </DialogContent>
+    </Dialog>
+
+    {/* Favorite management dialog */}
+    <Dialog open={favManageOpen} onOpenChange={(o) => { if (!o) { setFavManageOpen(false); setFavCheckedIds(new Set()) } }}>
+      <DialogContent className="w-[420px]">
+        <header className="flex items-center justify-between border-b px-4 py-3">
+          <h3 className="text-[15px] font-medium">管理常用模板</h3>
+          <Button variant="ghost" size="iconSm" onClick={() => { setFavManageOpen(false); setFavCheckedIds(new Set()) }}>
+            <Icon name="x" className="h-3.5 w-3.5" />
+          </Button>
+        </header>
+
+        <div className="flex flex-col gap-2 overflow-y-auto p-4" style={{ maxHeight: '50vh' }}>
+          {favorites.length === 0 ? (
+            <p className="text-center text-[13px] text-muted-foreground py-4">暂无常用模板</p>
+          ) : (
+            favorites.map((fav) => {
+              const checked = favCheckedIds.has(fav.id)
+              return (
+                <label
+                  key={fav.id}
+                  className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-accent/50 transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 accent-brand shrink-0"
+                    checked={checked}
+                    onChange={() => {
+                      setFavCheckedIds((prev) => {
+                        const next = new Set(prev)
+                        if (next.has(fav.id)) {
+                          next.delete(fav.id)
+                        } else {
+                          next.add(fav.id)
+                        }
+                        return next
+                      })
+                    }}
+                  />
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <span className="text-[13px] font-medium truncate">
+                      {fav.favorite_name || fav.display_name_zh || fav.name}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground line-clamp-2">
+                      {fav.favorite_description || fav.description_zh || fav.description || '暂无描述'}
+                    </span>
+                  </div>
+                </label>
+              )
+            })
+          )}
+        </div>
+
+        <footer className="flex justify-between items-center border-t px-4 py-3">
+          <span className="text-[11px] text-muted-foreground">
+            {favCheckedIds.size > 0 ? `已选 ${favCheckedIds.size} 个` : '勾选要移出的模板'}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => { setFavManageOpen(false); setFavCheckedIds(new Set()) }}>
+              取消
+            </Button>
+            <Button
+              variant="brand"
+              size="sm"
+              disabled={favCheckedIds.size === 0}
+              onClick={async () => {
+                const ids = Array.from(favCheckedIds)
+                for (const id of ids) {
+                  try {
+                    await setFavorite(id, { is_favorite: false })
+                  } catch {
+                    // ignore individual failures
+                  }
+                }
+                setFavCheckedIds(new Set())
+              }}
+            >
+              确认移出
+            </Button>
+          </div>
         </footer>
       </DialogContent>
     </Dialog>

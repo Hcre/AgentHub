@@ -97,9 +97,22 @@ class CodexRuntime(AgentRuntime):
 
         cmd = [binary, "exec", "--json"]
         if self._model:
-            cmd.extend(["-c", f'model="{self._model}"'])
-        if self._max_turns > 0:
-            cmd.extend(["--max-turns", str(self._max_turns)])
+            cmd.extend(["-m", self._model])
+        # 全部权限绕过（与 Claude Code bypassPermissions 对齐）
+        cmd.append("--dangerously-bypass-approvals-and-sandbox")
+
+        # 工作目录：从请求动态取（会话 workspace），通过 -C flag 传给 Codex
+        cwd = _resolve_cwd(request.working_directory)
+        if not cwd and self._workspace:
+            cwd = _resolve_cwd(self._workspace)
+        if cwd:
+            cmd.extend(["-C", cwd])
+        elif request.working_directory or self._workspace:
+            yield StreamEvent(
+                type=StreamEventType.TEXT,
+                seq=0,
+                content=f"⚠️ 工作目录不可用: {request.working_directory or self._workspace}\n请检查路径是否存在。",
+            )
 
         # stdin 传 prompt；codex exec 用 `-` 表示从 stdin 读
         cmd.append("-")
@@ -117,17 +130,6 @@ class CodexRuntime(AgentRuntime):
 
         logger.info("Codex spawn: %s (model=%s)", " ".join(cmd), self._model or "default")
 
-        # 工作目录：从请求动态取（会话 workspace），fallback 构造函数参数
-        cwd = _resolve_cwd(request.working_directory)
-        if not cwd and self._workspace:
-            cwd = _resolve_cwd(self._workspace)
-        if (request.working_directory or self._workspace) and not cwd:
-            yield StreamEvent(
-                type=StreamEventType.TEXT,
-                seq=0,
-                content=f"⚠️ 工作目录不可用: {request.working_directory or self._workspace}\n请检查路径是否存在。",
-            )
-
         try:
             self._process = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -135,7 +137,6 @@ class CodexRuntime(AgentRuntime):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
-                cwd=cwd,
             )
         except FileNotFoundError:
             yield StreamEvent(type=StreamEventType.ERROR, seq=0, content="Codex CLI not found")
