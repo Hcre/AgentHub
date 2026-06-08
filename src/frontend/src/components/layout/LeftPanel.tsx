@@ -84,6 +84,13 @@ export function LeftPanel() {
   const [dmSelected, setDmSelected] = useState<Set<string>>(() => new Set())
   const [dmBatchDeleteConfirm, setDmBatchDeleteConfirm] = useState(false)
   const removeConversations = useChatStore((s) => s.removeConversations)
+  // t7 B-4-P2-CL01：搜索（300ms debounce）+ 置顶
+  const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery.trim().toLowerCase()), 300)
+    return () => clearTimeout(t)
+  }, [searchQuery])
 
   const exitDmBatch = () => {
     setDmBatchMode(false)
@@ -145,6 +152,25 @@ export function LeftPanel() {
     return list
   }, [agents, conversations, messages])
 
+  // t7 B-4-P2-CL01：搜索过滤 + 置顶排序（pinned 排前）
+  const filteredDmList = useMemo(() => {
+    let list = dmList
+    if (debouncedQuery) {
+      list = list.filter(
+        ({ agent, conv }) =>
+          conv.name.toLowerCase().includes(debouncedQuery) ||
+          agent.name.toLowerCase().includes(debouncedQuery),
+      )
+    }
+    // 置顶排前（同 pinned 内按最近消息时间）
+    const pinnedFirst = [...list].sort((a, b) => {
+      const ap = a.conv.pinned ? 1 : 0
+      const bp = b.conv.pinned ? 1 : 0
+      return bp - ap
+    })
+    return pinnedFirst
+  }, [dmList, debouncedQuery])
+
   return (
     <aside className="glass-panel flex h-full w-full flex-col overflow-hidden rounded-2xl border shadow-sm">
       {/* 顶部：搜索框 + 收起按钮 */}
@@ -153,6 +179,9 @@ export function LeftPanel() {
           <Icon name="search" className="h-3.5 w-3.5" />
           <input
             placeholder="跳转到…"
+            data-testid="leftpanel-search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground/70"
           />
         </div>
@@ -226,7 +255,7 @@ export function LeftPanel() {
                 还没有私聊 · 去 AI 队友里发起
               </p>
             ) : (
-              dmList.map(({ agent, conv, key }) => {
+              filteredDmList.map(({ agent, conv, key }) => {
                 const isActive =
                   section === 'chat' && activeAgentId === agent.id && activeConversationId === conv.id
                 const selected = dmSelected.has(key)
