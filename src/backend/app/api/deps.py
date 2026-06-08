@@ -24,6 +24,7 @@ from app.application.services import (
     McpBindingService,
     McpInstallService,
     McpMarketService,
+    McpServerService,
     MemoryService,
     SessionService,
     UsageService,
