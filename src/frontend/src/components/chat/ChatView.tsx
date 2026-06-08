@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { user } from '../../data/mock'
 import { convKey, useChatStore } from '../../stores/chatStore'
 import { useUIStore } from '../../stores/uiStore'
@@ -114,15 +114,8 @@ export function ChatView({ agent }: { agent: Agent }) {
     composerRef.current?.setReplyTo(ref)
   }
 
-  // 3 个 prompt 建议卡
-  const PROMPTS = useMemo(
-    () => [
-      { icon: '🔍', title: '帮我看看代码', desc: '打开项目后说"看看 src/"', onPick: '帮我看看当前项目的代码结构' },
-      { icon: '🐛', title: '改个 bug', desc: '贴错误日志让它定位', onPick: '我遇到一个 bug，需要你帮我定位和修复' },
-      { icon: '✨', title: '起一个新项目', desc: '从一句话需求到目录', onPick: '帮我从零开始一个新项目，先聊聊需求' },
-    ],
-    [],
-  )
+  // 3 个 prompt 建议卡（top-level const — 用作 single source of truth，测试也用同一份）
+  const prompts = PROMPTS_DEFAULT
 
   return (
     <div className="flex h-full flex-col">
@@ -135,8 +128,8 @@ export function ChatView({ agent }: { agent: Agent }) {
           {list.length === 0 ? (
             <EmptyChatState
               agentName={agent.name}
-              prompts={PROMPTS}
-              onPick={(text) => composerRef.current?.setText(text)}
+              prompts={prompts}
+              onPick={(text) => onSend({ text })}
             />
           ) : (
             list.map((m) => (
@@ -195,14 +188,40 @@ export function ChatView({ agent }: { agent: Agent }) {
 
 // ── 空态：3 个 prompt 建议卡 + 提示语 ─────────────────────────────
 
-interface PromptCard {
+export interface PromptCard {
   icon: string
   title: string
   desc: string
   onPick: string
 }
 
-function EmptyChatState({
+/**
+ * S1 私聊空态默认 3 张建议卡（与 docs/specs/04-commands §6.4.7 BDD 场景对齐）。
+ *
+ * 提为 top-level const（替代之前的 useMemo 包裹）— 数据完全静态，useMemo 空依赖等同 const，
+ * 且 top-level 形式方便测试 (vitest) 直接 import 同一份数据，避免在测试里复制粘贴。
+ *
+ * 修改后务必同步：
+ *   - 04-commands §6.4.7 (BDD spec)
+ *   - __tests__/ChatView.suggestion.test.tsx (4 个 it 锁数据)
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export const PROMPTS_DEFAULT: PromptCard[] = [
+  { icon: '🔍', title: '帮我看看代码', desc: '打开项目后说"看看 src/"', onPick: '帮我看看当前项目的代码结构' },
+  { icon: '🐛', title: '改个 bug', desc: '贴错误日志让它定位', onPick: '我遇到一个 bug，需要你帮我定位和修复' },
+  { icon: '✨', title: '起一个新项目', desc: '从一句话需求到目录', onPick: '帮我从零开始一个新项目，先聊聊需求' },
+]
+
+/**
+ * S1 私聊空态展示组件。
+ *
+ * onPick 接收每个 PromptCard 的 onPick 文本字段。
+ * **注意**：调用方应直接走 send 链路（如 ChatView 的 onSend），不要只把文字塞进
+ * composer input — 否则用户体感「点了没反应」（Day 2 gap #6）。
+ *
+ * 导出供 vitest 单测使用。
+ */
+export function EmptyChatState({
   agentName,
   prompts,
   onPick,
@@ -225,6 +244,7 @@ function EmptyChatState({
           <button
             key={p.title}
             type="button"
+            data-testid={`prompt-card-${p.title}`}
             onClick={() => onPick(p.onPick)}
             className="group flex flex-col items-start gap-1.5 rounded-xl border bg-card/70 p-3.5 text-left transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:bg-card hover:shadow-sm"
           >

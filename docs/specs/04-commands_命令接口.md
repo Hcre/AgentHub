@@ -654,6 +654,25 @@ make lint           # ruff + eslint + tsc
 | **UI 验收（Playwright）** | 打开 `http://localhost:5174/` → 进 AI 队友 → 创建 Agent → 故意填错 apiKey 让 4xx 触发 → 截图保存 `docs/deliverables/screenshots/e2e-t2-createagent-502-2026-06-09.png`（部署后兜底）|
 | **测试** | `src/frontend/src/components/agent/__tests__/CreateAgentModal.test.tsx` 5 个 it (5xx/4xx/network/length/unknown 各 1) |
 
+#### 6.4.7 S1 私聊建议卡 click 真接 backend（**B-4-P2-S1-S01 修复 gap #6**）
+
+| 项 | 内容 |
+|----|------|
+| **场景 ID** | `B-4-P2-S1-S01` S1 私聊 3 建议卡 click 真发 backend |
+| **对应任务** | Day 2 gap #6 修复：3 建议按钮（帮我看看代码/改个 bug/起新项目）click 后无 /api/messages POST + 输入框未填 |
+| **入口** | S1 私聊空状态（list.length === 0）展示的 3 个 PromptCard |
+| **Given** | 用户在 S1 私聊空状态（无消息）看到 3 张建议卡 |
+| **When-1** | 点击「帮我看看代码」卡 |
+| **Then-1** | 调用 `onSend({ text: '帮我看看当前项目的代码结构' })` → sendMessage/send 链路 → 后端 POST /api/messages（或 WS）→ 用户消息进 list → typing indicator → LLM 流式回复 |
+| **When-2** | 点击「改个 bug」卡 |
+| **Then-2** | 同上，text = '我遇到一个 bug，需要你帮我定位和修复' |
+| **When-3** | 点击「起一个新项目」卡 |
+| **Then-3** | 同上，text = '帮我从零开始一个新项目，先聊聊需求' |
+| **Then-4** | 3 张卡从 DOM 消失（list.length > 0 触发 EmptyChatState 卸载），scrollToBottom 触发 |
+| **修复口径** | `ChatView.tsx` line 138-140：`onPick={(text) => composerRef.current?.setText(text)}` → `onPick={(text) => onSend({ text })}`，跳过 composer，直接走 onSend (line 93 WS 优先 + send 降级) |
+| **实现位置** | `src/frontend/src/components/chat/ChatView.tsx` EmptyChatState 提升为 export + `PROMPTS_DEFAULT` 提为 top-level const（与 brief 「T2 收尾: 在 component 文件顶层 export 纯函数」模式一致）|
+| **测试** | `src/frontend/src/components/chat/__tests__/ChatView.suggestion.test.tsx` 4 个 it (render 3 卡 + 3 click 各 1：call onPick with right text)|
+
 ### 6.5 多端支持（PRD §6 P2）
 
 #### 6.5.1 移动端 H5
