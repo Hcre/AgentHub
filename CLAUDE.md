@@ -180,18 +180,32 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 
 > 详细人向手册见 `README.md` §使用手册；下表是 AI 高频操作命令。
 
+### 部署架构
+
+| 组件 | 位置 | 端口 |
+|------|------|------|
+| PostgreSQL | Docker | 5432 |
+| Redis | Docker | 6379 |
+| 后端 | 本机 | 8000 |
+| 前端 | 本机 | 5173 |
+
+> 数据库在 Docker（数据持久化），后端在本机跑才能扫到宿主机的 Claude Code / Pi Agent / OpenCode / Codex CLI。
+
 | 要做什么 | 命令 |
 |---------|------|
-| 跑起全栈 | `docker compose -f src/docker/docker-compose.yml up -d --build` |
-| 看状态 / 日志 | `docker compose -f src/docker/docker-compose.yml ps` · `... logs -f backend` |
+| 跑起数据库 | `docker compose -f src/docker/docker-compose.yml up -d postgres redis` |
+| 跑起后端 | `cd src/backend && docker compose -f ../docker/docker-compose.yml exec -T postgres true 2>/dev/null; DATABASE_URL=postgresql+asyncpg://agenthub:agenthub_dev_pwd@localhost:5432/agenthub REDIS_URL=redis://localhost:6379/0 SKILLS_DIR=.agenthub/skills TEMPLATES_DIR=.agenthub/templates uvicorn app.main:app --host 127.0.0.1 --port 8000` |
+| 跑起前端 | `cd src/frontend && npm run dev` |
+| 跑起全栈（旧 Docker 模式） | `docker compose -f src/docker/docker-compose.yml up -d --build` |
+| 看状态 / 日志 | `docker compose -f src/docker/docker-compose.yml ps` · `docker compose -f src/docker/docker-compose.yml logs -f backend` |
 | 停止 | `docker compose -f src/docker/docker-compose.yml down` |
-| 跑迁移 / 测试 | `... exec backend alembic upgrade head` · `... exec backend pytest -q` |
+| 跑迁移 / 测试 | `cd src/backend && alembic upgrade head` · `pytest -q` |
 | 提交前校验 | `scripts/verify.bat`（ruff+mypy+tsc+eslint） |
 | 重建代码图谱 | `python scripts/gen_codegraph.py` → 查 `.codegraph/graph.json`（缺陷/影响分析）|
-| 起 dashboard | `python scripts/start_server.py` → `http://localhost:8000/dashboard.html` |
+| 起 dashboard | `python scripts/start_server.py` → `http://localhost:8080/dashboard.html` |
 | 文档/worklog 校验 | `python scripts/check_docs.py` · `python scripts/check_worklog.py` |
 
-**端口**：frontend 5174 · backend 8000（`/docs` `/health`）· postgres 5432 · redis 6379。
+**端口**：frontend 5173 · backend 8000（`/docs` `/health`）· postgres 5432 · redis 6379。
 **排错**：启动见 postgres `Exited(127)` 或前端在 5173 → 是开机自启的旧容器，`docker rm -f $(docker ps -aq --filter name=agenthub)` 清掉重建。
 
 ---

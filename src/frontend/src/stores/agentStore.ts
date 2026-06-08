@@ -121,26 +121,8 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       }))
       return agent.id
     } catch (e) {
-      // 后端返回具体错误 → 抛出给 UI 展示
-      if (e instanceof Error && e.message.startsWith('API ')) throw e
-      // 后端完全不可用（网络断开等）→ 本地降级 mock，保证 UI 不卡
-      const id = uid('ag')
-      const color = COLOR_CYCLE[get().agents.length % COLOR_CYCLE.length] ?? 'neutral'
-      const agent: Agent = {
-        id,
-        name: input.name,
-        role: input.role,
-        color,
-        online: true,
-        skillCount: input.skills.length,
-        agentSystem: input.agentSystem,
-        templateName: input.templateName,
-      }
-      set((s) => ({
-        agents: [...s.agents, agent],
-        profiles: { ...s.profiles, [id]: profile },
-      }))
-      return id
+      // 所有创建失败都抛出，不静默降级 mock（mock agent 无法连接 WebSocket 对话）
+      throw e
     }
   },
 

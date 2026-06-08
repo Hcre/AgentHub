@@ -35,11 +35,13 @@ class CodexRuntime(AgentRuntime):
         agent_id: str = "",
         api_key: str = "",
         timeout: int = _DEFAULT_TIMEOUT,
+        workspace: str | None = None,
     ) -> None:
         self._model = model
         self._agent_id = agent_id
         self._api_key = api_key
         self._timeout = timeout
+        self._workspace = workspace
         self._process: asyncio.subprocess.Process | None = None
 
     async def stream(self, request: AgentRequest) -> AsyncIterator[StreamEvent]:
@@ -74,6 +76,7 @@ class CodexRuntime(AgentRuntime):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
+                cwd=self._workspace,
             )
         except FileNotFoundError:
             yield StreamEvent(type=StreamEventType.ERROR, seq=0, content="Codex CLI not found")

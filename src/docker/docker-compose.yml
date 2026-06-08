@@ -96,7 +96,7 @@ services:
       backend:
         condition: service_started
     ports:
-      - "5174:5173"  # 主机 5174 → 容器 vite dev 5173（dev 模式，无 nginx）
+      - "5173:5173"  # 主机 5173 → 容器 vite dev 5173（dev 模式，无 nginx）
     # 源文件 volume mount：host 改文件即生效（vite HMR 实时刷新），
     # 不再需要 docker compose build + up -d 重启
     volumes:
