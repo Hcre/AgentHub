@@ -130,7 +130,7 @@ export function ApiKeyManager() {
                       // 同步到后端协调者 Agent
                       if (nextId) {
                         try {
-                          const r = await fetch('/api/settings/coordinator-credential', {
+                          const r = await fetch('/api/agents/coordinator/credential', {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ provider: k.provider, api_key: k.apiKey, model: k.model || '' }),
