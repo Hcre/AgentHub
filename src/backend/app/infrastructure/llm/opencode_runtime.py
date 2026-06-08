@@ -180,12 +180,12 @@ class OpenCodeRuntime(AgentRuntime):
         cmd = [binary, "run", "--format", "json", "--pure"]
         if oc_session:
             cmd.extend(["--session", oc_session])
-        # 权限模式（可配置，不再硬编码 --dangerously-skip-permissions）
-        cmd.extend(["--permission-mode", self._permission_mode])
-        cmd.extend(["--max-turns", str(self._max_turns)])
+        # 权限：始终跳过权限检查（对齐 Claude Code bypassPermissions）
+        cmd.append("--dangerously-skip-permissions")
+
+        # system_prompt 拼进完整 prompt，通过 stdin 传入（避免 Windows 命令行长度限制）
         if sp:
-            cmd.extend(["--system-prompt", sp])
-        cmd.append(prompt)
+            prompt = f"{sp}\n\n---\n\n{prompt}"
 
         logger.info(
             "OpenCode spawn: %s (provider=%s, oc_session=%s, permission=%s)",
@@ -198,12 +198,16 @@ class OpenCodeRuntime(AgentRuntime):
         try:
             self._process = await asyncio.create_subprocess_exec(
                 *cmd,
-                stdin=asyncio.subprocess.DEVNULL,
+                stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
                 cwd=cwd,
             )
+            # prompt 通过 stdin 传入，不放在命令行（避免 Windows 命令行长度限制）
+            if self._process.stdin:
+                self._process.stdin.write(prompt.encode())
+                self._process.stdin.write_eof()
         except FileNotFoundError:
             yield StreamEvent(type=StreamEventType.ERROR, seq=0, content="OpenCode CLI 启动失败")
             return
