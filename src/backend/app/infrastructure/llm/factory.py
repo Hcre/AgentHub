@@ -164,6 +164,7 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
             agent.name,
             provider_value,
         )
+        s_pi = agent.settings or {}
         return PiAgentRuntime(
             model=agent.model,
             agent_id=str(agent.id),
@@ -171,6 +172,11 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
             provider=provider_value,
             api_key=api_key,
             base_url=agent.base_url or "",
+            proxy_base=settings.proxy_base_url,
+            timeout=s_pi.get("cli_timeout", settings.claude_cli_timeout),
+            thinking_level=s_pi.get("thinking_level", "off"),
+            permission_mode=s_pi.get("permission_mode", "bypassPermissions"),
+            max_turns=s_pi.get("max_turns", 10),
         )
 
     if system == AgentSystem.OPENCODE:
@@ -195,12 +201,16 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
             model,
             provider_value,
         )
+        s_oc = agent.settings or {}
         return OpenCodeRuntime(
             model=model,
             agent_id=str(agent.id),
             provider=provider_value,
             api_key=api_key,
-            timeout=agent.settings.get("cli_timeout", settings.claude_cli_timeout),
+            timeout=s_oc.get("cli_timeout", settings.claude_cli_timeout),
+            permission_mode=s_oc.get("permission_mode", "bypassPermissions"),
+            max_turns=s_oc.get("max_turns", 10),
+            proxy_base=settings.proxy_base_url,
         )
 
     if system == AgentSystem.CODEX:
@@ -210,7 +220,7 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
         from app.infrastructure.llm.codex_runtime import CodexRuntime
 
         api_key = _resolve_api_key(agent)
-        s = agent.settings or {}
+        s_cx = agent.settings or {}
         logger.info(
             "Agent '%s' → CodexRuntime (CLI, model=%s)", agent.name, agent.model or "default"
         )
@@ -218,7 +228,11 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
             model=agent.model or "",
             agent_id=str(agent.id),
             api_key=api_key,
-            workspace=s.get("workspace_path"),
+            workspace=s_cx.get("workspace_path"),
+            timeout=s_cx.get("cli_timeout", settings.claude_cli_timeout),
+            permission_mode=s_cx.get("permission_mode", "bypassPermissions"),
+            max_turns=s_cx.get("max_turns", 10),
+            proxy_base=settings.proxy_base_url,
         )
 
     # GEMINI / CURSOR_AGENT — CLI 适配器待实现，暂走 HTTP API

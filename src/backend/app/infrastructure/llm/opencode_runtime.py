@@ -3,6 +3,10 @@
 多轮对话通过 opencode 原生 --session 实现：
 - 首次调用 spawn opencode run，从 stdout 捕获 sessionID
 - 后续调用加 --session <id>，opencode 自动维护上下文
+
+session_key 规则（对齐 ClaudeCodeRuntime）：
+- 私聊：session_key = session_id（字符串）
+- 群聊：uuid5(session_id:agent_id)（确定性映射，避免跨 agent 会话污染）
 """
 
 from __future__ import annotations
@@ -14,9 +18,9 @@ import logging
 import os
 import re
 import tempfile
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import suppress
-from pathlib import Path
 from typing import Any, ClassVar
 
 from app.core.config import settings
@@ -32,9 +36,33 @@ from app.domain.llm.protocol import (
 logger = logging.getLogger(__name__)
 
 _DEFAULT_TIMEOUT = 300
+_DEFAULT_MAX_TURNS = 10
+_DEFAULT_PERMISSION_MODE = "bypassPermissions"
 
 # AgentHub session UUID → opencode session ID
 _session_map: dict[str, str] = {}
+
+
+def _resolve_cwd(workspace: str | None) -> str | None:
+    """将 workspace 转为可用 cwd。自动检测 Docker/宿主机。"""
+    if not workspace:
+        return None
+    path = workspace.strip()
+    if not path:
+        return None
+    m = re.match(r"^([A-Za-z]):[/\\](.*)", path)
+    if m:
+        # 先试原始路径（宿主机）
+        if os.path.exists(path):
+            return path
+        # 再试 Docker mount
+        rest = m.group(2).replace("\\", "/")
+        container = f"/mnt/host_{m.group(1).lower()}/{rest}"
+        if os.path.exists(container):
+            return container
+        logger.warning("workspace 路径不存在: %s", workspace)
+        return None
+    return path if os.path.exists(path) else None
 
 
 class OpenCodeRuntime(AgentRuntime):
@@ -56,16 +84,29 @@ class OpenCodeRuntime(AgentRuntime):
         provider: str = "deepseek",
         api_key: str = "",
         timeout: int = _DEFAULT_TIMEOUT,
+        permission_mode: str = _DEFAULT_PERMISSION_MODE,
+        proxy_base: str = "",
+        max_turns: int = _DEFAULT_MAX_TURNS,
     ) -> None:
         self._model = model or "deepseek/deepseek-v4-flash"
         self._agent_id = agent_id
         self._provider = provider
         self._api_key = api_key
         self._timeout = timeout
+        self._permission_mode = permission_mode
+        self._max_turns = max_turns
+        self._proxy_url = (
+            f"{proxy_base.rstrip('/')}/proxy/agents/{agent_id}" if proxy_base and agent_id else ""
+        )
         self._process: asyncio.subprocess.Process | None = None
         self._text_seen = False  # step 内是否已产出 text（区分中间 step_finish 和终态）
 
     async def stream(self, request: AgentRequest) -> AsyncIterator[StreamEvent]:
+        # 合并群聊 delta 到 system_prompt（对齐 ClaudeCode V0 行为）
+        sp = request.system_prompt
+        if request.group_delta_text:
+            sp = "\n\n".join(filter(None, [sp, request.group_delta_text]))
+
         prompt = self._extract_prompt(request)
         if not prompt:
             yield StreamEvent(type=StreamEventType.ERROR, seq=0, content="OpenCode: 无用户消息")
@@ -80,7 +121,14 @@ class OpenCodeRuntime(AgentRuntime):
             )
             return
 
-        cwd = request.working_directory or os.getcwd()
+        cwd = _resolve_cwd(request.working_directory)
+        if request.working_directory and not cwd:
+            yield StreamEvent(
+                type=StreamEventType.TEXT,
+                seq=0,
+                content=f"⚠️ 工作目录不可用: {request.working_directory}\n请检查路径是否存在。",
+            )
+
         env = os.environ.copy()
         # opencode Unix 风格，用 $HOME/.config 找配置文件
         if "HOME" not in env:
@@ -106,7 +154,9 @@ class OpenCodeRuntime(AgentRuntime):
         # 有 apiKey 时必须注入配置（否则 opencode 无凭证，挂起直至超时）；MCP 可空。
         # 两者都无时跳过：不写空配置覆盖用户本地的 ~/.config/opencode/opencode.json。
         if api_key or mcp_section:
-            cfg_path = _write_opencode_config(self._provider, api_key, mcp_section)
+            cfg_path = _write_opencode_config(
+                self._provider, api_key, mcp_section, model=self._model
+            )
             if cfg_path:
                 env["OPENCODE_CONFIG"] = cfg_path
         else:
@@ -115,21 +165,34 @@ class OpenCodeRuntime(AgentRuntime):
                 "opencode 将尝试 ~/.config/opencode/opencode.json；若不存在则无凭证，可能挂起。"
             )
 
+        # 环境变量注入 model / proxy（对齐 ClaudeCodeRuntime _build_env）
+        if self._model:
+            env["OPENCODE_MODEL"] = self._model
+        if self._proxy_url:
+            env["OPENCODE_API_KEY"] = "agenthub-proxy"
+            env["OPENCODE_BASE_URL"] = self._proxy_url
+
         # 多轮对话：首次创建 session，后续用 --session 继续
-        ah_session = str(request.session_id)
-        oc_session = _session_map.get(ah_session)
+        # 群聊：uuid5(session_id:agent_id) 确定性映射，避免跨 agent 会话污染
+        session_key = self._compute_session_key(request)
+        oc_session = _session_map.get(session_key)
 
         cmd = [binary, "run", "--format", "json", "--pure"]
         if oc_session:
             cmd.extend(["--session", oc_session])
-        # 不再传 --model：CLI 启动时从 opencode.json 读 default model
-        cmd.extend(["--dangerously-skip-permissions", prompt])
+        # 权限模式（可配置，不再硬编码 --dangerously-skip-permissions）
+        cmd.extend(["--permission-mode", self._permission_mode])
+        cmd.extend(["--max-turns", str(self._max_turns)])
+        if sp:
+            cmd.extend(["--system-prompt", sp])
+        cmd.append(prompt)
 
         logger.info(
-            "OpenCode spawn: %s (provider=%s, oc_session=%s)",
+            "OpenCode spawn: %s (provider=%s, oc_session=%s, permission=%s)",
             " ".join(cmd),
             self._provider,
             oc_session or "new",
+            self._permission_mode,
         )
 
         try:
@@ -137,7 +200,7 @@ class OpenCodeRuntime(AgentRuntime):
                 *cmd,
                 stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
                 env=env,
                 cwd=cwd,
             )
@@ -154,8 +217,8 @@ class OpenCodeRuntime(AgentRuntime):
                 if not oc_session:
                     sid = _extract_session_id(line)
                     if sid:
-                        _session_map[ah_session] = sid
-                        logger.debug("OpenCode session %s → %s", ah_session, sid)
+                        _session_map[session_key] = sid
+                        logger.debug("OpenCode session %s → %s", session_key, sid)
 
                 events = self._parse_line(line, seq)
                 for evt in events:
@@ -210,6 +273,13 @@ class OpenCodeRuntime(AgentRuntime):
                 return msg.get("content", "")
         return ""
 
+    @staticmethod
+    def _compute_session_key(request: AgentRequest) -> str:
+        """会话键：群聊使用 uuid5(session_id:agent_id) 避免跨 agent 污染。"""
+        if request.is_group_chat and request.agent_id is not None:
+            return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{request.session_id}:{request.agent_id}"))
+        return str(request.session_id)
+
     async def _read_lines_with_timeout(self, stdout: asyncio.StreamReader) -> AsyncIterator[str]:
         deadline = asyncio.get_event_loop().time() + self._timeout
         while True:
@@ -230,7 +300,8 @@ class OpenCodeRuntime(AgentRuntime):
         try:
             data = json.loads(line)
         except json.JSONDecodeError:
-            return [StreamEvent(type=StreamEventType.TEXT, seq=seq, content=line)]
+            logger.warning("OpenCode 非 JSON 行: %s", line[:200])
+            return []
 
         # opencode v1.15+ JSON schema: 大部分字段嵌套在 data.part 内
         part = data.get("part", {})
@@ -279,6 +350,12 @@ class OpenCodeRuntime(AgentRuntime):
             state = part.get("state", {})
             if state.get("status") == "completed":
                 output = state.get("output", "")
+                content_str = None
+                if output:
+                    if isinstance(output, str):
+                        content_str = output
+                    else:
+                        content_str = json.dumps(output, ensure_ascii=False)
                 events.append(
                     StreamEvent(
                         type=StreamEventType.TOOL_RESULT,
@@ -286,7 +363,7 @@ class OpenCodeRuntime(AgentRuntime):
                         tool_result=ToolResult(
                             call_id=call_id,
                             success=True,
-                            content=str(output)[:2000] if output else None,
+                            content=content_str,
                         ),
                     )
                 )
@@ -306,8 +383,27 @@ class OpenCodeRuntime(AgentRuntime):
                 )
             )
         elif event_type in ("done", "result", "complete", "exit"):
+            # 从 data 中提取 usage / cost / duration 等元数据
+            usage = data.get("usage") or part.get("usage") or {}
+            metadata: dict = {
+                "model": self._model,
+            }
+            if usage:
+                metadata["token_usage"] = usage
+            cost = data.get("total_cost_usd") or part.get("total_cost_usd")
+            if cost is not None:
+                metadata["total_cost_usd"] = cost
+            duration = data.get("duration_ms") or part.get("duration_ms")
+            if duration is not None:
+                metadata["duration_ms"] = duration
+            is_error = data.get("is_error") or part.get("is_error", False)
+            if is_error:
+                metadata["is_error"] = True
+            errors = data.get("errors") or part.get("errors") or []
+            if errors:
+                metadata["errors"] = errors
             events.append(
-                StreamEvent(type=StreamEventType.DONE, seq=seq, metadata={"model": self._model})
+                StreamEvent(type=StreamEventType.DONE, seq=seq, metadata=metadata)
             )
         elif event_type == "step_finish":
             # 仅当 step 内产出过 text 时才视为终态；
@@ -344,76 +440,6 @@ def _extract_session_id(line: str) -> str | None:
     return m.group(1) if m else None
 
 
-# opencode.jsonc 模板 — 除了 apiKey 其他字段固定
-_OPENCODE_CONFIG_TEMPLATE = """{
-  "$schema": "https://opencode.ai/config.json",
-  "model": "deepseek/deepseek-v4-pro",
-  "small_model": "deepseek/deepseek-v4-flash",
-  "provider": {
-    "deepseek": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "DeepSeek",
-      "options": {
-        "baseURL": "https://api.deepseek.com/v1",
-        "apiKey": "{api_key}"
-      },
-      "models": {
-        "deepseek-v4-flash": {
-          "name": "deepseek-v4-flash",
-          "limit": { "context": 1000000, "output": 393216 },
-          "modalities": { "input": ["text"], "output": ["text"] },
-          "variants": {
-            "think-high": {
-              "reasoning": true,
-              "reasoningEffort": "high",
-              "interleaved": { "field": "reasoning_content" }
-            }
-          }
-        },
-        "deepseek-v4-pro": {
-          "name": "deepseek-v4-pro",
-          "limit": { "context": 1000000, "output": 393216 },
-          "modalities": { "input": ["text"], "output": ["text"] },
-          "variants": {
-            "think-high": {
-              "reasoning": true,
-              "reasoningEffort": "high",
-              "interleaved": { "field": "reasoning_content" }
-            }
-          }
-        }
-      }
-    }
-  }
-}"""
-
-
-def _write_provider_config(provider: str, api_key: str) -> None:
-    """动态写入 opencode.jsonc，注入 AgentHub 解密后的 API key。"""
-    config_dir = Path.home() / ".config" / "opencode"
-    config_dir.mkdir(parents=True, exist_ok=True)
-    config_path = config_dir / "opencode.jsonc"
-
-    # 只写 deepseek provider，其他 provider 可扩展
-    if provider == "deepseek":
-        content = _OPENCODE_CONFIG_TEMPLATE.replace("{api_key}", api_key)
-    else:
-        # 通用模板
-        content = f"""{{
-  "$schema": "https://opencode.ai/config.json",
-  "provider": {{
-    "{provider}": {{
-      "npm": "@ai-sdk/openai-compatible",
-      "options": {{
-        "baseURL": "",
-        "apiKey": "{api_key}"
-      }}
-    }}
-  }}
-}}"""
-
-    config_path.write_text(content, encoding="utf-8")
-    logger.info("OpenCode config written: %s (provider=%s)", config_path, provider)
 
 
 def _entry_to_opencode(entry: dict[str, Any]) -> tuple[str, dict[str, Any]]:
@@ -459,28 +485,75 @@ def _build_opencode_mcp(
     return mcp
 
 
-def _build_provider_dict(provider: str, api_key: str) -> dict[str, Any]:
-    """返回 provider 配置 dict，产出 dict 供自包含临时配置。"""
+def _build_provider_dict(provider: str, api_key: str, model: str = "") -> dict[str, Any]:
+    """返回 provider 配置 dict，产出 dict 供自包含临时配置。
+
+    模型使用传入的 model 参数（来自构造函数），不再硬编码。
+    非 deepseek provider 使用通用 @ai-sdk/openai-compatible 模板。
+    """
     if provider == "deepseek":
-        parsed: dict[str, Any] = json.loads(_OPENCODE_CONFIG_TEMPLATE.replace("{api_key}", api_key))
-        return parsed
+        # 使用传入的模型名动态构建配置
+        model_id = model or "deepseek/deepseek-v4-pro"
+        small_model = "deepseek/deepseek-v4-flash"
+        model_short = model_id.split("/", 1)[1] if "/" in model_id else model_id
+        return {
+            "$schema": "https://opencode.ai/config.json",
+            "model": model_id,
+            "small_model": small_model,
+            "provider": {
+                "deepseek": {
+                    "npm": "@ai-sdk/openai-compatible",
+                    "name": "DeepSeek",
+                    "options": {
+                        "baseURL": "https://api.deepseek.com/v1",
+                        "apiKey": api_key,
+                    },
+                    "models": {
+                        model_short: {
+                            "name": model_short,
+                            "limit": {"context": 1000000, "output": 393216},
+                            "modalities": {"input": ["text"], "output": ["text"]},
+                            "variants": {
+                                "think-high": {
+                                    "reasoning": True,
+                                    "reasoningEffort": "high",
+                                    "interleaved": {"field": "reasoning_content"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+        }
+    # 非 deepseek provider：使用通用模板，baseURL 从已知映射获取
+    base_url_map: dict[str, str] = {
+        "anthropic": "https://api.anthropic.com/v1",
+        "openai": "https://api.openai.com/v1",
+        "xiaomi": "https://api.x.ai/v1",
+        "minimax": "https://api.minimax.chat/v1",
+        "siliconflow": "https://api.siliconflow.cn/v1",
+    }
+    base_url = base_url_map.get(provider, "")
     return {
         "$schema": "https://opencode.ai/config.json",
+        "model": model or f"{provider}/default",
         "provider": {
             provider: {
                 "npm": "@ai-sdk/openai-compatible",
-                "options": {"baseURL": "", "apiKey": api_key},
+                "options": {"baseURL": base_url, "apiKey": api_key},
             }
         },
     }
 
 
-def _write_opencode_config(provider: str, api_key: str, mcp_section: dict[str, Any]) -> str | None:
-    """写自包含临时 opencode 配置（provider+mcp），返回路径供 OPENCODE_CONFIG。
+def _write_opencode_config(
+    provider: str, api_key: str, mcp_section: dict[str, Any], model: str = ""
+) -> str | None:
+    """写自包含临时 opencode 配置（provider+mcp+model），返回路径供 OPENCODE_CONFIG。
 
     delete=False 持久化供 CLI 读取，atexit 清理（对齐 claude_code _write_mcp_config）。
     """
-    config = _build_provider_dict(provider, api_key)
+    config = _build_provider_dict(provider, api_key, model=model)
     config["mcp"] = mcp_section
     try:
         f = tempfile.NamedTemporaryFile(  # noqa: SIM115 — 故意 delete=False，atexit 清理

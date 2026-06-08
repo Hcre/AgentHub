@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_TIMEOUT = 300
 _DEFAULT_THINKING_LEVEL = "off"
+_DEFAULT_MAX_TURNS = 10
+_DEFAULT_PERMISSION_MODE = "bypassPermissions"
 
 # Provider → Pi --provider 参数
 # Provider → Pi CLI --provider 参数值
@@ -93,6 +95,8 @@ class PiAgentRuntime(AgentRuntime):
         thinking_level: str = _DEFAULT_THINKING_LEVEL,
         timeout: int = _DEFAULT_TIMEOUT,
         session_dir: str = "",
+        permission_mode: str = _DEFAULT_PERMISSION_MODE,
+        max_turns: int = _DEFAULT_MAX_TURNS,
     ) -> None:
         self._model = model
         self._agent_id = agent_id
@@ -102,6 +106,8 @@ class PiAgentRuntime(AgentRuntime):
         self._base_url = base_url
         self._thinking_level = thinking_level
         self._timeout = timeout
+        self._permission_mode = permission_mode
+        self._max_turns = max_turns
 
         self._proxy_url = (
             f"{proxy_base.rstrip('/')}/proxy/agents/{agent_id}" if proxy_base and agent_id else ""
@@ -113,6 +119,11 @@ class PiAgentRuntime(AgentRuntime):
         self._process: asyncio.subprocess.Process | None = None
 
     async def stream(self, request: AgentRequest) -> AsyncIterator[StreamEvent]:
+        # 合并群聊 delta 到 system_prompt（对齐 ClaudeCode V0 行为）
+        sp = request.system_prompt
+        if request.group_delta_text:
+            sp = "\n\n".join(filter(None, [sp, request.group_delta_text]))
+
         logger.info(
             "Pi Agent request_id=%s session=%s provider=%s model=%s",
             request.request_id,
@@ -126,23 +137,38 @@ class PiAgentRuntime(AgentRuntime):
             yield StreamEvent(type=StreamEventType.ERROR, seq=0, content="Pi Agent: 无用户消息")
             return
 
-        session_key = str(request.session_id)
+        # 群聊：uuid5(session_id:agent_id) 确定性映射，避免跨 agent 会话污染
+        session_key = self._compute_session_key(request)
         session_file = str(Path(self._session_dir) / f"{session_key}.jsonl")
 
-        cmd = self._build_cmd(session_file, request)
+        cmd = self._build_cmd(session_file, request, sp)
         env = self._build_env()
         logger.debug("Pi CLI cmd: %s", " ".join(cmd))
 
         cwd = _resolve_cwd(request.working_directory)
+        if request.working_directory and not cwd:
+            yield StreamEvent(
+                type=StreamEventType.TEXT,
+                seq=0,
+                content=f"⚠️ 工作目录不可用: {request.working_directory}\n请检查路径是否存在。",
+            )
 
-        self._process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=env,
-            cwd=cwd,
-        )
+        try:
+            self._process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env,
+                cwd=cwd,
+            )
+        except FileNotFoundError:
+            yield StreamEvent(
+                type=StreamEventType.ERROR,
+                seq=0,
+                content=f"⚠️ pi CLI 未安装或路径不存在: {cwd or '当前目录'}",
+            )
+            return
         assert self._process.stdin is not None
         assert self._process.stdout is not None
 
@@ -221,7 +247,7 @@ class PiAgentRuntime(AgentRuntime):
             return str(local)
         return "pi"  # 最后 fallback
 
-    def _build_cmd(self, session_file: str, request: AgentRequest) -> list[str]:
+    def _build_cmd(self, session_file: str, request: AgentRequest, sp: str | None = None) -> list[str]:
         cmd = [
             self._pi_binary(),
             "--mode",
@@ -233,17 +259,19 @@ class PiAgentRuntime(AgentRuntime):
         pi_provider = _PROVIDER_MAP.get(self._provider, "anthropic")
         cmd.extend(["--provider", pi_provider])
 
-        # 不再传 --model：CLI 启动时从 ~/.pi/agent/settings.json 读 defaultModel
-
         if self._thinking_level != "off":
             cmd.extend(["--thinking", self._thinking_level])
 
-        if request.system_prompt:
-            prompt = request.system_prompt
-            if self._agent_name:
-                prompt = f"你的名字是{self._agent_name}。\n\n{prompt}"
-            cmd.extend(["--system-prompt", prompt])
+        # 权限模式（可配置）
+        cmd.extend(["--permission-mode", self._permission_mode])
+        cmd.extend(["--max-turns", str(self._max_turns)])
 
+        if sp:
+            if self._agent_name:
+                sp = f"你的名字是{self._agent_name}。\n\n{sp}"
+            cmd.extend(["--system-prompt", sp])
+
+        # API key：代理模式下不暴露在命令行（由 _build_env 注入环境变量）
         if self._api_key and not self._proxy_url:
             cmd.extend(["--api-key", self._api_key])
 
@@ -254,12 +282,29 @@ class PiAgentRuntime(AgentRuntime):
         return cmd
 
     def _build_env(self) -> dict[str, str]:
-        """不再注入 model/api_key/base_url：CLI 启动时自己从 ~/.pi/ 读。
-        AgentHub 只控制 cwd / system_prompt / skills。
+        """构造 CLI 子进程环境变量。
+
+        - 任意模式：注入 model（让 CLI 知道用什么模型）
+        - 代理模式（proxy_url 非空）：额外注入 API key / base URL
+          把请求重定向到 AgentHub 代理（认证/限流）
+        - 全局模式：不覆盖 API key / base URL，CLI 沿用自身配置
         """
         env = os.environ.copy()
-        return env
-
+        # 注入模型：通过 provider 对应的 env var（如 ANTHROPIC_MODEL、DEEPSEEK_API_KEY 等）
+        if self._model:
+            env["PI_MODEL"] = self._model
+        if self._proxy_url:
+            # 代理模式：API key 通过环境变量注入（不在命令行暴露）
+            env_key = _PROVIDER_ENV_KEY.get(self._provider, "")
+            if env_key:
+                env[env_key] = "agenthub-proxy"
+            # 注入代理 base URL
+            env["PI_BASE_URL"] = self._proxy_url
+        elif self._api_key:
+            # 非代理模式：如果有 API key，注入环境变量
+            env_key = _PROVIDER_ENV_KEY.get(self._provider, "")
+            if env_key and env_key not in env:
+                env[env_key] = self._api_key
         return env
 
     @staticmethod
@@ -268,6 +313,16 @@ class PiAgentRuntime(AgentRuntime):
             if msg.get("role") == "user":
                 return msg.get("content", "")
         return ""
+
+    @staticmethod
+    def _compute_session_key(request: AgentRequest) -> str:
+        """会话键：群聊使用 session_id（单 agent 视角），私聊直接使用 session_id。
+
+        Pi CLI 使用文件路径存储会话，不需要 UUID 合法性检查，但仍需隔离。
+        """
+        if request.is_group_chat and request.agent_id is not None:
+            return f"{request.session_id}_{request.agent_id}"
+        return str(request.session_id)
 
     async def _read_lines_with_timeout(self, stdout: asyncio.StreamReader) -> AsyncIterator[str]:
         deadline = asyncio.get_event_loop().time() + self._timeout

@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shutil
 from collections.abc import AsyncIterator
 
@@ -18,11 +19,37 @@ from app.domain.llm.protocol import (
     AgentRuntime,
     StreamEvent,
     StreamEventType,
+    ToolCall,
+    ToolResult,
 )
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_TIMEOUT = 300  # 秒
+_DEFAULT_MAX_TURNS = 10
+_DEFAULT_PERMISSION_MODE = "bypassPermissions"
+
+
+def _resolve_cwd(workspace: str | None) -> str | None:
+    """将 workspace 转为可用 cwd。自动检测 Docker/宿主机。"""
+    if not workspace:
+        return None
+    path = workspace.strip()
+    if not path:
+        return None
+    m = re.match(r"^([A-Za-z]):[/\\](.*)", path)
+    if m:
+        # 先试原始路径（宿主机）
+        if os.path.exists(path):
+            return path
+        # 再试 Docker mount
+        rest = m.group(2).replace("\\", "/")
+        container = f"/mnt/host_{m.group(1).lower()}/{rest}"
+        if os.path.exists(container):
+            return container
+        logger.warning("workspace 路径不存在: %s", workspace)
+        return None
+    return path if os.path.exists(path) else None
 
 
 class CodexRuntime(AgentRuntime):
@@ -36,25 +63,44 @@ class CodexRuntime(AgentRuntime):
         api_key: str = "",
         timeout: int = _DEFAULT_TIMEOUT,
         workspace: str | None = None,
+        permission_mode: str = _DEFAULT_PERMISSION_MODE,
+        max_turns: int = _DEFAULT_MAX_TURNS,
+        proxy_base: str = "",
     ) -> None:
         self._model = model
         self._agent_id = agent_id
         self._api_key = api_key
         self._timeout = timeout
         self._workspace = workspace
+        self._permission_mode = permission_mode
+        self._max_turns = max_turns
+        self._proxy_url = (
+            f"{proxy_base.rstrip('/')}/proxy/agents/{agent_id}" if proxy_base and agent_id else ""
+        )
         self._process: asyncio.subprocess.Process | None = None
 
     async def stream(self, request: AgentRequest) -> AsyncIterator[StreamEvent]:
-        prompt = self._extract_prompt(request)
-        if not prompt:
+        # 构建完整 prompt：system_prompt + group_delta_text + 最后一条用户消息
+        sp = request.system_prompt
+        if request.group_delta_text:
+            sp = "\n\n".join(filter(None, [sp, request.group_delta_text]))
+        trigger = self._extract_prompt(request)
+        if not trigger:
             yield StreamEvent(type=StreamEventType.ERROR, seq=0, content="Codex: no user message")
             return
+
+        # 注入 system_prompt：Codex CLI 没有 --system-prompt flag，
+        # 将 sp 作为 prompt 前缀拼接（SP 在前，用户消息在后）
+        prompt = f"{sp}\n\n---\n\n{trigger}" if sp else trigger
 
         binary = shutil.which("codex") or "codex"
 
         cmd = [binary, "exec", "--json"]
         if self._model:
             cmd.extend(["-c", f'model="{self._model}"'])
+        # 权限模式 + 最大轮次
+        cmd.extend(["--approval-mode", self._permission_mode])
+        cmd.extend(["--max-turns", str(self._max_turns)])
 
         # stdin 传 prompt；codex exec 用 `-` 表示从 stdin 读
         cmd.append("-")
@@ -63,24 +109,25 @@ class CodexRuntime(AgentRuntime):
         # 确保 HOME 在 Windows 下存在（codex 读 ~/.codex/config.toml）
         if "HOME" not in env:
             env["HOME"] = os.environ.get("USERPROFILE", "")
-        # 注入 API key（如果 agent 有存储或环境变量有）
-        if self._api_key:
+        # 代理模式：API key + base URL 通过环境变量注入
+        if self._proxy_url:
+            env["OPENAI_API_KEY"] = "agenthub-proxy"
+            env["OPENAI_BASE_URL"] = self._proxy_url
+        elif self._api_key:
             env["OPENAI_API_KEY"] = self._api_key
 
         logger.info("Codex spawn: %s (model=%s)", " ".join(cmd), self._model or "default")
 
         # 工作目录：从请求动态取（会话 workspace），fallback 构造函数参数
-        cwd = None
-        wd = getattr(request, 'working_directory', None) or self._workspace
-        if wd:
-            import re as _re
-            wd = wd.strip()
-            if _re.match(r"^[A-Za-z]:", wd) and os.path.exists(wd):
-                cwd = wd
-            elif os.path.exists(wd):
-                cwd = wd
-            else:
-                logger.warning("Codex workspace 路径不存在: %s", wd)
+        cwd = _resolve_cwd(request.working_directory)
+        if not cwd and self._workspace:
+            cwd = _resolve_cwd(self._workspace)
+        if (request.working_directory or self._workspace) and not cwd:
+            yield StreamEvent(
+                type=StreamEventType.TEXT,
+                seq=0,
+                content=f"⚠️ 工作目录不可用: {request.working_directory or self._workspace}\n请检查路径是否存在。",
+            )
 
         try:
             self._process = await asyncio.create_subprocess_exec(
@@ -168,12 +215,13 @@ class CodexRuntime(AgentRuntime):
 
         codex JSONL 事件类型:
         - thread.started / turn.started → 跳过
-        - item.completed → 提取 item.text 作为 TEXT 事件
-        - turn.completed → DONE 事件（含 usage）
+        - item.completed → 提取 item.text (TEXT) + item.content[] 中的 tool_use (TOOL_CALL)
+        - turn.completed → DONE 事件（含 usage / cost / duration）
         """
         try:
             data = json.loads(line)
         except json.JSONDecodeError:
+            logger.warning("Codex 非 JSON 行: %s", line[:200])
             return []
 
         event_type = data.get("type", "")
@@ -181,23 +229,74 @@ class CodexRuntime(AgentRuntime):
 
         if event_type == "item.completed":
             item = data.get("item", {})
+            # 提取纯文本
             text = item.get("text", "")
             if text:
                 events.append(StreamEvent(type=StreamEventType.TEXT, seq=seq, content=text))
                 seq += 1
+            # 提取 content 数组中的 tool_use / tool_result blocks
+            for block in item.get("content", []) or []:
+                block_type = block.get("type", "")
+                if block_type == "tool_use":
+                    events.append(
+                        StreamEvent(
+                            type=StreamEventType.TOOL_CALL,
+                            seq=seq,
+                            tool_call=ToolCall(
+                                call_id=block.get("id", ""),
+                                name=block.get("name", ""),
+                                arguments=block.get("input", {}),
+                            ),
+                        )
+                    )
+                    seq += 1
+                elif block_type == "tool_result":
+                    raw_content = block.get("content")
+                    if isinstance(raw_content, list):
+                        raw_content = "\n".join(
+                            c.get("text", "")
+                            for c in raw_content
+                            if isinstance(c, dict) and c.get("type") == "text"
+                        )
+                    elif not isinstance(raw_content, str):
+                        raw_content = str(raw_content) if raw_content is not None else None
+                    is_error = block.get("is_error", False)
+                    events.append(
+                        StreamEvent(
+                            type=StreamEventType.TOOL_RESULT,
+                            seq=seq,
+                            tool_result=ToolResult(
+                                call_id=block.get("tool_use_id", ""),
+                                success=not is_error,
+                                content=raw_content if not is_error else None,
+                                error=raw_content if is_error else None,
+                            ),
+                        )
+                    )
+                    seq += 1
 
         elif event_type == "turn.completed":
             usage = data.get("usage", {})
+            metadata: dict = {
+                "model": "codex-cli",
+                "token_usage": usage,
+                "is_error": False,
+            }
+            # 提取额外元数据（如果 codex 提供）
+            cost = data.get("total_cost_usd")
+            if cost is not None:
+                metadata["total_cost_usd"] = cost
+            duration = data.get("duration_ms")
+            if duration is not None:
+                metadata["duration_ms"] = duration
+            is_error = data.get("is_error", False)
+            if is_error:
+                metadata["is_error"] = True
+            errors = data.get("errors", [])
+            if errors:
+                metadata["errors"] = errors
             events.append(
-                StreamEvent(
-                    type=StreamEventType.DONE,
-                    seq=seq,
-                    metadata={
-                        "model": "codex-cli",
-                        "token_usage": usage,
-                        "is_error": False,
-                    },
-                )
+                StreamEvent(type=StreamEventType.DONE, seq=seq, metadata=metadata)
             )
 
         return events
