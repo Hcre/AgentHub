@@ -3,16 +3,18 @@ import { cn } from '../../lib/cn'
 import { fsApi, type FsItem, type FsSearchResultItem } from '../../api/fs'
 import { Icon } from '../ui'
 
-/** 中间省略文件名：保留首尾和后缀 */
-function midTruncate(name: string, max = 22): string {
+/** 中间省略文件名：始终保留首尾和后缀 */
+function midTruncate(name: string, max = 18): string {
   if (name.length <= max) return name
   const dot = name.lastIndexOf('.')
-  const ext = dot > 0 && dot > name.length - 8 ? name.slice(dot) : ''
+  // 后缀 ≤ 6 字符且不是全部（不是 .gitignore 这种）
+  const ext = dot > 0 && dot >= name.length - 7 ? name.slice(dot) : ''
   const base = ext ? name.slice(0, dot) : name
   const avail = max - ext.length - 1
   if (avail < 4) return name.slice(0, max - 1) + '…'
-  const half = Math.floor(avail / 2)
-  return base.slice(0, avail - half) + '…' + base.slice(-half) + ext
+  const keepStart = Math.ceil(avail * 0.55)
+  const keepEnd = avail - keepStart
+  return base.slice(0, keepStart) + '…' + base.slice(-keepEnd) + ext
 }
 
 interface FileTreeProps {
