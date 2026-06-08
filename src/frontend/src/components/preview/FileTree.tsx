@@ -265,7 +265,9 @@ function SearchResults({
       .search(root, query)
       .then((d) => {
         if (myReqId !== reqIdRef.current) return
-        setData({ results: d.results, truncated: d.truncated, error: null })
+        const results = Array.isArray(d?.results) ? d.results : []
+        const error = d?.error || (!Array.isArray(d?.results) && d?.detail ? String(d.detail) : null) || null
+        setData({ results, truncated: d?.truncated ?? false, error })
         setHasLoaded(true)
       })
       .catch((e) => {
