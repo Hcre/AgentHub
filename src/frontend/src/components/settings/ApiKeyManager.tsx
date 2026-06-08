@@ -81,7 +81,7 @@ export function ApiKeyManager() {
   const [dialogOpen, setDialogOpen] = useState(false)
 
   return (
-    <div className="flex h-full flex-col bg-background">
+    <div className="glass-panel flex h-full flex-col overflow-hidden rounded-2xl border shadow-sm">
       <header className="flex items-center gap-3 border-b px-4 py-3">
         <Button variant="ghost" size="iconSm" onClick={() => setSection('settings')}>
           <Icon name="chevronLeft" className="h-4 w-4" />
