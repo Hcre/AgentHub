@@ -254,6 +254,7 @@ function sectionTitle(section: string): string {
       return '任务'
     case 'calendar':
       return '日历'
+    case 'settings':
     case 'api-keys':
       return '设置'
     default:

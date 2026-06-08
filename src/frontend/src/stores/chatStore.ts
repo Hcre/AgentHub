@@ -234,6 +234,10 @@ export const useChatStore = create<ChatState>()(
               args: tc.arguments ?? {},
               status: 'pending',
             }
+            // 文件修改类工具 → 通知 FilePreview 刷新
+            if (/^(Write|Edit|Bash|write|edit|bash|write_to_file|replace_in_file)$/i.test(tc.name)) {
+              queueMicrotask(() => window.dispatchEvent(new CustomEvent('file-changed')))
+            }
             const idx = list.findIndex((m) => m.id === streamingId(key))
             if (idx >= 0) {
               const cur = list[idx]!

@@ -258,6 +258,9 @@ export const useGroupStore = create<GroupState>((set, get) => ({
           args: tc.arguments ?? {},
           status: 'pending',
         }
+        if (/^(Write|Edit|Bash|write|edit|bash|write_to_file|replace_in_file)$/i.test(tc.name)) {
+          queueMicrotask(() => window.dispatchEvent(new CustomEvent('file-changed')))
+        }
         const idx = list.findIndex((m) => m.id === sentinelId)
         if (idx >= 0) {
           const cur = list[idx]!

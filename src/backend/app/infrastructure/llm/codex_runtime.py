@@ -13,6 +13,7 @@ import os
 import re
 import shutil
 from collections.abc import AsyncIterator
+from contextlib import suppress
 
 from app.domain.llm.protocol import (
     AgentRequest,
@@ -25,7 +26,7 @@ from app.domain.llm.protocol import (
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_TIMEOUT = 300  # 秒
+_DEFAULT_TIMEOUT = 120  # 秒
 _DEFAULT_MAX_TURNS = 10
 _DEFAULT_PERMISSION_MODE = "bypassPermissions"
 
@@ -148,19 +149,43 @@ class CodexRuntime(AgentRuntime):
 
         assert self._process.stdout is not None
         seq = 0
-        try:
-            async for line in self._read_lines_with_timeout(self._process.stdout):
-                events = self._parse_line(line, seq)
-                for evt in events:
-                    yield evt
-                    seq = evt.seq + 1
-        except TimeoutError:
+        watchdog_task: asyncio.Task[None] | None = None
+        timed_out = False
+
+        async def _watchdog() -> None:
+            nonlocal timed_out
+            try:
+                await asyncio.sleep(self._timeout)
+                timed_out = True
+                logger.warning(
+                    "Codex CLI 超时 (%ss)，强制终止子进程 pid=%s",
+                    self._timeout,
+                    self._process.pid if self._process else "?",
+                )
+                await self.stop()
+            except asyncio.CancelledError:
+                pass
+
+        if self._process and self._process.stdout:
+            watchdog_task = asyncio.create_task(_watchdog())
+            try:
+                async for line in self._read_lines(self._process.stdout):
+                    events = self._parse_line(line, seq)
+                    for evt in events:
+                        yield evt
+                        seq = evt.seq + 1
+            finally:
+                if watchdog_task and not watchdog_task.done():
+                    watchdog_task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await watchdog_task
+
+        if timed_out:
             yield StreamEvent(
                 type=StreamEventType.ERROR,
                 seq=seq,
-                content=f"Codex CLI timeout ({self._timeout}s)",
+                content=f"Codex CLI 超时 ({self._timeout}s)，已强制终止。请重试。",
             )
-            await self.stop()
             return
 
         await self._process.wait()
@@ -184,7 +209,34 @@ class CodexRuntime(AgentRuntime):
                 await asyncio.wait_for(self._process.wait(), timeout=5)
             except TimeoutError:
                 self._process.terminate()
+                try:
+                    await asyncio.wait_for(self._process.wait(), timeout=3)
+                except TimeoutError:
+                    await self._force_kill_subprocess()
             self._process = None
+
+    async def _force_kill_subprocess(self) -> None:
+        """跨平台强制杀子进程。asyncio wait_for 无法取消 Windows 管道 I/O 时兜底。"""
+        if self._process is None:
+            return
+        pid = self._process.pid
+        if pid is None:
+            return
+        import platform
+        import subprocess as _sub
+
+        if platform.system() == "Windows":
+            try:
+                _sub.run(
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    capture_output=True,
+                    timeout=10,
+                )
+            except Exception:
+                pass
+        else:
+            with suppress(Exception):
+                os.kill(pid, 9)
 
     @staticmethod
     def _extract_prompt(request: AgentRequest) -> str:
@@ -193,16 +245,11 @@ class CodexRuntime(AgentRuntime):
                 return msg.get("content", "")
         return ""
 
-    async def _read_lines_with_timeout(self, stdout: asyncio.StreamReader) -> AsyncIterator[str]:
-        deadline = asyncio.get_event_loop().time() + self._timeout
+    @staticmethod
+    async def _read_lines(stdout: asyncio.StreamReader) -> AsyncIterator[str]:
+        """读取 stdout 行，不做超时（超时由 watchdog task 杀进程 → EOF 来保证）。"""
         while True:
-            remaining = deadline - asyncio.get_event_loop().time()
-            if remaining <= 0:
-                raise TimeoutError
-            try:
-                line = await asyncio.wait_for(stdout.readline(), timeout=remaining)
-            except TimeoutError:
-                raise
+            line = await stdout.readline()
             if not line:
                 break
             decoded = line.decode(errors="replace").strip()

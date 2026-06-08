@@ -864,6 +864,30 @@ async def fs_read(body: FsReadRequest) -> dict:
         raise HTTPException(status_code=415, detail="二进制文件不支持预览")
 
 
+@FS_ROUTER.get("/raw")
+async def fs_raw(path: str):
+    """Serve raw file content with proper MIME type (for images, etc.)."""
+    import os as _os
+    import mimetypes
+
+    from fastapi.responses import FileResponse
+
+    if not path:
+        raise HTTPException(status_code=400, detail="path 必填")
+    real = _resolve_path(path)
+    if not _os.path.isfile(real):
+        raise HTTPException(status_code=404, detail=f"文件不存在：{real}")
+    size = _os.path.getsize(real)
+    if size > 10 * 1024 * 1024:  # 10 MB
+        raise HTTPException(status_code=413, detail="文件超过 10MB")
+
+    mime_type, _ = mimetypes.guess_type(real)
+    if not mime_type:
+        mime_type = "application/octet-stream"
+
+    return FileResponse(real, media_type=mime_type)
+
+
 @FS_ROUTER.post("/mkdir")
 async def fs_mkdir(parent: str, name: str) -> dict:
     """在 parent 下新建文件夹 name。"""

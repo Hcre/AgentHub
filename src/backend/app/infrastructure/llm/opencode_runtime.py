@@ -215,26 +215,50 @@ class OpenCodeRuntime(AgentRuntime):
         assert self._process.stdout is not None
 
         seq = 0
-        try:
-            async for line in self._read_lines_with_timeout(self._process.stdout):
-                # 从首个事件中提取 opencode sessionID
-                if not oc_session:
-                    sid = _extract_session_id(line)
-                    if sid:
-                        _session_map[session_key] = sid
-                        logger.debug("OpenCode session %s → %s", session_key, sid)
+        watchdog_task: asyncio.Task[None] | None = None
+        timed_out = False
 
-                events = self._parse_line(line, seq)
-                for evt in events:
-                    yield evt
-                    seq = evt.seq + 1
-                if events and events[-1].type in (StreamEventType.DONE, StreamEventType.ERROR):
-                    break
-        except TimeoutError:
+        async def _watchdog() -> None:
+            nonlocal timed_out
+            try:
+                await asyncio.sleep(self._timeout)
+                timed_out = True
+                logger.warning(
+                    "OpenCode 超时 (%ss)，强制终止子进程 pid=%s",
+                    self._timeout,
+                    self._process.pid if self._process else "?",
+                )
+                await self.stop()
+            except asyncio.CancelledError:
+                pass  # 正常完成，取消 watchdog
+
+        if self._process and self._process.stdout:
+            watchdog_task = asyncio.create_task(_watchdog())
+            try:
+                async for line in self._read_lines(self._process.stdout):
+                    # 从首个事件中提取 opencode sessionID
+                    if not oc_session:
+                        sid = _extract_session_id(line)
+                        if sid:
+                            _session_map[session_key] = sid
+                            logger.debug("OpenCode session %s → %s", session_key, sid)
+
+                    events = self._parse_line(line, seq)
+                    for evt in events:
+                        yield evt
+                        seq = evt.seq + 1
+                    if events and events[-1].type in (StreamEventType.DONE, StreamEventType.ERROR):
+                        break
+            finally:
+                if watchdog_task and not watchdog_task.done():
+                    watchdog_task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await watchdog_task
+
+        if timed_out:
             yield StreamEvent(
-                type=StreamEventType.ERROR, seq=seq, content=f"OpenCode 超时 ({self._timeout}s)"
+                type=StreamEventType.ERROR, seq=seq, content=f"OpenCode 超时 ({self._timeout}s)，已强制终止。请重试。"
             )
-            await self.stop()
             return
 
         try:
@@ -262,7 +286,34 @@ class OpenCodeRuntime(AgentRuntime):
                 await asyncio.wait_for(self._process.wait(), timeout=5)
             except TimeoutError:
                 self._process.kill()
+                try:
+                    await asyncio.wait_for(self._process.wait(), timeout=3)
+                except TimeoutError:
+                    await self._force_kill_subprocess()
             self._process = None
+
+    async def _force_kill_subprocess(self) -> None:
+        """跨平台强制杀子进程。asyncio wait_for 无法取消 Windows 管道 I/O 时兜底。"""
+        if self._process is None:
+            return
+        pid = self._process.pid
+        if pid is None:
+            return
+        import platform
+        import subprocess as _sub
+
+        if platform.system() == "Windows":
+            try:
+                _sub.run(
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    capture_output=True,
+                    timeout=10,
+                )
+            except Exception:
+                pass
+        else:
+            with suppress(Exception):
+                os.kill(pid, 9)
 
     @staticmethod
     def _find_binary() -> str | None:
@@ -284,16 +335,35 @@ class OpenCodeRuntime(AgentRuntime):
             return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{request.session_id}:{request.agent_id}"))
         return str(request.session_id)
 
-    async def _read_lines_with_timeout(self, stdout: asyncio.StreamReader) -> AsyncIterator[str]:
-        deadline = asyncio.get_event_loop().time() + self._timeout
+    @staticmethod
+    def _is_progress_message(text: str) -> bool:
+        """识别 OpenCode CLI 的进度/状态消息（不应显示给用户）。"""
+        text_stripped = text.strip()
+        # 已知的 OpenCode 进度消息前缀
+        progress_prefixes = (
+            "Drafting.",
+            "Drafting…",
+            "Working on",
+            "Working…",
+            "Processing.",
+            "Processing…",
+            "Thinking.",
+            "Thinking…",
+        )
+        for prefix in progress_prefixes:
+            if text_stripped.startswith(prefix):
+                return True
+        # 短纯英文状态消息（≤5 词且不含中文）→ 很可能是进度提示
+        words = text_stripped.split()
+        if len(words) <= 5 and not any("一" <= c <= "鿿" for c in text_stripped):
+            return True
+        return False
+
+    @staticmethod
+    async def _read_lines(stdout: asyncio.StreamReader) -> AsyncIterator[str]:
+        """读取 stdout 行，不做超时（超时由 watchdog task 杀进程 → EOF 来保证）。"""
         while True:
-            remaining = deadline - asyncio.get_event_loop().time()
-            if remaining <= 0:
-                raise TimeoutError
-            try:
-                line = await asyncio.wait_for(stdout.readline(), timeout=remaining)
-            except TimeoutError:
-                raise
+            line = await stdout.readline()
             if not line:
                 break
             decoded = line.decode(errors="replace").strip()
@@ -327,8 +397,12 @@ class OpenCodeRuntime(AgentRuntime):
         if event_type in ("text", "content", "message"):
             text = _s("text") or _s("content") or _s("message")
             if text:
-                self._text_seen = True
-                events.append(StreamEvent(type=StreamEventType.TEXT, seq=seq, content=text))
+                if self._is_progress_message(text):
+                    # OpenCode 进度/状态消息 → 思考面板，不显示给用户
+                    events.append(StreamEvent(type=StreamEventType.THINKING, seq=seq, content=text))
+                else:
+                    self._text_seen = True
+                    events.append(StreamEvent(type=StreamEventType.TEXT, seq=seq, content=text))
         elif event_type == "thinking":
             text = _s("text") or _s("content") or _s("thinking")
             if text:
@@ -385,6 +459,14 @@ class OpenCodeRuntime(AgentRuntime):
                         content=tr_content,
                     ),
                 )
+            )
+        elif event_type == "step_start":
+            # 开始处理一个新 step → 发 THINKING 状态，避免前端空白等待
+            draft_text = part.get("drafting") or part.get("status") or ""
+            if not draft_text:
+                draft_text = "正在处理…"
+            events.append(
+                StreamEvent(type=StreamEventType.THINKING, seq=seq, content=draft_text)
             )
         elif event_type in ("done", "result", "complete", "exit"):
             # 从 data 中提取 usage / cost / duration 等元数据

@@ -12,6 +12,7 @@ import { GroupsListPage } from '../group/GroupsListPage'
 import { InboxView } from '../inbox/InboxView'
 import { TasksTabView } from '../tasks/TasksTabView'
 import { ApiKeyManager } from '../settings/ApiKeyManager'
+import { SettingsPage } from '../settings/SettingsPage'
 import { SkillMarketplacePage } from '../skills/SkillMarketplacePage'
 import { MemoryPanel } from '../memory/MemoryPanel'
 import { SettingsView, SkillsView } from '../views/TabViews'
@@ -76,6 +77,7 @@ export function CenterPanel() {
   if (section === 'group') return <GroupChatView />
   if (section === 'agent-detail') return <AgentsListPage />
   if (section === 'skills-market') return <SkillMarketplacePage />
+  if (section === 'settings') return <SettingsPage />
   if (section === 'api-keys') return <ApiKeyManager />
   if (section === 'tasks')
     return (

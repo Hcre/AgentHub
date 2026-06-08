@@ -3,6 +3,20 @@ import { cn } from '../../lib/cn'
 import { fsApi, type FsItem, type FsSearchResultItem } from '../../api/fs'
 import { Icon } from '../ui'
 
+/** 中间省略文件名：始终保留首尾和后缀 */
+function midTruncate(name: string, max = 18): string {
+  if (name.length <= max) return name
+  const dot = name.lastIndexOf('.')
+  // 后缀 ≤ 6 字符且不是全部（不是 .gitignore 这种）
+  const ext = dot > 0 && dot >= name.length - 7 ? name.slice(dot) : ''
+  const base = ext ? name.slice(0, dot) : name
+  const avail = max - ext.length - 1
+  if (avail < 4) return name.slice(0, max - 1) + '…'
+  const keepStart = Math.ceil(avail * 0.55)
+  const keepEnd = avail - keepStart
+  return base.slice(0, keepStart) + '…' + base.slice(-keepEnd) + ext
+}
+
 interface FileTreeProps {
   /** 根目录（workdir） */
   root: string
@@ -197,7 +211,7 @@ function TreeNode({
           <span className="h-3 w-3 flex-shrink-0" />
         )}
         {!isDir && <span className="flex-shrink-0 text-[11px]">📄</span>}
-        <span className="truncate text-[12px]">{item.name}</span>
+        <span className="truncate text-[12px]" title={item.name}>{midTruncate(item.name)}</span>
       </button>
       {isDir && isOpen && (
         <ul className="space-y-0.5">
@@ -265,7 +279,9 @@ function SearchResults({
       .search(root, query)
       .then((d) => {
         if (myReqId !== reqIdRef.current) return
-        setData({ results: d.results, truncated: d.truncated, error: null })
+        const results = Array.isArray(d?.items) ? d.items : Array.isArray(d?.results) ? d.results : []
+        const error = d?.error || (!results.length && d?.detail ? String(d.detail) : null) || null
+        setData({ results, truncated: d?.truncated ?? false, error })
         setHasLoaded(true)
       })
       .catch((e) => {
@@ -308,8 +324,8 @@ function SearchResults({
                     {r.type !== 'dir' && (
                       <span className="flex-shrink-0 text-[11px]">📄</span>
                     )}
-                    <span className="flex-shrink-0 text-foreground">{r.name}</span>
-                    <span className="flex-1 truncate text-muted-foreground/70">{rel}</span>
+                    <span className="flex-shrink-0 whitespace-nowrap text-foreground">{midTruncate(r.name)}</span>
+                    <span className="flex-1 truncate text-muted-foreground/70" title={rel}>{rel}</span>
                   </button>
                 </li>
               )

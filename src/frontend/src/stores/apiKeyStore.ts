@@ -15,8 +15,10 @@ export interface ApiKeyEntry {
 
 interface ApiKeyState {
   keys: ApiKeyEntry[]
+  coordinatorCredentialId: string | null
   addKey: (data: { name: string; provider: string; apiKey: string; baseUrl?: string; model?: string }) => void
   removeKey: (id: string) => void
+  setCoordinatorCredential: (id: string | null) => void
 }
 
 export const PROVIDER_LABELS: Record<string, string> = {
@@ -33,6 +35,7 @@ export const useApiKeyStore = create<ApiKeyState>()(
   persist(
     (set, get) => ({
       keys: [],
+      coordinatorCredentialId: null,
 
       addKey: (data) => {
         const entry: ApiKeyEntry = {
@@ -49,8 +52,13 @@ export const useApiKeyStore = create<ApiKeyState>()(
       },
 
       removeKey: (id) => {
-        set({ keys: get().keys.filter((k) => k.id !== id) })
+        set((s) => {
+          const next = s.keys.filter((k) => k.id !== id)
+          return { keys: next, coordinatorCredentialId: s.coordinatorCredentialId === id ? null : s.coordinatorCredentialId }
+        })
       },
+
+      setCoordinatorCredential: (id) => set({ coordinatorCredentialId: id }),
     }),
     { name: 'agenthub-apikeys' },
   ),

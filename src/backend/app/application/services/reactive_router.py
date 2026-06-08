@@ -61,6 +61,10 @@ RawDecideFn = Callable[[SessionState], Awaitable[dict]]
 _MAX_TRANSCRIPT = 15
 _PER_MSG_CHARS = 300
 
+# 协调者凭证（前端点星 → PUT /api/agents/coordinator/credential → 更新此变量）
+# ReactiveRouter 优先使用此凭证；未设置时回退 settings/env
+_coordinator_credential: dict[str, str] = {}
+
 
 class ReactiveRouter:
     """统一前门 reactive 决策器。无状态，每次读 SessionState；走廉价模型 tool_use。"""
@@ -300,9 +304,14 @@ class ReactiveRouter:
         if isinstance(self._client, AsyncOpenAI):
             client = self._client
         elif self._provider == "deepseek":
-            client = AsyncOpenAI(base_url="https://api.deepseek.com/v1", api_key=settings.deepseek_api_key)
+            cred_key = _coordinator_credential.get("api_key")
+            client = AsyncOpenAI(
+                base_url="https://api.deepseek.com/v1",
+                api_key=cred_key or settings.deepseek_api_key,
+            )
         else:
-            client = AsyncOpenAI(api_key=settings.openai_api_key)
+            cred_key = _coordinator_credential.get("api_key")
+            client = AsyncOpenAI(api_key=cred_key or settings.openai_api_key)
         system, prompt = self._build_prompts(state)
         ant = self._tool_schema()
         extra = {}
