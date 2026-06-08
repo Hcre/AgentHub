@@ -198,7 +198,7 @@ function Breadcrumb({
   const segs = rel.split('/').filter(Boolean)
   return (
     <div
-      className="flex flex-shrink-0 items-center gap-1 border-b border-border/60 bg-muted/10 px-3 py-1 font-mono text-[11.5px] text-muted-foreground"
+      className="flex flex-shrink-0 items-center gap-1 border-b border-border/60 bg-white px-3 py-1 font-mono text-[11.5px] text-muted-foreground dark:bg-black"
       title={path}
     >
       <span className="min-w-0 flex-1 truncate">
@@ -254,7 +254,7 @@ function CodeView({ content, path }: { content: string; path?: string }) {
       )}
     >
       {/* 工具栏：自动换行切换 */}
-      <div className="flex flex-shrink-0 items-center justify-end border-b border-border/40 bg-muted/10 px-2 py-0.5">
+      <div className="flex flex-shrink-0 items-center justify-end border-b border-border/40 bg-white px-2 py-0.5 dark:bg-black">
         <Button
           variant="ghost"
           size="iconSm"
@@ -334,7 +334,7 @@ function ImageView({ path, name }: { path: string; name: string }) {
 
 function MarkdownView({ content }: { content: string }) {
   return (
-    <div className="min-h-full overflow-auto px-6 py-4">
+    <div className="min-h-full overflow-auto bg-white px-6 py-4 dark:bg-black">
       <div className="prose prose-sm max-w-none text-[14px] leading-[1.6] text-foreground">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>
           {content}
