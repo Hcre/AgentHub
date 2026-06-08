@@ -180,9 +180,6 @@ async def _ping_cli(system: str, binary: str, req: PingRequest) -> bool:
         env_key = _opencode_env_for(req.provider)
         if env_key and req.api_key:
             env[env_key] = req.api_key
-        # opencode 需要 HOME 来找 ~/.config/opencode/opencode.json
-        if "HOME" not in env:
-            env["HOME"] = os.environ.get("USERPROFILE", "")
         cmd = [
             binary,
             "run",

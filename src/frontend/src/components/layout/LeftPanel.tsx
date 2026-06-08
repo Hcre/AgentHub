@@ -116,13 +116,22 @@ export function LeftPanel() {
 
   // 扁平私聊列表：每 Agent 内会话倒序（最新在前），跨 Agent 保持 store 顺序
   const dmList = useMemo(() => {
-    return agents.flatMap((a) =>
+    const list = agents.flatMap((a) =>
       (conversations[a.id] ?? [])
         .slice()
         .reverse()
         .map((c) => ({ agent: a, conv: c, key: `${a.id}:${c.id}` })),
     )
-  }, [agents, conversations])
+    // 按最近消息时间排序（最新的在前）
+    list.sort((a, b) => {
+      const aMsgs = messages[convKey(a.agent.id, a.conv.id)] ?? []
+      const bMsgs = messages[convKey(b.agent.id, b.conv.id)] ?? []
+      const aTime = aMsgs[aMsgs.length - 1]?.time ?? a.conv.updatedAt ?? '0'
+      const bTime = bMsgs[bMsgs.length - 1]?.time ?? b.conv.updatedAt ?? '0'
+      return bTime.localeCompare(aTime)
+    })
+    return list
+  }, [agents, conversations, messages])
 
   return (
     <aside className="glass-panel flex h-full w-full flex-col overflow-hidden rounded-2xl border shadow-sm">
