@@ -23,3 +23,11 @@ class UsageRepository(ABC):
 
     @abstractmethod
     async def group_by_agent(self, session_id: UUID, window: UsageWindow) -> list[dict]: ...
+
+    @abstractmethod
+    async def sum_global(self, window: UsageWindow) -> dict[str, int]: ...
+
+    @abstractmethod
+    async def group_by_agent_global(
+        self, window: UsageWindow, top_n: int = 10
+    ) -> list[dict]: ...

@@ -53,3 +53,13 @@ async def get_session_usage(
     svc: ServiceDep = ...,  # type: ignore[assignment]
 ) -> dict:
     return await svc.aggregate_by_session(session_id, window_name=window)
+
+
+@router.get("/global")
+async def get_global_usage(
+    window: str = Query(default="24h", pattern="^(1h|24h|7d)$"),
+    top_n: int = Query(default=10, ge=1, le=100),
+    svc: ServiceDep = ...,  # type: ignore[assignment]
+) -> dict:
+    """全平台 Token 聚合（t6 Token 监控 UI 用，1h/24h/7d window + top N agent）。"""
+    return await svc.aggregate_global(window_name=window, top_n=top_n)

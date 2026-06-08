@@ -84,9 +84,16 @@ class UsageService:
             "by_agent": by_agent,
         }
 
-    # TODO(t6-m5-5-3-token-ui): aggregate_global(window_name) 需先
-    # 1) domain/repositories/usage_repository.py 加 sum_global + group_by_agent_global 抽象方法
-    # 2) infrastructure/repositories/usage_repository.py 实现 (Postgres + InMemory)
-    # 3) api/routers/usage.py 加 GET /api/usage/global 端点
-    # 4) 前端 TokenMonitorPanel 调 3 端点
-    # 详见 docs/plan/day2-pipeline-v2/README.md §3 t6 + worklogs/yuan/2026-06-08_t6-token-monitor.md
+    async def aggregate_global(self, window_name: str = "24h", top_n: int = 10) -> dict:
+        """全平台 Token 聚合（t6 Token 监控 UI 用，不限 agent/session）。"""
+        window = UsageWindow.from_name(window_name)
+        total = await self._repo.sum_global(window)
+        by_agent = await self._repo.group_by_agent_global(window, top_n=top_n)
+        return {
+            "window": window_name,
+            "since": window.since.isoformat(),
+            "prompt_tokens": total["prompt"],
+            "completion_tokens": total["completion"],
+            "total_tokens": total["total"],
+            "by_agent": by_agent,
+        }

@@ -146,3 +146,26 @@ class PostgresUsageRepository:
         for b in agg.values():
             b["total"] = b["prompt"] + b["completion"]
         return sorted(agg.values(), key=lambda x: x["total"], reverse=True)
+
+    async def sum_global(self, window: UsageWindow) -> dict[str, int]:
+        return await self._bucket_sum(where_clauses=[UsageRecordModel.created_at >= window.since])
+
+    async def group_by_agent_global(
+        self, window: UsageWindow, top_n: int = 10
+    ) -> list[dict]:
+        stmt = (
+            select(
+                UsageRecordModel.agent_id,
+                func.coalesce(func.sum(UsageRecordModel.tokens), 0).label("total"),
+            )
+            .where(UsageRecordModel.created_at >= window.since)
+            .group_by(UsageRecordModel.agent_id)
+            .order_by(func.sum(UsageRecordModel.tokens).desc())
+            .limit(top_n)
+        )
+        rows = (await self._s.execute(stmt)).all()
+        return [
+            {"agent_id": str(aid), "total_tokens": int(total)}
+            for aid, total in rows
+            if aid is not None
+        ]
