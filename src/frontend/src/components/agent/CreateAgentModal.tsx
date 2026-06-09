@@ -231,7 +231,6 @@ export function CreateAgentModal({
   const cards = buildCards(scannedProviders, scanning)
   const [step, setStep] = useState(1)
   const [agentName, setAgentName] = useState('')
-  const [nameError, setNameError] = useState('')
 
   // Step 1: dynamic template selection
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
@@ -419,7 +418,6 @@ export function CreateAgentModal({
     setAgentSystem('')
     setStatus('idle')
     setErrorMsg('')
-    setNameError('')
   }
 
   const handleClose = () => {
@@ -443,12 +441,11 @@ export function CreateAgentModal({
   })()
 
   const goNext = () => {
-    if (!agentName.trim()) { setNameError('请输入队友名称'); return }
-    if (existingNames.includes(agentName.trim().toLowerCase())) { setNameError('该名称已被使用，请换一个'); return }
-    if (!hasAnySelection) { setNameError('请选择一个模板'); return }
+    if (!agentName.trim()) return
+    if (existingNames.includes(agentName.trim().toLowerCase())) return
+    if (!hasAnySelection) return
     if (isCustom && (!customPrompt.trim() || !customRoleName.trim())) return
     setAgentSystem('')
-    setNameError('')
     setStep(2)
 
     // 后台异步扫描 CLI
@@ -541,12 +538,12 @@ export function CreateAgentModal({
 
               <Input
                 value={agentName}
-                onChange={(e) => { setAgentName(e.target.value); setNameError('') }}
+                onChange={(e) => setAgentName(e.target.value)}
                 placeholder="例如：我的代码助手"
                 autoFocus
               />
-              {nameError && (
-                <p className="text-[11px] text-red-500 -mt-1">{nameError}</p>
+              {agentName.trim() && existingNames.includes(agentName.trim().toLowerCase()) && (
+                <p className="text-[11px] text-red-500 -mt-1">该名称已被使用，请换一个</p>
               )}
 
               <div className="border-t border-border/60 my-1" />
