@@ -88,8 +88,14 @@ export function LeftPanel() {
   const [dmBatchDeleteConfirm, setDmBatchDeleteConfirm] = useState(false)
   const removeConversations = useChatStore((s) => s.removeConversations)
   const setConversationPinned = useChatStore((s) => s.setConversationPinned)
+  const setConversationArchived = useChatStore((s) => s.setConversationArchived)
   const sessionIds = useChatStore((s) => s.sessionIds)
   const setSessionId = useChatStore((s) => s.setSessionId)
+  const addConversation = useChatStore((s) => s.addConversation)
+  // M1#2：归档 in-flight 跟踪 + 错误提示（pin 同样的乐观+in-flight+inline 错误模式）
+  const [inFlightArchive, setInFlightArchive] = useState<Set<string>>(() => new Set())
+  const [archiveError, setArchiveError] = useState<string | null>(null)
+  const [openArchived, setOpenArchived] = useState(false)
   // t7 B-4-P2-CL01：搜索（300ms debounce）+ 置顶
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -102,7 +108,61 @@ export function LeftPanel() {
   // 最近一次 pin 错误（与 MessageBubble.copyStatus 同 pattern：inline 显示，不引 toast 库）
   const [pinError, setPinError] = useState<string | null>(null)
 
-  // t7 B-4-P2-CL01：4 trade-off 实现（user 决策：乐观 + createPrivate 兜底 + 1 retry + in-flight 禁用 + inline 错误）
+  // M1#2：归档切换（pin 同样的乐观 + createPrivate 兜底 + 1 retry + in-flight 禁用 + inline 错误）
+  const handleToggleArchive = async (
+    agentId: string,
+    convId: string,
+    nextArchived: boolean,
+  ): Promise<void> => {
+    const key = convKey(agentId, convId)
+    if (inFlightArchive.has(key)) return
+    setInFlightArchive((prev) => new Set(prev).add(key))
+    setArchiveError(null)
+    setConversationArchived(agentId, convId, nextArchived)
+    try {
+      let sid = sessionIds[key]
+      if (!sid) {
+        const sess = await sessionsApi.createPrivate(agentId)
+        sid = sess.id
+        setSessionId(key, sid)
+      }
+      const doPatch = () => sessionsApi.patch(sid!, { archived: nextArchived })
+      try {
+        await doPatch()
+      } catch (err1) {
+        console.warn('[archive] PATCH failed, retrying once', err1)
+        await doPatch()
+      }
+    } catch (err) {
+      console.warn('[archive] toggle failed', err)
+      setArchiveError(`归档失败：${(err as Error).message ?? '网络错误'}`)
+    } finally {
+      setInFlightArchive((prev) => {
+        const next = new Set(prev)
+        next.delete(key)
+        return next
+      })
+    }
+  }
+
+  // M1#2：扁平私聊列表过滤 archived（默认不展示已归档的）
+  const filteredDmList = useMemo(() => {
+    let list = dmList.filter(({ conv }) => !conv.archived)
+    if (debouncedQuery) {
+      list = list.filter(
+        ({ agent, conv }) =>
+          conv.name.toLowerCase().includes(debouncedQuery) ||
+          agent.name.toLowerCase().includes(debouncedQuery),
+      )
+    }
+    // 置顶排前（同 pinned 内按最近消息时间）
+    return [...list].sort((a, b) => (b.conv.pinned ? 1 : 0) - (a.conv.pinned ? 1 : 0))
+  }, [dmList, debouncedQuery])
+
+  // M1#2：已归档列表
+  const archivedList = useMemo(() => dmList.filter(({ conv }) => conv.archived), [dmList])
+
+  // M1#2：右键菜单增加「归档/取消归档」选项（替代方案：hover 显示 archive 图标，简化为右键菜单）
   const handleTogglePin = async (
     agentId: string,
     convId: string,
@@ -211,25 +271,6 @@ export function LeftPanel() {
     return list
   }, [agents, conversations, messages])
 
-  // t7 B-4-P2-CL01：搜索过滤 + 置顶排序（pinned 排前）
-  const filteredDmList = useMemo(() => {
-    let list = dmList
-    if (debouncedQuery) {
-      list = list.filter(
-        ({ agent, conv }) =>
-          conv.name.toLowerCase().includes(debouncedQuery) ||
-          agent.name.toLowerCase().includes(debouncedQuery),
-      )
-    }
-    // 置顶排前（同 pinned 内按最近消息时间）
-    const pinnedFirst = [...list].sort((a, b) => {
-      const ap = a.conv.pinned ? 1 : 0
-      const bp = b.conv.pinned ? 1 : 0
-      return bp - ap
-    })
-    return pinnedFirst
-  }, [dmList, debouncedQuery])
-
   return (
     <aside className="glass-panel flex h-full w-full flex-col overflow-hidden rounded-2xl border shadow-sm">
       {/* 顶部：搜索框 + 收起按钮 */}
@@ -324,9 +365,23 @@ export function LeftPanel() {
         {openDM && (
           <div className="space-y-px">
             {dmList.length === 0 ? (
-              <p className="px-2 py-1.5 text-[12px] text-muted-foreground/70">
-                还没有私聊 · 去 AI 队友里发起
-              </p>
+              // M1#1：空态加「发起私聊」CTA — 新用户进站后的第一个可点击入口
+              <button
+                type="button"
+                onClick={() => {
+                  const firstAgent = agents[0]
+                  if (firstAgent) {
+                    const cid = addConversation(firstAgent.id)
+                    openConversation(firstAgent.id, cid)
+                  }
+                }}
+                disabled={agents.length === 0}
+                data-testid="leftpanel-dm-cta"
+                className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-brand/30 bg-brand/5 px-2 py-2 text-[12px] font-medium text-brand transition-colors hover:bg-brand/10 disabled:opacity-40"
+              >
+                <Icon name="plus" className="h-3 w-3" />
+                发起私聊
+              </button>
             ) : (
               filteredDmList.map(({ agent, conv, key }) => {
                 const isActive =

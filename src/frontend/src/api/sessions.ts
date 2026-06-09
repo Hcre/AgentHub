@@ -32,8 +32,11 @@ export const sessionsApi = {
     }),
   messages: (sessionId: string) => api.get<MessageOut[]>(`/api/sessions/${sessionId}/messages`),
   // t7 B-4-P2-CL01：PATCH 接受 pinned 字段翻转置顶状态
-  patch: (sessionId: string, body: { title?: string; workspace_path?: string; pinned?: boolean }) =>
-    api.patch<Session>(`/api/sessions/${sessionId}`, body),
+  // M1#2 新增 archived 字段翻转归档状态
+  patch: (
+    sessionId: string,
+    body: { title?: string; workspace_path?: string; pinned?: boolean; archived?: boolean },
+  ) => api.patch<Session>(`/api/sessions/${sessionId}`, body),
   // 删除单条消息（后端 DELETE /api/messages/{id}，204 无内容，无需 session_id）
   deleteMessage: (messageId: string) => api.del<void>(`/api/messages/${messageId}`),
 }

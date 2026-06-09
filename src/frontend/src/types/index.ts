@@ -53,6 +53,12 @@ export interface Conversation {
   workdir?: string
   /** t7 B-4-P2-CL01：会话置顶 — true 时排在列表最前。 */
   pinned?: boolean
+  /** M1#2 会话归档 — true 时移入「已归档」折叠分区。 */
+  archived?: boolean
+  /** 后端 Session id（用于 hydrate 后的回灌对话）。 */
+  sessionId?: string
+  /** 最近更新时间（后端 ISO 字符串，用于排序）。 */
+  updatedAt?: string
 }
 
 export interface CenterTab {

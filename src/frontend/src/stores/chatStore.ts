@@ -15,6 +15,7 @@ import type {
   ToolCallEntry,
   ToolResultEntry,
 } from '../types'
+import type { Session } from '../api/sessions'
 
 /** 会话键：agentId:conversationId */
 export const convKey = (agentId: string, conversationId: string) => `${agentId}:${conversationId}`
@@ -70,6 +71,10 @@ interface ChatState {
   removeConversation: (agentId: string, conversationId: string) => void
   /** 批量删除会话 */
   removeConversations: (agentId: string, conversationIds: string[]) => void
+  /** M1#1：把后端 Session[] 回灌进前端 store（私聊死路修复 + 刷新保持） */
+  hydrateFromSessions: (sessions: Session[]) => void
+  /** M1#2：归档/取消归档会话（本地状态翻转；调用方负责 PATCH 持久化） */
+  setConversationArchived: (agentId: string, conversationId: string, archived: boolean) => void
 }
 
 export const useChatStore = create<ChatState>()(
@@ -109,43 +114,70 @@ export const useChatStore = create<ChatState>()(
         })
       },
 
-  removeConversation: (agentId, conversationId) => {
-    const key = convKey(agentId, conversationId)
-    // 关闭该会话的持久 WS 连接
-    import("../hooks/wsPool").then(({ closePoolWs }) => {
-      const sid = get().sessionIds[key]
-      if (sid) closePoolWs(`${sid}:${key}`)
-    })
-    set((s) => {
-      const existing = s.conversations[agentId] ?? []
-      const filtered = existing.filter((c) => c.id !== conversationId)
-      const nextConv = { ...s.conversations }
-      if (filtered.length > 0) { nextConv[agentId] = filtered } else { delete nextConv[agentId] }
-      const nextMsgs = { ...s.messages }; delete nextMsgs[key]
-      const nextSessions = { ...s.sessionIds }; delete nextSessions[key]
-      const nextTyping = { ...s.typing }; delete nextTyping[key]
-      const nextUnread = { ...s.unreadByConv }; delete nextUnread[key]
-      return { conversations: nextConv, messages: nextMsgs, sessionIds: nextSessions, typing: nextTyping, unreadByConv: nextUnread }
-    })
-  },
+      removeConversation: (agentId, conversationId) => {
+        const key = convKey(agentId, conversationId)
+        // 关闭该会话的持久 WS 连接
+        import('../hooks/wsPool').then(({ closePoolWs }) => {
+          const sid = get().sessionIds[key]
+          if (sid) closePoolWs(`${sid}:${key}`)
+        })
+        set((s) => {
+          const existing = s.conversations[agentId] ?? []
+          const filtered = existing.filter((c) => c.id !== conversationId)
+          const nextConv = { ...s.conversations }
+          if (filtered.length > 0) {
+            nextConv[agentId] = filtered
+          } else {
+            delete nextConv[agentId]
+          }
+          const nextMsgs = { ...s.messages }
+          delete nextMsgs[key]
+          const nextSessions = { ...s.sessionIds }
+          delete nextSessions[key]
+          const nextTyping = { ...s.typing }
+          delete nextTyping[key]
+          const nextUnread = { ...s.unreadByConv }
+          delete nextUnread[key]
+          return {
+            conversations: nextConv,
+            messages: nextMsgs,
+            sessionIds: nextSessions,
+            typing: nextTyping,
+            unreadByConv: nextUnread,
+          }
+        })
+      },
 
-  removeConversations: (agentId, conversationIds) => {
-    set((s) => {
-      const existing = s.conversations[agentId] ?? []
-      const filtered = existing.filter((c) => !new Set(conversationIds).has(c.id))
-      const nextConv = { ...s.conversations }
-      if (filtered.length > 0) { nextConv[agentId] = filtered } else { delete nextConv[agentId] }
-      const nextMsgs = { ...s.messages }
-      const nextSessions = { ...s.sessionIds }
-      const nextTyping = { ...s.typing }
-      const nextUnread = { ...s.unreadByConv }
-      for (const cid of conversationIds) {
-        const k = convKey(agentId, cid)
-        delete nextMsgs[k]; delete nextSessions[k]; delete nextTyping[k]; delete nextUnread[k]
-      }
-      return { conversations: nextConv, messages: nextMsgs, sessionIds: nextSessions, typing: nextTyping, unreadByConv: nextUnread }
-    })
-  },
+      removeConversations: (agentId, conversationIds) => {
+        set((s) => {
+          const existing = s.conversations[agentId] ?? []
+          const filtered = existing.filter((c) => !new Set(conversationIds).has(c.id))
+          const nextConv = { ...s.conversations }
+          if (filtered.length > 0) {
+            nextConv[agentId] = filtered
+          } else {
+            delete nextConv[agentId]
+          }
+          const nextMsgs = { ...s.messages }
+          const nextSessions = { ...s.sessionIds }
+          const nextTyping = { ...s.typing }
+          const nextUnread = { ...s.unreadByConv }
+          for (const cid of conversationIds) {
+            const k = convKey(agentId, cid)
+            delete nextMsgs[k]
+            delete nextSessions[k]
+            delete nextTyping[k]
+            delete nextUnread[k]
+          }
+          return {
+            conversations: nextConv,
+            messages: nextMsgs,
+            sessionIds: nextSessions,
+            typing: nextTyping,
+            unreadByConv: nextUnread,
+          }
+        })
+      },
 
       applyStreamEvent: (key, event) => {
         set((s) => {
@@ -243,7 +275,9 @@ export const useChatStore = create<ChatState>()(
               status: 'pending',
             }
             // 文件修改类工具 → 通知 FilePreview 刷新
-            if (/^(Write|Edit|Bash|write|edit|bash|write_to_file|replace_in_file)$/i.test(tc.name)) {
+            if (
+              /^(Write|Edit|Bash|write|edit|bash|write_to_file|replace_in_file)$/i.test(tc.name)
+            ) {
               queueMicrotask(() => window.dispatchEvent(new CustomEvent('file-changed')))
             }
             const idx = list.findIndex((m) => m.id === streamingId(key))
@@ -530,6 +564,65 @@ export const useChatStore = create<ChatState>()(
         set((s) => {
           const existing = s.conversations[agentId] ?? []
           const next = existing.map((c) => (c.id === conversationId ? { ...c, pinned } : c))
+          return { conversations: { ...s.conversations, [agentId]: next } }
+        })
+      },
+
+      // M1#1：回灌后端 Session → 前端 store（保留本地新建的 + 以 session_id 去重）
+      hydrateFromSessions: (sessions) => {
+        set((s) => {
+          const nextConv = { ...s.conversations }
+          const nextSids = { ...s.sessionIds }
+          for (const sess of sessions) {
+            const agentId = sess.agent_id
+            if (!agentId) continue
+            // 跳过 group 类型（私聊列表不展示 group）
+            if (sess.type && sess.type !== 'private') continue
+            const convId = `sess_${sess.id}`
+            const key = convKey(agentId, convId)
+            // 本地优先：本地已有会话 → 仅补 sessionId（不覆盖 name/workdir）
+            const existing = nextConv[agentId] ?? []
+            const existedConv = existing.find((c) => c.id === convId || c.sessionId === sess.id)
+            if (existedConv) {
+              // 更新 sessionId + 远程字段
+              const updated = existing.map((c) =>
+                c.id === existedConv.id
+                  ? {
+                      ...c,
+                      sessionId: sess.id,
+                      pinned: sess.pinned ?? c.pinned,
+                      archived: sess.archived ?? c.archived,
+                      updatedAt: sess.updated_at ?? c.updatedAt,
+                    }
+                  : c,
+              )
+              nextConv[agentId] = updated
+              nextSids[key] = sess.id
+            } else {
+              // 新建对话对象
+              const conv: Conversation = {
+                id: convId,
+                name: sess.title || `对话 ${existing.length + 1}`,
+                subtitle: sess.workspace_path || '已恢复会话',
+                workdir: sess.workspace_path || undefined,
+                pinned: sess.pinned ?? false,
+                archived: sess.archived ?? false,
+                sessionId: sess.id,
+                updatedAt: sess.updated_at,
+              }
+              nextConv[agentId] = [...existing, conv]
+              nextSids[key] = sess.id
+            }
+          }
+          return { conversations: nextConv, sessionIds: nextSids }
+        })
+      },
+
+      // M1#2：归档/取消归档（本地翻转）
+      setConversationArchived: (agentId, conversationId, archived) => {
+        set((s) => {
+          const existing = s.conversations[agentId] ?? []
+          const next = existing.map((c) => (c.id === conversationId ? { ...c, archived } : c))
           return { conversations: { ...s.conversations, [agentId]: next } }
         })
       },
