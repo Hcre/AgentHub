@@ -22,6 +22,13 @@ export const fsApi = {
 
   /** M3-B：抽取 .pptx 文件的页文本（python-pptx 后端实现） */
   pptxSlides: (path: string) => api.post<PptxSlidesOut>('/api/fs/pptx-slides', { path }),
+
+  /** M3-C：某文件的 git commit 列表（owner override降级：只读，无 fs_write） */
+  fileHistory: (path: string, limit = 50) =>
+    api.post<FileHistoryOut>('/api/fs/file-history', { path, limit }),
+  /** M3-C：取某文件在某 commit 时的内容（git show <sha>:<path>） */
+  fileAtRev: (path: string, rev: string) =>
+    api.post<FileAtRevOut>('/api/fs/file-at-rev', { path, rev }),
 }
 
 export interface FsItem {
@@ -85,4 +92,23 @@ export interface PptxSlidesOut {
     texts: string[]
     text_count: number
   }>
+}
+
+// M3-C 版本历史读端点返回结构
+export interface FileHistoryCommit {
+  sha: string
+  author: string
+  time: string
+  message: string
+}
+export interface FileHistoryOut {
+  path: string
+  is_git: boolean
+  commits: FileHistoryCommit[]
+}
+export interface FileAtRevOut {
+  path: string
+  rev: string
+  content: string
+  size: number
 }

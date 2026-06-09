@@ -847,7 +847,128 @@ class PptxSlidesRequest(BaseModel):
     path: str
 
 
+class FileHistoryRequest(BaseModel):
+    path: str
+    limit: int = 50
+
+
+class FileAtRevRequest(BaseModel):
+    path: str
+    rev: str  # commit sha
+
+
 @FS_ROUTER.post("/pptx-slides")
+async def fs_pptx_slides(body: PptxSlidesRequest) -> dict:
+    """M3-B PPT 抽页：用 python-pptx 把每页文本抽成 JSON。"""
+    import os as _os
+
+    if not body.path:
+        raise HTTPException(status_code=400, detail="path 必填")
+    real = _resolve_path(body.path)
+    if not _os.path.isfile(real):
+        raise HTTPException(status_code=404, detail=f"文件不存在：{real}")
+    if not real.lower().endswith(".pptx"):
+        raise HTTPException(status_code=415, detail="仅支持 .pptx 文件")
+    try:
+        from pptx import Presentation
+    except ImportError:
+        raise HTTPException(status_code=501, detail="python-pptx 未安装")
+    try:
+        prs = Presentation(real)
+        slides = []
+        for idx, slide in enumerate(prs.slides, start=1):
+            texts = []
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    for para in shape.text_frame.paragraphs:
+                        t = "".join(run.text for run in para.runs).strip()
+                        if t:
+                            texts.append(t)
+            slides.append({"index": idx, "texts": texts, "text_count": len(texts)})
+        return {"path": real, "slide_count": len(slides), "slides": slides}
+    except Exception as e:
+        raise HTTPException(status_code=415, detail=f"无法解析 pptx：{e!s}")
+
+
+@FS_ROUTER.post("/file-history")
+async def fs_file_history(body: FileHistoryRequest) -> dict:
+    """M3-C 版本历史（owner override降级方案：只做读端点，跳过 fs_write）：
+    返回某文件的 git commit 列表（git log --follow）。非 git 仓库返空列表。"""
+    import asyncio as _asyncio
+    import subprocess as _sp
+    import os as _os
+
+    if not body.path:
+        raise HTTPException(status_code=400, detail="path 必填")
+    real = _resolve_path(body.path)
+    if not _os.path.isfile(real):
+        raise HTTPException(status_code=404, detail=f"文件不存在：{real}")
+
+    def _run() -> _sp.CompletedProcess[str]:
+        return _sp.run(
+            ["git", "log", "--follow", f"--format=%H%x1f%an%x1f%ai%x1f%s", f"-n{body.limit}", "--", real],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+    try:
+        result = await _asyncio.to_thread(_run)
+    except _sp.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="git log 超时")
+    except FileNotFoundError:
+        raise HTTPException(status_code=501, detail="git 未安装")
+
+    if result.returncode != 0:
+        # 非 git 仓库 / 路径不在 git 内 → 空列表（前端显示空态）
+        return {"path": real, "is_git": False, "commits": []}
+
+    commits = []
+    for line in result.stdout.strip().split("\n"):
+        if not line:
+            continue
+        parts = line.split("\x1f", 3)
+        if len(parts) < 4:
+            continue
+        sha, author, time, message = parts[0], parts[1], parts[2], parts[3]
+        commits.append({"sha": sha, "author": author, "time": time, "message": message})
+
+    return {"path": real, "is_git": True, "commits": commits}
+
+
+@FS_ROUTER.post("/file-at-rev")
+async def fs_file_at_rev(body: FileAtRevRequest) -> dict:
+    """M3-C：返回某文件在某 commit 时的内容（git show <sha>:<path>）。
+    非 git 仓库 / sha 无效 → 404。"""
+    import asyncio as _asyncio
+    import subprocess as _sp
+    import os as _os
+
+    if not body.path or not body.rev:
+        raise HTTPException(status_code=400, detail="path 和 rev 都必填")
+    real = _resolve_path(body.path)
+    if not _os.path.isfile(real):
+        raise HTTPException(status_code=404, detail=f"文件不存在：{real}")
+
+    def _run() -> _sp.CompletedProcess[str]:
+        return _sp.run(
+            ["git", "show", f"{body.rev}:{real}"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+    try:
+        result = await _asyncio.to_thread(_run)
+    except _sp.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="git show 超时")
+    except FileNotFoundError:
+        raise HTTPException(status_code=501, detail="git 未安装")
+
+    if result.returncode != 0:
+        raise HTTPException(status_code=404, detail=f"该版本无此文件或 sha 无效：{result.stderr.strip()}")
+
+    return {"path": real, "rev": body.rev, "content": result.stdout, "size": len(result.stdout)}
 async def fs_pptx_slides(body: PptxSlidesRequest) -> dict:
     """M3-B PPT 抽页：用 python-pptx 把每页文本抽成 JSON（图片暂走 fs_raw）。"""
     import os as _os
