@@ -21,12 +21,14 @@ from app.application.services import (
     ChatService,
     DeployService,
     GroupService,
+    InboxService,
     McpBindingService,
     McpInstallService,
     McpMarketService,
     McpServerService,
     MemoryService,
     SessionService,
+    TaskService,
     UsageService,
 )
 from app.application.services.context_builder import ContextBuilder
@@ -47,12 +49,14 @@ from app.infrastructure.repositories import (
     PostgresAgentRepository,
     PostgresDeploymentRepository,
     PostgresGroupRepository,
+    PostgresInboxRepository,
     PostgresMcpBindingRepository,
     PostgresMcpInstallationRepository,
     PostgresMcpServerRepository,
     PostgresMemoryRepository,
     PostgresMessageRepository,
     PostgresSessionRepository,
+    PostgresTaskRepository,
     PostgresUsageRepository,
 )
 from app.infrastructure.repositories.template_repository import (
@@ -173,6 +177,26 @@ def get_mcp_binding_repo(session: DbSession) -> PostgresMcpBindingRepository:
 
 def get_deploy_repo(session: DbSession) -> PostgresDeploymentRepository:
     return PostgresDeploymentRepository(session)
+
+
+def get_task_repo(session: DbSession) -> PostgresTaskRepository:
+    return PostgresTaskRepository(session)
+
+
+def get_task_service(
+    repo: Annotated[PostgresTaskRepository, Depends(get_task_repo)],
+) -> TaskService:
+    return TaskService(repo)
+
+
+def get_inbox_repo(session: DbSession) -> PostgresInboxRepository:
+    return PostgresInboxRepository(session)
+
+
+def get_inbox_service(
+    repo: Annotated[PostgresInboxRepository, Depends(get_inbox_repo)],
+) -> InboxService:
+    return InboxService(repo)
 
 
 def get_mcp_binding_service(

@@ -8,6 +8,7 @@ import {
 } from 'react'
 import { cn } from '../../lib/cn'
 import { mcpApi, type McpMarketItem } from '../../api/mcp'
+import { skillsApi } from '../../api/skills'
 import { useUIStore } from '../../stores/uiStore'
 import { Avatar, Button, ConfirmDialog, Icon } from '../ui'
 
@@ -140,9 +141,9 @@ export function SkillMarketplacePage() {
   // 加载已安装列表
   const loadInstalled = useCallback(() => {
     setInstalledLoading(true)
-    fetch('/api/skills/library?_=' + Date.now())
-      .then(safeJson)
-      .then((list: InstalledSkill[]) => setInstalled(list ?? []))
+    skillsApi
+      .listLibrary()
+      .then((list) => setInstalled(list ?? []))
       .catch(() => {})
       .finally(() => setInstalledLoading(false))
   }, [])
@@ -915,14 +916,7 @@ export function SkillMarketplacePage() {
           if (!deleteConfirm) return
           setInstalledDeleting(true)
           try {
-            const r = await fetch(`/api/skills/library/${encodeURIComponent(deleteConfirm)}`, {
-              method: 'DELETE',
-            })
-            if (!r.ok) {
-              const d = await r.json().catch(() => ({}))
-              setError(d.detail ?? `删除失败 (${r.status})`)
-              return
-            }
+            await skillsApi.removeLibrary(deleteConfirm)
             setInstalled((prev) => prev.filter((x) => x.name !== deleteConfirm))
           } catch (e) {
             setError(e instanceof Error ? e.message : '删除失败')
@@ -946,16 +940,7 @@ export function SkillMarketplacePage() {
           if (!batchDeleteConfirm) return
           setInstalledDeleting(true)
           try {
-            const r = await fetch('/api/skills/library/batch-delete', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ names: batchDeleteConfirm }),
-            })
-            if (!r.ok) {
-              const d = await r.json().catch(() => ({}))
-              setError(d.detail ?? `删除失败 (${r.status})`)
-              return
-            }
+            await skillsApi.batchDeleteLibrary(batchDeleteConfirm)
             setInstalled((prev) => prev.filter((s) => !batchDeleteConfirm.includes(s.name)))
             setInstalledSelected(new Set())
             setInstalledBatchMode(false)

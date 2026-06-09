@@ -109,7 +109,11 @@ class TaskModel(Base):
     priority: Mapped[str] = mapped_column(String(16), default="medium")
     assignee_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True, index=True)
     assignee_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # 展示层自由文本（看板 CRUD）：assignee_label 容纳任意 Agent id/标签，
+    # due_label 为自由截止文本（"Today"/"Wed"/"05-30"），与 assignee_id/due_date 解耦。
+    assignee_label: Mapped[str | None] = mapped_column(String(128), nullable=True)
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    due_label: Mapped[str | None] = mapped_column(String(64), nullable=True)
     tags: Mapped[list] = mapped_column(JSON, default=list)
     parent_task_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True, index=True)
     source: Mapped[str] = mapped_column(String(16), default="manual")
@@ -379,6 +383,36 @@ class DeploymentModel(Base):
     error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     ttl: Mapped[int] = mapped_column(Integer, default=3600)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
+
+
+# --- 收件箱（M4 审批流，alembic 0020）---
+
+
+class InboxItemModel(Base):
+    """收件箱条目（inbox_items）。审批 / 任务 / 系统通知统一表。"""
+
+    __tablename__ = "inbox_items"
+    __table_args__ = (
+        Index("ix_inbox_items_status", "status"),
+        Index("ix_inbox_items_type", "type"),
+        Index("idx_inbox_items_status_created", "status", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    type: Mapped[str] = mapped_column(String(16), default="system")
+    title: Mapped[str] = mapped_column(String(256))
+    summary: Mapped[str] = mapped_column(Text, default="")
+    actor: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    actor_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    when_label: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    status: Mapped[str] = mapped_column(String(16), default="unread")
+    resolution: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    session_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now

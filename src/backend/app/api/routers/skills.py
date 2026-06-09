@@ -969,3 +969,43 @@ async def fs_reveal(body: RevealRequest) -> dict:
         raise HTTPException(status_code=500, detail=f"启动资源管理器失败：{e}") from e
 
     return {"ok": True, "path": str(real), "kind": "file" if is_file else "folder"}
+
+
+@FS_ROUTER.get("/git-diff")
+async def fs_git_diff(path: str, staged: bool = False) -> dict:
+    """在 path（git 工作目录）跑 `git diff [--staged]`，返 unified diff 文本。
+
+    - 失败（不是 git repo / git 不可用）→ 返 200 + `{ok:false, reason:...}`，不抛 500
+      （前端可优雅降级为"无 diff"提示）
+    - 输出过大（>2MB）截断到 2MB + `truncated:true`
+    - 无变更 → `{ok:true, diff:""}`
+    """
+    import os as _os
+    import subprocess as _sp
+
+    if not path:
+        raise HTTPException(status_code=400, detail="path 必填")
+    real = _resolve_path(path)
+    if not _os.path.isdir(real):
+        raise HTTPException(status_code=404, detail=f"目录不存在：{real}")
+    args = ["git", "-C", real, "diff", "--no-color", "--no-ext-diff"]
+    if staged:
+        args.append("--staged")
+    try:
+        proc = _sp.run(args, capture_output=True, text=True, timeout=10)
+    except FileNotFoundError:
+        return {"ok": False, "reason": "git 未安装或不在 PATH"}
+    except _sp.TimeoutExpired:
+        return {"ok": False, "reason": "git diff 超时（>10s）"}
+    except OSError as e:
+        return {"ok": False, "reason": f"执行失败：{e}"}
+    if proc.returncode != 0:
+        # 不是 git 仓库时 git 也会返非 0 + stderr "not a git repository"
+        stderr = (proc.stderr or "").strip().splitlines()
+        return {"ok": False, "reason": stderr[-1] if stderr else f"git 退出码 {proc.returncode}"}
+    text = proc.stdout or ""
+    truncated = False
+    if len(text) > 2 * 1024 * 1024:
+        text = text[: 2 * 1024 * 1024]
+        truncated = True
+    return {"ok": True, "diff": text, "truncated": truncated, "staged": staged}

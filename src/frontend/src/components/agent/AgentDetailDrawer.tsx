@@ -4,7 +4,7 @@ import { useAgentStore } from '../../stores/agentStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useUIStore } from '../../stores/uiStore'
 import { StartChatModal } from '../chat/StartChatModal'
-import { Avatar, Badge, Button, Icon } from '../ui'
+import { Avatar, Badge, Button, Icon, Input, Textarea } from '../ui'
 
 function Field({ label, value }: { label: string; value: string | number }) {
   return (
@@ -24,10 +24,14 @@ function Field({ label, value }: { label: string; value: string | number }) {
 export function AgentDetailDrawer() {
   const { agentDrawerAgentId, closeAgentDrawer, openConversation, setFileWorkdir } = useUIStore()
   const open = agentDrawerAgentId !== null
-  const { agents, profiles, removeAgent } = useAgentStore()
+  const { agents, profiles, removeAgent, updateAgent } = useAgentStore()
   const conversations = useChatStore((s) => s.conversations)
   const addConversation = useChatStore((s) => s.addConversation)
   const [showStartChat, setShowStartChat] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState({ name: '', role: '', bio: '' })
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const agent = agents.find((a) => a.id === agentDrawerAgentId)
   const profile = agent ? profiles[agent.id] : undefined
@@ -41,6 +45,15 @@ export function AgentDetailDrawer() {
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [open, closeAgentDrawer])
+
+  // 切换 Agent 或关闭抽屉时退出编辑态，避免脏草稿串台。
+  // setState-in-effect 按项目惯例 disable（同 CreateAgentModal/ChatView）：这里是
+  // 「外部 prop 变化 → 重置本地编辑态」的同步，无级联渲染风险。
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEditing(false)
+    setSaveError(null)
+  }, [agentDrawerAgentId])
 
   if (!open || !agent) return null
 
@@ -62,6 +75,35 @@ export function AgentDetailDrawer() {
     if (window.confirm(`确定删除队友「${agent.name}」？该操作不可恢复。`)) {
       removeAgent(agent.id)
       closeAgentDrawer()
+    }
+  }
+
+  const startEdit = () => {
+    setDraft({ name: agent.name, role: agent.role, bio: profile?.bio ?? '' })
+    setSaveError(null)
+    setEditing(true)
+  }
+
+  const cancelEdit = () => {
+    setEditing(false)
+    setSaveError(null)
+  }
+
+  const saveEdit = async () => {
+    const name = draft.name.trim()
+    if (!name) {
+      setSaveError('名称不能为空')
+      return
+    }
+    setSaving(true)
+    setSaveError(null)
+    try {
+      await updateAgent(agent.id, { name, role: draft.role.trim(), systemPrompt: draft.bio.trim() })
+      setEditing(false)
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : '保存失败，请重试')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -101,15 +143,54 @@ export function AgentDetailDrawer() {
         </header>
 
         <div className="flex-1 space-y-4 overflow-y-auto p-4">
-          {/* 简介 */}
-          <section>
-            <div className="mb-1.5 font-mono text-[10.5px] uppercase tracking-wider text-muted-foreground">
-              简介
-            </div>
-            <p className="rounded-lg border bg-muted/30 px-3 py-2.5 text-[13px] leading-relaxed text-foreground/90 [text-wrap:pretty]">
-              {profile?.bio ?? '暂无简介'}
-            </p>
-          </section>
+          {/* 简介 / 编辑表单 */}
+          {editing ? (
+            <section className="space-y-3" aria-label="编辑队友">
+              <div>
+                <label className="mb-1 block font-mono text-[10.5px] uppercase tracking-wider text-muted-foreground">
+                  名称
+                </label>
+                <Input
+                  value={draft.name}
+                  onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+                  placeholder="队友名称"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block font-mono text-[10.5px] uppercase tracking-wider text-muted-foreground">
+                  角色
+                </label>
+                <Input
+                  value={draft.role}
+                  onChange={(e) => setDraft((d) => ({ ...d, role: e.target.value }))}
+                  placeholder="一句话角色定位"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block font-mono text-[10.5px] uppercase tracking-wider text-muted-foreground">
+                  系统提示 / 简介
+                </label>
+                <Textarea
+                  value={draft.bio}
+                  onChange={(e) => setDraft((d) => ({ ...d, bio: e.target.value }))}
+                  rows={5}
+                  placeholder="系统提示词（system prompt）"
+                />
+              </div>
+              {saveError && (
+                <p className="text-[12px] text-destructive">{saveError}</p>
+              )}
+            </section>
+          ) : (
+            <section>
+              <div className="mb-1.5 font-mono text-[10.5px] uppercase tracking-wider text-muted-foreground">
+                简介
+              </div>
+              <p className="rounded-lg border bg-muted/30 px-3 py-2.5 text-[13px] leading-relaxed text-foreground/90 [text-wrap:pretty]">
+                {profile?.bio ?? '暂无简介'}
+              </p>
+            </section>
+          )}
 
           {/* 能力 */}
           {profile?.capabilities && profile.capabilities.length > 0 && (
@@ -161,19 +242,37 @@ export function AgentDetailDrawer() {
         </div>
 
         <footer className="flex gap-2 border-t border-border/70 p-3">
-          <Button variant="brand" size="sm" className="flex-1" onClick={handleStartChat}>
-            <Icon name="chat" className="h-3.5 w-3.5" />
-            发起私聊
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDelete}
-            className="text-destructive hover:bg-destructive/10"
-            title="删除队友"
-          >
-            <Icon name="trash2" className="h-3.5 w-3.5" />
-          </Button>
+          {editing ? (
+            <>
+              <Button variant="ghost" size="sm" onClick={cancelEdit} disabled={saving}>
+                取消
+              </Button>
+              <Button variant="brand" size="sm" className="flex-1" onClick={saveEdit} disabled={saving}>
+                <Icon name="check" className="h-3.5 w-3.5" />
+                {saving ? '保存中…' : '保存'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="brand" size="sm" className="flex-1" onClick={handleStartChat}>
+                <Icon name="chat" className="h-3.5 w-3.5" />
+                发起私聊
+              </Button>
+              <Button variant="outline" size="sm" onClick={startEdit} title="编辑队友">
+                <Icon name="pencil" className="h-3.5 w-3.5" />
+                编辑
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDelete}
+                className="text-destructive hover:bg-destructive/10"
+                title="删除队友"
+              >
+                <Icon name="trash2" className="h-3.5 w-3.5" />
+              </Button>
+            </>
+          )}
         </footer>
       </aside>
 
