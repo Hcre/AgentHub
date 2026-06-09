@@ -81,27 +81,18 @@ class OpenCodeRuntime(AgentRuntime):
     def __init__(
         self,
         *,
-        model: str = "",
         agent_id: str = "",
-        provider: str = "deepseek",
-        api_key: str = "",
         timeout: int = _DEFAULT_TIMEOUT,
-        permission_mode: str = _DEFAULT_PERMISSION_MODE,
-        proxy_base: str = "",
-        max_turns: int = _DEFAULT_MAX_TURNS,
     ) -> None:
-        self._model = model or "deepseek/deepseek-v4-flash"
+        self._model = ""
         self._agent_id = agent_id
-        self._provider = provider
-        self._api_key = api_key
+        self._provider = ""
+        self._api_key = ""
         self._timeout = timeout
-        self._permission_mode = permission_mode
-        self._max_turns = max_turns
-        self._proxy_url = (
-            f"{proxy_base.rstrip('/')}/proxy/agents/{agent_id}" if proxy_base and agent_id else ""
-        )
+        self._proxy_url = ""
+        self._permission_mode = "bypassPermissions"
         self._process: asyncio.subprocess.Process | None = None
-        self._text_seen = False  # step 内是否已产出 text（区分中间 step_finish 和终态）
+        self._text_seen = False
 
     async def stream(self, request: AgentRequest) -> AsyncIterator[StreamEvent]:
         # 合并群聊 delta 到 system_prompt（对齐 ClaudeCode V0 行为）

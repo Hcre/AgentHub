@@ -87,29 +87,22 @@ class PiAgentRuntime(AgentRuntime):
     def __init__(
         self,
         *,
-        model: str = "",
         agent_id: str = "",
         agent_name: str = "",
-        provider: str = "anthropic",
-        api_key: str = "",
-        base_url: str = "",
-        proxy_base: str = "",
         thinking_level: str = _DEFAULT_THINKING_LEVEL,
         timeout: int = _DEFAULT_TIMEOUT,
-        session_dir: str = "",
-        permission_mode: str = _DEFAULT_PERMISSION_MODE,
-        max_turns: int = _DEFAULT_MAX_TURNS,
     ) -> None:
-        self._model = model
+        self._model = ""
         self._agent_id = agent_id
         self._agent_name = agent_name
-        self._provider = provider
-        self._api_key = api_key
-        self._base_url = base_url
+        self._provider = ""
+        self._api_key = ""
+        self._base_url = ""
         self._thinking_level = thinking_level
         self._timeout = timeout
-        self._permission_mode = permission_mode
-        self._max_turns = max_turns
+        self._proxy_url = ""
+        self._permission_mode = "bypassPermissions"
+        self._max_turns = 10
 
         self._proxy_url = (
             f"{proxy_base.rstrip('/')}/proxy/agents/{agent_id}" if proxy_base and agent_id else ""

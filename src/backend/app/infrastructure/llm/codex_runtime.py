@@ -63,25 +63,18 @@ class CodexRuntime(AgentRuntime):
     def __init__(
         self,
         *,
-        model: str = "",
         agent_id: str = "",
-        api_key: str = "",
         timeout: int = _DEFAULT_TIMEOUT,
         workspace: str | None = None,
-        permission_mode: str = _DEFAULT_PERMISSION_MODE,
-        max_turns: int = _DEFAULT_MAX_TURNS,
-        proxy_base: str = "",
     ) -> None:
-        self._model = model
+        self._model = ""
         self._agent_id = agent_id
-        self._api_key = api_key
+        self._api_key = ""
         self._timeout = timeout
         self._workspace = workspace
-        self._permission_mode = permission_mode
-        self._max_turns = max_turns
-        self._proxy_url = (
-            f"{proxy_base.rstrip('/')}/proxy/agents/{agent_id}" if proxy_base and agent_id else ""
-        )
+        self._proxy_url = ""
+        self._permission_mode = "bypassPermissions"
+        self._max_turns = 10
         self._process: asyncio.subprocess.Process | None = None
 
     async def stream(self, request: AgentRequest) -> AsyncIterator[StreamEvent]:

@@ -83,19 +83,12 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
         from app.infrastructure.llm.pi_agent_runtime import PiAgentRuntime
 
         s = agent.settings or {}
-        api_key = decrypt_secret(agent.settings.get("api_key_encrypted", "")) if agent.settings.get("api_key_encrypted", "") else ""
-        logger.info("Agent '%s' → PiAgentRuntime (CLI, provider=%s, model=%s)", agent.name, agent.settings.get("provider", "deepseek"), agent.settings.get("model", ""))
+        logger.info("Agent '%s' → PiAgentRuntime (CLI)", agent.name)
         return PiAgentRuntime(
             agent_id=str(agent.id),
             agent_name=agent.name,
-            model=agent.settings.get("model", "") or "",
-            provider=agent.settings.get("provider", "deepseek") or "anthropic",
-            api_key=api_key,
-            proxy_base=settings.proxy_base_url or "",
             timeout=s.get("cli_timeout", settings.claude_cli_timeout),
             thinking_level=s.get("thinking_level", "off"),
-            permission_mode=s.get("permission_mode", "bypassPermissions"),
-            max_turns=s.get("max_turns", 10),
         )
 
     if system == AgentSystem.OPENCODE:
@@ -105,17 +98,10 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
         from app.infrastructure.llm.opencode_runtime import OpenCodeRuntime
 
         s = agent.settings or {}
-        api_key = decrypt_secret(agent.settings.get("api_key_encrypted", "")) if agent.settings.get("api_key_encrypted", "") else ""
-        logger.info("Agent '%s' → OpenCodeRuntime (CLI, provider=%s, model=%s)", agent.name, agent.settings.get("provider", "deepseek"), agent.settings.get("model", ""))
+        logger.info("Agent '%s' → OpenCodeRuntime (CLI)", agent.name)
         return OpenCodeRuntime(
             agent_id=str(agent.id),
-            model=agent.settings.get("model", "") or "",
-            provider=agent.settings.get("provider", "deepseek") or "deepseek",
-            api_key=api_key,
-            proxy_base=settings.proxy_base_url or "",
             timeout=s.get("cli_timeout", settings.claude_cli_timeout),
-            permission_mode=s.get("permission_mode", "bypassPermissions"),
-            max_turns=s.get("max_turns", 10),
         )
 
     if system == AgentSystem.CODEX:
@@ -125,17 +111,11 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
         from app.infrastructure.llm.codex_runtime import CodexRuntime
 
         s = agent.settings or {}
-        api_key = decrypt_secret(agent.settings.get("api_key_encrypted", "")) if agent.settings.get("api_key_encrypted", "") else ""
-        logger.info("Agent '%s' → CodexRuntime (CLI, model=%s)", agent.name, agent.settings.get("model", ""))
+        logger.info("Agent '%s' → CodexRuntime (CLI)", agent.name)
         return CodexRuntime(
             agent_id=str(agent.id),
-            model=agent.settings.get("model", "") or "",
-            api_key=api_key,
-            proxy_base=settings.proxy_base_url or "",
             workspace=s.get("workspace_path"),
             timeout=s.get("cli_timeout", settings.claude_cli_timeout),
-            permission_mode=s.get("permission_mode", "bypassPermissions"),
-            max_turns=s.get("max_turns", 10),
         )
 
     if system in (AgentSystem.GEMINI, AgentSystem.CURSOR_AGENT):
