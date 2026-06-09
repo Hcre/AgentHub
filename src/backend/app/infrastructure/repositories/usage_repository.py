@@ -12,7 +12,7 @@ from app.domain.usage.usage_record import (
     USAGE_KIND_COMPLETION,
     USAGE_KIND_PROMPT,
 )
-from app.infrastructure.db.models import UsageRecordModel
+from app.infrastructure.db.models import AgentModel, UsageRecordModel
 
 
 def _to_domain(m: UsageRecordModel) -> UsageRecord:
@@ -121,23 +121,25 @@ class PostgresUsageRepository:
         stmt = (
             select(
                 UsageRecordModel.agent_id,
+                AgentModel.name,
                 UsageRecordModel.kind,
                 func.coalesce(func.sum(UsageRecordModel.tokens), 0),
             )
+            .outerjoin(AgentModel, UsageRecordModel.agent_id == AgentModel.id)
             .where(
                 UsageRecordModel.session_id == session_id,
                 UsageRecordModel.created_at >= window.since,
             )
-            .group_by(UsageRecordModel.agent_id, UsageRecordModel.kind)
+            .group_by(UsageRecordModel.agent_id, AgentModel.name, UsageRecordModel.kind)
         )
         rows = (await self._s.execute(stmt)).all()
         agg: dict[UUID, dict] = {}
-        for aid, kind, total in rows:
+        for aid, name, kind, total in rows:
             if aid is None:
                 continue
             bucket = agg.setdefault(
                 aid,
-                {"agent_id": str(aid), "prompt": 0, "completion": 0, "total": 0},
+                {"agent_id": str(aid), "agent_name": name or str(aid)[:8], "prompt": 0, "completion": 0, "total": 0},
             )
             if kind == USAGE_KIND_PROMPT:
                 bucket["prompt"] = int(total)
@@ -156,16 +158,18 @@ class PostgresUsageRepository:
         stmt = (
             select(
                 UsageRecordModel.agent_id,
+                AgentModel.name,
                 func.coalesce(func.sum(UsageRecordModel.tokens), 0).label("total"),
             )
+            .outerjoin(AgentModel, UsageRecordModel.agent_id == AgentModel.id)
             .where(UsageRecordModel.created_at >= window.since)
-            .group_by(UsageRecordModel.agent_id)
+            .group_by(UsageRecordModel.agent_id, AgentModel.name)
             .order_by(func.sum(UsageRecordModel.tokens).desc())
             .limit(top_n)
         )
         rows = (await self._s.execute(stmt)).all()
         return [
-            {"agent_id": str(aid), "total_tokens": int(total)}
-            for aid, total in rows
+            {"agent_id": str(aid), "agent_name": name or str(aid)[:8], "total_tokens": int(total)}
+            for aid, name, total in rows
             if aid is not None
         ]

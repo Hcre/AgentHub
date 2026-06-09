@@ -27,10 +27,26 @@ export interface ParsedDiff {
   hasChanges: boolean
 }
 
+/** 多文件 diff：每个文件一条 */
+export interface FileDiff {
+  /** 文件名（从 +++ b/path 提取） */
+  filename: string
+  oldValue: string
+  newValue: string
+  hasChanges: boolean
+}
+
 const HUNK_HEADER = /^@@/
 const FILE_HEADER_OLD = /^--- /
 const FILE_HEADER_NEW = /^\+\+\+ /
 const NO_NEWLINE_MARKER = /^\\ No newline at end of file$/
+const DIFF_GIT_HEADER = /^diff --git /
+
+/** 从 +++ b/path 行提取文件名 */
+function extractFilename(line: string): string {
+  const m = line.match(/^\+\+\+ b\/(.+)$/)
+  return m ? m[1] : ''
+}
 
 export function parseUnifiedDiff(diff: string): ParsedDiff {
   const oldLines: string[] = []
@@ -73,6 +89,53 @@ export function parseUnifiedDiff(diff: string): ParsedDiff {
     newValue: trimTrailing(newLines).join('\n'),
     hasChanges,
   }
+}
+
+/**
+ * 把多文件 unified diff 按 diff --git 切分，每文件独立解析。
+ * 无 diff --git 头时回退到单文件解析（兼容 ```diff 围栏）。
+ */
+export function parseMultiFileDiff(diff: string): FileDiff[] {
+  if (!diff) return []
+
+  // 按 diff --git 切分
+  const chunks: { filename: string; body: string }[] = []
+  const lines = diff.split('\n')
+  let currentFilename = ''
+  let currentLines: string[] = []
+  let started = false
+
+  for (const raw of lines) {
+    if (DIFF_GIT_HEADER.test(raw)) {
+      // 保存上一个 chunk
+      if (started && currentLines.length > 0) {
+        chunks.push({ filename: currentFilename, body: currentLines.join('\n') })
+      }
+      started = true
+      currentFilename = ''
+      currentLines = [raw]
+    } else if (started) {
+      currentLines.push(raw)
+      if (FILE_HEADER_NEW.test(raw) && !currentFilename) {
+        currentFilename = extractFilename(raw)
+      }
+    }
+  }
+  // 最后一个 chunk
+  if (started && currentLines.length > 0) {
+    chunks.push({ filename: currentFilename, body: currentLines.join('\n') })
+  }
+
+  // 无 diff --git 头 → 单文件回退
+  if (chunks.length === 0) {
+    const parsed = parseUnifiedDiff(diff)
+    return [{ filename: '', oldValue: parsed.oldValue, newValue: parsed.newValue, hasChanges: parsed.hasChanges }]
+  }
+
+  return chunks.map((c) => {
+    const parsed = parseUnifiedDiff(c.body)
+    return { filename: c.filename, ...parsed }
+  })
 }
 
 /**

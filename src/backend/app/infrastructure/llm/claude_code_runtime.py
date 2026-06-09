@@ -694,6 +694,10 @@ class ClaudeCodeRuntime(AgentRuntime):
                 "subtype": data.get("subtype", ""),
                 "is_error": data.get("is_error", False),
             }
+            # token 消耗（Claude Code CLI result 事件含 usage dict）
+            result_usage = data.get("usage")
+            if isinstance(result_usage, dict):
+                metadata["token_usage"] = result_usage
             # 权限阻断信息
             denials = data.get("permission_denials", [])
             if denials:

@@ -20,17 +20,50 @@ def estimate_tokens(text: str) -> int:
 
 
 def extract_completion_tokens(metadata: dict | None) -> int:
+    """从 metadata 提取真实 token 消耗。
+
+    各 runtime 上报格式：
+      - Claude Adapter / Codex / OpenCode: token_usage={"input_tokens":N,"output_tokens":M}
+      - Claude Code CLI:            token_usage={"input_tokens":N,"output_tokens":M}
+      - Pi Agent:                   usage={"input_tokens":N,"output_tokens":M}
+      - Mock:                       token_usage=int
+      - Anthropic SDK:              usage={"input_tokens":N,"output_tokens":N}
+    """
     if not metadata:
         return 0
-    usage = metadata.get("usage")
-    if isinstance(usage, dict):
-        for key in ("output_tokens", "completion_tokens"):
-            v = usage.get(key)
+
+    def _from_dict(d: dict) -> int:
+        """从 usage dict 取 output_tokens 或 completion_tokens。"""
+        for key in ("output_tokens", "completion_tokens", "input_tokens"):
+            v = d.get(key)
             if isinstance(v, int) and v >= 0:
                 return v
+        return 0
+
+    # 路径 1: "usage" 键（Pi Agent, Anthropic SDK）
+    usage = metadata.get("usage")
+    if isinstance(usage, dict):
+        tokens = _from_dict(usage)
+        if tokens > 0:
+            return tokens
+    if isinstance(usage, int) and usage >= 0:
+        return usage
+
+    # 路径 2: "token_usage" 键（Claude Code, Claude Adapter, Codex, OpenCode, Mock）
     tu = metadata.get("token_usage")
+    if isinstance(tu, dict):
+        tokens = _from_dict(tu)
+        if tokens > 0:
+            return tokens
     if isinstance(tu, int) and tu >= 0:
         return tu
+
+    # 路径 3: 直接从顶层取 output_tokens / completion_tokens（兼容旧格式）
+    for key in ("output_tokens", "completion_tokens"):
+        v = metadata.get(key)
+        if isinstance(v, int) and v >= 0:
+            return v
+
     return 0
 
 

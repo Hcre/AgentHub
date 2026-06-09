@@ -7,7 +7,7 @@ interface UsageResp {
   prompt_tokens: number
   completion_tokens: number
   since: string
-  by_agent: { agent_id: string; total_tokens: number }[]
+  by_agent: { agent_id: string; agent_name: string; total_tokens: number }[]
 }
 
 const WINDOWS = ['1h', '24h', '7d'] as const
@@ -85,7 +85,7 @@ export function TokenMonitorPanel({
           </div>
         )}
         <footer className="flex justify-between border-t p-3 text-xs text-muted-foreground">
-          <span>Top agent: {data['24h']?.by_agent?.[0]?.agent_id?.slice(0, 8) ?? '—'}</span>
+          <span>Top agent: {data['24h']?.by_agent?.[0]?.agent_name ?? '—'}</span>
           <Button onClick={() => onOpenChange(false)}>关闭</Button>
         </footer>
       </DialogContent>

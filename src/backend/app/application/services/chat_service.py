@@ -487,11 +487,17 @@ class ChatService:
 
         buffer: list[str] = []
         last_event: StreamEvent | None = None
+        accumulated_meta: dict = {}  # 收集所有事件的 token_usage/usage
         try:
             async for raw_event in adapter.stream(request):
                 event = self._tag_sender(raw_event, target.id)
                 if event.type == StreamEventType.TEXT and event.content:
                     buffer.append(event.content)
+                # 收集所有事件的 token 元数据（某些 runtime 不放 DONE 事件里）
+                if event.metadata:
+                    for k in ("token_usage", "usage", "model"):
+                        if k in (event.metadata or {}):
+                            accumulated_meta[k] = event.metadata[k]
                 last_event = event
                 yield event
         except Exception as exc:
@@ -536,14 +542,17 @@ class ChatService:
         # P1-2 token 消耗监控触发点（LLM 完成路径）
         if self._usage is not None:
             try:
-                last_meta = last_event.metadata if last_event else None
-                model = last_meta.get("model") if last_meta else None
+                # 优先用 last_event（DONE 事件通常含最全 metadata），
+                # 再合并 accumulated_meta（兜底非 DONE 事件里的 token_usage）
+                last_meta = dict(last_event.metadata) if last_event and last_event.metadata else {}
+                last_meta = {**accumulated_meta, **last_meta}  # last_event 优先
+                model = last_meta.get("model")
                 await self._usage.record_completion(
                     session_id=session.id,
                     message_id=assistant_msg.id,
                     agent_id=target.id,
                     content=full,
-                    metadata=last_meta,
+                    metadata=last_meta if last_meta else None,
                     model=model,
                 )
             except Exception:
