@@ -59,7 +59,7 @@ class ProxyHandler:
             return JSONResponse({"error": "agent not found"}, status_code=404)
 
         # 2. 解密 API Key
-        real_key = decrypt_secret(agent.api_key_encrypted)
+        real_key = decrypt_secret(agent.settings.get("api_key_encrypted", ""))
         if not real_key:
             return JSONResponse({"error": "agent has no api_key"}, status_code=400)
 
@@ -68,7 +68,7 @@ class ProxyHandler:
             return Response(status_code=200)
 
         # 4. 拼接目标 URL
-        base = (agent.base_url or "").rstrip("/")
+        base = (agent.settings.get("base_url", "") or "").rstrip("/")
         if not base:
             return JSONResponse({"error": "agent has no base_url"}, status_code=400)
         target_url = f"{base}/{path}"
@@ -91,7 +91,7 @@ class ProxyHandler:
 
         # 5. 处理 body — 非 Anthropic 提供商过滤 system 消息
         body = await request.body()
-        if body and "deepseek" in (agent.base_url or "").lower():
+        if body and "deepseek" in (agent.settings.get("base_url", "") or "").lower():
             try:
                 data = json.loads(body)
                 msgs = data.get("messages", [])

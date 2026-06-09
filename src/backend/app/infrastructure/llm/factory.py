@@ -45,16 +45,16 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
     system = agent.agent_system
 
     if system == AgentSystem.ANTHROPIC_API:
-        api_key = decrypt_secret(agent.api_key_encrypted)
+        api_key = decrypt_secret(agent.settings.get("api_key_encrypted", ""))
         if not api_key:
             logger.warning("Agent %s 无 API key，降级为 mock", agent.name)
             return MockAdapter()
         from app.infrastructure.llm.claude_adapter import ClaudeAdapter
 
-        return ClaudeAdapter(api_key=api_key, model=agent.model or settings.default_model)
+        return ClaudeAdapter(api_key=api_key, model=agent.settings.get("model", "") or settings.default_model)
 
     if system == AgentSystem.OPENAI_API:
-        api_key = decrypt_secret(agent.api_key_encrypted)
+        api_key = decrypt_secret(agent.settings.get("api_key_encrypted", ""))
         if not api_key:
             logger.warning("Agent %s 无 API key，降级为 mock", agent.name)
             return MockAdapter()
@@ -83,13 +83,13 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
         from app.infrastructure.llm.pi_agent_runtime import PiAgentRuntime
 
         s = agent.settings or {}
-        api_key = decrypt_secret(agent.api_key_encrypted) if agent.api_key_encrypted else ""
-        logger.info("Agent '%s' → PiAgentRuntime (CLI, provider=%s, model=%s)", agent.name, agent.provider, agent.model)
+        api_key = decrypt_secret(agent.settings.get("api_key_encrypted", "")) if agent.settings.get("api_key_encrypted", "") else ""
+        logger.info("Agent '%s' → PiAgentRuntime (CLI, provider=%s, model=%s)", agent.name, agent.settings.get("provider", "deepseek"), agent.settings.get("model", ""))
         return PiAgentRuntime(
             agent_id=str(agent.id),
             agent_name=agent.name,
-            model=agent.model or "",
-            provider=agent.provider or "anthropic",
+            model=agent.settings.get("model", "") or "",
+            provider=agent.settings.get("provider", "deepseek") or "anthropic",
             api_key=api_key,
             proxy_base=settings.proxy_base_url or "",
             timeout=s.get("cli_timeout", settings.claude_cli_timeout),
@@ -105,12 +105,12 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
         from app.infrastructure.llm.opencode_runtime import OpenCodeRuntime
 
         s = agent.settings or {}
-        api_key = decrypt_secret(agent.api_key_encrypted) if agent.api_key_encrypted else ""
-        logger.info("Agent '%s' → OpenCodeRuntime (CLI, provider=%s, model=%s)", agent.name, agent.provider, agent.model)
+        api_key = decrypt_secret(agent.settings.get("api_key_encrypted", "")) if agent.settings.get("api_key_encrypted", "") else ""
+        logger.info("Agent '%s' → OpenCodeRuntime (CLI, provider=%s, model=%s)", agent.name, agent.settings.get("provider", "deepseek"), agent.settings.get("model", ""))
         return OpenCodeRuntime(
             agent_id=str(agent.id),
-            model=agent.model or "",
-            provider=agent.provider or "deepseek",
+            model=agent.settings.get("model", "") or "",
+            provider=agent.settings.get("provider", "deepseek") or "deepseek",
             api_key=api_key,
             proxy_base=settings.proxy_base_url or "",
             timeout=s.get("cli_timeout", settings.claude_cli_timeout),
@@ -125,11 +125,11 @@ def build_adapter_for_agent(agent: Agent) -> UnifiedAgent:
         from app.infrastructure.llm.codex_runtime import CodexRuntime
 
         s = agent.settings or {}
-        api_key = decrypt_secret(agent.api_key_encrypted) if agent.api_key_encrypted else ""
-        logger.info("Agent '%s' → CodexRuntime (CLI, model=%s)", agent.name, agent.model)
+        api_key = decrypt_secret(agent.settings.get("api_key_encrypted", "")) if agent.settings.get("api_key_encrypted", "") else ""
+        logger.info("Agent '%s' → CodexRuntime (CLI, model=%s)", agent.name, agent.settings.get("model", ""))
         return CodexRuntime(
             agent_id=str(agent.id),
-            model=agent.model or "",
+            model=agent.settings.get("model", "") or "",
             api_key=api_key,
             proxy_base=settings.proxy_base_url or "",
             workspace=s.get("workspace_path"),
