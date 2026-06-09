@@ -171,8 +171,9 @@ class ClaudeCodeRuntime(AgentRuntime):
         ):
             try:
                 send()
-            except ProcessLookupError:
-                break  # 已退出
+            except (ProcessLookupError, ValueError):
+                # ProcessLookupError=已退出; ValueError=Windows 不支持 SIGINT，直接试下一档
+                continue
             try:
                 await asyncio.wait_for(proc.wait(), timeout=grace)
                 break  # 收住了
@@ -550,14 +551,31 @@ class ClaudeCodeRuntime(AgentRuntime):
 
     @staticmethod
     async def _read_lines(stdout: asyncio.StreamReader, session_id: str) -> AsyncIterator[str]:
-        """读取 stdout 行，同时写入 CLI 日志。不做超时（超时由 watchdog task 杀进程 → EOF 来保证）。"""
+        """读取 stdout 行，同时写入 CLI 日志。不做超时（超时由 watchdog task 杀进程 → EOF 来保证）。
+        CLI 输出可能含很长的 JSON 行（嵌文件内容），readline 默认 64KB buffer 会 LimitOverrunError。
+        这里用逐字节读取直到 \n，buffer 无上限，避免截断。"""
         log_path = get_log_path(session_id)
         with open(log_path, "a", encoding="utf-8", errors="replace") as log_f:
+            buf = bytearray()
             while True:
-                line = await stdout.readline()
-                if not line:
-                    break
-                decoded = line.decode(errors="replace").strip()
+                chunk = await stdout.read(8192)
+                if not chunk:
+                    break  # EOF
+                buf.extend(chunk)
+                # 切出行
+                while b"\n" in buf:
+                    idx = buf.index(b"\n")
+                    line = bytes(buf[:idx])
+                    del buf[: idx + 1]
+                    decoded = line.decode(errors="replace").strip()
+                    if decoded:
+                        ts = datetime.now(UTC).isoformat()
+                        log_f.write(f"[{ts}] {decoded}\n")
+                        log_f.flush()
+                        yield decoded
+            # 最后残余（EOF 前最后一行没有 \n）
+            if buf:
+                decoded = bytes(buf).decode(errors="replace").strip()
                 if decoded:
                     ts = datetime.now(UTC).isoformat()
                     log_f.write(f"[{ts}] {decoded}\n")

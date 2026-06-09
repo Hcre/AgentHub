@@ -10,6 +10,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal, Protocol
+from uuid import UUID
 
 from app.domain.task_engine.dag import TaskDef, TaskNode
 
@@ -109,3 +110,55 @@ class Verifier(Protocol):
     """验收：对完成的任务出裁决。内部跑机械命令 / 独立 reviewer。"""
 
     async def verify(self, node: TaskNode) -> Verdict: ...
+
+
+# ── Supervisor（可选注入）───────────────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class StepEvent:
+    """Supervisor 监听的步骤级事件载荷。"""
+
+    step_id: str
+    title: str
+    worker: str
+    status: str  # completed / failed
+    reason: str = ""  # 失败原因（status=failed 时）
+
+
+@dataclass(frozen=True)
+class StallEvent:
+    """Supervisor 监听的卡死事件载荷。"""
+
+    description: str
+    failed_steps: tuple[str, ...]
+    blocked_steps: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SupervisorConfig:
+    """Supervisor 配置（注入 orchestrator 时提供）。"""
+
+    supervisor_agent_id: str  # 担任 supervisor 角色的 Agent name 或 id
+    enabled: bool = True
+    max_turns: int = 10  # 单次唤醒最多 spawn 的 CLI turn 数
+
+
+class Supervisor(Protocol):
+    """可选注入：任务监督者。
+
+    唤醒时机（hook）：
+      - on_step_completed: worker 完成一个步骤
+      - on_step_failed: 步骤永久失败（retry 耗尽）
+      - on_all_completed: 全部任务完成
+      - on_stall_detected: 检测到卡死
+
+    若注入 None，行为与当前完全一致——所有 hook 被跳过。
+    """
+
+    async def on_step_completed(self, session_id: UUID, event: StepEvent) -> None: ...
+
+    async def on_step_failed(self, session_id: UUID, event: StepEvent) -> None: ...
+
+    async def on_all_completed(self, session_id: UUID) -> None: ...
+
+    async def on_stall_detected(self, session_id: UUID, event: StallEvent) -> None: ...

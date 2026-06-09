@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from uuid import UUID
 
 from app.domain.enums import TaskStatus
 from app.domain.task_engine.dag import TaskDef, TaskGraph, TaskNode, build_graph, topological_order
@@ -23,6 +24,9 @@ from app.domain.task_engine.ports import (
     Planner,
     ProgressSink,
     RunResult,
+    StallEvent,
+    StepEvent,
+    Supervisor,
     Verifier,
     WorkerOutcome,
 )
@@ -94,6 +98,8 @@ class Orchestrator:
         ctx: PlanContext,
         progress: ProgressSink | None = None,
         message_sink: MessageSink | None = None,
+        supervisor: Supervisor | None = None,
+        session_id: UUID | None = None,
     ) -> None:
         self._planner = planner
         self._executor = executor
@@ -101,6 +107,8 @@ class Orchestrator:
         self._ctx = ctx
         self._progress = progress
         self._message_sink = message_sink  # R4：关键事件写 transcript（messages 表 + 群聊）
+        self._supervisor = supervisor
+        self._session_id = session_id
         self.graph: TaskGraph | None = None
         self.events: list[dict] = []  # MVP：内存事件
         # 执行期旁路消息队列（§11.6）：CoordinatorRun 共享此引用，
@@ -293,16 +301,24 @@ class Orchestrator:
                 self._transition(node, TaskStatus.COMPLETED)
                 await self._emit_update(node, "done")
                 await self._post_step_done(node)  # R4：完成入 transcript
+                await self._notify_supervisor_step_completed(node)
             else:
                 permanent = self._handle_failure(node, verdict.reason)
                 await self._emit_update(node, "failed", node.fail_reason)
                 if permanent:
                     await self._post_step_failed(node)
+                    await self._notify_supervisor_step_failed(node)
             return
 
         if outcome.status == "not_done":
-            # 流结束没交卷。不转移、不失败、不重试——节点停在 RUNNING。
-            # _drive 取不到新 ready → break → park。用户回话 → on_feed --resume 续跑。
+            # 流结束没交卷。不转移、不失败——但主动 nudge worker 调 task_complete。
+            # 如果 worker 没提问（无 pending_answer），说明它只是忘了交卷，推一条强制指令。
+            worker = node.task.suggested_worker
+            if not node.pending_answer and worker:
+                self._pending_notes.setdefault(worker, []).append(
+                    "你已经完成了所有工作。现在请**只做一件事**：调用 `task_complete` 工具交卷"
+                    "（summary 写：做了什么、产物在哪）。不要做其他任何操作，只调工具。"
+                )
             self._record("parked", node.task.id)
             return
 
@@ -311,6 +327,7 @@ class Orchestrator:
         await self._emit_update(node, "failed", node.fail_reason)
         if permanent:
             await self._post_step_failed(node)
+            await self._notify_supervisor_step_failed(node)
 
     def _handle_failure(self, node: TaskNode, reason: str) -> bool:
         """处理失败。返回 True 表示永久失败（retry 耗尽/不可重试），调用方据此通报。"""
@@ -390,6 +407,11 @@ class Orchestrator:
         )
         await self._emit("text", {"content": content})  # WS 任务面板
         await self._post_message(content)                # R4：入 transcript
+        # 通知 supervisor
+        assert self.graph is not None
+        failed_ids = [n.task.id for n in self.graph.nodes.values() if n.status == TaskStatus.FAILED]
+        blocked_ids = [n.task.id for n in self.graph.nodes.values() if n.status == TaskStatus.BLOCKED]
+        await self._notify_supervisor_stall(description, failed_ids, blocked_ids)
 
     # ── R4：关键事件入 transcript（messages 表 + 群聊）─────────────────────────
 
@@ -418,10 +440,68 @@ class Orchestrator:
             f"❌ {node.task.title}（{worker}）已失败（重试 {node.retries} 次不通过）{reason}"
         )
 
+    # ── Supervisor 通知 ────────────────────────────────────────────────────────
+
+    async def _notify_supervisor_step_completed(self, node: TaskNode) -> None:
+        """通知 supervisor 步骤完成。失败静默吞掉，不阻塞主流程。"""
+        if self._supervisor is None or self._session_id is None:
+            return
+        try:
+            event = StepEvent(
+                step_id=node.task.id,
+                title=node.task.title,
+                worker=node.worker or node.task.suggested_worker,
+                status="completed",
+            )
+            await self._supervisor.on_step_completed(self._session_id, event)
+        except Exception:
+            logger.exception("supervisor on_step_completed 异常")
+
+    async def _notify_supervisor_step_failed(self, node: TaskNode) -> None:
+        """通知 supervisor 步骤永久失败。失败静默吞掉，不阻塞主流程。"""
+        if self._supervisor is None or self._session_id is None:
+            return
+        try:
+            event = StepEvent(
+                step_id=node.task.id,
+                title=node.task.title,
+                worker=node.worker or node.task.suggested_worker,
+                status="failed",
+                reason=node.fail_reason or "",
+            )
+            await self._supervisor.on_step_failed(self._session_id, event)
+        except Exception:
+            logger.exception("supervisor on_step_failed 异常")
+
+    async def _notify_supervisor_all_completed(self) -> None:
+        """通知 supervisor 全部完成。"""
+        if self._supervisor is None or self._session_id is None:
+            return
+        try:
+            await self._supervisor.on_all_completed(self._session_id)
+        except Exception:
+            logger.exception("supervisor on_all_completed 异常")
+
+    async def _notify_supervisor_stall(self, description: str, failed: list[str], blocked: list[str]) -> None:
+        """通知 supervisor 检测到卡死。"""
+        if self._supervisor is None or self._session_id is None:
+            return
+        try:
+            event = StallEvent(
+                description=description,
+                failed_steps=tuple(failed),
+                blocked_steps=tuple(blocked),
+            )
+            await self._supervisor.on_stall_detected(self._session_id, event)
+        except Exception:
+            logger.exception("supervisor on_stall_detected 异常")
+
     async def _finish(self, reason: ExitReason) -> None:
         """全完成：出 summary → 调回调释放 run。"""
         summary = self._build_summary()
         await self._emit_summary(summary)
+        if reason == ExitReason.COMPLETED:
+            await self._notify_supervisor_all_completed()
         if self._on_finish is not None:
             await self._on_finish(RunResult(reason, summary))
 

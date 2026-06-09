@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     l1_window_size: int = 20
     max_tokens: int = 16000
     max_tool_turns: int = 10
-    claude_cli_timeout: int = 300
+    claude_cli_timeout: int = 1200  # 20 分钟，长任务（博客全栈构建）需要更长时间
     proxy_base_url: str = "http://127.0.0.1:9001"
 
     # --- Claude Code 长驻进程（Phase 1，见 ADR-02）---
@@ -78,6 +78,18 @@ class Settings(BaseSettings):
     # --- 步骤终结工具 MCP (coordinator v3) ---
     # MCP_STEP_TOOLS_URL 非空时，worker CLI spawn 注入 step-tools server（task_complete/ask）
     mcp_step_tools_url: str = "http://127.0.0.1:8000/api/step-tools/sse"
+
+    # --- Supervisor 工具 MCP ---
+    # MCP_SUPERVISOR_TOOLS_URL 非空时，supervisor CLI spawn 注入 supervisor-tools server
+    mcp_supervisor_tools_url: str = "http://127.0.0.1:8000/api/supervisor-tools/sse"
+
+    # --- Supervisor 配置 ---
+    # SUPERVISOR_AGENT_NAME: 担任 supervisor 的 agent 名字（为空=禁用 supervisor）
+    supervisor_agent_name: str = ""
+    # SUPERVISOR_ENABLED: 显式启用开关（supervisor_agent_name 为空时自动禁用）
+    supervisor_enabled: bool = True
+    # SUPERVISOR_MAX_TURNS: 单次任务 supervisor 最多 spawn 的 CLI turn 数
+    supervisor_max_turns: int = 10
 
     # --- CORS ---
     cors_origins: str = "http://localhost:5173"

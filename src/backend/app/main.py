@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.mcp_memory import get_mcp_asgi
 from app.api.mcp_step_tools import get_mcp_step_tools_asgi
+from app.api.supervisor_tools import get_supervisor_mcp_asgi
 from app.api.routers import (
     agents,
     attachments,
@@ -162,6 +163,9 @@ if _mcp_asgi is not None:
 _step_tools_asgi = get_mcp_step_tools_asgi()
 if _step_tools_asgi is not None:
     app.mount("/api/step-tools", _step_tools_asgi)
+_supervisor_tools_asgi = get_supervisor_mcp_asgi()
+if _supervisor_tools_asgi is not None:
+    app.mount("/api/supervisor-tools", _supervisor_tools_asgi)
 
 
 @app.get("/health", tags=["health"])
