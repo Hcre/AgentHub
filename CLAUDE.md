@@ -101,6 +101,7 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 ## 行为准则
 
 ### 禁止
+- **🚫 禁止直接在 `main` 分支开发、提交、push**。所有工作必须在 `feature/<domain>/<desc>` 分支上进行，通过 PR 合并（PR-02）。
 - 奉承话、空话、猜测 —— 不确定就查代码/文档
 - 过度设计 —— 不做 spec 里没写的功能
 - 跳过红线 —— `docs/conventions/` 任一条红线都不能违反
@@ -126,7 +127,7 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 |------|------|------|
 | 架构 | AR-01 5 层洋葱 / AR-02 新 Agent 只加 Adapter / AR-03 Harness 无 LLM / AR-04 Agent 不直通 / AR-05 FSM 事件溯源 / AR-06 system-model 解耦 | [01-architecture](docs/conventions/01-architecture_架构设计规范.md) |
 | 代码 | CR-01~12（Python 7 + TS 3 + 通用 2，详见 [CLAUDE.md §2](docs/conventions/CLAUDE-规范导航.md)） | [02-coding](docs/conventions/02-coding_代码编写规范.md) |
-| Git | PR-02 分支命名 / PR-03 Conventional / PR-06 ≥1 Approve / PR-07 verify | [03-git](docs/conventions/03-git_Git协作规范.md) |
+| Git | **🚫 禁止 main 开发** / PR-02 分支命名 / PR-03 Conventional / PR-06 ≥1 Approve / PR-07 verify | [03-git](docs/conventions/03-git_Git协作规范.md) |
 | API | AP-01~07（kebab + `{error:{code,message}}` + JWT + Pydantic + 版本 + 兼容 + WS request_id） | [04-api](docs/conventions/04-api_API设计规范.md) |
 | 测试 | T-01~06（独立 / Mock 边界 / 三路径 / 无 flaky / Adapter & FSM 必测） | [05-testing](docs/conventions/05-testing_测试规范.md) |
 | 文档 | D-01~12（命名 + 自动校验，详见 `check_docs.py`） | [06-documentation](docs/conventions/06-documentation_文档规范.md) |
@@ -227,7 +228,7 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 ```
 
 ### 每次工作前
-1. `skills/git-workflow/` 检查分支 + 同步 main（不要在 main 上开发）
+1. `skills/git-workflow/` 检查分支 + 同步 main。**绝对禁止直接在 main 上 commit/push**——发现自己在 main 上立刻切到 feature 分支
 2. 读根 `STATUS.md` 了解其他人在做什么
 3. 读 `docs/plan/开发清单_roadmap.md` 确认当前进度
 
