@@ -34,7 +34,9 @@ class SessionOut(BaseModel):
     agent_id: UUID | None
     workspace_path: str
     pinned: bool = False
+    archived: bool = False  # M1#2 会话归档
     created_at: datetime
+    updated_at: datetime | None = None  # 前端排序用
 
 
 class SendMessageRequest(BaseModel):

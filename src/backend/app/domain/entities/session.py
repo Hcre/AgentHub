@@ -23,6 +23,7 @@ class Session:
     agent_id: UUID | None = None  # 私聊时必填
     workspace_path: str = ""  # Agent 工作目录（宿主机绝对路径）
     pinned: bool = False  # t7 B-4-P2-CL01：会话置顶
+    archived: bool = False  # M1#2：会话归档（前端 LeftPanel「已归档」分区）
     created_at: datetime = field(default_factory=_now)
     updated_at: datetime = field(default_factory=_now)
 

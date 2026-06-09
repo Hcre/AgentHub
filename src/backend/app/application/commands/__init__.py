@@ -126,6 +126,7 @@ class UpdateSessionCommand:
     title: str | None = None
     workspace_path: str | None = None
     pinned: bool | None = None  # t7 B-4-P2-CL01：会话置顶开关
+    archived: bool | None = None  # M1#2：会话归档开关
 
 
 # === Task Commands ===

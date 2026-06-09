@@ -55,7 +55,9 @@ class SessionResponse:
     agent_id: UUID | None
     workspace_path: str
     pinned: bool
+    archived: bool = False  # M1#2
     created_at: datetime
+    updated_at: datetime | None = None  # M1#1 前端排序用
 
     @classmethod
     def from_domain(cls, s: Session) -> SessionResponse:
@@ -67,7 +69,9 @@ class SessionResponse:
             agent_id=s.agent_id,
             workspace_path=s.workspace_path or "",
             pinned=s.pinned,
+            archived=s.archived,
             created_at=s.created_at,
+            updated_at=s.updated_at,
         )
 
 

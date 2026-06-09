@@ -73,6 +73,8 @@ class SessionService:
             session.workspace_path = cmd.workspace_path
         if cmd.pinned is not None:
             session.pinned = cmd.pinned
+        if cmd.archived is not None:  # M1#2
+            session.archived = cmd.archived
         await self._sessions.save(session)
         return SessionResponse.from_domain(session)
 

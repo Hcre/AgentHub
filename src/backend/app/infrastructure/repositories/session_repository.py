@@ -22,6 +22,7 @@ def _to_domain(m: SessionModel) -> Session:
         agent_id=m.agent_id,
         workspace_path=m.workspace_path or "",
         pinned=m.pinned,
+        archived=m.archived,
         created_at=m.created_at,
         updated_at=m.updated_at,
     )
@@ -43,12 +44,14 @@ class PostgresSessionRepository(SessionRepository):
                     agent_id=session.agent_id,
                     workspace_path=session.workspace_path or "",
                     pinned=session.pinned,
+                    archived=session.archived,
                 )
             )
         else:
             existing.title = session.title
             existing.workspace_path = session.workspace_path or ""
             existing.pinned = session.pinned
+            existing.archived = session.archived
         await self._s.flush()
 
     async def get_by_id(self, session_id: UUID) -> Session | None:
