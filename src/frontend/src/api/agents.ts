@@ -31,6 +31,15 @@ export interface UpdateAgentInput {
   system_prompt?: string;
 }
 
+/** M1#4 对话式创建：后端抽出的 Agent 草稿 */
+export interface AgentDraft {
+  name: string
+  role: string
+  system_prompt: string
+  skills: string[]
+  source: string
+}
+
 export const agentsApi = {
   list: () => api.get<ApiAgent[]>("/api/agents"),
   get: (id: string) => api.get<ApiAgent>(`/api/agents/${id}`),
@@ -40,4 +49,7 @@ export const agentsApi = {
   remove: (id: string) => api.del<void>(`/api/agents/${id}`),
   /** 连通性检查：获取 Agent 配置确认可用 */
   ping: (id: string) => api.get<ApiAgent>(`/api/agents/${id}`),
+  /** M1#4 对话式创建：自然语言 → Agent 草稿（不持久化） */
+  draftFromChat: (description: string) =>
+    api.post<AgentDraft>("/api/agents/draft-from-chat", { description }),
 };

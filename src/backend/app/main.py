@@ -137,6 +137,14 @@ _step_tools_asgi = get_mcp_step_tools_asgi()
 if _step_tools_asgi is not None:
     app.mount("/api/step-tools", _step_tools_asgi)
 
+# M4①.1：部署真链路 — 把 _assets/deploy/{id}/ 暴露为 /preview/{id}/
+# （静态托管走 FastAPI StaticFiles，生产可改 nginx 同路径反向代理）
+import os as _os  # noqa: E402
+from fastapi.staticfiles import StaticFiles as _StaticFiles  # noqa: E402
+_DEPLOY_ROOT = _os.path.abspath("_assets/deploy")
+_os.makedirs(_DEPLOY_ROOT, exist_ok=True)
+app.mount("/preview", _StaticFiles(directory=_DEPLOY_ROOT, html=True, check_dir=False), name="deploy-preview")
+
 
 @app.get("/health", tags=["health"])
 async def health() -> dict:
