@@ -419,6 +419,7 @@ export function CreateAgentModal({
     setAgentSystem('')
     setStatus('idle')
     setErrorMsg('')
+    setNameError('')
   }
 
   const handleClose = () => {
@@ -434,17 +435,20 @@ export function CreateAgentModal({
 
   const canNext = (() => {
     if (preSelectedTemplate) return true
-    if (!hasAnySelection) { setNameError('请选择一个模板'); return false }
-    if (!agentName.trim()) { setNameError('请输入队友名称'); return false }
-    if (existingNames.includes(agentName.trim().toLowerCase())) { setNameError('该名称已被使用，请换一个'); return false }
+    if (!hasAnySelection) return false
+    if (!agentName.trim()) return false
+    if (existingNames.includes(agentName.trim().toLowerCase())) return false
     if (isCustom && (!customPrompt.trim() || !customRoleName.trim())) return false
-    setNameError('')
     return true
   })()
 
   const goNext = () => {
-    if (!canNext) return
+    if (!agentName.trim()) { setNameError('请输入队友名称'); return }
+    if (existingNames.includes(agentName.trim().toLowerCase())) { setNameError('该名称已被使用，请换一个'); return }
+    if (!hasAnySelection) { setNameError('请选择一个模板'); return }
+    if (isCustom && (!customPrompt.trim() || !customRoleName.trim())) return
     setAgentSystem('')
+    setNameError('')
     setStep(2)
 
     // 后台异步扫描 CLI
