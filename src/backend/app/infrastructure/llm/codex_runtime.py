@@ -408,13 +408,21 @@ class CodexRuntime(AgentRuntime):
                 StreamEvent(type=StreamEventType.DONE, seq=seq, metadata=metadata)
             )
 
+        elif event_type == "error":
+            # Codex 重连/网络错误消息 → THINKING 面板展示进度
+            msg = data.get("message", "")
+            if msg:
+                events.append(
+                    StreamEvent(type=StreamEventType.THINKING, seq=seq, content=f"⚠️ {msg}")
+                )
+
         elif event_type in ("thread.started", "turn.started"):
             pass  # 跳过元事件
 
         else:
-            # 未知事件类型：记录 warning，若含 text/content 则回退为 TEXT
+            # 未知事件类型：记录 warning，若含 text/content/message 则回退为 TEXT
             logger.debug("Codex 未知事件类型: %s keys=%s", event_type, list(data.keys())[:5])
-            fallback_text = data.get("text") or data.get("content")
+            fallback_text = data.get("text") or data.get("content") or data.get("message")
             if fallback_text and isinstance(fallback_text, str):
                 events.append(
                     StreamEvent(type=StreamEventType.TEXT, seq=seq, content=fallback_text)
