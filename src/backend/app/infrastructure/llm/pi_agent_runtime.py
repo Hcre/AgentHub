@@ -104,11 +104,7 @@ class PiAgentRuntime(AgentRuntime):
         self._permission_mode = "bypassPermissions"
         self._max_turns = 10
 
-        self._proxy_url = (
-            f"{proxy_base.rstrip('/')}/proxy/agents/{agent_id}" if proxy_base and agent_id else ""
-        )
-
-        self._session_dir = session_dir or str(Path.home() / ".agenthub" / "pi-sessions")
+        self._session_dir = ""  # Pi CLI manages its own session directory
         Path(self._session_dir).mkdir(parents=True, exist_ok=True)
 
         self._process: asyncio.subprocess.Process | None = None
