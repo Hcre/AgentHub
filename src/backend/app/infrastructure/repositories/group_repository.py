@@ -24,6 +24,7 @@ def _to_domain(m: GroupModel, member_ids: list[UUID]) -> Group:
         coordinator_id=m.coordinator_id,
         coordinator_config=dict(m.coordinator_config or {}),
         member_ids=member_ids,
+        workspace_path=m.workspace_path or "",
         created_at=m.created_at,
         updated_at=m.updated_at,
     )
@@ -36,6 +37,7 @@ def _to_model(g: Group) -> GroupModel:
         description=g.description,
         coordinator_id=g.coordinator_id,
         coordinator_config=g.coordinator_config,
+        workspace_path=g.workspace_path,
     )
 
 
@@ -43,6 +45,7 @@ def _update_model(m: GroupModel, g: Group) -> None:
     m.name = g.name
     m.description = g.description
     m.coordinator_config = g.coordinator_config
+    m.workspace_path = g.workspace_path
 
 
 class PostgresGroupRepository(GroupRepository):

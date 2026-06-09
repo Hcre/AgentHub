@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Icon } from '../ui'
+import { Button, Dialog, DialogContent, Icon } from '../ui'
 
 const WINDOWS = [
   { key: '1h', label: '1 小时' } as const,
@@ -120,10 +120,31 @@ const CLI_CONFIG_PATHS = [
 export function SettingsPage() {
   // 协调者凭证表单
   const [provider, setProvider] = useState('deepseek')
-  const [model, setModel] = useState('')
+  const [model, setModel] = useState('deepseek-chat')
   const [apiKey, setApiKey] = useState('')
+  const [baseUrl, setBaseUrl] = useState('')
+  const [hasSavedKey, setHasSavedKey] = useState(false)
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<'idle' | 'saved' | 'error'>('idle')
+  const [credentialOpen, setCredentialOpen] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; latency_ms?: number; model?: string; error?: string } | null>(null)
+
+  // 页面加载时读取已保存凭证
+  useEffect(() => {
+    fetch('/api/agents/coordinator/credential')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.has_key) {
+          setProvider(data.provider || 'deepseek')
+          setModel(data.model || 'deepseek-chat')
+          setBaseUrl(data.base_url || '')
+          setHasSavedKey(true)
+          // 不设置 apiKey（已加密，只返回前缀），用户需重新输入
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   // CLI 配置面板
   const [showCliConfig, setShowCliConfig] = useState(false)
@@ -132,18 +153,40 @@ export function SettingsPage() {
     if (!apiKey.trim()) return
     setSaving(true)
     setFeedback('idle')
+    setTestResult(null)
     try {
       const r = await fetch('/api/agents/coordinator/credential', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider, api_key: apiKey, model }),
+        body: JSON.stringify({ provider, api_key: apiKey, model, base_url: baseUrl }),
       })
       if (!r.ok) throw new Error(`${r.status}`)
       setFeedback('saved')
+      setHasSavedKey(true)
     } catch {
       setFeedback('error')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleTest = async () => {
+    if (!apiKey.trim() || !model.trim()) return
+    setTesting(true)
+    setTestResult(null)
+    setFeedback('idle')
+    try {
+      const r = await fetch('/api/agents/coordinator/credential/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, api_key: apiKey, model, base_url: baseUrl }),
+      })
+      const data = await r.json()
+      setTestResult(data)
+    } catch {
+      setTestResult({ ok: false, error: '网络请求失败' })
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -164,64 +207,144 @@ export function SettingsPage() {
         {/* ── 协调者凭证 ── */}
         <section>
           <h3 className="mb-3 text-[13px] font-medium text-muted-foreground">协调者凭证</h3>
-          <div className="rounded-lg border border-border/60 glass-soft p-4 space-y-3">
-            {/* Provider */}
-            <div>
-              <label className="block mb-1 text-[11px] text-muted-foreground">Provider</label>
-              <select
-                value={provider}
-                onChange={(e) => setProvider(e.target.value)}
-                className="w-full rounded-md border border-border/60 bg-background px-3 py-1.5 text-[13px] text-foreground outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/20"
-              >
-                {PROVIDERS.map((p) => (
-                  <option key={p.value} value={p.value}>{p.label}</option>
-                ))}
-              </select>
+          <button
+            onClick={() => setCredentialOpen(true)}
+            className="flex w-full items-center gap-4 rounded-lg border border-border/60 glass-soft p-4 text-left transition-colors hover:bg-accent/40"
+          >
+            <div className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg bg-brand/10 text-brand">
+              <Icon name="brain" className="h-5 w-5" />
             </div>
-
-            {/* Model */}
-            <div>
-              <label className="block mb-1 text-[11px] text-muted-foreground">Model</label>
-              <input
-                type="text"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                placeholder="如 deepseek-chat"
-                className="w-full rounded-md border border-border/60 bg-background px-3 py-1.5 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-brand/50 focus:ring-1 focus:ring-brand/20"
-              />
+            <div className="min-w-0 flex-1">
+              <div className="text-[13px] font-medium">
+                {hasSavedKey ? `${PROVIDERS.find(p => p.value === provider)?.label ?? provider} · ${model || '—'}` : '未配置'}
+              </div>
+              <div className="mt-0.5 text-[11px] text-muted-foreground">
+                {hasSavedKey
+                  ? `密钥已设置 · 点击修改`
+                  : '点击配置协调者 API 凭证'}
+              </div>
             </div>
-
-            {/* API Key */}
-            <div>
-              <label className="block mb-1 text-[11px] text-muted-foreground">API Key</label>
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="sk-..."
-                className="w-full rounded-md border border-border/60 bg-background px-3 py-1.5 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-brand/50 focus:ring-1 focus:ring-brand/20"
-              />
+            <div className={`grid h-3 w-3 flex-shrink-0 place-items-center rounded-full ${hasSavedKey ? 'bg-emerald-500' : 'bg-muted-foreground/30'}`}>
+              {hasSavedKey && <Icon name="check" className="h-2 w-2 text-white" strokeWidth={3} />}
             </div>
-
-            {/* Save button + feedback */}
-            <div className="flex items-center gap-3 pt-1">
-              <button
-                onClick={handleSave}
-                disabled={saving || !apiKey.trim()}
-                className="inline-flex items-center gap-1.5 rounded-md bg-brand px-4 py-1.5 text-[13px] font-medium text-brand-foreground shadow-sm transition-colors hover:bg-brand/90 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Icon name="check" className="h-3.5 w-3.5" />
-                {saving ? '保存中…' : '保存'}
-              </button>
-              {feedback === 'saved' && (
-                <span className="text-[12px] text-green-600 dark:text-green-400">已保存</span>
-              )}
-              {feedback === 'error' && (
-                <span className="text-[12px] text-destructive">保存失败，请重试</span>
-              )}
-            </div>
-          </div>
+          </button>
         </section>
+
+        {/* 凭证弹窗 */}
+        <Dialog open={credentialOpen} onOpenChange={setCredentialOpen}>
+          <DialogContent className="w-[440px]">
+            <header className="flex items-center gap-3 border-b border-border/70 p-4">
+              <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg bg-brand/10 text-brand">
+                <Icon name="brain" className="h-4 w-4" strokeWidth={2} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-[15px] font-semibold">协调者凭证</h2>
+                <p className="mt-0.5 text-[12px] text-muted-foreground">
+                  配置群组协调者使用的 LLM API
+                </p>
+              </div>
+            </header>
+
+            <div className="space-y-3 p-4">
+              {/* Provider */}
+              <div>
+                <label className="block mb-1 text-[11px] text-muted-foreground">Provider</label>
+                <select
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value)}
+                  className="w-full rounded-md border border-border/60 bg-background px-3 py-1.5 text-[13px] text-foreground outline-none focus:border-brand/50"
+                >
+                  {PROVIDERS.map((p) => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Model */}
+              <div>
+                <label className="block mb-1 text-[11px] text-muted-foreground">Model</label>
+                <input
+                  type="text"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  placeholder="如 deepseek-chat"
+                  className="w-full rounded-md border border-border/60 bg-background px-3 py-1.5 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-brand/50"
+                />
+              </div>
+
+              {/* API Key */}
+              <div>
+                <label className="block mb-1 text-[11px] text-muted-foreground">API Key</label>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="sk-..."
+                  className="w-full rounded-md border border-border/60 bg-background px-3 py-1.5 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-brand/50"
+                />
+              </div>
+
+              {/* Base URL */}
+              <div>
+                <label className="block mb-1 text-[11px] text-muted-foreground">
+                  Base URL <span className="text-muted-foreground/50">（可选）</span>
+                </label>
+                <input
+                  type="text"
+                  value={baseUrl}
+                  onChange={(e) => setBaseUrl(e.target.value)}
+                  placeholder="留空则自动推导"
+                  className="w-full rounded-md border border-border/60 bg-background px-3 py-1.5 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-brand/50"
+                />
+              </div>
+
+              {/* Test result */}
+              {testResult && (
+                <div className={`rounded-md px-3 py-2 text-[12px] ${testResult.ok ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' : 'bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-300'}`}>
+                  {testResult.ok
+                    ? `✓ 连通正常 · ${testResult.latency_ms}ms · 模型 ${testResult.model}`
+                    : `✗ 连通失败 · ${testResult.error}`}
+                </div>
+              )}
+
+              {/* Save feedback */}
+              {!testResult && feedback === 'saved' && (
+                <div className="rounded-md bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+                  ✓ 已保存
+                </div>
+              )}
+              {!testResult && feedback === 'error' && (
+                <div className="rounded-md bg-red-50 px-3 py-2 text-[12px] text-red-600 dark:bg-red-950/30 dark:text-red-300">
+                  保存失败，请重试
+                </div>
+              )}
+            </div>
+
+            <footer className="flex items-center justify-between gap-2 border-t border-border/70 p-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleTest}
+                disabled={testing || !apiKey.trim() || !model.trim()}
+              >
+                {testing ? '测试中…' : '测试连通'}
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setCredentialOpen(false)}>
+                  取消
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={saving || !apiKey.trim()}
+                >
+                  {saving ? '保存中…' : '保存'}
+                </Button>
+              </div>
+            </footer>
+          </DialogContent>
+        </Dialog>
 
         {/* ── CLI 配置 ── */}
         <section>

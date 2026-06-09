@@ -319,12 +319,6 @@ class PiAgentRuntime(AgentRuntime):
             session_file,
         ]
 
-        # provider/model 不传——让 CLI 读自己的 ~/.pi/agent/settings.json
-        if self._provider:
-            cmd.extend(["--provider", _PROVIDER_MAP.get(self._provider, self._provider)])
-        if self._model:
-            cmd.extend(["--model", self._model])
-
         if self._thinking_level != "off":
             cmd.extend(["--thinking", self._thinking_level])
 
@@ -342,10 +336,6 @@ class PiAgentRuntime(AgentRuntime):
                 )
             cmd.extend(["--system-prompt", sp])
 
-        # API key：代理模式下不暴露在命令行（由 _build_env 注入环境变量）
-        if self._api_key and not self._proxy_url:
-            cmd.extend(["--api-key", self._api_key])
-
         # 工具允许列表映射（如果上游支持 --tools flag）
         if request.available_tools:
             cmd.extend(["--tools", ",".join(request.available_tools)])
@@ -357,34 +347,8 @@ class PiAgentRuntime(AgentRuntime):
         return cmd
 
     def _build_env(self) -> dict[str, str]:
-        """构造 CLI 子进程环境变量。
-
-        - 代理模式（proxy_url 非空）：通过 provider-specific 环境变量注入 API key
-          和 base URL，把请求重定向到 AgentHub 代理（认证/限流）
-        - 全局模式：不覆盖 API key / base URL，CLI 沿用自身配置
-        """
-        env = os.environ.copy()
-        if self._proxy_url:
-            # 代理模式：API key 通过环境变量注入（不在命令行暴露）
-            env_key = _PROVIDER_ENV_KEY.get(self._provider, "")
-            if env_key:
-                # 占位 key：代理服务端会替换为真实 key
-                env[env_key] = self._proxy_url + "/key" if env_key else ""
-            # 注入代理 base URL
-            base_env_keys = {
-                "anthropic": "ANTHROPIC_BASE_URL",
-                "openai": "OPENAI_BASE_URL",
-                "deepseek": "DEEPSEEK_BASE_URL",
-            }
-            base_key = base_env_keys.get(self._provider)
-            if base_key:
-                env[base_key] = self._proxy_url
-        elif self._api_key:
-            # 非代理模式：如果有 API key，注入环境变量
-            env_key = _PROVIDER_ENV_KEY.get(self._provider, "")
-            if env_key and env_key not in env:
-                env[env_key] = self._api_key
-        return env
+        """构造 CLI 子进程环境变量。不注入 provider/model/api_key——CLI 读本地配置。"""
+        return os.environ.copy()
 
     @staticmethod
     def _extract_prompt(request: AgentRequest) -> str:

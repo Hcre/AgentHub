@@ -62,6 +62,7 @@ async def create_group(body: GroupCreateRequest, svc: ServiceDep) -> GroupOut:
             name=body.name,
             description=body.description,
             member_ids=body.member_ids,
+            workspace_path=getattr(body, "workdir", "") or "",
         )
     )
     return _to_out(resp)

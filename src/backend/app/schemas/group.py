@@ -15,6 +15,7 @@ class GroupCreateRequest(BaseModel):
     name: str = Field(pattern=NAME_PATTERN)
     description: str = Field(default="", max_length=2000)
     member_ids: list[UUID] = Field(default_factory=list, max_length=20)
+    workdir: str = Field(default="", max_length=1000, alias="workdir")
 
 
 class GroupCoordinatorOut(BaseModel):

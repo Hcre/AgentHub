@@ -79,7 +79,7 @@ class ReactiveRouter:
     ) -> None:
         self._raw_decide = raw_decide
         self._client = client
-        self._model = model or settings.reactive_model
+        self._model = model or _coordinator_credential.get("model") or settings.reactive_model
         self._provider = provider or settings.reactive_provider
 
     async def decide(self, state: SessionState) -> PlannerDecision:

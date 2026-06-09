@@ -81,6 +81,49 @@ async def delete_agent(agent_id: UUID, svc: ServiceDep) -> Response:
 # -- 协调者凭证：前端点星后写入所有 is_system=true 的 Agent --
 
 
+@router.get("/coordinator/credential")
+async def get_coordinator_credential(
+    svc: ServiceDep,
+) -> dict:
+    """读取已保存的协调者凭证（用于前端回填表单）。优先内存，fallback DB。"""
+    from app.application.services.reactive_router import _coordinator_credential
+    from app.core.security import decrypt_secret
+
+    # 1) 内存中有 → 直接返回（不泄露完整 key，只给前缀提示）
+    if _coordinator_credential:
+        key = _coordinator_credential.get("api_key", "")
+        return {
+            "provider": _coordinator_credential.get("provider", ""),
+            "model": _coordinator_credential.get("model", ""),
+            "base_url": _coordinator_credential.get("base_url", ""),
+            "api_key_prefix": key[:6] + "…" if len(key) > 6 else "",
+            "has_key": bool(key),
+        }
+
+    # 2) 查 DB：从任一 system agent 的 settings 读取
+    agents = await svc._repo.list()
+    for a in agents:
+        if a.is_system:
+            creds = a.settings.get("coordinator_credential", {}) if isinstance(a.settings, dict) else {}
+            if creds and creds.get("api_key_encrypted"):
+                decrypted = decrypt_secret(creds["api_key_encrypted"])
+                # 回填内存（下次 Planner/ReactiveRouter 直接用）
+                _coordinator_credential["provider"] = creds.get("provider", "")
+                _coordinator_credential["api_key"] = decrypted
+                _coordinator_credential["model"] = creds.get("model", "")
+                _coordinator_credential["base_url"] = creds.get("base_url", "")
+                return {
+                    "provider": creds.get("provider", ""),
+                    "model": creds.get("model", ""),
+                    "base_url": creds.get("base_url", ""),
+                    "api_key_prefix": decrypted[:6] + "…" if len(decrypted) > 6 else "",
+                    "has_key": True,
+                }
+            break
+
+    return {"provider": "", "model": "", "base_url": "", "api_key_prefix": "", "has_key": False}
+
+
 @router.put("/coordinator/credential")
 async def set_coordinator_credential(
     body: dict,
@@ -90,15 +133,77 @@ async def set_coordinator_credential(
     provider = body.get("provider", "")
     api_key = body.get("api_key", "")
     model = body.get("model", "")
+    base_url = body.get("base_url", "")
     if not provider or not api_key:
         raise HTTPException(status_code=400, detail="provider and api_key are required")
     count = await svc.update_coordinator_credential(
-        provider=str(provider), api_key=str(api_key), model=str(model)
+        provider=str(provider), api_key=str(api_key), model=str(model), base_url=str(base_url) if base_url else ""
     )
-    # 同步更新内存中的全局凭证（ReactiveRouter 实时读取）
+    # 同步更新内存中的全局凭证（ReactiveRouter + Planner 实时读取）
     from app.application.services.reactive_router import _coordinator_credential
 
     _coordinator_credential["provider"] = str(provider)
     _coordinator_credential["api_key"] = str(api_key)
     _coordinator_credential["model"] = str(model)
+    _coordinator_credential["base_url"] = str(base_url) if base_url else ""
     return {"updated": count}
+
+
+@router.get("/coordinator/credential/status")
+async def credential_status() -> dict:
+    """快速检查：协调者凭证是否已配置（不发起网络请求）。"""
+    from app.application.services.reactive_router import _coordinator_credential
+
+    if _coordinator_credential.get("api_key"):
+        return {
+            "configured": True,
+            "provider": _coordinator_credential.get("provider", ""),
+            "model": _coordinator_credential.get("model", ""),
+        }
+    return {"configured": False}
+
+
+@router.post("/coordinator/credential/test")
+async def test_coordinator_credential(
+    body: dict,
+) -> dict:
+    """用当前表单参数测试 API 连通性（不保存）。发一条简短消息，检查是否返回有效响应。"""
+    import time as _time
+
+    provider = body.get("provider", "")
+    api_key = body.get("api_key", "")
+    model = body.get("model", "")
+    base_url = body.get("base_url", "")
+
+    if not provider or not api_key:
+        raise HTTPException(status_code=400, detail="provider and api_key are required")
+    if provider == "anthropic":
+        raise HTTPException(status_code=400, detail="anthropic provider 暂不支持连通测试，请用 OpenAI 兼容 provider")
+
+    if not model:
+        raise HTTPException(status_code=400, detail="model is required for OpenAI-compatible providers")
+
+    from openai import AsyncOpenAI
+
+    url = base_url or ("https://api.deepseek.com/v1" if provider == "deepseek" else None)
+    client = AsyncOpenAI(api_key=api_key, base_url=url) if url else AsyncOpenAI(api_key=api_key)
+
+    t0 = _time.monotonic()
+    try:
+        resp = await client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "hi"}],
+            max_tokens=10,
+            timeout=15,
+        )
+        latency = int((_time.monotonic() - t0) * 1000)
+        reply = resp.choices[0].message.content or "" if resp.choices else ""
+        return {
+            "ok": True,
+            "latency_ms": latency,
+            "model": model,
+            "reply_preview": reply[:100],
+        }
+    except Exception as e:
+        latency = int((_time.monotonic() - t0) * 1000)
+        return {"ok": False, "error": str(e)[:500], "latency_ms": latency}

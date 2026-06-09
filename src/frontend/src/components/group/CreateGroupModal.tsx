@@ -94,10 +94,20 @@ export function CreateGroupModal({ open, onClose }: { open: boolean; onClose: ()
     workdir.trim().length > 0 &&
     !submitting
 
+  const [credMissing, setCredMissing] = useState(false)
+
   const submit = async () => {
     if (!canSubmit) return
     setSubmitting(true)
+    setCredMissing(false)
     try {
+      // 预检：协调者凭证是否已配置
+      const statusRes = await fetch('/api/agents/coordinator/credential/status')
+      const status = await statusRes.json().catch(() => ({}))
+      if (!status.configured) {
+        setCredMissing(true)
+        return
+      }
       const id = await createGroup({
         name: name.trim(),
         description: description.trim() || undefined,
@@ -107,7 +117,9 @@ export function CreateGroupModal({ open, onClose }: { open: boolean; onClose: ()
       if (workdir.trim()) setFileWorkdir(workdir.trim())
       reset()
       onClose()
-      openGroup(id) // 创建后自动进入新群（设计 §5.4）
+      openGroup(id)
+    } catch {
+      // 创建失败：留 UI 让用户重试
     } finally {
       setSubmitting(false)
     }
@@ -245,6 +257,25 @@ export function CreateGroupModal({ open, onClose }: { open: boolean; onClose: ()
             </div>
           </div>
         </div>
+
+        {credMissing && (
+          <div className="border-t border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/30">
+            <p className="text-[13px] font-medium text-amber-800 dark:text-amber-200">
+              协调者凭证未配置
+            </p>
+            <p className="mt-0.5 text-[12px] text-amber-700 dark:text-amber-300">
+              群组需要协调者调用 LLM 来路由消息和拆解任务。请先前往
+              <button
+                type="button"
+                onClick={() => { onClose(); useUIStore.getState().setSection('settings') }}
+                className="mx-1 font-medium underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-100"
+              >
+                设置 → 协调者凭证
+              </button>
+              配置 API Key。
+            </p>
+          </div>
+        )}
 
         <footer className="flex justify-end gap-2 border-t px-4 py-3">
           <Button variant="outline" size="sm" onClick={onClose}>

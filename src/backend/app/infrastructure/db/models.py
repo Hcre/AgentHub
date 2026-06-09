@@ -160,6 +160,7 @@ class GroupModel(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     coordinator_id: Mapped[UUID] = mapped_column(Uuid, index=True)
     coordinator_config: Mapped[dict] = mapped_column(JSON, default=dict)
+    workspace_path: Mapped[str] = mapped_column(String(1024), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now

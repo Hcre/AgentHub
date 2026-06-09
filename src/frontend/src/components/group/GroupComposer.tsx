@@ -267,7 +267,7 @@ export function GroupComposer({
           style={{
             maxHeight: 200,
             color: 'transparent',
-            caretColor: 'currentColor',
+            caretColor: '#0f172a',
           }}
         />
       </div>

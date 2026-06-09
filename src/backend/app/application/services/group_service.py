@@ -26,7 +26,7 @@ from app.core.events import EventBus
 from app.core.exceptions import DomainError, NotFoundError, ValidationError
 from app.domain.entities.agent import Agent
 from app.domain.entities.group import Group
-from app.domain.enums import AgentSystem, Provider
+from app.domain.enums import AgentSystem
 from app.domain.repositories import AgentRepository, GroupRepository
 
 
@@ -58,7 +58,6 @@ class GroupService:
             avatar="🧭",
             role="Coordinator",
             agent_system=AgentSystem.MOCK,
-            provider=Provider.SYSTEM,
             is_system=True,
         )
         await self._agents.save(coordinator)
@@ -68,6 +67,7 @@ class GroupService:
             description=cmd.description,
             coordinator_id=coordinator.id,
             member_ids=member_ids,
+            workspace_path=cmd.workspace_path,
         )
         await self._groups.save(group)
 

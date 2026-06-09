@@ -32,13 +32,26 @@ ServiceDep = Annotated[SessionService, Depends(get_session_service)]
 
 @router.post("/sessions", response_model=SessionOut, status_code=status.HTTP_201_CREATED)
 async def create_session(body: SessionCreateRequest, svc: ServiceDep) -> SessionOut:
+    workspace_path = body.workspace_path or ""
+
+    # 群聊 session：如果没传 workspace_path，从 Group 实体复制
+    if str(body.type) == "group" and body.group_id and not workspace_path:
+        from app.infrastructure.db.base import session_factory
+        from app.infrastructure.repositories import PostgresGroupRepository
+
+        async with session_factory() as db:
+            group_repo = PostgresGroupRepository(db)
+            group = await group_repo.get_by_id(body.group_id)
+            if group is not None and group.workspace_path:
+                workspace_path = group.workspace_path
+
     resp = await svc.create(
         CreateSessionCommand(
             type=str(body.type),
             group_id=body.group_id,
             agent_id=body.agent_id,
             title=body.title,
-            workspace_path=body.workspace_path or "",
+            workspace_path=workspace_path,
         )
     )
     return SessionOut(**resp.__dict__)

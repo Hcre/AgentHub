@@ -77,7 +77,7 @@ class Settings(BaseSettings):
 
     # --- 步骤终结工具 MCP (coordinator v3) ---
     # MCP_STEP_TOOLS_URL 非空时，worker CLI spawn 注入 step-tools server（task_complete/ask）
-    mcp_step_tools_url: str = ""  # 例：http://127.0.0.1:8000/api/step-tools/sse
+    mcp_step_tools_url: str = "http://127.0.0.1:8000/api/step-tools/sse"
 
     # --- CORS ---
     cors_origins: str = "http://localhost:5173"

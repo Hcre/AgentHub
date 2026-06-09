@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
+
+logger = logging.getLogger(__name__)
 from contextlib import asynccontextmanager
 
 import httpx
@@ -58,6 +61,29 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         start_pool_sweeper()
     # CLI PATH 扫描调度器：启动时立即扫一次 + 后台每 1h 扫一次（P1-3，best-effort）
     await startup_cli_scheduler()
+    # 从 DB 回填协调者凭证到内存（ReactiveRouter + Planner 启动后立即可用）
+    try:
+        from app.application.services.reactive_router import _coordinator_credential
+        from app.core.security import decrypt_secret
+        from app.infrastructure.db.base import session_factory
+        from app.infrastructure.repositories import PostgresAgentRepository
+
+        async with session_factory() as db:
+            repo = PostgresAgentRepository(db)
+            agents = await repo.list()
+            for a in agents:
+                if a.is_system:
+                    creds = a.settings.get("coordinator_credential", {}) if isinstance(a.settings, dict) else {}
+                    if creds and creds.get("api_key_encrypted"):
+                        _coordinator_credential["provider"] = creds.get("provider", "")
+                        _coordinator_credential["api_key"] = decrypt_secret(creds["api_key_encrypted"])
+                        _coordinator_credential["model"] = creds.get("model", "")
+                        _coordinator_credential["base_url"] = creds.get("base_url", "")
+                        logger.info("Startup: loaded coordinator credential provider=%s model=%s",
+                                    _coordinator_credential.get("provider"), _coordinator_credential.get("model"))
+                        break
+    except Exception:
+        logger.warning("Startup: failed to load coordinator credential from DB", exc_info=True)
     yield
     await kill_all()
     await shutdown_cli_scheduler()

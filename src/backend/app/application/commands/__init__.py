@@ -51,6 +51,7 @@ class CreateGroupCommand:
     name: str
     description: str = ""
     member_ids: list[UUID] = field(default_factory=list)
+    workspace_path: str = ""
 
 
 @dataclass

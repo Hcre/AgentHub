@@ -14,6 +14,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from uuid import UUID, uuid4
 
+from app.core.config import settings
 from app.domain.entities.agent import Agent
 from app.domain.llm.protocol import AgentRequest, StreamEvent, StreamEventType
 from app.domain.task_engine.dag import TaskNode
@@ -27,6 +28,8 @@ DEFAULT_TIMEOUT = 600.0  # 单任务墙钟上限（秒）；__init__ 的 timeout
 # server name 来自 mcp_step_tools.py 的 FastMCP("agenthub-step-tools")
 # 若实测格式不同，只改此处常量即可
 _TASK_COMPLETE_TOOL = "mcp__agenthub-step-tools__task_complete"
+# Claude Code CLI 用 mcp__<server>__<tool> 格式，opencode/Pi Agent 用原生 tool name
+_TASK_COMPLETE_NAMES = {_TASK_COMPLETE_TOOL, "task_complete"}
 
 # 任务执行契约（D1：不是群聊回复，是"干这个活"）。
 # v4 完成协议（coordinator-v4-R1 §6.4）：task_complete 是唯一结构化信号。
@@ -119,6 +122,17 @@ def build_task_request(
     notes = node.pending_notes or []
     if notes:
         content += "\n\n## 用户执行期补充（请注意以下约束）\n" + "\n".join(f"- {n}" for n in notes)
+    # 步骤终结工具 MCP（task_complete）—— agent 必须挂载，否则永远无法交卷
+    step_tools_url = getattr(settings, "mcp_step_tools_url", "") or ""
+    mcp_servers: list[dict] = []
+    if step_tools_url:
+        url = f"{step_tools_url}?agent_id={agent.id}"
+        if session_id:
+            url += f"&session_id={session_id}"
+        if group_id:
+            url += f"&group_id={group_id}"
+        mcp_servers.append({"name": "agenthub-step-tools", "type": "sse", "url": url})
+
     return AgentRequest(
         request_id=str(uuid4()),
         session_id=session_id,
@@ -130,6 +144,7 @@ def build_task_request(
         group_id=group_id,
         is_group_chat=True,
         has_history=True,  # 始终 --resume：投放任务到已有 CLI session，不新建冲突
+        mcp_servers=mcp_servers,
     )
 
 
@@ -137,6 +152,16 @@ def build_summary_request(
     node: TaskNode, agent: Agent, *, session_id: UUID, group_id: UUID, workspace: str | None
 ) -> AgentRequest:
     """中断复盘请求：--resume 复原被中断前上下文，让 worker 汇报停在哪/做了啥/剩啥/残留。"""
+    step_tools_url = getattr(settings, "mcp_step_tools_url", "") or ""
+    mcp_servers: list[dict] = []
+    if step_tools_url:
+        url = f"{step_tools_url}?agent_id={agent.id}"
+        if session_id:
+            url += f"&session_id={session_id}"
+        if group_id:
+            url += f"&group_id={group_id}"
+        mcp_servers.append({"name": "agenthub-step-tools", "type": "sse", "url": url})
+
     return AgentRequest(
         request_id=str(uuid4()),
         session_id=session_id,
@@ -148,6 +173,7 @@ def build_summary_request(
         group_id=group_id,
         is_group_chat=True,
         has_history=True,  # --resume 复原中断前的上下文
+        mcp_servers=mcp_servers,
     )
 
 
@@ -270,7 +296,7 @@ class AgentExecutor:
             async for evt in adapter.stream(request):  # type: ignore[attr-defined]
                 await self._to_sink(evt, request.agent_id, node.task.id)  # TEXT/工具 → sink（带 taskId）
                 if evt.type == StreamEventType.TOOL_CALL and evt.tool_call:
-                    if evt.tool_call.name == _TASK_COMPLETE_TOOL:
+                    if evt.tool_call.name in _TASK_COMPLETE_NAMES:
                         done_summary = evt.tool_call.arguments.get("summary", "")
                         logger.info("task_complete detected task=%s", node.task.id)
                 elif evt.type == StreamEventType.ERROR:

@@ -126,43 +126,14 @@ class OpenCodeRuntime(AgentRuntime):
         if "HOME" not in env:
             env["HOME"] = os.environ.get("USERPROFILE", "")
 
-        # AgentHub 通过 OPENCODE_CONFIG 自包含临时配置文件注入 provider + apiKey，
-        # 不再依赖 ~/.config/opencode/opencode.json（用户本地可能不存在）。
-        # opencode 从配置文件读取密钥，不依赖环境变量传递。
-
-        # MCP 注入（ADR-06 统一原则）：opencode 无 --mcp-config flag，改用逐进程隔离通道
-        # OPENCODE_CONFIG=<tmp>（本机实测可注入，非全局，零串号）。临时配置自包含
-        # provider+mcp 块。mcp 块随每次 spawn 重写。
-        #
-        # 解析有效 API key：AgentHub 存储优先 → 回退环境变量。
-        api_key = self._api_key
-        if not api_key:
-            env_var = self._PROVIDER_ENV.get(self._provider)
-            if env_var:
-                api_key = os.environ.get(env_var, "")
+        # MCP 注入：仅注入 step-tools / memory MCP（不注入 provider/model——CLI 读本地配置）
         mcp_section = _build_opencode_mcp(
             request.mcp_servers, settings.mcp_memory_url, self._agent_id
         )
-        # 有 apiKey 时必须注入配置（否则 opencode 无凭证，挂起直至超时）；MCP 可空。
-        # 两者都无时跳过：不写空配置覆盖用户本地的 ~/.config/opencode/opencode.json。
-        if api_key or mcp_section:
-            cfg_path = _write_opencode_config(
-                self._provider, api_key, mcp_section, model=self._model
-            )
+        if mcp_section:
+            cfg_path = _write_opencode_config(mcp_section)
             if cfg_path:
                 env["OPENCODE_CONFIG"] = cfg_path
-        else:
-            logger.warning(
-                "OpenCode: 无 apiKey 且无 MCP server，跳过 OPENCODE_CONFIG 注入。"
-                "opencode 将尝试 ~/.config/opencode/opencode.json；若不存在则无凭证，可能挂起。"
-            )
-
-        # 环境变量注入 model / proxy（对齐 ClaudeCodeRuntime _build_env）
-        if self._model:
-            env["OPENCODE_MODEL"] = self._model
-        if self._proxy_url:
-            env["OPENCODE_API_KEY"] = "agenthub-proxy"
-            env["OPENCODE_BASE_URL"] = self._proxy_url
 
         # 多轮对话：首次创建 session，后续用 --session 继续
         # 群聊：uuid5(session_id:agent_id) 确定性映射，避免跨 agent 会话污染
@@ -653,15 +624,9 @@ def _build_provider_dict(provider: str, api_key: str, model: str = "") -> dict[s
     }
 
 
-def _write_opencode_config(
-    provider: str, api_key: str, mcp_section: dict[str, Any], model: str = ""
-) -> str | None:
-    """写自包含临时 opencode 配置（provider+mcp+model），返回路径供 OPENCODE_CONFIG。
-
-    delete=False 持久化供 CLI 读取，atexit 清理（对齐 claude_code _write_mcp_config）。
-    """
-    config = _build_provider_dict(provider, api_key, model=model)
-    config["mcp"] = mcp_section
+def _write_opencode_config(mcp_section: dict[str, Any]) -> str | None:
+    """写临时 opencode MCP 配置，返回路径供 OPENCODE_CONFIG。不注入 provider/model——CLI 读本地配置。"""
+    config = {"mcp": mcp_section}
     try:
         f = tempfile.NamedTemporaryFile(  # noqa: SIM115 — 故意 delete=False，atexit 清理
             mode="w",

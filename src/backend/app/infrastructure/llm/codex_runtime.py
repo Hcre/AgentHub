@@ -93,8 +93,6 @@ class CodexRuntime(AgentRuntime):
         binary = shutil.which("codex") or "codex"
 
         cmd = [binary, "exec", "--json"]
-        if self._model:
-            cmd.extend(["-m", self._model])
         # 全部权限绕过（与 Claude Code bypassPermissions 对齐）
         cmd.append("--dangerously-bypass-approvals-and-sandbox")
         # 工作目录：从请求动态取（会话 workspace），通过 -C flag 传给 Codex
@@ -117,12 +115,6 @@ class CodexRuntime(AgentRuntime):
         # 确保 HOME 在 Windows 下存在（codex 读 ~/.codex/config.toml）
         if "HOME" not in env:
             env["HOME"] = os.environ.get("USERPROFILE", "")
-        # 代理模式：API key + base URL 通过环境变量注入
-        if self._proxy_url:
-            env["OPENAI_API_KEY"] = "agenthub-proxy"
-            env["OPENAI_BASE_URL"] = self._proxy_url
-        elif self._api_key:
-            env["OPENAI_API_KEY"] = self._api_key
 
         session_key = self._compute_session_key(request)
         logger.info(

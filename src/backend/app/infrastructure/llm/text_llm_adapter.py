@@ -55,24 +55,31 @@ class OpenAITextLLM:
 
 def build_text_llm() -> TextLLM:
     """按 settings 构造 Planner 的 TextLLM。provider/model/base_url/api_key 全部可配置——
-    不锁定任何单一模型或端点（OpenAI 兼容 provider 必须显式指定模型）。"""
-    provider = settings.coordinator_provider
-    model = settings.coordinator_model
+    不锁定任何单一模型或端点（OpenAI 兼容 provider 必须显式指定模型）。
+
+    凭证优先级：Settings 页面保存的 _coordinator_credential > 环境变量 settings。
+    """
+    from app.application.services.reactive_router import _coordinator_credential
+
+    cred = _coordinator_credential or {}
+    provider = cred.get("provider") or settings.coordinator_provider
+    model = cred.get("model") or settings.coordinator_model
 
     if provider == "anthropic":
         return AnthropicTextLLM(
             anthropic.AsyncAnthropic(
-                api_key=settings.coordinator_api_key or settings.anthropic_api_key
+                api_key=cred.get("api_key") or settings.coordinator_api_key or settings.anthropic_api_key
             ),
             model or settings.default_model,
         )
 
     # OpenAI 兼容（openai / deepseek / groq / vllm …）
-    base_url = settings.coordinator_base_url
+    base_url = cred.get("base_url") or settings.coordinator_base_url
     if not base_url and provider == "deepseek":
         base_url = _DEEPSEEK_BASE_URL
     key = (
-        settings.coordinator_api_key
+        cred.get("api_key")
+        or settings.coordinator_api_key
         or settings.deepseek_api_key
         or settings.openai_api_key
     )
