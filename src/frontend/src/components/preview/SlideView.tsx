@@ -75,9 +75,7 @@ export function SlideView({ path, name }: Props) {
             data-active={i === active ? 'true' : undefined}
             className={cn(
               'flex w-full flex-col items-center border-b p-2 text-[10px] transition-colors',
-              i === active
-                ? 'bg-brand/10 text-brand'
-                : 'text-muted-foreground hover:bg-accent',
+              i === active ? 'bg-brand/10 text-brand' : 'text-muted-foreground hover:bg-accent',
             )}
           >
             <div className="mb-1 flex h-12 w-20 items-center justify-center rounded border bg-background text-[10px]">

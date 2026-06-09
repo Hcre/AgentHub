@@ -141,7 +141,10 @@ export function ConversationalAgentCreate({ onCreated, onCancel }: Props) {
                   onChange={(e) =>
                     setDraft({
                       ...draft,
-                      skills: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+                      skills: e.target.value
+                        .split(',')
+                        .map((s) => s.trim())
+                        .filter(Boolean),
                     })
                   }
                   className="w-full rounded border bg-background px-2 py-1.5 text-[13px] outline-none focus:border-brand"
@@ -184,9 +187,7 @@ export function ConversationalAgentCreate({ onCreated, onCancel }: Props) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
-        {label}
-      </label>
+      <label className="mb-1 block text-[11px] font-medium text-muted-foreground">{label}</label>
       {children}
     </div>
   )

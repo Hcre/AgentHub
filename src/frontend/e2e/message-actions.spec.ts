@@ -49,7 +49,9 @@ test.describe('M1#3 消息操作 E2E', () => {
 
     await page.screenshot({ path: `${SCREENSHOT_DIR}/e2e-msg-02-after-send.png` })
 
-    const messages = page.locator('[data-testid^="message-"], .message-bubble, [class*="MessageBubble"]')
+    const messages = page.locator(
+      '[data-testid^="message-"], .message-bubble, [class*="MessageBubble"]',
+    )
     await expect(messages.first()).toBeVisible({ timeout: 5_000 })
 
     await context.grantPermissions(['clipboard-read', 'clipboard-write'])

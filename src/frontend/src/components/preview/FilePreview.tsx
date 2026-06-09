@@ -16,7 +16,7 @@ const TREE_WIDTH = 200
 // ── 文件类型检测 ─────────────────────────────────────────────────
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'])
 const MARKDOWN_EXTS = new Set(['.md', '.markdown'])
-const PPTX_EXTS = new Set(['.pptx'])  // M3-B PPT 浏览
+const PPTX_EXTS = new Set(['.pptx']) // M3-B PPT 浏览
 
 function fileExt(name: string): string {
   const i = name.lastIndexOf('.')
@@ -53,14 +53,19 @@ export function FilePreview({ workdir, initialPath, onOpenFile }: FilePreviewPro
     const onFileChanged = () => {
       const f = fileRef.current
       if (!f) return
-      fsApi.readFile(f.path).then((data) => {
-        if (f.content !== data.content) {
-          setFlashKey((k) => k + 1)
-          setFile((prev) => prev?.path === f.path
-            ? { ...prev, content: data.content, size: data.size, error: null }
-            : prev)
-        }
-      }).catch(() => {})
+      fsApi
+        .readFile(f.path)
+        .then((data) => {
+          if (f.content !== data.content) {
+            setFlashKey((k) => k + 1)
+            setFile((prev) =>
+              prev?.path === f.path
+                ? { ...prev, content: data.content, size: data.size, error: null }
+                : prev,
+            )
+          }
+        })
+        .catch(() => {})
     }
     window.addEventListener('file-changed', onFileChanged)
     return () => window.removeEventListener('file-changed', onFileChanged)
@@ -96,9 +101,11 @@ export function FilePreview({ workdir, initialPath, onOpenFile }: FilePreviewPro
       const data = await fsApi.readFile(path)
       setFile({ path, name, content: data.content, size: data.size, loading: false, error: null })
     } catch (e) {
-      setFile((prev) => prev?.path === path
-        ? { ...prev, loading: false, error: e instanceof Error ? e.message : '读取失败' }
-        : prev)
+      setFile((prev) =>
+        prev?.path === path
+          ? { ...prev, loading: false, error: e instanceof Error ? e.message : '读取失败' }
+          : prev,
+      )
     }
   }
 
@@ -107,9 +114,7 @@ export function FilePreview({ workdir, initialPath, onOpenFile }: FilePreviewPro
       <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center text-sm text-muted-foreground">
         <Icon name="panelRight" className="h-7 w-7 opacity-40" strokeWidth={1.5} />
         <p>暂无工作目录</p>
-        <p className="text-[11.5px] text-muted-foreground/70">
-          请在私聊或群组里指定工作目录
-        </p>
+        <p className="text-[11.5px] text-muted-foreground/70">请在私聊或群组里指定工作目录</p>
       </div>
     )
   }
@@ -117,7 +122,9 @@ export function FilePreview({ workdir, initialPath, onOpenFile }: FilePreviewPro
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* 面包屑：当前文件路径 + 文件树折叠按钮 */}
-      {file && !file.loading && <Breadcrumb path={file.path} workdir={workdir} right={<TreeToggleButton />} />}
+      {file && !file.loading && (
+        <Breadcrumb path={file.path} workdir={workdir} right={<TreeToggleButton />} />
+      )}
 
       {/* 主体：内容（flex-1） + 文件树（固定 140px，折叠时 0） */}
       <div className="flex min-h-0 flex-1">
@@ -142,7 +149,12 @@ export function FilePreview({ workdir, initialPath, onOpenFile }: FilePreviewPro
               </div>
             )}
             {file && !file.loading && !file.error && (
-              <FileContentView path={file.path} name={file.name} content={file.content} flashKey={flashKey} />
+              <FileContentView
+                path={file.path}
+                name={file.name}
+                content={file.content}
+                flashKey={flashKey}
+              />
             )}
           </div>
         </div>
@@ -339,7 +351,12 @@ function CodeView({ content, path }: { content: string; path?: string }) {
 
 // ── 文件内容分发 ──────────────────────────────────────────────────
 
-function FileContentView({ path, name, content, flashKey }: {
+function FileContentView({
+  path,
+  name,
+  content,
+  flashKey,
+}: {
   path: string
   name: string
   content: string
@@ -348,7 +365,7 @@ function FileContentView({ path, name, content, flashKey }: {
   const ext = fileExt(name)
   if (IMAGE_EXTS.has(ext)) return <ImageView path={path} name={name} />
   if (MARKDOWN_EXTS.has(ext)) return <MarkdownView content={content} />
-  if (PPTX_EXTS.has(ext)) return <SlideView path={path} name={name} />  // M3-B
+  if (PPTX_EXTS.has(ext)) return <SlideView path={path} name={name} /> // M3-B
   return <CodeView content={content} path={path} key={flashKey} />
 }
 
@@ -382,9 +399,7 @@ function MarkdownView({ content }: { content: string }) {
   return (
     <div className="min-h-full overflow-auto bg-white px-6 py-4 dark:bg-black">
       <div className="prose prose-sm max-w-none text-[14px] leading-[1.6] text-foreground">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-          {content}
-        </ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
       </div>
     </div>
   )
