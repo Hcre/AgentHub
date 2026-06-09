@@ -260,8 +260,16 @@ class ReactiveRouter:
         history_block = "\n".join(_fmt(m) for m in history) if history else "（无历史）"
         parts = [
             "# 候选成员\n" + members,
-            "# 历史上下文\n（仅供理解背景，不要对这些消息做路由决策）\n" + history_block,
         ]
+        # 本轮已在排队回复的成员（不应该再选）
+        if state.responded:
+            parts.append(
+                "## 本轮已在排队回复的成员（不要再选）\n"
+                + "\n".join(f"- {n}（已在回本轮消息，不必再选）" for n in sorted(state.responded))
+            )
+        parts.append(
+            "# 历史上下文\n（仅供理解背景，不要对这些消息做路由决策）\n" + history_block
+        )
         if last_user and last_user.id != target.id:
             parts.append(
                 "# 用户最后一条消息\n（用户的最新意图，辅助判断上下文）\n" + _fmt(last_user)

@@ -47,6 +47,7 @@ class SessionState:
     members: tuple[Agent, ...] = ()  # 候选 worker（= 群成员）
     transcript: tuple[Message, ...] = ()  # 近窗口（design §7 reactive 轻档，15 条截断）
     active_plan: PlanView | None = None  # None=纯对话；非 None=DAG 投影
+    responded: frozenset[str] = field(default_factory=frozenset)  # 本轮已在排队回复的成员名
     constraints: tuple[str, ...] = field(default_factory=tuple)
 
     @property
@@ -63,6 +64,7 @@ class SessionState:
         message_repo: MessageRepository,
         window: int,
         active_plan: PlanView | None = None,
+        responded: frozenset[str] = frozenset(),
     ) -> SessionState:
         """从消息流 + 任务流投影构造 reactive 决策输入。
 
@@ -75,4 +77,5 @@ class SessionState:
             members=tuple(members),
             transcript=tuple(reversed(recent)),  # 仓库返回倒序 → 翻成时间正序
             active_plan=active_plan,
+            responded=responded,
         )
