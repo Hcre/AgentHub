@@ -19,6 +19,9 @@ export const fsApi = {
    *  非 git 仓库 / git 缺失 / 超时 → 200 + {ok:false, reason:string}，前端不抛异常。 */
   gitDiff: (path: string, staged = false) =>
     api.get<FsGitDiffOut>(`/api/fs/git-diff?path=${encodeURIComponent(path)}&staged=${staged}`),
+
+  /** M3-B：抽取 .pptx 文件的页文本（python-pptx 后端实现） */
+  pptxSlides: (path: string) => api.post<PptxSlidesOut>('/api/fs/pptx-slides', { path }),
 }
 
 export interface FsItem {
@@ -71,4 +74,15 @@ export interface FsGitDiffOut {
   staged?: boolean
   /** ok=false 时的错误描述（中文，来自后端） */
   reason?: string
+}
+
+// M3-B PPT 抽页端点返回结构
+export interface PptxSlidesOut {
+  path: string
+  slide_count: number
+  slides: Array<{
+    index: number
+    texts: string[]
+    text_count: number
+  }>
 }

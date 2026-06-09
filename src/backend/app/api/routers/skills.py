@@ -843,6 +843,43 @@ class FsReadRequest(BaseModel):
     path: str
 
 
+class PptxSlidesRequest(BaseModel):
+    path: str
+
+
+@FS_ROUTER.post("/pptx-slides")
+async def fs_pptx_slides(body: PptxSlidesRequest) -> dict:
+    """M3-B PPT 抽页：用 python-pptx 把每页文本抽成 JSON（图片暂走 fs_raw）。"""
+    import os as _os
+
+    if not body.path:
+        raise HTTPException(status_code=400, detail="path 必填")
+    real = _resolve_path(body.path)
+    if not _os.path.isfile(real):
+        raise HTTPException(status_code=404, detail=f"文件不存在：{real}")
+    if not real.lower().endswith(".pptx"):
+        raise HTTPException(status_code=415, detail="仅支持 .pptx 文件")
+    try:
+        from pptx import Presentation  # python-pptx（requirements 已声明）
+    except ImportError:
+        raise HTTPException(status_code=501, detail="python-pptx 未安装")
+    try:
+        prs = Presentation(real)
+        slides = []
+        for idx, slide in enumerate(prs.slides, start=1):
+            texts = []
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    for para in shape.text_frame.paragraphs:
+                        t = "".join(run.text for run in para.runs).strip()
+                        if t:
+                            texts.append(t)
+            slides.append({"index": idx, "texts": texts, "text_count": len(texts)})
+        return {"path": real, "slide_count": len(slides), "slides": slides}
+    except Exception as e:
+        raise HTTPException(status_code=415, detail=f"无法解析 pptx：{e!s}")
+
+
 @FS_ROUTER.post("/read")
 async def fs_read(body: FsReadRequest) -> dict:
     """读文件内容（限文本类，>2MB 返 413）。"""

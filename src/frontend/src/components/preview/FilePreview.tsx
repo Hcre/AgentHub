@@ -7,6 +7,7 @@ import { fsApi } from '../../api/fs'
 import { Button, Icon } from '../ui'
 import { FileTree } from './FileTree'
 import { SelectionEditPopover, type SelectionInfo } from './SelectionEditPopover'
+import { SlideView } from './SlideView'
 import { useUIStore } from '../../stores/uiStore'
 
 /** 文件树固定宽度（与 AppShell 全局拖拽的右栏宽度解耦） */
@@ -15,6 +16,7 @@ const TREE_WIDTH = 200
 // ── 文件类型检测 ─────────────────────────────────────────────────
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'])
 const MARKDOWN_EXTS = new Set(['.md', '.markdown'])
+const PPTX_EXTS = new Set(['.pptx'])  // M3-B PPT 浏览
 
 function fileExt(name: string): string {
   const i = name.lastIndexOf('.')
@@ -346,6 +348,7 @@ function FileContentView({ path, name, content, flashKey }: {
   const ext = fileExt(name)
   if (IMAGE_EXTS.has(ext)) return <ImageView path={path} name={name} />
   if (MARKDOWN_EXTS.has(ext)) return <MarkdownView content={content} />
+  if (PPTX_EXTS.has(ext)) return <SlideView path={path} name={name} />  // M3-B
   return <CodeView content={content} path={path} key={flashKey} />
 }
 
