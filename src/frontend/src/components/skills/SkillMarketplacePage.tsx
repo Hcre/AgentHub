@@ -1,5 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from 'react'
 import { cn } from '../../lib/cn'
+import { mcpApi, type McpMarketItem } from '../../api/mcp'
+import { skillsApi } from '../../api/skills'
+import { useUIStore } from '../../stores/uiStore'
 import { Avatar, Button, ConfirmDialog, Icon } from '../ui'
 
 interface MarketSkill {
@@ -29,7 +39,7 @@ interface InstalledSkill {
 }
 
 type SortBy = 'default' | 'stars' | 'downloads'
-type Tab = 'market' | 'installed'
+type Tab = 'market' | 'installed' | 'mcp'
 
 /** 排序选项展示（label/icon/value 三元组） */
 const SORT_OPTIONS: ReadonlyArray<{ value: SortBy; label: string; icon: string }> = [
@@ -77,7 +87,8 @@ function GlassIconBtn({
         'hover:bg-accent hover:text-foreground',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        variant === 'brand' && 'text-brand border-brand/40 bg-brand/5 hover:bg-brand/10 hover:text-brand',
+        variant === 'brand' &&
+          'text-brand border-brand/40 bg-brand/5 hover:bg-brand/10 hover:text-brand',
       )}
     >
       <Icon name={icon} className="h-3.5 w-3.5" />
@@ -110,12 +121,29 @@ export function SkillMarketplacePage() {
   // ── tab 状态 ──
   const [tab, setTab] = useState<Tab>('market')
 
+  // ── MCP 市场 tab 状态 (F1 接入, 后端 13 endpoint 由 api/mcp.ts 封装) ──
+  const activeConvId = useUIStore((s) => s.activeConversationId)
+  // MCP endpoint 要求 workspace_id 为 UUID (R1: session_id 维度 stand-in)。
+  // uiStore.activeConvId 是 conv_key 字符串 (e.g. "cmq5ezout8cm3")，不是 UUID。
+  // 兼容策略: 匹配 UUID 格式则用之, 否则降级到 system UUID (允许 demo 浏览 market)。
+  const SYSTEM_WORKSPACE = '00000000-0000-0000-0000-000000000000'
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const workspaceId = activeConvId && UUID_RE.test(activeConvId) ? activeConvId : SYSTEM_WORKSPACE
+  const [mcpItems, setMcpItems] = useState<McpMarketItem[]>([])
+  const [mcpLoading, setMcpLoading] = useState(false)
+  const [mcpError, setMcpError] = useState('')
+  const [mcpInstalling, setMcpInstalling] = useState<Set<string>>(new Set())
+  const [mcpInstalled, setMcpInstalled] = useState<Set<string>>(new Set())
+
+  // F3 接入：MCP marketplace 加载 + 安装 函数见 line 257+ (原版, 有 activeConvId 校验 + 4-char hash)
+  // tab 切到 mcp 时加载由 line 281+ useEffect 处理
+
   // 加载已安装列表
   const loadInstalled = useCallback(() => {
     setInstalledLoading(true)
-    fetch('/api/skills/library?_=' + Date.now())
-      .then(safeJson)
-      .then((list: InstalledSkill[]) => setInstalled(list ?? []))
+    skillsApi
+      .listLibrary()
+      .then((list) => setInstalled(list ?? []))
       .catch(() => {})
       .finally(() => setInstalledLoading(false))
   }, [])
@@ -205,11 +233,52 @@ export function SkillMarketplacePage() {
     window.open(skill.skill_url, '_blank', 'noopener,noreferrer')
   }
 
+  // ── MCP 市场: 加载 / 安装 (F1+F2) ──
+  // workspace_id: 优先用 activeConvId (需 UUID 格式), 否则降级到 system UUID
+  const loadMcpMarket = useCallback(async () => {
+    setMcpLoading(true)
+    setMcpError('')
+    try {
+      const r = await mcpApi.listMarket({
+        workspace_id: workspaceId,
+        page: 1,
+        page_size: 30,
+      })
+      setMcpItems(r.items ?? [])
+    } catch (e) {
+      setMcpError(e instanceof Error ? e.message : '加载 MCP 市场失败')
+    } finally {
+      setMcpLoading(false)
+    }
+  }, [workspaceId])
+
+  useEffect(() => {
+    if (tab === 'mcp') queueMicrotask(() => void loadMcpMarket())
+  }, [tab, loadMcpMarket])
+
+  const installMcp = async (item: McpMarketItem) => {
+    setMcpInstalling((prev) => new Set(prev).add(item.mcp_id))
+    setMcpError('')
+    try {
+      await mcpApi.install({
+        workspace_id: workspaceId,
+        mcp_id: item.mcp_id,
+        instance_name: `${item.slug}-${Date.now().toString(36).slice(-4)}`,
+      })
+      setMcpInstalled((prev) => new Set(prev).add(item.mcp_id))
+    } catch (e) {
+      setMcpError(e instanceof Error ? e.message : '安装 MCP 失败')
+    } finally {
+      setMcpInstalling((prev) => {
+        const next = new Set(prev)
+        next.delete(item.mcp_id)
+        return next
+      })
+    }
+  }
+
   // 已装名字集合（用于「市场」卡判断按钮态）
-  const installedNames = useMemo(
-    () => new Set(installed.map((s) => s.name)),
-    [installed],
-  )
+  const installedNames = useMemo(() => new Set(installed.map((s) => s.name)), [installed])
 
   // 当前 sort 的展示信息（加运行时兜底，防 TS 非空断言被打脸）
   const currentSort = SORT_OPTIONS.find((o) => o.value === sortBy) ?? SORT_OPTIONS[0]
@@ -271,6 +340,18 @@ export function SkillMarketplacePage() {
                 {installed.length}
               </span>
             )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('mcp')}
+            className={cn(
+              'rounded-md px-4 py-1.5 transition-colors',
+              tab === 'mcp'
+                ? 'bg-brand/15 text-brand font-medium'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            MCP 服务
           </button>
         </div>
 
@@ -348,13 +429,9 @@ export function SkillMarketplacePage() {
                             : 'text-foreground',
                         )}
                       >
-                        <span className="w-4 text-center text-[14px] opacity-80">
-                          {opt.icon}
-                        </span>
+                        <span className="w-4 text-center text-[14px] opacity-80">{opt.icon}</span>
                         <span className="flex-1">{opt.label}</span>
-                        {sortBy === opt.value && (
-                          <Icon name="check" className="h-3.5 w-3.5" />
-                        )}
+                        {sortBy === opt.value && <Icon name="check" className="h-3.5 w-3.5" />}
                       </button>
                     ))}
                   </div>
@@ -441,13 +518,7 @@ export function SkillMarketplacePage() {
                             {/* 安装 / 已安装：状态化 */}
                             <GlassIconBtn
                               icon={isInstalled ? 'check' : 'plus'}
-                              title={
-                                installing
-                                  ? '安装中…'
-                                  : isInstalled
-                                    ? '已安装'
-                                    : '安装'
-                              }
+                              title={installing ? '安装中…' : isInstalled ? '已安装' : '安装'}
                               onClick={() => !isInstalled && !installing && installSkill(s)}
                               disabled={isInstalled || installing}
                               variant={isInstalled ? 'default' : 'brand'}
@@ -506,7 +577,8 @@ export function SkillMarketplacePage() {
                   <div className="flex items-center gap-2 text-[12.5px]">
                     <Icon name="listCheck" className="h-3.5 w-3.5 text-brand" />
                     <span>
-                      已选 <b className="text-brand">{installedSelected.size}</b> / {installed.length}
+                      已选 <b className="text-brand">{installedSelected.size}</b> /{' '}
+                      {installed.length}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -554,14 +626,18 @@ export function SkillMarketplacePage() {
                   return (
                     <article
                       key={s.name}
-                      onClick={installedBatchMode ? () => {
-                        setInstalledSelected((prev) => {
-                          const next = new Set(prev)
-                          if (next.has(s.name)) next.delete(s.name)
-                          else next.add(s.name)
-                          return next
-                        })
-                      } : undefined}
+                      onClick={
+                        installedBatchMode
+                          ? () => {
+                              setInstalledSelected((prev) => {
+                                const next = new Set(prev)
+                                if (next.has(s.name)) next.delete(s.name)
+                                else next.add(s.name)
+                                return next
+                              })
+                            }
+                          : undefined
+                      }
                       className={cn(
                         'relative flex flex-col gap-2 rounded-xl glass-soft p-3 border transition-colors',
                         'border-border/60 hover:border-border',
@@ -651,6 +727,183 @@ export function SkillMarketplacePage() {
         </div>
       )}
 
+      {/* ── MCP 服务 tab (F3 接入, 真消费 mcpApi 8 端点) ── */}
+      {tab === 'mcp' && (
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          {mcpError && (
+            <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600">
+              {mcpError}
+            </div>
+          )}
+          {mcpLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <span className="text-[13px] text-muted-foreground">加载 MCP 服务中…</span>
+            </div>
+          ) : mcpItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <Icon name="network" className="mb-2 h-8 w-8 text-muted-foreground/30" />
+              <p className="text-[13px] font-medium">还没有可安装的 MCP server</p>
+              <p className="mt-1 text-[12px] text-muted-foreground">
+                当前 marketplace 为空。可走 F3 创建后再浏览
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
+              {mcpItems.map((m) => {
+                const installing = mcpInstalling.has(m.mcp_id)
+                const installed = mcpInstalled.has(m.mcp_id)
+                return (
+                  <article
+                    key={m.mcp_id}
+                    data-testid={`mcp-card-${m.slug}`}
+                    data-installed={installed ? 'true' : 'false'}
+                    className="group relative flex flex-col gap-2 rounded-xl glass-soft p-3 border border-border/60 transition-colors hover:border-border"
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <Avatar
+                        initial={m.name[0]?.toUpperCase() ?? '?'}
+                        color="brand"
+                        size={32}
+                        className="flex-shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="min-w-0 flex-1 truncate text-[13.5px] font-semibold leading-tight">
+                            {m.name}
+                          </h3>
+                          {m.official && (
+                            <span className="flex-shrink-0 rounded-md bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                              官方
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-0.5 font-mono text-[10.5px] text-muted-foreground/70">
+                          {m.transport} · v{m.version} · ↓{m.install_count}
+                        </div>
+                      </div>
+                    </div>
+                    <p className="line-clamp-3 min-h-[3em] flex-1 text-[12px] leading-relaxed text-foreground/75">
+                      {m.description || '暂无描述'}
+                    </p>
+                    <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+                      <div className="flex flex-wrap gap-0.5">
+                        {m.tags.slice(0, 3).map((t) => (
+                          <span
+                            key={t}
+                            className="rounded bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                      <GlassIconBtn
+                        icon={installed ? 'check' : 'plus'}
+                        title={installing ? '安装中…' : installed ? '已安装' : '安装'}
+                        onClick={() => !installed && !installing && installMcp(m)}
+                        disabled={installed || installing}
+                        variant={installed ? 'default' : 'brand'}
+                      />
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── MCP 市场 tab (F1+F2 接入) ── */}
+      {tab === 'mcp' && (
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          {mcpLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <span className="text-[13px] text-muted-foreground">加载中…</span>
+            </div>
+          ) : mcpError ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <Icon name="files" className="mb-2 h-8 w-8 text-muted-foreground/30" />
+              <p className="text-[13px] font-medium text-muted-foreground">{mcpError}</p>
+              {!activeConvId && (
+                <p className="mt-1 text-[12px] text-muted-foreground/70">
+                  MCP 安装需要 workspace context
+                </p>
+              )}
+            </div>
+          ) : mcpItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <Icon name="files" className="mb-2 h-8 w-8 text-muted-foreground/30" />
+              <p className="text-[13px] font-medium">MCP 市场暂为空</p>
+              <p className="mt-1 text-[12px] text-muted-foreground">
+                后端 <code>/api/mcp/market</code> 0 个 server
+                <br />
+                可在 F3 路径创建 (POST <code>/api/mcp/servers</code>)
+              </p>
+            </div>
+          ) : (
+            <div className="mx-auto grid max-w-3xl gap-3">
+              {mcpItems.map((item) => {
+                const isInstalled = mcpInstalled.has(item.mcp_id)
+                const isInstalling = mcpInstalling.has(item.mcp_id)
+                return (
+                  <article
+                    key={item.mcp_id}
+                    data-testid={`mcp-card-${item.slug}`}
+                    data-installed={isInstalled ? 'true' : 'false'}
+                    className="flex items-start gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-brand/40"
+                  >
+                    <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-md border bg-muted/30 text-brand">
+                      <Icon name="globe" className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[13px] font-medium">{item.name}</span>
+                        {item.official && (
+                          <span className="rounded bg-brand/10 px-1.5 text-[10px] font-medium text-brand">
+                            OFFICIAL
+                          </span>
+                        )}
+                        <span className="rounded bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground">
+                          {item.transport}
+                        </span>
+                        <span className="font-mono text-[10px] text-muted-foreground/60">
+                          v{item.version}
+                        </span>
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-[12.5px] text-muted-foreground">
+                        {item.description}
+                      </p>
+                      {item.tags.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {item.tags.slice(0, 4).map((t) => (
+                            <span
+                              key={t}
+                              className="rounded bg-muted/30 px-1.5 font-mono text-[10px] text-muted-foreground"
+                            >
+                              {t}
+                            </span>
+                          ))}
+                          <span className="ml-auto text-[10px] text-muted-foreground/60">
+                            ⬇ {item.install_count}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      variant={isInstalled ? 'default' : 'brand'}
+                      size="sm"
+                      onClick={() => !isInstalled && !isInstalling && void installMcp(item)}
+                      disabled={isInstalled || isInstalling}
+                    >
+                      {isInstalling ? '安装中…' : isInstalled ? '已安装' : '安装'}
+                    </Button>
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 单个删除确认 */}
       <ConfirmDialog
         open={deleteConfirm !== null}
@@ -663,8 +916,7 @@ export function SkillMarketplacePage() {
           if (!deleteConfirm) return
           setInstalledDeleting(true)
           try {
-            const r = await fetch(`/api/skills/library/${encodeURIComponent(deleteConfirm)}`, { method: 'DELETE' })
-            if (!r.ok) { const d = await r.json().catch(() => ({})); setError(d.detail ?? `删除失败 (${r.status})`); return }
+            await skillsApi.removeLibrary(deleteConfirm)
             setInstalled((prev) => prev.filter((x) => x.name !== deleteConfirm))
           } catch (e) {
             setError(e instanceof Error ? e.message : '删除失败')
@@ -688,12 +940,7 @@ export function SkillMarketplacePage() {
           if (!batchDeleteConfirm) return
           setInstalledDeleting(true)
           try {
-            const r = await fetch('/api/skills/library/batch-delete', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ names: batchDeleteConfirm }),
-            })
-            if (!r.ok) { const d = await r.json().catch(() => ({})); setError(d.detail ?? `删除失败 (${r.status})`); return }
+            await skillsApi.batchDeleteLibrary(batchDeleteConfirm)
             setInstalled((prev) => prev.filter((s) => !batchDeleteConfirm.includes(s.name)))
             setInstalledSelected(new Set())
             setInstalledBatchMode(false)

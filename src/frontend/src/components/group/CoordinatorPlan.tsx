@@ -1,4 +1,4 @@
-import { Avatar, Badge, Button, Icon } from '../ui'
+import { Avatar, Badge, Icon } from '../ui'
 import { lookupActor } from './actors'
 import type { CoordinatorPlan as Plan, Group } from '../../types'
 
@@ -14,11 +14,13 @@ export function CoordinatorPlan({ plan, group }: { plan: Plan; group?: Group }) 
         <div className="flex-1" />
         <Badge variant="brand">协调者</Badge>
       </header>
-      <div className="px-4 py-3">
-        <p className="text-[13.5px] leading-relaxed text-foreground/90 [text-wrap:pretty]">
-          {plan.summary}
-        </p>
-      </div>
+      {plan.summary && (
+        <div className="px-4 py-3">
+          <p className="text-[13.5px] leading-relaxed text-foreground/90 [text-wrap:pretty]">
+            {plan.summary}
+          </p>
+        </div>
+      )}
       <ol className="divide-y border-t">
         {plan.steps.map((s) => {
           const a = lookupActor(s.who, group)
@@ -35,9 +37,11 @@ export function CoordinatorPlan({ plan, group }: { plan: Plan; group?: Group }) 
                 <span className="truncate text-[12.5px] font-medium">{a.name}</span>
               </div>
               <span className="flex-1 truncate text-[13px]">{s.label}</span>
-              <span className="hidden items-center gap-1 font-mono text-[10.5px] text-muted-foreground md:inline-flex">
-                <Icon name="clock" className="h-3 w-3" />~{s.eta} min
-              </span>
+              {s.eta > 0 && (
+                <span className="hidden items-center gap-1 font-mono text-[10.5px] text-muted-foreground md:inline-flex">
+                  <Icon name="clock" className="h-3 w-3" />~{s.eta} min
+                </span>
+              )}
               <span className="hidden font-mono text-[10.5px] text-muted-foreground lg:inline">
                 {s.depends.length ? `依赖 ${s.depends.join(', ')}` : '可立即开始'}
               </span>
@@ -59,19 +63,10 @@ export function CoordinatorPlan({ plan, group }: { plan: Plan; group?: Group }) 
           </div>
         </div>
       )}
-      <footer className="flex items-center justify-between border-t bg-muted/20 px-4 py-2">
+      <footer className="flex items-center border-t bg-muted/20 px-4 py-2">
         <span className="font-mono text-[11px] text-muted-foreground">
-          每个子任务会作为独立任务进入「任务」标签
+          每个子任务作为独立任务执行，进度见顶部面板
         </span>
-        <div className="flex gap-1.5">
-          <Button variant="ghost" size="sm">
-            改一下
-          </Button>
-          <Button variant="brand" size="sm">
-            <Icon name="zap" className="h-3 w-3" />
-            派发
-          </Button>
-        </div>
       </footer>
     </div>
   )

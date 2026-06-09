@@ -69,3 +69,11 @@ repos:
         always_run: true
         pass_filenames: false
         stages: [pre-push]
+
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.13.0
+    hooks:
+      - id: markdownlint-cli2
+        name: STATUS.md markdownlint (严规则)
+        files: ^STATUS\.md$
+        stages: [pre-push]

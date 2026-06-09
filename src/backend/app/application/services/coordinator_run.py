@@ -281,32 +281,94 @@ def make_ws_progress_sink(
 
 
 def make_worker_event_sink(
-    session_id: UUID, *, persist: Callable[[object, str], Awaitable[None]] | None = None
+    session_id: UUID,
+    coordinator_id: UUID | None = None,
+    *,
+    persist: Callable[[object, str], Awaitable[None]] | None = None,
 ) -> Callable[[StreamEvent], Awaitable[None]]:
-    """worker 流 event_sink：累积 TEXT，turn 结束（DONE）落成一条 worker 消息进 transcript。
+    """worker 流 event_sink：双通道分流。
 
-    让 worker 在群里出声——「用 Markdown 还是 CMS?」这类提问进 transcript，用户看得到、
-    decide/feed 才有料（v4 §2.4/§12 的核心，原 event_sink=None 把这半条断了）。
-    持久化在 turn 结束整条落库（不逐 chunk 广播，避免与 MessageSent 双渲染）。
+    **聊天通道（干净叙事，保守版 §2）**：worker 动手前的开场白（首个 tool_call 前的文本）→
+    一条「报到」消息进 transcript；turn 结束（DONE）的收尾文本 → 一条「交卷」消息。
+    中间穿插的旁白不入聊天，只进步骤详情，避免刷屏。
+
+    **步骤活动通道（Claude Code 风格实时进度）**：每个 TEXT/TOOL_CALL/TOOL_RESULT 都打上
+    taskId 广播为 `task_activity`，前端归到对应步骤的实时进度 feed（点开步骤卡片可见）。
     """
     _persist = persist or (
         lambda agent_id, text: post_worker_message_background(session_id, agent_id, text)
     )
-    buffers: dict[object, list[str]] = {}
+    run_buf: dict[object, list[str]] = {}   # 当前连续文本段（遇 tool_call 清空）
+    announced: dict[object, bool] = {}       # 是否已发过开场白
+
+    async def _activity(task_id: object, payload: dict) -> None:
+        if coordinator_id is None or not task_id:
+            return
+        evt = StreamEvent(
+            type=StreamEventType.TASK_ACTIVITY,
+            seq=0,
+            metadata={"taskId": task_id, **payload},
+            sender_agent_id=coordinator_id,
+        )
+        await ws_manager.broadcast(session_id, evt.model_dump(mode="json"))
 
     async def sink(evt: StreamEvent) -> None:
+        who = evt.sender_agent_id
+        task_id = evt.metadata.get("taskId")
+
         if evt.type == StreamEventType.TEXT and evt.content:
-            buffers.setdefault(evt.sender_agent_id, []).append(evt.content)
+            run_buf.setdefault(who, []).append(evt.content)
+            await _activity(task_id, {"kind": "text", "text": evt.content})
+
+        elif evt.type == StreamEventType.TOOL_CALL and evt.tool_call:
+            # 首个工具调用前的开场白 → 报到（仅一次）。中段旁白只进 feed，不刷聊天。
+            if not announced.get(who):
+                text = "".join(run_buf.get(who, [])).strip()
+                if text:
+                    await _persist(who, text)
+                    announced[who] = True
+            run_buf[who] = []
+            await _activity(task_id, {
+                "kind": "tool_call",
+                "callId": evt.tool_call.call_id,
+                "name": evt.tool_call.name,
+            })
+
+        elif evt.type == StreamEventType.TOOL_RESULT and evt.tool_result:
+            await _activity(task_id, {
+                "kind": "tool_result",
+                "callId": evt.tool_result.call_id,
+                "ok": evt.tool_result.success,
+            })
+
         elif evt.type == StreamEventType.DONE:
-            text = "".join(buffers.pop(evt.sender_agent_id, [])).strip()
+            text = "".join(run_buf.pop(who, [])).strip()
+            announced.pop(who, None)
             if text:
-                await _persist(evt.sender_agent_id, text)
+                await _persist(who, text)
 
     return sink
 
 
+async def _broadcast_chat_message(session_id: UUID, agent_id: object, content: str) -> None:
+    """后台任务里把一条完整发言实时推给前端 WS（单条 TEXT 带 final 标记，前端 append 成独立消息）。
+
+    必须直接 broadcast：后台 Orchestrator 的发言无法走已结束的 HTTP 流，而 MessageSent
+    事件无 WS 订阅者（只落库），不 broadcast 就只能刷新页面才看得到（本会话「组员不说话」根因）。
+    用 metadata.final 让前端直接落一条完成消息，避免与流式哨兵粘连。
+    """
+    await ws_manager.broadcast(
+        session_id,
+        StreamEvent(
+            type=StreamEventType.TEXT, seq=0, content=content,
+            sender_agent_id=agent_id,  # type: ignore[arg-type]
+            metadata={"final": True},
+        ).model_dump(mode="json"),
+    )
+
+
 async def post_worker_message_background(session_id: UUID, agent_id: object, content: str) -> None:
-    """后台落 worker 发言（role=ASSISTANT, sender=worker）→ 进 transcript + 广播前端。"""
+    """后台落 worker 发言（role=ASSISTANT, sender=worker）→ 进 transcript + 实时广播前端。"""
     msg = Message(
         session_id=session_id, role=MessageRole.ASSISTANT, content=content,
         sender_agent_id=agent_id,  # type: ignore[arg-type]
@@ -314,6 +376,7 @@ async def post_worker_message_background(session_id: UUID, agent_id: object, con
     async with session_factory() as db:
         await PostgresMessageRepository(db).save(msg)
         await db.commit()
+    await _broadcast_chat_message(session_id, agent_id, content)  # 实时进群聊
     await get_event_bus().publish(
         MessageSent(
             session_id=session_id, message_id=msg.id, role="assistant", content_type="text"
@@ -345,7 +408,7 @@ async def build_default_orchestrator(
         session_id=session.id,
         group_id=group.id,
         workspace=workspace,
-        event_sink=make_worker_event_sink(session.id),  # worker 发言进群聊 transcript
+        event_sink=make_worker_event_sink(session.id, group.coordinator_id),  # 发言进群聊 + 活动进步骤 feed
     )
     verifier = MechanicalVerifier(workspace=workspace)
     worker_ids = {a.name: str(a.id) for a in members}  # 给 plan step.who 翻译用
@@ -356,20 +419,30 @@ async def build_default_orchestrator(
         ctx=ctx,
         # WS 带外推送；worker_ids 让 plan step.who 是 agent id（前端 lookupActor 按 id 查）
         progress=make_ws_progress_sink(session.id, group.coordinator_id, worker_ids),
-        # R4：关键事件入 transcript（独立 DB session 落 SYSTEM 消息 + 广播）
-        message_sink=lambda content: post_system_background(session.id, content),
+        # R4：关键事件入 transcript（独立 DB session 落 SYSTEM 消息 + 实时广播，挂协调者身份）
+        message_sink=lambda content: post_system_background(session.id, content, group.coordinator_id),
     )
 
 
 # ── 后台系统消息落库（独立 session，不用请求作用域）──────────────────────────
 
 
-async def post_system_background(session_id: UUID, content: str) -> None:
-    """后台任务专用：开独立 DB session 落系统消息 + 广播。请求已结束，不能复用其 session。"""
-    msg = Message(session_id=session_id, role=MessageRole.SYSTEM, content=content)
+async def post_system_background(
+    session_id: UUID, content: str, coordinator_id: UUID | None = None
+) -> None:
+    """后台任务专用：开独立 DB session 落系统消息 + 实时广播。请求已结束，不能复用其 session。
+
+    coordinator_id：里程碑通报（开始执行/✅完成/❌失败/卡死）挂协调者身份，前端才能
+    识别为协调者消息渲染成里程碑分隔线（否则 sender=None → unknown）。
+    """
+    msg = Message(
+        session_id=session_id, role=MessageRole.SYSTEM, content=content,
+        sender_agent_id=coordinator_id,  # type: ignore[arg-type]
+    )
     async with session_factory() as db:
         await PostgresMessageRepository(db).save(msg)
         await db.commit()
+    await _broadcast_chat_message(session_id, coordinator_id, content)  # 实时进群聊
     await get_event_bus().publish(
         MessageSent(
             session_id=session_id, message_id=msg.id, role="system", content_type="text"

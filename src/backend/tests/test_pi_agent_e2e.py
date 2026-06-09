@@ -9,9 +9,12 @@
 
 import asyncio
 import os
+import shutil
 import sys
 from pathlib import Path
 from uuid import uuid4
+
+import pytest
 
 # 设置 backend 路径（src/backend，含 app 包）以支持 standalone 运行
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -28,7 +31,14 @@ os.environ.setdefault("SECRET_KEY", "test_key_for_e2e")
 
 
 async def test_factory_routing():
-    """测试1: 工厂路由"""
+    """测试1: 工厂路由
+
+    v4 R2 起（commit 之后, factory.py 严格硬依赖 CLI），无 Pi CLI 直接 raise —
+    本机无 pi 二进制时（per TD-04）整测试 skip。Setup 早期 return 比让 factory 抛
+    RuntimeError 再 skip 干净。
+    """
+    if not shutil.which("pi"):
+        pytest.skip("Pi CLI 未安装（per TD-04：v4 R2 起 factory 硬依赖 CLI）")
     from app.domain.entities.agent import Agent
     from app.domain.enums import AgentStatus, AgentSystem, Provider
     from app.infrastructure.llm.factory import build_adapter_for_agent

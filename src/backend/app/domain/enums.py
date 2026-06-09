@@ -107,6 +107,21 @@ class NotificationCategory(StrEnum):
     CALENDAR = "calendar"
 
 
+class InboxItemStatus(StrEnum):
+    """收件箱条目生命周期（M4 审批流）。"""
+
+    UNREAD = "unread"
+    READ = "read"
+    RESOLVED = "resolved"  # 审批已批准/驳回，从未决列表移除
+
+
+class InboxResolution(StrEnum):
+    """审批结果（type=approval 的条目 resolve 时回填）。"""
+
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 class DispatchMode(StrEnum):
     # 用户级/命令级（SendMessageCommand 兼容值）
     AUTO = "auto"

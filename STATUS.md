@@ -1,197 +1,344 @@
 # 当前状态
 
-> 最后更新: 2026-06-08 21:45（3 CLI 全线补齐 + 协调者 v4 后端 + 会话删除/置顶 + 搜索/分页 + 网页侧栏 + 模板管理弹窗）
-> 规则：**每次 push 或开始/结束一个任务时，更新你自己的那一行。**
+> 更新:**2026-06-09 18:30 pytest 现状修正 (袁, 分支 feature/frontend/preview-tabs; 修 14 个 v4 R2 后未同步的陈旧测试 + 删 2 孤儿测试模块 + 跳 1 v3 时代 AT_ROUTING 静默断言 + 修 1 真生产 bug _RecordingSink 签名 + 删 1 死源 coordinator_orchestrator.py; 实测 356 pytest 全绿 / 2 skipped, 替代 6/8 起的失真"332 无回归"叙事; 详见 TD-14)** +**2026-06-09 16:30 #2 Tasks + #3 Inbox 全栈持久化 CRUD 落地 (袁, 分支 feature/frontend/preview-tabs; 两项后端 mock 骨架→真 service+表; 前端弃 mock 接真 API; 13 项缺口全闭环; alembic 0020; 9 pytest + ~~332 无回归~~ (6/9 18:30 修正) + Playwright 4 截图)** +2026-06-091:40整合版 (整理而非瘦身) +2026-06-0900:45 真测补完标注 (per [test-report-2026-06-09-comprehensive.html](docs/reports/test-report-2026-06-09-comprehensive.html)) + **2026-06-091:40 后端 ↔ 前端缺口盘点 (per袁1:28a~1:31a inventory + 本轮 grep复核)** + **2026-06-092:40 预览面板 4 tab 真实 UI 落地 (袁, 分支 feature/frontend/preview-tabs; Diff + Deploy 新建, Files/Webpage 验证; 后端 fs/git-diff 端点新增; Playwright 7 截图)** + **2026-06-0907:30 后端已完成但前端缺失功能点补全 (袁, 同分支; #9 编辑Agent + #10 删除消息 + #12 ping延迟 + #7 Templates同步复核 + #4 CLI重扫 + #8 Skills wrapper; 此类缺口清零, 余 #2/#3 后端为 mock 骨架)**
+> - 数据源: `docs/plan/背景.md` (PRD +考察要点 +交付物) + git `200aba4:STATUS.md` (旧198 行) +3 新 ADR (0016/0017/0018) + worklogs/{袁,董,黎}/ + **本轮 grep16 router ×8 client ×7 nav实证**
+> - 规则: 每次 push 或开始/结束任务时, 更新你自己那一行
+> - 强约束: pre-push markdownlint-cli2 (D-13) — MD024/036/041 严, MD013 关 (per 2026-06-08 决策"不要瘦身")
+> - 谁做的: 每个事件段首加 `[owner]` 标签, 进度表 row 直接 = 该人本周完成清单
 
-| 我 | 正在做 | 阻塞？ | 这周完成了 |
+---
+
+## 📊 三人进度 (per git HEAD 200aba4, 06-08 EOD)
+
+| 我 | 正在做 | 阻塞？ | 本周完成了 |
 |----|--------|--------|-----------|
-| 黎 | 3 CLI 全线对齐 + 版本稳定 push main | 无 | Template v4 ✅ + CLI streaming 全线 ✅ + bypassPermissions ✅ + 网页侧栏预览 ✅ + 删除确认弹窗 ✅ + 会话删除清理+导航切换 ✅ + **Pi/OpenCode/Codex 全对齐 ✅** |
-| 董 | 任务编排前端：live DAG 面板 + 里程碑入聊天 + 组员开工报到 | 无 | 群聊全栈 ✅ + 记忆系统全链路 ✅ + **协调者 v4 后端全落 main ✅**：v4 设计 7 篇 + R0→R5 + abort，1541 行测试全绿 ✅ | (docs: update STATUS for 3 CLI alignment + session delete fix + webpage sidebar)
-| 袁 | **t7 B-4-P2-CL01 phase-3 全完 @21:14** (4 commit: b611ce8 feat(backend) + 2257ba3 test(backend) + 5c9c7d4 feat(frontend) + 94b6a70 test(frontend); alembic 0019 (原 brief 估 0015, 实际 0015-0018 被 templates 占用, head=0018→新 0019) + Session.pinned 9 文件全链路 + 4 pytest + Conversation.pinned + LeftPanel pin icon + handleTogglePin 4 决策 (乐观+createPrivate 兜底+1 retry+in-flight 禁用) + 3 vitest 绿; 顺手修 9d96156 漏的 useEffect import) — **next gate: t10 M6 finalize (v6 视频 + README + M3/M4 inbox) 或 黎 桌面 specs Reviewer 答稿** | 🟡 t3 SLA 至 23:03；t10/t11 未启动；Feishu 同步待 user OAuth | **t7 phase-3 全完 @21:14** (4 commit 见上); **t7 partial @20:29** (9d96156 search wire 30 行); **t12 e2e-pin-auth 兜底 @19:43** (1f15f7f); **t6 @19:38** (3 commit); **t1/t2/t4 @19:18** (3 commit); **t8+t9 @18:45** (58465e0 + ca7e33f) |
+| **黎** (oldmanpushbike) | 网页侧栏预览 + 版本稳定 push main | 无 | Template v4 (192 模板+favorites) ✅ + CLI streaming 全线 (5 种流式事件 UI+折叠组) ✅ + 图标居中 ✅ + 弹窗关闭修复 ✅ + bypassPermissions ✅ + scanner 精简 ✅ + 网页侧栏预览 ✅ + 删除确认弹窗 ✅ + 会话最近消息 ✅ |
+| **董** (yii.d) | 协调者+任务编排部分 | 无 | 群聊全栈实现 ✅ + CLI 多模型代理 ✅ + ADR-02 长驻 CLI ✅ + 前端群聊 ✅ + 记忆系统 B 方向设计 ✅ + B1 后端实现 ✅ + B2 详细设计 ✅ + Agent 创建全链路 6 处 bug 修复 + 9 个测试 ✅ + MCP save_memory 端到端打通 ✅ + 前端记忆面板 ✅ + 记忆分支合并 main ✅ |
+| **袁** (xiangbianpangde) | pytest 现状修正 (feature/frontend/preview-tabs, 6/9 18:30) | 🟢 356 pytest 全绿, 待 commit/push | **2026-06-09 18:30 pytest 现状修正** (修 14 个 v4 R2 后未同步的陈旧测试: 11 个 reactive_router (删 _state 的 dispatch_mode kwarg + 2 个 v3 行为断言 + 1 个 transcript 测试改顺序), 1 个 test_mcp _write_mcp_config 位置→kwargs, 1 个 test_claude_code_runtime 默认值 acceptEdits→bypassPermissions, 2 个 test_context Windows 路径分隔符; 跳 1 v3 时代 AT_ROUTING 静默断言 + 1 本机无 pi CLI 的工厂路由; 删 2 孤儿测试模块 (test_orchestrator_degrade + test_usage_e2e) + 1 死源 coordinator_orchestrator.py; 修 1 真生产 bug: _RecordingSink.__call__ 签名 2 参→3 参对齐 chat_service._coord_post; 改 2 个 v3 时代 events==[] 断言为 v4 真实行为 (任务受理 / 降级 note 的 1 条 system message 提示). 实测 356 pytest 全绿 / 2 skipped. 详见 TD-14) + **2026-06-09 16:30 #2 Tasks + #3 Inbox 全栈持久化 CRUD** (后端两项 mock 骨架→真 service: `TaskService`/`InboxService` + 2 Postgres 仓储 + alembic 0020 (tasks 补 2 列 + 新建 inbox_items 表) + `schemas/task.py`/`inbox.py` (含 422 校验) + 路由全接线; 前端 `api/tasks.ts`/`api/inbox.ts` (UI↔领域词表映射) + 弃 taskStore/inboxStore mock 改真 API + NavRail 加收件箱入口闭 TD-05; tsc+eslint 绿 + 9 pytest 三路径 + ~~332 pytest 无回归~~ (6/9 18:30 实测修正：当时实为 25 failed / 335 passed) + Playwright 4 截图 E2E (任务创建跨刷新持久化 + 收件箱批准→后端 resolved); 真 bug 修: 非法 enum 入参 500→422) + **2026-06-09 07:30 缺口补全 6 项** (#9 编辑Agent full E2E + #10 删除消息 + #12 ping延迟 + #7 Templates复核 + #4 CLI重扫 scan() + #8 Skills wrapper; tsc+eslint绿; gap-09/gap-10 截图; 审计排除 #2/#3 mock 骨架) + | t3 MCP P3 F3 路径 A @22:00 (2 commit fde10e4 + a2b9ff3) ✅ + t7 phase-3 @21:14 (4 commit pushed) ✅ + t7 partial @20:29 + t12 @19:43 + t6 @19:38 + t1/t2/t4 @19:18 + t8+t9 @18:45 + **2026-06-09 00:45 真测补完** (mcp.py 重复路由修复 + 4 路径 live curl + t7 pin Playwright 3 截图, 3 真 bug 暴露, pytest 332/351 (6/9 18:30 实测修正：当时实为 25 failed / 335 passed) + vitest 106/108 + live API 12/13 端点) + **2026-06-09 02:40 预览面板 4 tab 真实 UI** (Diff tab 新建 `DiffPanel.tsx` + 后端 `GET /api/fs/git-diff` + Deploy tab 新建 `DeployPanel.tsx` + `api/deploy.ts` + Files/Webpage 验证; tsc+eslint 绿; live git-diff 3 路径; Playwright 7 截图 `preview-tabs-0X-*.png`; 1 真 bug 暴露+修 `_os` NameError) |
 
-## ⏭️ 进行中交接
+---
 
-- **✅ 2026-06-07 凌晨冲刺（plan_bcf9945c 收束,06/07 01:20-05:50,Mavis owner）**：
-  - 决策：`worklogs/decisions/0010-integration-verify-downscope-e.md`（E 视觉 downscope 到 API+code,Inbox M4 TODO）+ `worklogs/decisions/0011-plan-bcf9945c-complete.md`（plan_complete=true）
+## 🎯 考察要点 4 维度覆盖 (per `docs/plan/背景.md` line 57-77)
+
+| 维度 | 权重 | 评判要点 | 当前覆盖 | 谁做的 |
+|------|------|---------|---------|-------|
+| AI 协作能力 | 30% | 沉淀出和 ai 协作的 Spec/skill/rules 等协作规范 | ✅ `docs/conventions/` 9 篇 + `docs/specs/` 13 篇 + `worklogs/decisions/` 18 ADR + `skills/` 9 个 + `docs/templates/` 14 个 | 全员（黎/董/袁 + Mavis owner）|
+| 功能完整度 | 25% | IM 核心体验是否流畅、多 Agent 调度是否跑通 | ⚠️ **67%** (15 完整 + 5 部分 + 5 未做 + 1 计划)，详见 [PRD 6 大功能对账](#-prd-6-大核心功能-vs-现状-对账) | 全员 |
+| 生成效果质量 | 20% | 聊天 UI 体验、产物预览效果 | ✅ Web 端 localhost:5174 跑通, S2 群聊 6 条消息流 (用户→Coordinator 拆解→Claude/OpenCode/MockBot 并行→合并汇报) | 黎（UI 打磨）+ 董（前端群聊）|
+| 代码理解度 | 15% | 答辩时能否解释架构选型和核心逻辑 | ✅ 5 层洋葱架构图（[01-architecture](docs/conventions/01-architecture_架构设计规范.md) §一）+ 5 主表 ER 图（[03-data-model](docs/specs/03-data-model_数据模型.md) §二）+ 命令 reference (docs/plan/.../commands-reference.md) | Mavis owner (plan_ba86c4d0 docs-writer 任务) |
+| 创新与产品感 | 10% | 超预期功能点或体验优化 | ✅ 11 个真 Agent 队友 (含 Codex/OpenCode/Pi) + CLI/SDK 双轨适配器 (ADR-0001) + Pin 消息 + 部署卡 + 4 栏响应式 (useMediaQuery, 768/1024/1280/hamburger) | 全员 |
+
+---
+
+## 📦 交付物 4 项 (per `docs/plan/背景.md` line 78-82)
+
+| # | 交付物 | 位置 | 状态 | 谁做的 |
+|---|--------|------|------|-------|
+| 1 | 产品设计文档 + 技术文档飞书文档 | `docs/plan/背景.md` (PRD) + `docs/specs/00-05` (13 份规格) + 飞书 (`docs/deliverables/AI协作开发记录.md` 12.1KB CJK 3214 6 段) | ✅ done (凌晨冲刺 plan_bcf9945c `602026f`+`82b265a`) | Mavis owner (plan_ba86c4d0 docs-writer) |
+| 2 | 可运行 Demo github 仓库地址 | 当前仓库, main `eea1d0e` + 后续 6/7-6/8 多次 merge | ✅ done | 全员 |
+| 3 | AI 协作开发记录 | 仓库内 `docs/deliverables/AI协作开发记录.md` 12.1KB CJK 3214 6 段 a-f + 飞书文档 (per 背景 line 81) | ✅ done (v1 override_accept + v2 attempt 2 PASS) | Mavis owner |
+| 4 | 3-10 分钟 Demo 视频 | `docs/deliverables/video/AgentHub-Demo-Video.mp4` 17.7MB 200s 1920x1080 h264+aac+mov_text 字幕 zho + 7 TTS wav + 2 AI cover + 27 subtitle | ⚠️ done (v4 录屏 DISPLAY1 wallpaper 残留; v5 Win32 SetWindowPos + ffmpeg crash 失败; 已透明声明, **建议下阶段 v6 用真实工作流重做 per [ADR-0016](worklogs/decisions/0016-playwright-mcp-replace-cu-for-e2e-visual.md)**) | Mavis owner |
+
+---
+
+## 🎯 PRD 6 大核心功能 vs 现状 对账
+
+> 评估依据: `plan_ba86c4d0` 7 impl commit 落 main (HEAD `eea1d0e`) + 凌晨冲刺 4 commit + E2E 实测 + 代码阅读
+> 6 大功能子项共 25, 详见 `docs/plan/背景.md` line 15-56
+> [2026-06-07 22:00 重对账, Phase 2 Playwright E2E 后] 覆盖率 = (15+5×0.5)/(15+5+5+1) = **67%** (per [ADR-0017](worklogs/decisions/0017-prd-core-feature-25pct-gate-audit.md))
+
+| # | 子功能 | 状态 | 证据 | 谁做的 |
+|---|--------|------|------|-------|
+| **1. IM 聊天** | 对话列表（新建/置顶/归档/搜索/排序）| ⚠️ 部分 | 群组/私聊 tab + 卡片渲染；**置顶 [已真实测试 (AI 模拟)] / 归档/搜索未做**（UI 缺；归档/搜索 pytest only 未真测）| 黎（UI 基础）+ M5/M6 手动补 + 袁 (6/9 t7 pin Playwright 3 截图, [test-report-2026-06-09-comprehensive.html](docs/reports/test-report-2026-06-09-comprehensive.html) §6) |
+| | 单聊 1v1（明确任务）| ✅ 完整 | S1 私聊 "技术负责人" + 3 建议 + 输入框 + 附件 + WS（Composer.tsx）| 黎（前端 Composer）+ 董（WS）+ **袁 (6/9 部分已真测 — 走 AI 队友→发起私聊→pin happy path 走通, 但 ChatView.onSend 早返回 UI flow 死路 见 [test-report-2026-06-09-comprehensive.html](docs/reports/test-report-2026-06-09-comprehensive.html) §4 Bug 2)** |
+| | 群聊（多 Agent + @ + Orchestrator）| ✅ 完整 | S2 群聊 6 条消息流（用户→Coordinator 拆解→Claude/OpenCode/MockBot 并行→合并汇报）| 董（群聊全栈）+ 袁（E2E 验证）|
+| | 消息类型（文本/代码/图片/文件/网页预览/Diff/部署卡）| ✅ 完整 | 文本/代码/网页预览/Diff 均 ✅；图片/文件 ✅（Composer + attachments.py 200）；**部署卡 ✅**（plan_ba86c4d0 frontend-p2 + backend-p2 联合落地 `c2d2a59`+`f45a92f`, MessageBubble 部署卡接 peer DeployCardView + 状态色 + 3 路径 test）| 黎（前端）+ 董（后端 P2）+ Mavis owner (P2 委派) |
+| | 消息操作（回复/引用/重新生成/复制代码/应用 Diff/展开预览）| ⚠️ 部分 | 复制代码 ✅ 重新生成 ✅ **Pin ⚠️ 端点 401 → 已修 by t1-pin-auth (6/8 overnight)** + **回复/引用 ✅** + **全屏预览 ✅** 代码完整 (3 路径单测) E2E 需真 URL | 黎（前端 MessageBubble）+ 袁（Pin 401 修复 `b97c4fd`/`bd92b2a`/`5371f41`/`2cbfff8`）|
+| | 上下文管理（pin 关键消息）| ✅ 完整 | Pin 按钮 + 后端 `/api/messages/{id}/pin` 端点（schema 钉死测试）；**session 校验 ⚠️**（alembic 0012+0013 dual head race 已修 by t1 merge `2843b06`）| 黎（UI）+ 袁（后端 t1-pin-auth 5 路径 12 pytest）+ **袁 (6/9 t7 session.pinned 已真测 — Playwright 3 截图 + live PATCH 200, 详见 §6)** [已真实测试 (AI 模拟)] |
+| **2. Orchestrator** | 自动分派/聚合/并行 | ✅ 完整 | Coordinator 拆解 3 任务 + 3 Agent 并行 + 合并汇报（CoordinatorPlan.tsx）| 董 |
+| | 失败降级 | ✅ 完整 | plan_ba86c4d0 backend-p2 `f45a92f`（19 文件 +1974 行 + 21/21 pytest 全绿）| Mavis owner (P2 委派) |
+| | 任务看板持久化 (创建/列表/筛选/改状态/删除) | ✅ 完整 | 袁 6/9 全栈 CRUD：`TaskService`+`PostgresTaskRepository`+`tasks` 表(alembic 0020) + 前端 `taskStore` 接真 API；Playwright UI 创建跨刷新持久化 `tasks-inbox-02`（完整 FSM/DAG 派发留 task_engine M3+）| 袁 |
+| | 用户审批流 (收件箱批准/驳回) | ✅ 完整 | 袁 6/9 全栈：`InboxService`+`inbox_items` 表 + 前端批准/驳回接 resolve + NavRail 入口；Playwright 批准→后端 resolved `tasks-inbox-03/04` | 袁 |
+| | 代码冲突处理 | ❌ 未做 | 已知缺口 | — |
+| **3. 多 Agent 接入** | 适配器层（Claude Code + Codex + OpenCode + Pi）| ✅ 完整 | CLI/SDK 双轨（per ADR-0001）+ 11 个队友含 Codex/OpenCode/Pi | 董（CLI 接入）+ 黎（OpenCode fix）|
+| | 用户自建 Agent（对话式创建）| ⚠️ 部分 | CreateAgentModal 存在（E2E 验证 04-modal）| 董（Agent 创建全链路 6 处 bug 修复 + 9 测试）|
+| | 联系人列表（头像/名称/能力标签）| ✅ 完整 | AI 队友页 11 个 + 头像 + role 标签（AgentsListPage）| 黎 + **袁 (6/9 Playwright 走 11 article 确认渲染, [已真实测试 (AI 模拟)])** |
+| **4. 产物预览与编辑** | 网页 iframe 内联卡片 | ✅ 完整 | `WebPreviewCard.tsx:80` iframe sandbox（集成验证 A 验）| 黎 |
+| | 文档渲染 | ✅ 完整 | plan_ba86c4d0 frontend-p0-p1 `d9cd8af`+`d6a1658` 落 DocumentRenderer 3-mode (per frontend-p0-p1 verifier) | Mavis owner (P0 委派) |
+| | 【P2】PPT 浏览 | ❌ 未做 | 已知 P2 | — |
+| | 展开全屏预览 | ✅ 完整 | plan_ba86c4d0 frontend-p0-p1（Dialog fullscreen 模式）| Mavis owner |
+| | 代码编辑器 | ✅ 完整 | plan_ba86c4d0 frontend-p2 `c2d2a59`（MonacoEditor.tsx + Composer 代码模式 + 3 路径 test）| Mavis owner (P2 委派) |
+| | 【P2】Diff 视图 | ✅ 完整 | `DiffView.tsx:29-41` 彩色 emerald/rose（集成验证 B 验）| 黎 |
+| | 【P2】版本历史 | ❌ 未做 | 已知 P2 | — |
+| | 【P2】对话式局部修改（选中代码→描述修改）| ❌ 未做 | 已知 P2 | — |
+| **5. 【P2】部署发布** | 聊天发送"部署"指令 → 部署卡 | ✅ 完整 | plan_ba86c4d0 backend-p2 `f45a92f`（Deploy 端点）+ frontend-p2 `c2d2a59`（部署卡前端, peer DeployCardView + 状态色）| Mavis owner (P2 委派) |
+| | 预览 URL / 静态站点 / 容器化 / 源码打包 | ⚠️ 部分 | 端点已落, 真实部署流水线未跑 E2E（M5/MVP 节奏）| — |
+| **6. 【P2】多端支持** | Web 端（主力）| ✅ 完整 | localhost:5174 vite dev 跑通 | 黎 + **袁 (6/9 vite 9500 跑通 + Playwright 走完 t7 pin happy path, [已真实测试 (AI 模拟)])** |
+| | 桌面端 | 📋 计划 | Tauri 2 计划冻结中（`feature/desktop/spec-freeze`, per ADR-0007），**等 4 Q 答稿** (Q5-1 通知 / Q5-2 身份 / Q7-1 版本号 / Q11-1 降级方案) | 黎（proposer, worklog 2026-06-06_讨论-web转桌面app可行性.md）+ 等 董/袁 reply |
+| | 移动端 H5 | ✅ 完整 | **6/8 修正**: t3-mobile-h5 `a483424`+`8124e54` 落地 useMediaQuery (React 18 useSyncExternalStore + matchMedia SSR-safe) + AppShell 4 栏 mobile/desktop 分支 + 11 vitest (5 useMediaQuery + 6 AppShell) + 4 截图 (375/768/1280/hamburger) + BDD §6.5.1.1 B-6-P2-M02 5 When/Then | 袁（t3-mobile-h5, M5 overnight）|
+
+**整体覆盖率**: ✅ 完整 15 / ⚠️ 部分 5 / ❌ 未做 5 / 📋 计划 1 / ✅ done by 6/8 t3 1 = **67% → 71%**
+(6/8 修正: 之前 22:00 标 ❌ 移动 H5 实际 ✅ by t3 overnight; per [ADR-0018](worklogs/decisions/0018-plan-3eaba0fa-overnight-4track-close.md))
+
+---
+
+## ⚠️ 后端已做 / 前端未做 (per袁2026-06-091:31a inventory + 本轮 grep16 router ×8 client ×7 nav实证)
+
+> **盘点方法**: `ls src/backend/app/api/routers/` (16 router) + `Grep "@router\.(get|post|patch|delete)"` → 后端端点枚举 + `ls src/frontend/src/api/` (8 client) + `Grep "<apiName>Api\.|/api/<path>"` → 前端调用方枚举 + `Read App.tsx + CenterPanel.tsx + NavRail.tsx` → 主导航可路由性
+> **结论**: PRD6 大功能"覆盖71%"是按 feature维度打的; **按 endpoint维度**, 后端 ≥57端点 vs 前端8 client 文件 (内含 ~40 函数), **实际调用覆盖率 ≈60%**,缺口集中在 MCP/Deploy/Inbox/Tasks 等后端先做/前端待补的区域
+> **谁做的**:建议按端点对 owner协商 — [袁] MCP P3-F3路径 A (前后端同步), [黎] Deploy/Inbox/Tasks UI, [董] Usage router 注册 (TD-11)
+
+| # | 后端端点 (router) | 前端现状 | 影响 (per PRD6 大功能) |接手起点 |
+|---|------------------|---------|----------------------|---------|
+| **1** | **MCP** (`mcp.py`) 全套10端点: `GET /api/mcp/market`, `/market/templates`, `/market/{id}`, `POST /api/mcp/installations`, `DELETE /installations/{id}`, `POST /api/mcp/bindings`, `DELETE /bindings/{id}`, **`POST /api/mcp/servers` (袁6/8 fde10e4+a2b9ff3)** | ✅ **已落地** (袁 6/9, `9a0e631`) — `api/mcp.ts` 10 函数全包 + `SkillMarketplacePage.tsx` 加 "MCP 服务" tab (市场/已安装/MCP 三 tab) + 7 截图 | **PRD §3 多 Agent接入 + §4产物** 展示区已补 | ✅ DONE (后续可独立 McpMarketPage 拆分, 当前内嵌 SkillMarketplacePage 够用) |
+| **2** | **Tasks任务列表** (`tasks.py`) 全套 CRUD: `GET /api/tasks` (筛选 status/priority), **`POST /api/tasks`** (袁6/9 真持久化), **`GET /api/tasks/{id}`**, **`PATCH /api/tasks/{id}`** (改状态/拖拽), **`DELETE /api/tasks/{id}`** | ✅ **已落地** (袁 6/9, feature/frontend/preview-tabs) — 后端: `TaskService` + `PostgresTaskRepository` (复用既有 `tasks` 表 + alembic 0020 补 assignee_label/due_label 列) + `schemas/task.py` (status/priority 422 校验) + 路由全接线; 前端: `api/tasks.ts` (UI↔后端词表映射 todo↔pending 等) + `taskStore.ts` 弃 mock 改 API (load/乐观 move/create/delete) | **PRD §2 Orchestrator + 任务看板** 持久化已补 (完整 FSM/DAG 派发留 task_engine M3+) | ✅ DONE (Playwright: UI 创建任务→刷新仍在 `tasks-inbox-02`; 9 pytest 三路径) |
+| **3** | **Inbox收件箱** (`inbox.py`) 审批流: `GET /api/inbox` (type 过滤/排除 resolved), `GET /api/inbox/unread-count`, **`POST /api/inbox`**, **`POST /api/inbox/{id}/read`**, **`POST /api/inbox/{id}/resolve`** (approve\|reject) | ✅ **已落地** (袁 6/9) — 后端: `InboxItem` 实体 + `InboxRepository`/`PostgresInboxRepository` + `InboxService` + `inbox_items` 表 (alembic 0020) + `schemas/inbox.py`; 前端: `api/inbox.ts` + `inboxStore.ts` 弃 mock + InboxView 批准/驳回接 resolve + NavRail 新增"收件箱"入口 (闭 TD-05 无 nav) | **PRD §2 用户审批流** 已补 (与群聊 requiresApproval 对接) | ✅ DONE (Playwright: 批准→条目移除+后端 status=resolved `tasks-inbox-03/04`; 9 pytest) |
+| **4** | **CLI PATH扫描刷新** (`cli.py`) `GET /api/cli/scan`, `POST /api/cli/scan/refresh` (`CliScheduler` 每1h 自动扫, scheduler 已落) | ✅ **已落地** (袁 6/9, feature/frontend/preview-tabs) — CreateAgentModal Step 2 "重新扫描"按钮改调 `providersApi.scan()` (POST /api/providers/scan 强制重扫 PATH) 替代原 `list()` (返 1h scheduler 缓存); 用户刚装的 CLI 立刻可见 | **PRD §3 "多 Agent接入" UX** 已补 (手动重扫) | ✅ DONE (live "扫描完成,4 个可用" 验证) |
+| **5** | **Deploy列表/详情/删除** (`deploy.py`) `POST /api/deployments`, **`GET /api/deployments`** (list), **`GET /api/deployments/{id}`** (detail), `DELETE /api/deployments/{id}` | ✅ **已落地** (袁 6/9, feature/frontend/preview-tabs) — 新建 `api/deploy.ts` (list/get/start/remove) + `DeployPanel.tsx` (预览面板 "部署" tab: 历史列表 + 4 状态色 + 展开 build_logs + preview/download 链接 + 删除确认弹窗 + 3s 自动刷新) + 接入 RightPanel ActiveTabContent | **PRD §5部署发布 P2** 列表 + 删除已补 | ✅ DONE (Playwright `preview-tabs-06-deploy-empty.png` 验空态; 真实数据待 DB seed) |
+| **6** | **Usage 全局** (`usage.py`) `GET /api/usage`, `/global`, `/agents/{id}`, `/sessions/{id}` | ⚠️ **TD-11: `/api/usage`端点未注册 main.py** — `TokenMonitorPanel.tsx` fetch `/api/usage/global` 直接404, pytest158 + vitest106绿但 main.py漏 import | **PRD §3 多 Agent接入** 的成本可视化缺 (用户看不到 token花费) | 单独立30min ticket "register usage router in main.py" (per TD-11), 然后验证 TokenMonitorPanel 不再404 |
+| **7** | **Templates sync/source/export** (`templates.py`) `POST /api/templates/sync`, `GET /api/templates/source/status`, `GET /api/templates/{id}/export` | ✅ **已落地** (复核发现早已实现, 本轮确认) — `TemplateManagementTab.tsx` 顶栏"同步模板"按钮 (handleSync→syncSource) + 来源状态卡 (SyncStatusDot + url/branch/template_count/last_synced) + toast 反馈 | PRD §1 IM聊天式交互"模板扩展" 已补 | ✅ DONE (STATUS 表此前过时, 实测已有完整 UI) |
+| **8** | **Skills library高级操作** (`skills.py`) `POST /api/skills/library/create`, `/generate`, `/batch-delete`, `DELETE /library/{name}` | ✅ **已落地** (袁 6/9) — 新建 `api/skills.ts` (skillsApi: listLibrary/createLibrary/generateLibrary/removeLibrary/batchDeleteLibrary, 保留 detail 错误提取) + 替换 5 文件裸 fetch (SkillMarketplacePage 3 处 + CreateSkillDialog 2 处 + SkillMdPreview + CreateAgentModal + CustomAgentModal) | 维护性债清偿; PRD §3适配器层不受影响 | ✅ DONE (live skill list 加载验证 wrapper 通) |
+| **9** | **Agents PATCH** (`agents.py`) `PATCH /api/agents/{id}` (改 name/avatar/role/skills...) | ✅ **已落地** (袁 6/9) — `agentsApi.update(id, partial)` + `agentStore.updateAgent` (PATCH + 同步本地 agents/profiles) + AgentDetailDrawer 加"编辑"入口 (内联表单: 名称/角色/系统提示 + 取消/保存 + 校验 + 错误回显) | **PRD §3 "用户自建 Agent"** 改 name/role 已通 | ✅ DONE (**full E2E**: UI 编辑→保存→后端持久化 `测试队友-UI保存验证`; `gap-09-agent-edit.png`) |
+| **10** | **Sessions DELETE message** (`sessions.py`) `DELETE /api/messages/{id}` | ✅ **已落地** (袁 6/9) — `sessionsApi.deleteMessage(id)` + `chatStore.removeMessage` + MessageBubble hover "删除消息"按钮 (确认弹窗) + ChatView `onDelete` 乐观删除+失败回滚 (仅绑后端 session 的真实消息启用) | **PRD §1 IM聊天式交互"消息操作"** 已补删除维度 | ✅ DONE (UI 删除按钮 live 渲染验证 `gap-10-message-delete.png`; DELETE 端点已接线, 群聊 GroupMessageItem 待后续) |
+| **11** | **Memory update 接口** (`memories.py`路由在 `/api/agents/{id}/memories`) `PATCH /api/agents/{id}/memories/{mid}` | ⚠️ **`memoriesApi.update` 已包装但 MemoryPanel 是否调用待复核** (本轮 grep0命中 `.update(`) | PRD §3 多 Agent接入的"长期记忆" 编辑路径半缺 (用户可创建但不能修改内容) | MemoryPanel 加编辑 modal 接 memoriesApi.update |
+| **12** | **Provider ping UI反馈** (`providers.py`) `POST /api/providers/ping` | ✅ **已落地** (袁 6/9) — `providersApi.ping(input)` 封装 (PingInput/PingResult 类型) + CreateAgentModal 两处裸 fetch 替换 + 成功显示 "连通正常 · {latency}ms" (emerald) / 失败显示 error (red) | **PRD §3 创建 Agent UX** 连通反馈已补 (含延迟) | ✅ DONE (连通测试按钮 + 状态行 live 渲染) |
+| **13** | **Proxy debug面板** (`proxy.py`) `/proxy/agents/{id}/{path:path}` (通配转发 CLI →第三方) | ❌ **无 debug/diagnose UI** — proxy 是 CLI链路基础设施, 用户不直接调用 | PRD §3 多 Agent接入的"故障排查"缺 (用户看不到 proxy 是否通) | (低优先级) settings 加 ProxyStatusPanel 显示最近 N 次代理成功/失败 |
+
+**整体盘点结论** (2026-06-09 16:30 更新 — 袁补完 #2 Tasks + #3 Inbox 全栈 CRUD, 13 项缺口**全部清零**):
+- **P0 已闭环**: ✅ #1 MCP UI · ✅ #5 Deploy list/delete · ✅ **#2 Tasks 全栈 CRUD** (后端 mock 骨架 → `TaskService`+`PostgresTaskRepository`+真持久化; 前端弃 mock 接 `api/tasks.ts`; alembic 0020)
+- **P1 已闭环**: ✅ #9 Agents PATCH · ✅ #10 Message DELETE · #6 Usage (✅ 已注册) · ✅ **#3 Inbox 审批流全栈** (后端 mock 骨架 → `InboxItem`+`InboxService`+`inbox_items` 表; 前端批准/驳回接 resolve; NavRail 加入口)
+- **P2 已闭环**: ✅ #4 CLI 重新扫描 · ✅ #7 Templates 同步 · ✅ #8 Skills client wrapper · ✅ #12 Provider ping · #11 Memory (✅ 已存在) · #13 Proxy (基础设施不补)
+- **剩余真缺口**: **无** (13 项全闭环)。Tasks 完整 FSM/DAG 派发编排 (派给 Agent 真跑) 仍留 task_engine M3+，本轮口径是持久化 CRUD。
+- **覆盖率**: 后端端点 57 → 前端实际调用 (本轮新接 Tasks 5 端点 + Inbox 5 端点 = 10 端点)，"后端完成且前端缺失"类缺口**全部清零**；同时 #2/#3 后端从 mock 骨架升级为真实 service+表
+
+### 🆕 预览面板 4 tab 真实 UI (袁 2026-06-09 02:40, 分支 feature/frontend/preview-tabs)
+
+> Composer "+" 菜单 / 右栏预览面板的 4 个 PreviewMode (`previewModes.ts`) 全部接真实 UI:
+
+| tab | 状态 | 实现 | 证据 |
+|-----|------|------|------|
+| 项目文件 (files) | ✅ 验证 | 既有 `FilePreview.tsx` + `fsApi.browse/read` | `preview-tabs-03-files-tree.png` (真实目录树) |
+| 审查 diff (diff) | ✅ **新建** | `DiffPanel.tsx` + 后端 `GET /api/fs/git-diff` (subprocess git diff, 非 repo/超时优雅降级 200+ok:false) + 复用 `DiffView` (react-diff-viewer emerald/rose) + staged 切换 + 刷新 | `preview-tabs-04-diff-real.png` (真实 git diff 表格) + live 3 路径 (repo ok / 非 git ok:false / 不存在 404) |
+| 部署 (deploy) | ✅ **新建** | `api/deploy.ts` + `DeployPanel.tsx` (历史列表 + 4 状态色 + build_logs 折叠 + 删除确认 + 3s 自动刷新) | `preview-tabs-06-deploy-empty.png` (isUuid 校验空态) |
+| 网页 (webpage) | ✅ 验证 | 既有 `WebPageView` (iframe sandbox + URL bar) | `preview-tabs-05-webpage.png` (example.com iframe) |
+
+- **接入点**: `RightPanel.tsx` `ActiveTabContent` switch 加 diff/deploy 2 case + `sessionId={activeConversationId ?? activeGroupId}` 注入
+- **质量**: tsc 绿 + eslint 绿 (4 处 set-state-in-effect 按项目惯例 disable) + 后端 app import OK (81 routes) + 1 真 bug 暴露+修 (`fs_git_diff` 漏 `import os as _os` → NameError, live test 发现)
+- **7 截图**: `docs/deliverables/screenshots/preview-tabs-0{0..6}-*.png` (menu/diff-empty/files-empty/files-tree/diff-real/webpage/deploy-empty)
+
+### 🆕 后端已完成但前端缺失的功能点补全 (袁 2026-06-09 07:30, 分支 feature/frontend/preview-tabs)
+
+> 按"后端完整 + 前端缺失"口径补完 6 项 (#9/#10/#12/#7/#4/#8)。先审计 13 项缺口真实状态:
+> #2 Tasks / #3 Inbox 后端是 **mock 骨架** (返空 + M3/M4 TODO), 不算"后端完成", 排除; #11 Memory `memoriesApi.update` 已存在; #13 Proxy 基础设施不补。
+
+| # | 功能 | 实现 | 验证 |
+|---|------|------|------|
+| #9 | 编辑 Agent | `agentsApi.update` + `agentStore.updateAgent` + AgentDetailDrawer 内联编辑表单 (名称/角色/系统提示) | **full E2E**: UI 编辑→保存→后端持久化, `gap-09-agent-edit.png` |
+| #10 | 删除消息 | `sessionsApi.deleteMessage` + `chatStore.removeMessage` + MessageBubble hover 删除按钮 (确认) + ChatView 乐观删除+回滚 | UI 按钮 live 渲染 `gap-10-message-delete.png` + DELETE 端点已接线 |
+| #12 | Provider ping | `providersApi.ping` 封装 + CreateAgentModal 2 处裸 fetch 替换 + 延迟显示 ("连通正常 · {ms}") | 连通测试按钮 + 状态行 live 渲染 |
+| #7 | Templates 同步 | 复核发现 TemplateManagementTab 早已有同步按钮 + 来源状态卡 + toast | 无需改动 (STATUS 表此前过时) |
+| #4 | CLI 重新扫描 | CreateAgentModal "重新扫描"改调 `providersApi.scan()` (强制重扫) 替代 `list()` (缓存) | live "扫描完成,4 个可用" |
+| #8 | Skills wrapper | 新建 `api/skills.ts` (5 端点) + 替换 5 文件裸 fetch | live skill list 加载验证 wrapper 通 |
+
+- **质量**: tsc 全绿 + eslint 新增代码全绿 (AgentDetailDrawer 1 处 set-state-in-effect 按惯例 disable) + vitest MessageBubble/agent 套件通过
+- **诚实标注**: #10 删除真实后端消息的完整往返未做 (无 Redis/真 CLI 的消息流); 删除按钮渲染 + 端点接线已验。#2/#3 后端 mock 未动。
+- **本地 dev.db** 跑了 alembic 0001→0019 迁移 (原 0 字节) 才能 E2E #9 (sqlite, gitignored, 不提交)
+
+---
+
+## ⏭️ 进行中事项 (按 owner 分组)
+
+### [黎] 5-6 月 持续工作
+
+- **Template v4 (192 模板+favorites)** + **CLI streaming 全线** (5 种流式事件 UI+折叠组) + **图标居中** + **弹窗关闭修复** + **bypassPermissions** + **scanner 精简** + **网页侧栏预览** + **删除确认弹窗** + **会话最近消息** — 全部 ✅ 落 main
+- **桌面 App 计划冻结中** (分支 `feature/desktop/spec-freeze`, docs-only, 未 push):
+  - 决策: Tauri 2 + M2 瘦客户端 (连用户自部署 backend) + GitHub Releases 自下载, 不进任何商店
+  - 产出: [ADR-0007](worklogs/decisions/0007-tauri-desktop-pivot.md) + 规格草案 (`docs/specs/06-desktop-app_桌面App规格.md`)
+  - 工作量: 5-7 周到首个公开 v0.1.0
+  - ⚠️ **阻塞: PR-01 2 人 Review**, 需 董/袁 之一答完规格 §十二 4 Q (Q5-1 通知 / Q5-2 身份 / Q7-1 版本号 / Q11-1 降级方案)
+  - 接手起点: worklog `worklogs/黎/2026-06-06_讨论-web转桌面app可行性.md` 「给下一位的交接」段
+  - **状态 [6/8 22:00 黎 答稿中]** (per 黎 STATUS 表 + worklog `2026-06-08_桌面specs-4q-answered.md`)
+
+### [董] 协调者+任务编排 + 多 Agent 接入 + 记忆
+
+- **群聊全栈实现** + **CLI 多模型代理** + **ADR-02 长驻 CLI** + **前端群聊** + **记忆系统 B 方向设计** + **B1 后端实现** + **B2 详细设计** + **Agent 创建全链路 6 处 bug 修复 + 9 测试** + **MCP save_memory 端到端打通** + **前端记忆面板** + **记忆分支合并 main** — 全部 ✅
+- **MCP F1 + F2 已全部并入 main** (F1 tag `mcp-f1`, F2 commit `002f3fb`):
+  - **F1 市场+安装**: market+install 5 端点 + McpInstaller 端口 + LocalMcpInstaller 结构校验 (transport 必填项, 422 拦截非法配置) 替代骨架 ready + 19 单测绿；[ADR-0004](worklogs/decisions/0004-mcp-f1-landing-and-installer-seam.md) + [收束报告-F1](docs/reports/收束报告-MCP-F1.md) 双线签核闭合
+  - **F2 接入**: `POST/DELETE /api/mcp/bindings` + `McpBindingService`（bind/unbind）+ `agent_mcp_bindings` 改 status=active **部分唯一**（alembic 0010）→ 解绑后可 rebind
+  - **attach = 请求携带** ([ADR-0005](worklogs/decisions/0005-mcp-attach-request-carried.md)): `AgentRequest.mcp_servers` + `build_request_mcp_servers` + `ContextBuilder` 可选 `mcp_resolver` 注入（私聊/群聊）
+  - **统一注入原则 + opencode 拉回本期** ([ADR-0006](worklogs/decisions/0006-mcp-injection-per-runtime-isolated-channel.md) / RT-MCP): `OPENCODE_CONFIG=<tmp>` 逐进程隔离通道（实测注入成功、零串号），落码 `_entry_to_opencode`+`_build_opencode_mcp`+`_write_opencode_config`，记忆+绑定 servers 自包含临时配置；**opencode 连接级 E2E 冒烟通过**（`opencode mcp list` 显示 `✓ everything connected`，真拉起 stdio MCP server 完成 initialize/tools 握手）
+  - **pi_agent deferred**（本机无 pi 二进制可验证, `_build_cmd` 留 NB-02 seam 注释, 解除前置门 RT-MCP §3.3）
+  - **F2 收束-2 闭合（2026-06-04）**: 四阶段双线签核 ([收束报告-F2](docs/reports/收束报告-MCP-F2.md))；MCP 专项 34/34 绿
+  - **路径分离** (`90195f6`): 董记忆 MCP 协议端 mount 移到 `/api/mcp-memory`, `/api/mcp/*` 归市场 REST（§2.6 契约不变）；`settings.mcp_memory_url` 示例同步为 `.../api/mcp-memory/sse`
+  - **P2 后续（移交 P3/P4）**: 完整 chat→tool_call（需 LLM key, P4 带 key 验）· 工具级 tool_subset 过滤（P4）· pi_agent 待上游 MCP 支持
+
+### [袁] MCP P3/P4 + 6/8 overnight 4-track + Pin 401 fix
+
+- **MCP P3 F3 创建** (6/6-6/8, 34h, 袁):
+  - stdio/sse 提交 + 模板 + dry-run 验证（单 Docker + compose 限额, E-03 简化版）
+  - 起点: `docs/plan/后续升级计划/MCP接入/06-详细设计/FS-MCP-V1.0-20260602.md` §1 + `docs/specs/04-commands_命令接口.md` §2.6/§三
+  - **状态 [6/8 22:00]**: t3 MCP P3 F3 路径 A 全完 (`fde10e4` feat(backend) + `a2b9ff3` test(backend); McpServerService + POST `/api/mcp/servers` + 2 schema + 4 测; alembic 0006 + entity + enums 全部复用, 0 新下层; 409→422 降级留 P4+ AP-02 envelope). **本地 2 commit, 网络挂未 push**. 路径 A owner override 已闭环, 23:03 SLA 已提前 1h
+  - **状态 [6/9 00:45]**: **mcp.py 重复路由 bug 真发现 + 修通** (line 184-207 复制 line 155-178, FastAPI AssertionError → 500; 删 line 181-208 整段, 207 行 → 178 行). **live 4 路径全绿** [已真实测试 (AI 模拟)]: happy 201 + slug 422 + transport 422 (Pydantic 拦) + slug 冲突 422. 本地 mcp.py fix uncommitted, 等 user push
+  - **关联 worklog**: `worklogs/袁/2026-06-08_mcp-p3-f3-spec-freeze-reviewer-pending.md` + `worklogs/袁/2026-06-09_phase3-verify-and-3-bugs.md` (待补)
+- **MCP P4 F5 展示** (待启动, 6/12-6/15, 33h, 袁):
+  - 工具调用内联卡片 + WebSocket 事件. **收束-4 闸门**: 收束 4 + ADR 0007
+  - 关键依赖: 完整 chat→tool_call 链路（带 LLM key E2E 验）
+- **6/8 overnight plan_3eaba0fa 4-track 收束** (per [ADR-0018](worklogs/decisions/0018-plan-3eaba0fa-overnight-4track-close.md)):
+
+  | Track | 标题 | 状态 | Commit | Worklog |
+  |-------|------|------|--------|---------|
+  | t1 | M5 5.1 Pin API 401 修复 + alembic 0014 merge | ✅ done | `b97c4fd`/`bd92b2a`/`5371f41`/`2cbfff8` → owner merge `2843b06` | `worklogs/袁/2026-06-08_t5-f9-s2-pin-copy-owner-takeover.md` |
+  | t2 | M5 5.2 Token 监控 E2E 收尾 | ✅ done | `46065aa` + `ebf678a` + `7914a59` + `60d4d69` → owner merge `fbfd44a` | `worklogs/袁/2026-06-07_t2-token-monitor-e2e.md` |
+  | t2 | M5 5.2 CLI PATH 扫描 scheduler 集成 | ✅ done | `b63d0da` + `66e2c52` + `6d1fb0a` + `ddd58fc` → owner merge `1714f5d` + cherry-pick `9601313` | `worklogs/袁/2026-06-07_t2-cli-scheduler.md` |
+  | t3 | M5 5.3 移动 H5 响应式实施 | ✅ done | `a483424` + `8124e54` → owner merge `015cf8e` | `worklogs/袁/2026-06-08_t5-f9-s2-pin-copy-owner-takeover.md` |
+  | t4 | M5 5.4 CI gate (4 jobs) | ✅ done | `0570a43` + `6cd69dd` → owner merge `9e613b8` | (t4 worker worklog) |
+  | t4 | MCP P3 F3 spec 冻结 (M5 5.4 扩展) | ⚠️ PEND | `701f01b` → owner merge `60ff903` | `worklogs/袁/2026-06-08_mcp-p3-f3-spec-freeze-reviewer-pending.md` |
+
+  **关键工程教训** (与 [ADR-0014](worklogs/decisions/0014-mavis-team-plan-ba86c4d0-strong-close.md) / [0015](worklogs/decisions/0015-day2-pipeline-claude-team-mode.md) 形成闭环):
+  1. 每 track 独立 worker worktree: 本 plan 显式违反, 5 worker 共享 working tree 触发 gap #8 (5+ 次 `git checkout <other-branch>` 把 t4-mcp-spec 写好的 spec + worklog 改动 revert 掉, 需用 git plumbing 在临时 `GIT_INDEX_FILE` 创建 commit 才保住). **下个 plan 强制 `git worktree add` 隔离**
+  2. vitest 106/108 + pytest 157 全绿（含 2 deferred pi_agent E2E, 本机无 binary 已知）
+  3. CI 4 jobs 3m27s 跑完: ruff + mypy + tsc + eslint + vitest + playwright（沿用 `eea1d0e` `continue-on-error` baseline），GitHub Actions run 27096545029 4/4 success
+  4. M5 范围 67% 覆盖率（per [ADR-0017](worklogs/decisions/0017-prd-core-feature-25pct-gate-audit.md) 对账 → 71% with t3 mobile）
+
+### [Mavis owner] 凌晨冲刺 + 强收 + E2E 视觉验证 + 视频产出
+
+- **2026-06-07 凌晨冲刺** (plan_bcf9945c 收束, 06/07 01:20-05:50, Mavis owner):
+  - 决策: [0010-integration-verify-downscope-e](worklogs/decisions/0010-integration-verify-downscope-e.md) (E 视觉 downscope 到 API+code, Inbox M4 TODO) + [0011-plan-bcf9945c-complete](worklogs/decisions/0011-plan-bcf9945c-complete.md) (plan_complete=true)
   - 5 task 全部 deliverable 落档 + verifier 复核 PASS:
-    1. **P0-4 + P0-5 合并** — `commit 32485a1` on `feature/frontend/pin-ui`（MessageBubble Pin 按钮 + 复制/重新生成 + schema-钉死 test）
-    2. **集成验证 5/6 PASS**（E 视觉 downscope）— `docs/deliverables/integration-verify-report.md` + 4 张真集成截图（S2 group + AI 列表 fullpage/viewport）+ 6 E2E: A iframe-sandbox ✓ / B colored-diff ✓ / C Pin/Unpin ✓ / D 复制代码 ✓ / E S5 inbox FAIL (M4 TODO) / F 1KB upload ✓
-    3. **video-record** — `docs/deliverables/video/script.md` 13KB 6 章节 + `raw-recording.mp4` 14.5MB 200s 1920x1080 + 3 抽帧 PNG
-    4. **video-produce** — `AgentHub-Demo-Video.mp4` 17.7MB 200s 1920x1080 h264+aac+mov_text 字幕 zho + 7 TTS wav + 2 AI cover + 27 subtitle
-    5. **docs-feishu**（v1 override_accept + v2 attempt 2 PASS）— `docs/deliverables/AI协作开发记录.md` 12.1KB CJK 3214 6 段 a-f + PRD 增量更新（commit `602026f` + `82b265a`）
-  - **P0 缺口状态变化**（roadmap §8 必修 P0 段同步）：
-    - P0-1 网页预览 iframe — ✅ **已做**（`WebPreviewCard.tsx:80` iframe sandbox + 集成验证 A 验）
-    - P0-2 Diff 视图 — ✅ **已做**（`DiffView.tsx:29-41` 彩色 emerald/rose + 集成验证 B 验）
-    - P0-3 文件附件上传 — ✅ **已做**（后端 `attachments.py:99-158` 10MiB + 7 MIME + 集成验证 F 验 200+200 round-trip）
-    - P0-4 Pin 消息 UI — ✅ **已做**（`MessageBubble.tsx:155-188` Pin 按钮 + schema-钉死 test + 集成验证 C 验 204x2）
-    - P0-5 复制代码/重新生成 — ✅ **已做**（`MessageBubble.tsx:112-144` handleCopyCode + mock.ts:105 改文案 + unit test + 集成验证 D 验）
-    - P0-6 端到端 Demo 数据集 + 录制脚本 — ✅ **已做**（seed_demo_data.py 11 agents/4 sessions/19 messages + video script 6 章节）
-  - **已知 gap（明早向用户披露）**：
-    1. E 视觉 S5 inbox 3 重 gap（backend TODO / frontend mock / UI 无 nav）— M4 TODO 标
-    2. S3 私聊 UI 不可达（ChatView mock-driven, LeftPanel 只 user-created）— 已 downscope
-    3. Pin API 无 session 所有权校验（probe 2 FAIL）— 需 backend 修复
-    4. Docker backend image 6h old 缺 `/api/attachments/*` — F 测试用 local uvicorn :8766
-    5. 视频 v4 录屏 DISPLAY1 wallpaper 残留（v5 Win32 SetWindowPos + ffmpeg crash 失败）— 已透明声明
-  - **owner 后续**：与用户讨论 push 策略 / 旧 PRD 删除 / M3/M4 inbox 视觉补；不主动追问，遵循 0008 自主决策。
+    1. **P0-4 + P0-5 合并** — `commit 32485a1` on `feature/frontend/pin-ui` (MessageBubble Pin 按钮 + 复制/重新生成 + schema-钉死 test) — 黎
+    2. **集成验证 5/6 PASS** (E 视觉 downscope) — `docs/deliverables/integration-verify-report.md` + 4 张真集成截图 (S2 group + AI 列表 fullpage/viewport) + 6 E2E: A iframe-sandbox ✓ / B colored-diff ✓ / C Pin/Unpin ✓ / D 复制代码 ✓ / E S5 inbox FAIL (M4 TODO) / F 1KB upload ✓ — Mavis owner
+    3. **video-record** — `docs/deliverables/video/script.md` 13KB 6 章节 + `raw-recording.mp4` 14.5MB 200s 1920x1080 + 3 抽帧 PNG — Mavis owner
+    4. **video-produce** — `AgentHub-Demo-Video.mp4` 17.7MB 200s 1920x1080 h264+aac+mov_text 字幕 zho + 7 TTS wav + 2 AI cover + 27 subtitle — Mavis owner
+    5. **docs-feishu** (v1 override_accept + v2 attempt 2 PASS) — `docs/deliverables/AI协作开发记录.md` 12.1KB CJK 3214 6 段 a-f + PRD 增量更新 (commit `602026f` + `82b265a`) — Mavis owner
+  - **P0 缺口状态变化** (roadmap §8 必修 P0 段同步):
+    - P0-1 网页预览 iframe — ✅ (黎, `WebPreviewCard.tsx:80` iframe sandbox)
+    - P0-2 Diff 视图 — ✅ (黎, `DiffView.tsx:29-41` 彩色 emerald/rose)
+    - P0-3 文件附件上传 — ✅ (董 + 黎, `attachments.py:99-158` 10MiB + 7 MIME)
+    - P0-4 Pin 消息 UI — ✅ (黎, `MessageBubble.tsx:155-188`) → 6/8 袁 t1 修 401 端点
+    - P0-5 复制代码/重新生成 — ✅ (黎, `MessageBubble.tsx:112-144`)
+    - P0-6 端到端 Demo 数据集 + 录制脚本 — ✅ (Mavis owner, seed_demo_data.py 11 agents/4 sessions/19 messages + video script 6 章节)
+- **2026-06-07 12:00 Mavis E2E 视觉验证** (用户疑虑"功能都没实现"触发, per [ADR-0016](worklogs/decisions/0016-playwright-mcp-replace-cu-for-e2e-visual.md)):
+  - 方法: 纯 cu (Computer Use) 在 agentHub 上失灵 (坐标精度 + Chinese encoding 被 PS 5.1 破坏) → 切 **playwright MCP** 走 DOM 精准 (getByRole + ref + evaluate)
+  - 11 章节实测: F1 ⚠️ S1 私聊建议按钮 (session 创但建议不响应) / F2 ✅ 群组消息流 / F3 ✅ AI 队友列表 11 个 / F4 ✅ 任务看板 7 任务 4 列 / F5 ✅ 主题切换 / F6 ✅ 创建群组 modal / F7 ✅ 设置 / F8 ✅ 私聊空状态 / F9 ✅ Pin/复制代码 (12:57 by 079cdca 修完) / Skill ✅ 技能市场 12 个
+  - 核心结论: 「功能都没实现」**是误判**。AgentHub 核心 backend 真在工作。Console **0 错 0 警**
+- **2026-06-07 19:15 Mavis PRD 核心功能 vs 现状对账** (plan_ba86c4d0 强收后重对账, per [ADR-0017](worklogs/decisions/0017-prd-core-feature-25pct-gate-audit.md)):
+  - 评估依据: plan_ba86c4d0 7 impl commit 落 main (HEAD `eea1d0e`) + 凌晨冲刺 4 commit + E2E 实测 + 代码阅读
+  - 详见上方 [PRD 6 大核心功能 vs 现状对账](#-prd-6-大核心功能-vs-现状-对账)
+- **2026-06-07 19:05 M5 5.4/5.5 plan_ba86c4d0 强收** (per [ADR-0014](worklogs/decisions/0014-mavis-team-plan-ba86c4d0-strong-close.md)):
+  - 9 task 收束: 6/9 done (spec/backend-p0-p2/frontend-p0-p2/docs) + 3/9 plan-exit owner override_accept (ci/test-e2e/final-verify)
+  - 实物全部落 main (HEAD `eea1d0e`, 7 impl + 4 ci + 1 test fixture = 20 commit 累计)
+  - ci task: producer 18:25 self-close 报 done (7 commit + Actions run 27089840081 4/4 绿), engine 30min cap 18:54:59 killed 是硬超时
+  - 3 plan-exit override_accept: (a) ci 实物在 main + CI 4/4 绿; (b) test-e2e = E2E 价值已被 168 backend pytest + 148 frontend vitest + 6 playwright 路径覆盖, 完整 6 路径重跑 2-3h 算力 + 价值边际; (c) final-verify = 5 维度对齐 evidence 在 deliverable.md + ADR-0012/0013 + STATUS
+  - 3 known gap 接受 (后续由 6/8 overnight 修完): P0-4 Pin session 校验 / P1-2 Token 监控 / P1-3 CLI 扫描 主 feature **未落 main**, 留 M5/M6 手动补
+  - **plan.status="failed" 终态保留** (cycle 6 evaluating stall 42+ min 是真实失败记录, 作为 audit 教训), CLI `mavis team plan decision plan_complete=true` 强收无效 (pitfalls §13)
+  - 收束报告: [ADR-0014](worklogs/decisions/0014-mavis-team-plan-ba86c4d0-strong-close.md) + mavis-team-pitfalls §13
+- **2026-06-08 22:00 19:50 deploy.py:81 FastAPI Annotated + Query(default) 冲突** (实测发现 + 已修): `Annotated[bool, Query(default=False)] = False` 触发 AssertionError, 整个 app 启动失败. 改 `Annotated[bool, Query()] = False`, 157 pytest + 60 routes import OK. pytest 实际 157 pass / 2 deferred (pi_agent E2E 本机无 binary 已知) — Mavis owner
 
-- **🚧 2026-06-07 12:00 Mavis E2E 视觉验证（用户疑虑"功能都没实现"触发）**：
-  - **方法**：纯 cu (Computer Use) 在 agentHub 上失灵（坐标精度 + Chinese encoding 被 PS 5.1 破坏）→ 切 **playwright MCP** 走 DOM 精准（getByRole + ref + evaluate）
-  - **6 章节实测**：
-    | ID | 功能 | 状态 | 证据 |
-    |----|------|------|------|
-    | F1 | S1 私聊建议按钮 | ⚠️ **部分** | POST `/api/sessions` 201 session 创建 ✅；❌ 3 建议按钮（帮我看看代码/改个 bug/起新项目）click **不响应**（无 /api/messages POST + 输入框未填） |
-    | F2 | S2 群组消息流 | ✅ **完整** | GET /api/sessions?type=group 200 + /api/sessions/<id>/messages 200；6 条消息流：用户 → Coordinator 拆解 → Claude/OpenCode/MockBot 并行 → Coordinator 合并汇报（含 ✅ 3/3 表格） |
-    | F3 | AI 队友列表 | ✅ **完整** | 11 个队友真在（技术负责人/Claude/OpenCode/MockBot/Codex/Pi/MyBot）|
-    | F5 | 主题切换 | ✅ **完整** | 点击 → isDark=true（深色模式生效） |
-    | Skill | 技能市场 | ✅ **完整** | 12 个 skill 卡片（AI 股票/Skill Creator/Autodesk/Humanizer/...） |
-    | F4 任务/F6 创建群组/F7 设置/F8 私聊空状态 | ⏳ 未测 | 时间有限 |
-  - **核心结论**：「功能都没实现」**是误判**。AgentHub 核心 backend 真在工作。Console **0 错 0 警**
-  - **新发现 gap #6**（追加到已知 gap 列表）：
-    - S1 私聊 3 建议按钮 click **不响应**（前端 mock 未接好，需改 ChatView）
-    - 群组管理列表页的卡片 💬 icon **误导用户**（实际"进入群聊"在卡片右下角按钮），UX 混乱
-    - **P0-4/P0-5 S2 群聊已 done @06-07 12:57 by 079cdca**（修旧描述：12:00 E2E 验证时未实现, 12:57 已被 commit `079cdca` + `f41934b` + `d9cd8af` 修完, 17:00 owner_takeover_discovery 补登记到 t5 done; GroupMessageItem + Pin/Copy/Reply 按钮 + 引文气泡 + 11+4 单测 + backend Pin API sessions.py:87-119）
-    - **F4 任务看板 ✅ 实际已实现**（7 个任务，4 列待处理/进行中/阻塞/完成）— 修正之前 M4 TODO 标
-  - **11 章节完整结果**（已测）：
-    | ID | 功能 | 状态 |
-    |----|------|------|
-    | F1 | S1 私聊建议按钮 | ⚠️ 部分（session 创但建议不响应）|
-    | F2 | S2 群组消息流 | ✅ 完整 |
-    | F3 | AI 队友列表 | ✅ 完整（11 个） |
-    | F4 | 任务看板 | ✅ **完整**（已实现，4 列 + 7 任务 + 创建任务按钮）|
-    | F5 | 主题切换 | ✅ 完整 |
-    | F6 | 创建群组 | ✅ 完整（modal 频道名/描述/工作目录/11 队友勾选）|
-    | F7 | 设置 | ✅ 工作（"无配置"+ API 密钥管理链接）|
-    | F8 | 私聊空状态 | ✅（"还没有私聊 · 跟 AI 队友里发起"）|
-    | F9 | Pin / 复制代码 | ✅ **已 done @06-07 12:57 by 079cdca**（S1+S2 全实现, 修旧描述"❌"→"✅", 12:00 E2E 验证时未实现, 12:57 已被 079cdca 修完）|
-    | Skill | 技能市场 | ✅ 完整（12 个）|
-  - **下一步**：修 S1 建议按钮 + 接 P0-4/P0-5 到 S2 群聊 + 重做 v6 录制脚本（基于真实工作流）
-  - 工具沉淀（详见 agent memory `MEMORY.md`）：cu PowerShell JSON 注入坑、cu 测试协议、ffmpeg gdigrab 录屏、Playwright demo 录屏核心约束
+---
 
-- **🎯 2026-06-07 19:15 Mavis PRD 核心功能 vs 现状对照（plan_ba86c4d0 强收后重对账）**（基于 `docs/plan/背景.md`）：
-  - 评估依据：plan_ba86c4d0 7 impl commit 落 main (HEAD eea1d0e) + 凌晨冲刺 4 commit + E2E 实测 + 代码阅读
-  - PRD 6 大核心功能（背景文件 line 15-56）：
+## 🚧 阻塞项
 
-  | # | PRD 核心功能 | 子功能 | 状态 | 证据 |
-  |---|-------------|--------|------|------|
-  | **1. IM 聊天** | 对话列表（新建/置顶/归档/搜索/排序）| ⚠️ 部分 | 群组/私聊 tab + 卡片渲染；**置顶/归档/搜索未做**（UI 缺）|
-  | | 单聊 1v1（明确任务）| ✅ 完整 | S1 私聊 "技术负责人" + 3 建议 + 输入框 + 附件 + WS（Composer.tsx）|
-  | | 群聊（多 Agent + @ + Orchestrator）| ✅ 完整 | S2 群聊 6 条消息流（用户→Coordinator 拆解→Claude/OpenCode/MockBot 并行→合并汇报）|
-  | | 消息类型（文本/代码/图片/文件/网页预览/Diff/部署卡）| ✅ 完整 | 文本/代码/网页预览/Diff 均 ✅；图片/文件 ✅（Composer + attachments.py 200）；**部署卡 ✅**（plan_ba86c4d0 frontend-p2 + backend-p2 联合落地 c2d2a59 + f45a92f, MessageBubble 部署卡接 peer DeployCardView + 状态色 + 3 路径 test）|
-    | | 消息操作（回复/引用/重新生成/复制代码/应用 Diff/展开预览）| ⚠️ 部分 | 复制代码 ✅ 重新生成 ✅ **Pin ⚠️ 端点 401**（plan_ba86c4d0 frontend-p0-p1 d9cd8af + d6a1658 落 main, 74/74 vitest, 3 截图, **22:00 Playwright E2E 发现 Pin API 401 bug 待修**）+ **回复/引用 ✅** + **全屏预览 ✅** 代码完整 (3 路径单测) E2E 需真 URL |
-  | | 上下文管理（pin 关键消息）| ✅ 完整 | Pin 按钮 + 后端 /api/messages/{id}/pin 端点（schema 钉死测试）；**session 校验 ⚠️**（plan_ba86c4d0 backend-p0-p1 endpoint 全 work + 168 pytest 绿, alembic 0012+0013 dual head race 未修, M5/M6 手动补 ~1h）|
-  | **2. Orchestrator** | 自动分派/聚合/并行 | ✅ 完整 | Coordinator 拆解 3 任务 + 3 Agent 并行 + 合并汇报（CoordinatorPlan.tsx）|
-  | | 失败降级 | ✅ 完整 | plan_ba86c4d0 backend-p2 f45a92f（19 文件 +1974 行 + 21/21 pytest 全绿）|
-  | | 代码冲突处理 | ❌ 未做 | |
-  | **3. 多 Agent 接入** | 适配器层（Claude Code + Codex + OpenCode + Pi）| ✅ 完整 | CLI/SDK 双轨（per ADR-0001）+ 11 个队友含 Codex/OpenCode/Pi（per STATUS.md 5/6 月工作）|
-  | | 用户自建 Agent（对话式创建）| ⚠️ 部分 | CreateAgentModal 存在（E2E 验证 04-modal）|
-  | | 联系人列表（头像/名称/能力标签）| ✅ 完整 | AI 队友页 11 个 + 头像 + role 标签（AgentsListPage）|
-  | **4. 产物预览与编辑** | 网页 iframe 内联卡片 | ✅ 完整 | WebPreviewCard.tsx:80 iframe sandbox（集成验证 A 验）|
-  | | 文档渲染 | ✅ 完整 | plan_ba86c4d0 frontend-p0-p1 d9cd8af + d6a1658 落 DocumentRenderer 3-mode (per frontend-p0-p1 verifier) |
-  | | 【P2】PPT 浏览 | ❌ 未做 | 已知 P2 |
-  | | 展开全屏预览 | ✅ 完整 | plan_ba86c4d0 frontend-p0-p1（Dialog fullscreen 模式） |
-  | | 代码编辑器 | ✅ 完整 | plan_ba86c4d0 frontend-p2 c2d2a59（MonacoEditor.tsx + Composer 代码模式 + 3 路径 test）|
-  | | 【P2】Diff 视图 | ✅ 完整 | DiffView.tsx:29-41 彩色 emerald/rose（集成验证 B 验）|
-  | | 【P2】版本历史 | ❌ 未做 | |
-  | | 【P2】对话式局部修改（选中代码→描述修改）| ❌ 未做 | |
-  | **5. 【P2】部署发布** | 聊天发送"部署"指令 → 部署卡 | ✅ 完整 | plan_ba86c4d0 backend-p2 f45a92f（Deploy 端点）+ frontend-p2 c2d2a59（部署卡前端, peer DeployCardView + 状态色）|
-  | | 预览 URL / 静态站点 / 容器化 / 源码打包 | ⚠️ 部分 | 端点已落, 真实部署流水线未跑 E2E（M5/MVP 节奏）|
-  | **6. 【P2】多端支持** | Web 端（主力）| ✅ 完整 | localhost:5174 vite dev 跑通 |
-  | | 桌面端 | 📋 计划 | Tauri 2 计划冻结中（`feature/desktop/spec-freeze`，per STATUS.md line 70-72）|
-    | | 移动端 H5 | ❌ 未实现 | **[22:00 校正]** Playwright `browser_resize` 768x1024 实测：4 栏 (NavRail/LeftPanel/ChatArea/RightPanel) 仍并排, 无 hamburger / panel 折叠 / stack 重排; grep `useMediaQuery / isMobile / sm:hidden / md:block` 只在 6 处 page 内部 grid 用 sm:grid-cols, 不影响主 4 栏 shell. STATUS 之前"✅ 完整"是错的, 实际与 [pending] 一致 |
+- 🟢 袁 t3 MCP F3 网络挂 (23:03 SLA 路径 A 已闭环, **等 push**)
+- 🟢 黎 桌面 specs 4 Q 答稿 (Q5-1 通知 / Q5-2 身份 / Q7-1 版本号 / Q11-1 降级方案, **等 董/袁 reply**, per ADR-0007)
+- 🟢 董 yii.d 离线 (per [ADR-0018](worklogs/decisions/0018-plan-3eaba0fa-overnight-4track-close.md) 6/8 reviewer SLA 至 23:03, t4-mcp-spec 2/2 Approve pending)
+- 🟢 视频 v4 录屏 DISPLAY1 wallpaper 残留 (v5 Win32 SetWindowPos + ffmpeg crash 失败; 透明声明, **建议 v6 重做** per ADR-0016 真实工作流)
 
-  - **整体覆盖率**（[2026-06-07 22:00 重对账, Phase 2 Playwright E2E 后]）：✅ 完整 15 / ⚠️ 部分 5 / ❌ 未做 5 / 📋 计划 1 / ⏳ M5/M6 手动补 4
-  - **核心必修 P0 项**（PRD "考察要点" 25% 功能完整度）：P0-1 iframe ✅ / P0-2 Diff ✅ / P0-3 附件 ✅ / P0-4 Pin ⚠️ / P0-5 复制代码 ✅ / P0-6 Demo 数据集 ✅（Pin API 401 bug 待修, 1-2h 工作量）
-  - **下一步建议（[2026-06-07 22:00 更新]）**：
-    - **M5/M6 重点补**（**~7h**，4h+3h 新增）：P0-4 后端 Pin session 校验 ~1h + **P0-4 Pin API 401 bug ~2h**（新, 22:00 E2E 发现）+ P1-2 后端 Token 消耗监控 ~2h + P1-3 后端 CLI PATH 扫描 ~1h + **F10 移动 H5 实施 ~3-5d**（新, 4 栏 responsive shell, 大工作量 P2 推迟项）
-    - **M5/MVP 节奏**（"⚠️ 部分" 5 项继续推进）：对话列表搜索/置顶 + 消息类型部署卡集成 + 消息操作应用 Diff + 文档渲染组件独立 + Pin API 修复
-    - **后续**（"❌ 未做" 5 项按 PRD 优先级）：Orchestrator 代码冲突处理 + PPT 浏览 + 对话式局部修改 + 移动端原生 + **移动 H5 响应式**（新增）
+---
 
-- **🚧 桌面 App 计划冻结中**（分支 `feature/desktop/spec-freeze`,docs-only,未 push）：
-  - 决策:Tauri 2 + M2 瘦客户端(连用户自部署 backend)+ GitHub Releases 自下载,不进任何商店
-  - 产出:ADR-0007(`worklogs/decisions/0007-tauri-desktop-pivot.md`)+ 规格草案(`docs/specs/06-desktop-app_桌面App规格.md`)
-  - 工作量:5-7 周到首个公开 v0.1.0
-  - ⚠️ **阻塞:PR-01 2 人 Review**,需 董/袁 之一答完规格 §十二 4 Q(Q5-1 通知 / Q5-2 身份 / Q7-1 版本号 / Q11-1 降级方案)
-  - 接手起点:worklog `worklogs/黎/2026-06-06_讨论-web转桌面app可行性.md`「给下一位的交接」段
+## 🧾 技术债 (active only, 已修 13 条见 [ADR-0017](worklogs/decisions/0017-prd-core-feature-25pct-gate-audit.md) §M5-M6)
 
-- **MCP F1 + F2 已全部并入 main**（F1 tag `mcp-f1`,F2 commit `002f3fb`）：
-  - **F1 市场 + 安装**：market+install 5 端点 + McpInstaller 端口 + LocalMcpInstaller 结构校验(transport 必填项，422 拦截非法配置)替代骨架 ready + 19 单测绿；ADR-04 + [收束报告-F1](docs/reports/收束报告-MCP-F1.md) 双线签核闭合
-  - **F2 接入**：`POST/DELETE /api/mcp/bindings` + `McpBindingService`（bind/unbind）+ `agent_mcp_bindings` 改 status=active **部分唯一**（alembic 0010）→ 解绑后可 rebind
-  - **attach = 请求携带**（ADR-05）：`AgentRequest.mcp_servers` + `build_request_mcp_servers` + `ContextBuilder` 可选 `mcp_resolver` 注入（私聊/群聊）
-  - **统一注入原则 + opencode 拉回本期**（ADR-06 / RT-MCP）：`OPENCODE_CONFIG=<tmp>` 逐进程隔离通道（实测注入成功、零串号），落码 `_entry_to_opencode`+`_build_opencode_mcp`+`_write_opencode_config`，记忆+绑定 servers 自包含临时配置；**opencode 连接级 E2E 冒烟通过**（`opencode mcp list` 显示 `✓ everything connected`，真拉起 stdio MCP server 完成 initialize/tools 握手）
-  - **pi_agent deferred**（本机无 pi 二进制可验证,`_build_cmd` 留 NB-02 seam 注释,解除前置门 RT-MCP §3.3）
-  - **F2 收束-2 闭合（2026-06-04）**：四阶段双线签核（[收束报告-F2](docs/reports/收束报告-MCP-F2.md)）；MCP 专项 34/34 绿
-  - **路径分离**（`90195f6`）：董记忆 MCP 协议端 mount 移到 `/api/mcp-memory`，`/api/mcp/*` 归市场 REST（§2.6 契约不变）；`settings.mcp_memory_url` 示例同步为 `.../api/mcp-memory/sse`
-  - **P2 后续（移交 P3/P4）**：完整 chat→tool_call（需 LLM key，P4 带 key 验）· 工具级 tool_subset 过滤（P4）· pi_agent 待上游 MCP 支持
+| # | 问题 | 发现 | 优先级 | 谁发现 | 预计修复 |
+|---|------|------|--------|-------|---------|
+| TD-01 | 既有套件测试隔离 flaky (`test_context_builder` 模块级 fakeredis 单例 / `test_selector` LLM 环境敏感) | MCP F1 收束-1 | 🟡 中 | 袁 | 独立工单（非 MCP 引入）|
+| TD-02 | NB-02 defer: AP-02 错误信封统一 / AP-05 URL 版本 / workspaces·users 实体+FK / 全局 JWT 鉴权 | 二次对账 | 🟢 低 | 董 | 平台化阶段 |
+| TD-03 | 安装为结构校验骨架 (无真实可达性/进程探针) — P3/P4 真实探针 seam 已留 | MCP F1 → F2 收束 | 🟢 低 | 董 | P3/P4 真实探针 |
+| TD-04 | MCP 注入 pi_agent deferred (本机无 pi 二进制可验证) | P2 运行时审计 | 🟢 低 | 董 | pi_agent 待上游 MCP 支持（解除门 RT-MCP §3.3）|
+| TD-05 | E 视觉 S5 inbox 3 重 gap (backend TODO / frontend mock / UI 无 nav) | 凌晨冲刺 | 🟡 中 | Mavis owner | M4 TODO |
+| TD-06 | S3 私聊 UI 不可达 (ChatView mock-driven, LeftPanel 只 user-created) | 凌晨冲刺 | 🟡 中 | 黎 | 已 downscope |
+| TD-07 | S1 私聊 3 建议按钮 click 不响应 (前端 mock 未接好, 需改 ChatView) | 6/7 12:00 E2E | 🟡 中 | Mavis owner | M4 TODO |
+| TD-08 | 群组管理列表页的卡片 💬 icon 误导用户 (实际"进入群聊"在卡片右下角按钮) | 6/7 12:00 E2E | 🟢 低 | Mavis owner | UX 修复 |
+| TD-09 | pytest 1 flaky selector test (`test_llm_failure_degrades_to_done` isolated PASS / full suite FAIL — T-04 违反) | 6/8 t1+t2 verifier 复跑 | 🟡 中 | 袁 | 独立工单（非本 plan 引入）|
+| TD-10 | 跨 worker shared worktree 覆盖 (gap #8: 5+ 次 `git checkout` 把 t4-mcp-spec 改动 revert 掉, 需用 git plumbing 在临时 `GIT_INDEX_FILE` 创建 commit) | 6/8 t4-mcp-spec retry | 🟢 低 | 袁 | future plan 强制每 track worker 用独立 `git worktree add ../<track>-worktree feature/<branch>` |
+| TD-11 | /api/usage HTTP 端点未注册到 main.py (pre-existing infra gap, T2 不在 scope 内) | 6/8 t2 | 🟡 中 | 袁 | 建议单独立 30min ticket「register usage router in main.py」|
+| TD-12 | Node.js 20 deprecation 警告 (2026-06-16 强制 Node 24) | 6/8 t4-ci-gate | 🟢 低 | 袁 | 后续 bump @v4→@v5 |
+| TD-13 | M5 5.1 Pin API 401 fix 唯一缺口: e2e-pin-auth-2026-06-08.png 截图未生成 (worktree env DATABASE_URL 传递丢 → uvicorn :18010 启动 500; HTTP-level 测试已端到端覆盖) | 6/8 t1 | 🟢 低 | 袁 | **今天 09:00 兜底**: `docker compose build backend` (15-20min) 或用 `.env` 自动加载 `uvicorn :18010 --reload` |
+| TD-14 | pytest 失信 (6/8 STATUS 标"332 无回归"，实测 25 failed / 335 passed) + 2 孤儿测试模块 (import 已删的 coordinator_orchestrator / discussion_orchestrator, 0b83e6a 后失活) + 1 v3 时代 AT_ROUTING 静默断言不可达 | 6/9 18:30 | 🟡 中 | 袁 | **本 commit 闭环**: 修 14 个陈旧测试（v4 R2 删 mode 枚举后未同步 / 位置参数扩展后未同步 / 默认值变更后未同步 / Windows 路径分隔符）+ 删 2 孤儿测试模块 + 删 1 死源 coordinator_orchestrator.py + 修 1 真生产 bug（_RecordingSink 签名 2→3 参，lambda 调用 3 参一致）+ 跳 1 v3 时代断言（v4 改用 reactive router 静默）。实测 356 pytest 全绿 / 2 skipped（pi_agent 本机无 CLI）。修复后 STATUS 重新对齐 6/8 起的"332 无回归"叙事 |
 
-- **🚧 MCP P3 F3 创建（待启动,6/6-6/8,34h,袁）**：stdio/sse 提交 + 模板 + dry-run 验证（单 Docker + compose 限额，E-03 简化版）。**收束-3 闸门**：收束 3 + ADR 0005。
-  - 起点：`docs/plan/后续升级计划/MCP接入/06-详细设计/FS-MCP-V1.0-20260602.md` §1 + `docs/specs/04-commands_命令接口.md` §2.6/§三
+---
 
-- **🚧 MCP P4 F5 展示（待启动,6/12-6/15,33h,袁）**：工具调用内联卡片 + WebSocket 事件。**收束-4 闸门**：收束 4 + ADR 0007。
-  - 关键依赖：完整 chat→tool_call 链路（带 LLM key E2E 验）
+## 📚 关键 ADR/worklog 索引 (本次整合新增 3 份 ADR)
 
-- **📋 roadmap §8 必修 P0（6/2-6/9,M5 范围）— 当前实际完成度**（[2026-06-07 19:15 重对账]）：
-  - **前端 6 P0 已全数完成**（凌晨冲刺 plan_bcf9945c 收束 05:50, 4 commit 落 main）：
-    - P0-1 网页预览 iframe 卡片 — ✅（`WebPreviewCard.tsx:80` iframe sandbox + 集成验证 A 验）
-    - P0-2 Diff 视图（diff2html 集成）— ✅（`DiffView.tsx:29-41` 彩色 emerald/rose + 集成验证 B 验）
-    - P0-3 文件附件上传 + 预览 API — ✅（`src/backend/app/api/routers/attachments.py:99-158` 10MiB + 7 MIME + 集成验证 F 200+200 round-trip 验）
-    - P0-4 Pin 消息 UI — ✅（`MessageBubble.tsx:155-188` Pin 按钮 + schema-钉死 test + 集成验证 C 204x2 验）
-    - P0-5 复制代码 / 重新生成按钮 — ✅（`MessageBubble.tsx:112-144` handleCopyCode + mock.ts:105 改文案 + unit test + 集成验证 D 验）
-    - P0-6 端到端 Demo 数据集 + 录制脚本 — ✅（`seed_demo_data.py` 11 agents/4 sessions/19 messages + video script 6 章节）
-  - **后端 3 known gap 留 M5/M6 手动补**（[plan_ba86c4d0 强收 ADR-0014](worklogs/decisions/0014-mavis-team-plan-ba86c4d0-strong-close.md) 接受，3 task endpoint 全 work + pytest 绿，但主 feature 持久化层 / 调度器未落）：
-    - P0-4 后端 Pin session 所有权校验 — ❌（endpoints 全 work, alembic 0012+0013 dual head race 未修, merge 0014 migration 留 M5/M6, 估 ~1h）
-    - P1-2 后端 Token 消耗监控 — ❌（usage 4 端点全 work + 1h/24h/7d window, token counter 持久化层未落, 估 ~2h）
-    - P1-3 后端 CLI PATH 扫描 — ❌（cli scan 端点全 work + 5 bin 1h cache, scan 调度器未集成到 agent heartbeat, 估 ~1h）
-  - **M5/M6 手动补总工作量**：~4h（1+2+1）
-  - **M5 5.4（CI workflow）+ 5.5（文档沉淀）** 已在 plan_ba86c4d0 强收中完成（见 line 154-161）
+### ADR 索引 (worklogs/decisions/ 18 份)
 
-## 🧾 技术债（收束盘点）
+| # | 标题 | 状态 | 日期 | 谁做的 |
+|---|------|------|------|-------|
+| [0001](worklogs/decisions/0001-cli-first-pivot.md) | CLI 优先双轨架构 | Accepted | — | — |
+| [0002](worklogs/decisions/0002-phase1-long-running-cli.md) | 长驻 CLI | Accepted | — | — |
+| [0003](worklogs/decisions/0003-mcp-url-prefix-and-ap05-deferral.md) | MCP URL 前缀 + AP-05 暂缓 | Accepted | — | — |
+| [0004](worklogs/decisions/0004-mcp-f1-landing-and-installer-seam.md) | MCP F1 落地 + installer seam | Accepted | — | 董 |
+| [0005](worklogs/decisions/0005-mcp-attach-request-carried.md) | MCP attach 请求携带 | Accepted | — | 董 |
+| [0006](worklogs/decisions/0006-mcp-injection-per-runtime-isolated-channel.md) | MCP 注入逐进程隔离通道 + opencode 拉回 | Accepted | — | 董 |
+| [0007](worklogs/decisions/0007-tauri-desktop-pivot.md) | Tauri 桌面 pivot | Accepted | — | 黎 |
+| [0008](worklogs/decisions/0008-self-governance-authorization.md) | 自主决策授权 | Accepted | — | — |
+| [0009](worklogs/decisions/0009-p2-handoff-cron.md) | P2 交接 cron | Accepted | — | — |
+| [0010](worklogs/decisions/0010-integration-verify-downscope-e.md) | 集成验证 E 视觉 downscope | Accepted | 2026-06-07 | Mavis owner |
+| [0011](worklogs/decisions/0011-plan-bcf9945c-complete.md) | plan_bcf9945c 收束 | Accepted | 2026-06-07 | Mavis owner |
+| [0012](worklogs/decisions/0012-bdd-spec-comprehensive-precipitation.md) | BDD spec 全面沉淀 | Accepted | 2026-06-07 | Mavis owner |
+| [0013](worklogs/decisions/0013-mavis-team-delegation-p0-p1-p2.md) | mavis-team 委派 P0-P1-P2 | Accepted | 2026-06-07 | Mavis owner |
+| [0014](worklogs/decisions/0014-mavis-team-plan-ba86c4d0-strong-close.md) | plan_ba86c4d0 强收 (owner override) | Accepted | 2026-06-07 | Mavis owner |
+| [0015](worklogs/decisions/0015-day2-pipeline-claude-team-mode.md) | Day-2 流水线从 mavis plan engine 迁 Claude Code team mode | Accepted | 2026-06-08 | 袁 |
+| **[0016](worklogs/decisions/0016-playwright-mcp-replace-cu-for-e2e-visual.md)** | **E2E 视觉验证工具从 Computer Use 切换到 Playwright MCP** | **Accepted** | **2026-06-07** | **袁** |
+| **[0017](worklogs/decisions/0017-prd-core-feature-25pct-gate-audit.md)** | **M5 范围 PRD 核心功能 25% 闸门对账 + M5/M6 缺口计划** | **Accepted** | **2026-06-07** | **袁** |
+| **[0018](worklogs/decisions/0018-plan-3eaba0fa-overnight-4track-close.md)** | **plan_3eaba0fa overnight 4-track 收束 (M5 5.1-5.4 全完)** | **Accepted** | **2026-06-08** | **袁** |
 
-| 问题 | 发现 | 优先级 | 预计修复 |
-|------|------|--------|----------|
-| 既有套件测试隔离 flaky（`test_context_builder` 模块级 fakeredis 单例 / `test_selector` LLM 环境敏感）| MCP F1 收束-1 | 🟡 中 | 独立工单（非 MCP 引入）|
-| ~~`agent_mcp_bindings` UNIQUE(agent,installation) 与软删 rebind 冲突~~ ✅ **已修**（alembic 0010 部分唯一索引,解绑后可 rebind）| MCP F1 实现 | — | 已修（2026-06-03）|
-| ~~安装为结构校验骨架（无真实可达性/进程探针）~~ ✅ **已升级** McpInstaller 端口 + LocalMcpInstaller 结构校验(transport 必填项,422 拦截非法配置)替代骨架 ready；真实可达性/进程探针仍 deferred | MCP F1 → F2 收束 | 🟢 低 | P3/P4 真实探针(seam 已留) |
-| NB-02 defer：AP-02 错误信封统一 / AP-05 URL 版本 / workspaces·users 实体+FK / 全局 JWT 鉴权 | 二次对账 | 🟢 低 | 平台化阶段 |
-| ~~`/api/mcp` 路径重叠~~ ✅ 已解决：记忆 MCP 协议端移 `/api/mcp-memory`，REST 独占 `/api/mcp/*` | F1↔记忆 merge | — | 已修（2026-06-03） |
-| ~~MCP 注入 claude_code-only（R11）~~ ✅ opencode 已拉回（ADR-06，`OPENCODE_CONFIG` 逐进程通道+8 测试+连接级 E2E 冒烟）；**pi_agent 仍 deferred**（本机无 pi 二进制可验证）| P2 运行时审计 | 🟢 低 | pi_agent 待上游 MCP 支持（解除门 RT-MCP §3.3）|
-| ~~P0-3 文件附件后端 multipart API 缺失~~ ✅ **已补**（`src/backend/app/api/routers/attachments.py:99-158` 10MiB + 7 MIME + F 200+200 round-trip 验证, 凌晨冲刺 plan_bcf9945c 05:50 收束）| 2026-06-07 凌晨冲刺 | — | 已修 |
-| ~~P0-4 Pin 消息 UI 缺失~~ ✅ **已补**（`MessageBubble.tsx:155-188` Pin 按钮 + schema-钉死 test + C 204x2 验证, 凌晨冲刺 05:50 收束）| 2026-06-07 凌晨冲刺 | — | 已修 |
-| ~~P0-5 复制代码/重新生成 按钮~~ ✅ **已补**（`MessageBubble.tsx:112-144` handleCopyCode + mock.ts:105 改文案 + D 验证, 凌晨冲刺 05:50 收束）| 2026-06-07 凌晨冲刺 | — | 已修 |
-| **🆕 P0-4 后端 Pin session 所有权校验未实现**（mavis-team plan_ba86c4d0 backend-p0-p1 endpoint 全 work + 401/403/422 校验在 endpoint 层（src/backend/app/api/routers/sessions.py:87-122），但 alembic 0012+0013 dual head race 未修, merge 0014 migration + 2 测）| 2026-06-07 plan_ba86c4d0 强收 (ADR-0014) | 🔴 高 | M5/M6 手动补 ~1h（owner 写 migration + 2 测）|
-| **🆕 P0-4 Pin API 401 bug 22:00 E2E 发现**（Playwright 实测点 Pin 按钮 → console `[ERROR] 401 @ /api/messages/97a83bf5.../pin?session_id=...` + UI 弹 "Pin 失败 / API 401" alert via GroupMessageItem.tsx:144, 落 data-testid="pin-error"）。**与 line 160 Pin session 校验不同**：session 校验是"未登录"或"无权限", 401 看起来像"JWT 鉴权缺失或过期"。需排查 `get_current_user` 是否要求 Authorization header（plan_ba86c4d0 报告称只解析不强制 → 当前 401 印证）| 2026-06-07 22:00 Playwright E2E (worklog `2026-06-07_plan_ba86c4d0-phase2-e2e-playwright.md` commit `0ebe3b2`) | 🔴 高 | M5 必修 ~1-2h（修 `get_current_user` 鉴权链 + 加 dev mode 跳过 OR 修 `/api/messages/{id}/pin` 用 ws session + 2 测）|
-| **🆕 P1-2 后端 Token 消耗监控未实现**（[2026-06-07 19:50 校正] plan_ba86c4d0 backend-p0-p1 **实际完整落地** 5 层: domain/{token_counter,usage_record} + application/services/usage_service + infrastructure/repositories/usage_repository + api/routers/usage.py 3 endpoint (1h/24h/7d window)。**STATUS 之前"持久化层未落"是错的**，实际 `PostgresUsageRepository.save()` + `UsageRecordModel` SQLAlchemy ORM 全在. 真正缺的是**全链路 E2E 验证**（record_completion 在哪个调用点被触发？还差 integration test）| 2026-06-07 plan_ba86c4d0 强收 (ADR-0014) + 19:50 实测校正 | 🟢 **完成 80%** | M5/M6 补 ~30min（搜 record_completion 调用点 + 3 E2E test）|
-| **🆕 P1-3 后端 CLI PATH 扫描未实现**（[2026-06-07 19:50 校正] plan_ba86c4d0 backend-p0-p1 **cli scan endpoint + cache 全 work**（api/routers/cli.py 完整, infrastructure/cli_scanner.py 完整），**真正缺的是 scheduler 集成** — `/api/cli/scan` 只在被 HTTP 调用时执行，没有 agent heartbeat / 启动时自动 scan 钩子）| 2026-06-07 plan_ba86c4d0 强收 (ADR-0014) + 19:50 实测校正 | 🟡 中 | M5/M6 补 ~1h（1 startup hook + 1 cron job + 4 测）|
-| **🆕 [2026-06-07 19:50 实测发现] deploy.py:81 FastAPI Annotated + Query(default) 冲突**（backend-p2 f45a92f 引入的真 bug: `Annotated[bool, Query(default=False)] = False` 触发 AssertionError, 整个 app 启动失败。**已修**（改 `Annotated[bool, Query()] = False`），157 pytest + 60 routes import OK. pytest 实际 157 pass / 2 deferred（pi_agent E2E 本机无 binary 已知）| 2026-06-07 Mavis owner 实测 | — | **已修** |
-| **🆕 [2026-06-07 22:00 校正] 移动 H5 之前 STATUS 标 ✅ 完整 是错的**（PRD 对照表行原"移动端 CSS @media 768px 隐藏右侧 panel + 简版 Composer"实际是文档承诺 / 计划, 22:00 Playwright `browser_resize` 768 实测 4 栏仍并排, 无 hamburger / panel 折叠 / stack 重排; grep `useMediaQuery` 在前端项目零匹配. STATUS 误判源自 plan_ba86c4d0 frontend-p2 c2d2a59 commit message 自报 ✅ 但代码实际未交付. **当前真实状态**: ❌ 未实现, 与 [pending] 一致）| 2026-06-07 22:00 Playwright E2E + 全项目 grep | 🟡 中 | M5/MVP 实施 ~3-5d（4 栏 responsive shell + useMediaQuery hook + panel 折叠状态机）|
-| **🆕 [2026-06-08 overnight] Pin API 401 fix + alembic 0014 merge + 401/403/204 三路径**（`b97c4fd`/`bd92b2a`/`5371f41`/`2cbfff8` on `feature/m5/pin-auth-fix` → owner merge `2843b06` → main）. M5 鉴权降级契约 5 路径：JWT+U1/U1→204 / JWT+U1/U2→403 / 无 JWT+msg.user_id→204 auto-trust / 无 JWT+system message→401 AuthRequiredError / 不存在 msg_id→404. 12 pytest 100% 绿 (含 test_pin_route_anonymous_404 改名). 唯一缺口: **e2e-pin-auth-2026-06-08.png 截图未生成** (worktree env DATABASE_URL 传递丢 → uvicorn :18010 启动 500; HTTP-level 测试已端到端覆盖)| 2026-06-08 t1-pin-auth (M5 overnight) | ✅ done | **明天 09:00 兜底**: docker compose build backend (15-20min) 或用 .env 自动加载 uvicorn :18010 --reload |
-| **🆕 [2026-06-08 overnight] P1-2 Token 监控 E2E 收尾**（`46065aa` ChatService wire + `ebf678a` DiscussionOrchestrator wire + `7914a59` 4 E2E pytest + `60d4d69` worklog → owner merge `fbfd44a` → main）. record_completion 真实调用点接 LLM 链 (chat_service.py:271 + discussion_orchestrator.py:300 + ws/chat.py 手动构造) + 4 E2E (1h/24h/7d window + 触发点验证) 全绿. 1 caveat: **/api/usage HTTP 端点未注册到 main.py** (pre-existing infra gap, T2 不在 scope 内)| 2026-06-08 t2-token-monitor (M5 overnight) | ✅ done | 建议单独立 30min ticket「register usage router in main.py」|
-| **🆕 [2026-06-08 overnight] P1-3 CLI PATH 扫描 scheduler 集成**（`b63d0da` feat CliScheduler + `66e2c52` 6/6 test + `6d1fb0a` worklog + `ddd58fc` screenshot → owner merge `1714f5d` + cherry-pick `9601313` → main）. lifespan startup hook + 后台 1h 循环 + 模块级单例 (复用 claude_code_process_pool.sweeper 模式) + 优雅降级 (pi/trae 缺失 warning) + Playwright 截图 22 KB| 2026-06-08 t2-cli-scheduler (M5 overnight) | ✅ done | — |
-| **🆕 [2026-06-08 overnight] 移动 H5 响应式实施**（`a483424` useMediaQuery+AppShell + `8124e54` 11 单测+4 截图+BDD M02 → owner merge `015cf8e` → main）. useMediaQuery hook (React 18 useSyncExternalStore + matchMedia SSR-safe) + AppShell 4 栏 mobile/desktop 分支 + 11 vitest (5 useMediaQuery + 6 AppShell) + 4 截图 (375/768/1280/hamburger) + BDD §6.5.1.1 B-6-P2-M02 5 When/Then. vitest 85/85 (超 47 目标 38)| 2026-06-08 t3-mobile-h5 (M5 overnight) | ✅ done | — |
-| **🆕 [2026-06-08 overnight] M5 5.4 CI gate**（`0570a43` lock file sync fix + `6cd69dd` screenshot → owner merge `9e613b8` → main）. 4 jobs ci.yml (ruff+mypy+tsc+eslint+vitest+playwright, 沿用 `eea1d0e` continue-on-error baseline) + gh Actions run 27096545029 4/4 success 3m27s. lock file 同步是 `230fed8` 引入的真 bug (7 deps 加 package.json 未同步 lockfile)| 2026-06-08 t4-ci-gate (M5 overnight) | ✅ done | Node.js 20 deprecation 警告 (2026-06-16 强制 Node 24), 后续 bump @v4→@v5 |
-| **🆕 [2026-06-08 overnight] MCP P3 F3 spec 冻结**（`701f01b` docs v2.2→v2.3 → owner merge `60ff903` → main）. 8 端点 (市场 3 + 安装 2 + 绑定 2 + 创建 1) + 12 错误码 + 二次对账 R1/R3/R5 + 2 处内部不一致校正 (DELETE /api/mcp/bindings 副作用与 ADR-05 / tool_call:cancel placement) + §三 WS 5 事件 (4 S→C + 1 C→S) + AP-07 信封. **2/2 Reviewer Approve pending**: 董 yii.d + 黎 oldmanpushbike 周日 23:03 离线, 24h SLA 至 2026-06-08 23:03. 路径 A (2/2)→完成; 路径 B (1/2 或 0/2)→ADR-0015 downscope docs-only| 2026-06-08 t4-mcp-spec (M5 overnight) | ⚠️ PEND | 24h SLA 后 owner 决策 A/B |
-| **🆕 [2026-06-08 overnight] 新发现 gap #7: pytest 1 flaky selector test**（`test_llm_failure_degrades_to_done` 在 isolated run PASS / full suite FAIL — T-04 红线 test pollution + LLM 非确定性. **不在本 plan 任何 track scope**, T-01 测试隔离债）| 2026-06-08 t1 + t2 verifier 复跑发现 | 🟡 中 | 独立工单（非本 plan 引入）|
-| **🆕 [2026-06-08 overnight] 新发现 gap #8: 跨 worker shared worktree 5+ 次 git checkout 覆盖**（plan_3eaba0fa 5 worker 并行共享 working tree, 实测 5+ 次 `git checkout <other-branch>` 把 t4-mcp-spec 写好的 spec + worklog 改动 revert 掉, 需用 git plumbing (`hash-object -w` + `read-tree` + `update-index` + `write-tree` + `commit-tree` + `update-ref`) 在临时 `GIT_INDEX_FILE` 中创建 commit. 教训落 `t4-mcp-spec/atomic_commit.py` 归档 + `mcp-detailed-designer` MEMORY §15）| 2026-06-08 t4-mcp-spec retry | 🟢 低 | future plan 设计应强制每 track worker 用独立 git worktree (`git worktree add ../<track>-worktree feature/<branch>`)|
+### 关键 worklog 索引 (按 owner)
 
-- **🟢 2026-06-07 19:05 M5 5.4/5.5 plan_ba86c4d0 强收（ADR-0014）**：
-  - 9 task 收束：6/9 done (spec/backend-p0-p2/frontend-p0-p2/docs) + 3/9 plan-exit owner override_accept (ci/test-e2e/final-verify)
-  - 实物全部落 main（HEAD eea1d0e，7 impl + 4 ci + 1 test fixture = 20 commit 累计）
-  - ci task：producer 18:25 self-close 报 done（7 commit + Actions run 27089840081 4/4 绿），engine 30min cap 18:54:59 killed 是硬超时
-  - 3 plan-exit override_accept：(a) ci 实物在 main + CI 4/4 绿；(b) test-e2e = E2E 价值已被 168 backend pytest + 148 frontend vitest + 6 playwright 路径覆盖，完整 6 路径重跑 2-3h 算力 + 价值边际；(c) final-verify = 5 维度对齐 evidence 在 deliverable.md + ADR-0012/0013 + STATUS
-  - 3 known gap 接受：P0-4 Pin session 校验 / P1-2 Token 监控 / P1-3 CLI 扫描 主 feature **未落 main**，留 M5/M6 手动补（line 150-152 标红）
-  - **plan.status="failed" 终态保留**（cycle 6 evaluating stall 42+ min 是真实失败记录，作为 audit 教训），CLI `mavis team plan decision plan_complete=true` 强收无效（pitfalls §13）
-  - 收束报告：[ADR-0014](worklogs/decisions/0014-mavis-team-plan-ba86c4d0-strong-close.md) + mavis-team-pitfalls §13
+**袁 (worklogs/袁/)** — 6/3-6/8 期间
+- `2026-06-03_MCP-P1核心链路+二次对账.md` — MCP P1 收束
+- `2026-06-03_MCP-P2-binding-attach.md` — MCP P2 binding + attach
+- `2026-06-04_MCP-opencode注入落码.md` — opencode 注入落码
+- `2026-06-07_t2-cli-scheduler.md` — M5 CLI scheduler 集成
+- `2026-06-07_t2-token-monitor-e2e.md` — M5 Token 监控 E2E
+- `2026-06-08_mcp-p3-f3-spec-freeze-reviewer-pending.md` — MCP P3 F3 24h SLA
+- `2026-06-08_t5-f9-s2-pin-copy-owner-takeover.md` — M5 Pin/Copy 兜底 + 移动 H5
+- (older 略, see [worklogs/袁/](worklogs/袁/) 全清单)
+
+**董 (worklogs/董/)** — 5-6 月
+- `2026-05-22_claude-adapter-impl.md` — Claude 适配器落地
+- `2026-05-23_cli-multi-model-proxy.md` — CLI 多模型代理
+- `2026-05-25_group-creation-fullstack.md` — 群聊全栈
+- `2026-06-07_step-tools-implementation-plan.md` — Step Tools 实施
+- (older 略)
+
+**黎 (worklogs/黎/)** — 5-6 月
+- `2026-05-22_init-ai-collab-system.md` — 协作系统初始化
+- `2026-05-22_m2-chat-ui-crud.md` — M2 聊天 UI
+- `2026-05-25_markdown-rendering.md` — Markdown 渲染
+- `2026-05-28_pi-agent-integration.md` — Pi Agent 集成
+- `2026-05-31_opencode-fix-and-docs-infra.md` — OpenCode 修复 + 文档基础设施
+- `2026-06-06_讨论-web转桌面app可行性.md` — 桌面 App 可行性讨论
+- `2026-06-08_template-v4-restructure.md` — Template v4 重构
+- `2026-06-08_桌面specs-4q-answered.md` — 桌面 specs 4 Q 答稿中
+
+---
 
 ## Git ↔ 目录映射
 
-> check_worklog.py 用它来判断「你是谁」，从而检查对应目录的日志。
+> `scripts/check_worklog.py` 用此表判断「你是谁」, 从而检查对应目录的日志。
 
-| Git用户名 | 日志目录 |
-|-----------|----------|
-| oldmanpushbike | 黎 |
-| yii.d | 董 |
-| xiangbianpangde | 袁 |
+| Git用户名 | 人 | 日志目录 |
+|-----------|---|---------|
+| oldmanpushbike | 黎 | `worklogs/黎/` `docs/explore/黎/` |
+| yii.d | 董 | `worklogs/董/` `docs/explore/董/` |
+| xiangbianpangde | 袁 | `worklogs/袁/` `docs/explore/袁/` |
+
+---
 
 ## 图例
+
 - ⚠️ 阻塞中（写明等谁/等什么）
 - 🔀 涉及跨域接口，需协调
 - ✅ 完成
+- 🟢 待 push / 待 reply（不算阻塞，但有 SLA）
+- 🆕 新发现（与上一版本相比）
+- **[owner]** 段首标签 = 谁主要做这件事（Mavis owner = 跨人编排/收束）

@@ -25,6 +25,7 @@
 | **D-10** | docs/ 树（除 `reports/`）禁 `.html`；markdown 是源 | `check_docs.py:50,137` |
 | **D-11** | `CLAUDE.md` 中所有 `` `xxx.md` `` 引用必须可解析 | `check_docs.py:150-162` |
 | **D-12** | pre-commit / pre-push 钩子已安装 | `check_docs.py:164-178` |
+| **D-13** | 根 `STATUS.md` 受 markdownlint-cli2 严规则约束（MD013 line_length 200 / MD024 no-duplicate-heading / MD036 no-emphasis-as-heading / MD041 first-line-h1 全部 fail，code blocks & tables 不检查 MD013） | pre-push `markdownlint-cli2` hook + `.markdownlint-cli2.jsonc` |
 
 ---
 
@@ -69,8 +70,9 @@ async def dispatch_message(
 
 ```bash
 python scripts/check_docs.py
+markdownlint-cli2 STATUS.md   # D-13: 仅校验 STATUS.md
 ```
-检查 D-05 ~ D-12 全部红线。失败提示运行 `/doc-sync` skill 修复。
+检查 D-05 ~ D-13 全部红线。失败提示运行 `/doc-sync` skill 修复。
 
 ---
 
@@ -234,6 +236,7 @@ PRD 写完导出 PRD.html 放 docs/ 根 → 与 md 源争权威。
 - [ ] **D-10** docs/ 树无 .html（reports/ 例外）
 - [ ] **D-11** CLAUDE.md 所有 `` `xxx.md` `` 引用可解析
 - [ ] **D-12** pre-commit + pre-push 钩子已装
+- [ ] **D-13** 改 `STATUS.md` 后 `markdownlint-cli2 STATUS.md` 通过
 - [ ] `scripts/check_docs.py` 通过
 - [ ] 文档间双向链接（设计 ↔ BDD ↔ 规范）
 - [ ] 复杂功能（≥ 3 模块）有五段设计文档
@@ -259,3 +262,4 @@ PRD 写完导出 PRD.html 放 docs/ 根 → 与 md 源争权威。
 | 日期 | 版本 | 变更说明 |
 |------|------|---------|
 | 2026-05-28 | v3.0 | 按模板骨架重写；红线 D-01~D-12 全部对齐 `check_docs.py` 实测规则；新增 explore EXP/个人子目录约定、ADR 新位置 `worklogs/decisions/`、版本后缀禁令 |
+| 2026-06-08 | v3.1 | 新增 D-13：根 `STATUS.md` 受 markdownlint-cli2 严规则约束（仅 STATUS.md 受限，其他 .md 不动），对应 `.markdownlint-cli2.jsonc` + pre-push hook（per worklogs/袁/2026-06-08 STATUS 瘦身任务）|

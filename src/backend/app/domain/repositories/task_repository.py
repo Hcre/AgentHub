@@ -52,3 +52,8 @@ class TaskRepository(ABC):
 
     @abstractmethod
     async def list_subtasks(self, parent_task_id: UUID) -> list[Task]: ...
+
+    @abstractmethod
+    async def delete(self, task_id: UUID) -> bool:
+        """硬删除任务，返回是否删到（幂等：不存在返回 False）。"""
+        ...

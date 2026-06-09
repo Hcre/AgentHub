@@ -64,6 +64,8 @@ interface ChatState {
   clearUnread: (key: string) => void
   /** 整组合计未读（给 NavRail 红点用） */
   totalUnread: () => number
+  /** 从某会话消息桶移除单条消息（删除消息成功后调用） */
+  removeMessage: (key: string, messageId: string) => void
   /** 删除一个会话 */
   removeConversation: (agentId: string, conversationId: string) => void
   /** 批量删除会话 */
@@ -109,6 +111,11 @@ export const useChatStore = create<ChatState>()(
 
   removeConversation: (agentId, conversationId) => {
     const key = convKey(agentId, conversationId)
+    // 关闭该会话的持久 WS 连接
+    import("../hooks/wsPool").then(({ closePoolWs }) => {
+      const sid = get().sessionIds[key]
+      if (sid) closePoolWs(`${sid}:${key}`)
+    })
     set((s) => {
       const existing = s.conversations[agentId] ?? []
       const filtered = existing.filter((c) => c.id !== conversationId)
@@ -480,6 +487,14 @@ export const useChatStore = create<ChatState>()(
             ),
           },
         }))
+      },
+
+      removeMessage: (key, messageId) => {
+        set((s) => {
+          const list = s.messages[key]
+          if (!list) return {}
+          return { messages: { ...s.messages, [key]: list.filter((m) => m.id !== messageId) } }
+        })
       },
 
       removeConversation: (agentId, conversationId) => {

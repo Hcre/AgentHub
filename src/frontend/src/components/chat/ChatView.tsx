@@ -4,6 +4,7 @@ import { convKey, useChatStore } from '../../stores/chatStore'
 import { useUIStore } from '../../stores/uiStore'
 import { sessionsApi } from '../../api/sessions'
 import { useWebSocket } from '../../hooks/useWebSocket'
+import { getPoolWs } from '../../hooks/wsPool'
 import { Composer, type ComposerHandle } from './Composer'
 import { MessageBubble } from './MessageBubble'
 import { TypingIndicator } from './TypingIndicator'
@@ -18,6 +19,7 @@ export function ChatView({ agent }: { agent: Agent }) {
   const sessionIds = useChatStore((s) => s.sessionIds)
   const setSessionId = useChatStore((s) => s.setSessionId)
   const clearUnread = useChatStore((s) => s.clearUnread)
+  const removeMessage = useChatStore((s) => s.removeMessage)
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<ComposerHandle>(null)
@@ -113,6 +115,19 @@ export function ChatView({ agent }: { agent: Agent }) {
     composerRef.current?.setReplyTo(ref)
   }
 
+  // 删除消息：乐观从本地移除；后端 DELETE 失败则恢复并提示。仅对绑了后端 session
+  // 的真实消息启用（mock 消息的 onDelete 不下传，按钮不渲染）。
+  const handleDeleteMessage = (target: ChatMessage) => {
+    if (!key) return
+    const snapshot = list
+    removeMessage(key, target.id)
+    sessionsApi.deleteMessage(target.id).catch((e) => {
+      // 回滚：把整桶恢复到删除前
+      useChatStore.setState((s) => ({ messages: { ...s.messages, [key]: snapshot } }))
+      console.error('[ChatView] delete message failed:', e instanceof Error ? e.message : e)
+    })
+  }
+
   // 3 个 prompt 建议卡（top-level const — 用作 single source of truth，测试也用同一份）
   const prompts = PROMPTS_DEFAULT
 
@@ -139,6 +154,7 @@ export function ChatView({ agent }: { agent: Agent }) {
                 user={user}
                 sessionId={sessionId ?? undefined}
                 onReply={handleReply}
+                onDelete={sessionId ? handleDeleteMessage : undefined}
               />
             ))
           )}
@@ -180,7 +196,22 @@ export function ChatView({ agent }: { agent: Agent }) {
         </div>
       </div>
 
-      <Composer ref={composerRef} agent={agent} onSend={onSend} onCreateSkill={handleCreateSkill} />
+      <Composer
+        ref={composerRef}
+        agent={agent}
+        onSend={onSend}
+        onCreateSkill={handleCreateSkill}
+        isTyping={isTyping}
+        onAbort={() => {
+          const poolKey = sessionId && key ? `${sessionId}:${key}` : null
+          if (poolKey) {
+            const ws = getPoolWs(poolKey)
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'abort' }))
+            }
+          }
+        }}
+      />
     </div>
   )
 }
