@@ -72,5 +72,10 @@ export function useWebSocket(sessionId: string | null, convKey: string | null) {
     [addUserMessage, sessionId, convKey],
   );
 
-  return { sendMessage };
+  return { sendMessage, cancel: () => {
+    const ws = wsRef.current
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'cancel' }))
+    }
+  } };
 }

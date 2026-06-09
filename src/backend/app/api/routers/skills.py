@@ -888,8 +888,14 @@ async def fs_raw(path: str):
     return FileResponse(real, media_type=mime_type)
 
 
+class FsMkdirRequest(BaseModel):
+    parent: str
+    name: str
+
+
 @FS_ROUTER.post("/mkdir")
-async def fs_mkdir(parent: str, name: str) -> dict:
+async def fs_mkdir(body: FsMkdirRequest) -> dict:
+    parent, name = body.parent, body.name
     """在 parent 下新建文件夹 name。"""
     import os as _os
 

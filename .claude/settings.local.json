@@ -43,7 +43,9 @@
       "Bash(find /home/huishuohuademao/workspace/AgentHub-memory/src/backend -name python* -type f)",
       "Bash(find /home/huishuohuademao/workspace/AgentHub/src/backend -name activate -path *venv*)",
       "Bash(ls /home/huishuohuademao/workspace/AgentHub/src/backend/.venv/bin/python*)",
-      "Bash(PYTHONPATH=. /home/huishuohuademao/workspace/AgentHub/src/backend/.venv/bin/python -m pytest tests/test_memory_search_accuracy.py -v -s --no-header --tb=long)"
+      "Bash(PYTHONPATH=. /home/huishuohuademao/workspace/AgentHub/src/backend/.venv/bin/python -m pytest tests/test_memory_search_accuracy.py -v -s --no-header --tb=long)",
+      "WebFetch(domain:blog.csdn.net)",
+      "WebFetch(domain:www.markcallen.com)"
     ]
   }
 }

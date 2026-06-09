@@ -59,10 +59,7 @@ from app.infrastructure.llm.factory import build_adapter_for_agent
 logger = logging.getLogger(__name__)
 
 
-# v3 步1 前门机械反射（零 LLM）。control 从 CoordinatorGate 迁入；broadcast 从 Selector L1.5 提升。
-_CONTROL_RE = re.compile(
-    r"^(取消|停止|停下来?|暂停|停)(?![车站])|^(cancel|stop|abort)\b", re.IGNORECASE
-)
+# v3 步1 前门机械反射（零 LLM）。broadcast 从 Selector L1.5 提升。
 _BROADCAST_RE = re.compile(r"大家|各位|所有人|全员|全体|在座的|你们都说说|都来说说")
 
 # v4 R5：破坏性 replan 的确认词（零 LLM 反射，跟 control 同级）。确认词在开头、后面跟什么都算
@@ -212,12 +209,6 @@ class ChatService:
         text = trigger.content or ""
         run = self._registry.get(session.id)
 
-        # 反射②：control（执行态零 LLM 取消；无 run 时空操作）。命令，不是路由，先于 decide。
-        if self._is_control(text):
-            if run is not None:
-                await self._cancel_coordinator(session, run)
-            return
-
         # 反射②b：破坏性 replan 待确认（零 LLM）。确认 → 执行换图；非确认 → 不清不吞，
         # fall through 到统一循环（用户可能在改新需求，或闲聊两句后再回来确认）。
         if run is not None and run.pending_replan is not None and self._is_confirmation(text):
@@ -242,12 +233,13 @@ class ChatService:
         # active_plan 是 decide 的输入字段，不是分支条件。
         # 唯一的 if action== 是对 decide 输出的分发：
         rounds = 0
+        responded: set[str] = set()  # 本轮已在排队回复的成员，避免 router 重复选
         while True:
             active_plan = run.plan_view() if run is not None else None
             state = await SessionState.from_session(
                 session_id=session.id, members=members,
                 message_repo=self._messages, window=settings.l1_window_size,
-                active_plan=active_plan,
+                active_plan=active_plan, responded=frozenset(responded),
             )
             decision = await self._router.decide(state)
             rounds += 1
@@ -290,6 +282,11 @@ class ChatService:
                     await self._handle_replan(session, group, run, decision.requirement or text)
                 return
 
+            if decision.action == "cancel":
+                if run is not None:
+                    await self._cancel_coordinator(session, run)
+                return
+
             if decision.action == "relay":
                 active_workers = (
                     {s.worker for s in active_plan.steps if s.status == "running"}
@@ -299,12 +296,14 @@ class ChatService:
                 for w in decision.who:
                     if run is not None and w in active_workers:
                         # 在干活 → 投递层：in-flight 进桶 / parked 当答复 resume
+                        responded.add(w)  # router 下轮不再选
                         await run.relay(w, text)
                     else:
                         member = next((m for m in members if m.name == w), None)
                         if member is None:
                             continue  # 幻觉名 → 跳过
                         streamed_idle = True
+                        responded.add(w)  # 标记已回，router 下轮不再选
                         async for evt in self._stream_one_agent(
                             session=session, group=group, target=member, trigger=trigger
                         ):
@@ -331,11 +330,6 @@ class ChatService:
             return
 
     # --- v3 前门反射 + 轻执行（步1）---
-
-    @staticmethod
-    def _is_control(text: str) -> bool:
-        """执行态控制消息（取消/停止），零 LLM。从 CoordinatorGate 迁入。"""
-        return bool(_CONTROL_RE.match(text.strip()))
 
     @staticmethod
     def _is_broadcast(trigger: Message) -> bool:

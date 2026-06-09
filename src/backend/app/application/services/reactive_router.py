@@ -33,7 +33,7 @@ from app.domain.enums import MessageRole
 
 logger = logging.getLogger(__name__)
 
-Action = Literal["relay", "task", "replan", "done"]
+Action = Literal["relay", "task", "replan", "cancel", "done"]
 
 
 @dataclass(frozen=True)
@@ -127,6 +127,9 @@ class ReactiveRouter:
                 return PlannerDecision.done("replan: no requirement")
             return PlannerDecision(action="replan", requirement=requirement, reason=reason)
 
+        if action == "cancel":
+            return PlannerDecision(action="cancel", reason=reason)
+
         if action == "done":
             return PlannerDecision.done(reason)
 
@@ -145,11 +148,12 @@ class ReactiveRouter:
                 "properties": {
                     "action": {
                         "type": "string",
-                        "enum": ["relay", "task", "replan", "done"],
+                        "enum": ["relay", "task", "replan", "cancel", "done"],
                         "description": (
                             "relay=把这条转给某些成员（闲聊回话/接话/补充约束都算）；"
                             "task=复杂多步骤任务，需后台编排（单步骤操作请用 relay）；"
                             "replan=改变当前正在跑的任务的根本方向/架构/需求；"
+                            "cancel=有任务在跑，用户明确要求取消/停止；"
                             "done=无需任何响应"
                         ),
                     },
@@ -194,6 +198,9 @@ class ReactiveRouter:
             "判 task 后无需指定 who，编排系统会自动分配。\n\n"
             "**replan — 改变当前任务方向**\n"
             "有任务在跑，用户要求改根本方向/架构（如「改成微服务」「不做博客了做文档站」）。\n\n"
+            "**cancel — 取消当前任务**\n"
+            "有任务在跑，用户明确要求取消/停止/中止当前任务。\n"
+            "注意：犹豫或反问（如「停一下」「等一下」「能不能换个方式」）不是 cancel，应 relay 给对应成员讨论。\n\n"
             "**done — 不需要响应**\n"
             "以下情况必须 done：\n"
             "- Agent 已完成指令给出结果，等用户下一步\n"
@@ -260,8 +267,16 @@ class ReactiveRouter:
         history_block = "\n".join(_fmt(m) for m in history) if history else "（无历史）"
         parts = [
             "# 候选成员\n" + members,
-            "# 历史上下文\n（仅供理解背景，不要对这些消息做路由决策）\n" + history_block,
         ]
+        # 本轮已在排队回复的成员（不应该再选）
+        if state.responded:
+            parts.append(
+                "## 本轮已在排队回复的成员（不要再选）\n"
+                + "\n".join(f"- {n}（已在回本轮消息，不必再选）" for n in sorted(state.responded))
+            )
+        parts.append(
+            "# 历史上下文\n（仅供理解背景，不要对这些消息做路由决策）\n" + history_block
+        )
         if last_user and last_user.id != target.id:
             parts.append(
                 "# 用户最后一条消息\n（用户的最新意图，辅助判断上下文）\n" + _fmt(last_user)

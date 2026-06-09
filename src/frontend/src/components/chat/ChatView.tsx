@@ -4,7 +4,6 @@ import { convKey, useChatStore } from '../../stores/chatStore'
 import { useUIStore } from '../../stores/uiStore'
 import { sessionsApi } from '../../api/sessions'
 import { useWebSocket } from '../../hooks/useWebSocket'
-import { getPoolWs } from '../../hooks/wsPool'
 import { Composer, type ComposerHandle } from './Composer'
 import { MessageBubble } from './MessageBubble'
 import { TypingIndicator } from './TypingIndicator'
@@ -31,6 +30,7 @@ export function ChatView({ agent }: { agent: Agent }) {
   const key = activeConversationId ? convKey(agent.id, activeConversationId) : null
   const list = key ? (messages[key] ?? []) : []
   const isTyping = key ? (typing[key] ?? false) : false
+  const isStreaming = list.some((m) => m.streaming === true)
   const sessionId = key ? (sessionIds[key] ?? null) : null
 
   // 首次进入会话：创建后端 Session 并恢复 workspace。
@@ -61,7 +61,7 @@ export function ChatView({ agent }: { agent: Agent }) {
     }
   }, [key, sessionId, agent.id, setSessionId, activeConversationId])
 
-  const { sendMessage } = useWebSocket(sessionId, key)
+  const { sendMessage, cancel } = useWebSocket(sessionId, key)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -201,16 +201,8 @@ export function ChatView({ agent }: { agent: Agent }) {
         agent={agent}
         onSend={onSend}
         onCreateSkill={handleCreateSkill}
-        isTyping={isTyping}
-        onAbort={() => {
-          const poolKey = sessionId && key ? `${sessionId}:${key}` : null
-          if (poolKey) {
-            const ws = getPoolWs(poolKey)
-            if (ws && ws.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({ type: 'abort' }))
-            }
-          }
-        }}
+        isStreaming={isStreaming}
+        onCancel={cancel}
       />
     </div>
   )
