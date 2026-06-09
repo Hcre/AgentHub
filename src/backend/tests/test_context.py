@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -47,7 +48,10 @@ class TestListTree:
     def test_non_git_walk(self, tmp_path):
         (tmp_path / "src").mkdir()
         (tmp_path / "src" / "main.py").write_text("x")
-        assert "src/main.py" in _list_tree(str(tmp_path))
+        # _list_tree 走 os.walk + Path 拼接，Windows 下分隔符是 "\\"。
+        # 测试侧改 as_posix 走 POSIX 形式，避免平台耦合。
+        tree = _list_tree(str(tmp_path))
+        assert "src/main.py" in tree.replace("\\", "/")
 
     def test_ignore_dirs(self, tmp_path):
         (tmp_path / "node_modules" / "pkg").mkdir(parents=True)
@@ -55,7 +59,7 @@ class TestListTree:
         (tmp_path / "src").mkdir()
         (tmp_path / "src" / "app.py").write_text("x")
         tree = _list_tree(str(tmp_path))
-        assert "src/app.py" in tree
+        assert "src/app.py" in tree.replace("\\", "/")
         assert "node_modules" not in tree
 
 
