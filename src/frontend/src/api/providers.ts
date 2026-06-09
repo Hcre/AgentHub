@@ -26,6 +26,22 @@ export interface ProviderInfo {
   available: boolean
 }
 
+/** 对应 backend `PingRequest`（schemas/provider.py）。 */
+export interface PingInput {
+  agent_system: string
+  provider: string
+  model: string
+  api_key: string
+  base_url?: string
+}
+
+/** 对应 backend `PingResponse`：连通性预检结果（不创建 Agent，纯只读）。 */
+export interface PingResult {
+  ok: boolean
+  latency_ms?: number | null
+  error?: string | null
+}
+
 /** Provider 相关 API（CLI 自动检测 + 默认配置回填）。 */
 export const providersApi = {
   /** 列出当前系统中所有自动检测到的 Agent CLI。 */
@@ -35,4 +51,6 @@ export const providersApi = {
   /** 取某个 CLI 的本地配置（model + base_url + api_key + provider），Step 2 选中卡片后回填用。 */
   getDefaultConfig: (agentSystem: string) =>
     api.get<DefaultConfig>(`/api/providers/${encodeURIComponent(agentSystem)}/default-config`),
+  /** 连通性预检：spawn CLI 发探测消息，验证配置是否可用（25s 超时）。 */
+  ping: (input: PingInput) => api.post<PingResult>('/api/providers/ping', input),
 }

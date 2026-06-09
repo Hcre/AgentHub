@@ -28,13 +28,14 @@ _FE = _agent("前端小美", ["frontend", "ui"])
 _QA = _agent("测试小测", ["testing"])
 
 
-def _state(active_plan: PlanView | None = None, *, dispatch_mode: str = "discussion") -> SessionState:
+def _state(active_plan: PlanView | None = None) -> SessionState:
+    # v4 事件驱动重构后 SessionState 删了 dispatch_mode 字段（commit 0b83e6a 起 "无 mode 枚举"），
+    # 态由 active_plan 派生：None=纯对话，非 None=任务执行态。本地 dead kwarg 顺手清。
     return SessionState(
         session_id=uuid.uuid4(),
         members=(_BE, _FE, _QA),
         transcript=(),
         active_plan=active_plan,
-        dispatch_mode=dispatch_mode,
     )
 
 
@@ -138,22 +139,8 @@ async def test_invalid_action_degrades() -> None:
     assert d.action == "done"
 
 
-# ── dispatch_mode 进 prompt（AT_ROUTING 作为路由依据）──
-
-
-def test_at_routing_mode_in_prompt() -> None:
-    """dispatch_mode=at_routing → prompt 含「只在被 @ 时回复」的约束。"""
-    router = ReactiveRouter(raw_decide=lambda s: {})
-    system, _ = router._build_prompts(_state(dispatch_mode="at_routing"))
-    assert "AT_ROUTING" in system
-    assert "@" in system
-
-
-def test_discussion_mode_in_prompt() -> None:
-    """dispatch_mode=discussion → prompt 含正常讨论说明。"""
-    router = ReactiveRouter(raw_decide=lambda s: {})
-    system, _ = router._build_prompts(_state(dispatch_mode="discussion"))
-    assert "DISCUSSION" in system
+# ── dispatch_mode 进 prompt（v3 时代行为已废：v4 R2 删了 mode 枚举，AT_ROUTING / DISCUSSION
+#    文本不再出现在 system prompt，原两条测试删除） ──
 
 
 def test_transcript_labels_sender_by_name() -> None:
@@ -161,18 +148,21 @@ def test_transcript_labels_sender_by_name() -> None:
     from app.domain.entities.message import Message
     from app.domain.enums import MessageRole
 
+    # v4 R2 把 SYSTEM 消息从 history 过滤掉（噪音），但 transcript[0]（target）保留；
+    # 把系统消息置首以验证 _fmt 对 SYSTEM role 的标签仍可达。原顺序 (agent, sys, user) 时
+    # "系统: ✅" 落在 filtered history 里、assert 必挂。
+    sys_msg = Message(session_id=uuid.uuid4(), role=MessageRole.SYSTEM, content="✅ t1 已完成")
+    user_msg = Message(session_id=uuid.uuid4(), role=MessageRole.USER, content="你怎么看")
     agent_msg = Message(
         session_id=uuid.uuid4(), role=MessageRole.ASSISTANT,
         content="用 PG 还是 MySQL?", sender_agent_id=_BE.id,
     )
-    sys_msg = Message(session_id=uuid.uuid4(), role=MessageRole.SYSTEM, content="✅ t1 已完成")
-    user_msg = Message(session_id=uuid.uuid4(), role=MessageRole.USER, content="你怎么看")
     state = SessionState(
         session_id=uuid.uuid4(), members=(_BE, _FE, _QA),
-        transcript=(agent_msg, sys_msg, user_msg),
+        transcript=(sys_msg, user_msg, agent_msg),
     )
     router = ReactiveRouter(raw_decide=lambda s: {})
     _, prompt = router._build_prompts(state)
-    assert "后端阿强: 用 PG" in prompt  # 真名，不是 "Agent"
-    assert "系统: ✅" in prompt          # 系统消息不混成「用户」
-    assert "用户: 你怎么看" in prompt
+    assert "系统: ✅" in prompt           # target 位置保留 _fmt("系统", SYSTEM) 标签
+    assert "用户: 你怎么看" in prompt     # last_user 块保留
+    assert "后端阿强: 用 PG" in prompt    # 真名，不是 "Agent"

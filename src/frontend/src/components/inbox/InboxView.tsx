@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { cn } from '../../lib/cn'
 import { useInboxStore } from '../../stores/inboxStore'
 import { Badge, Button, Icon, Tabs, TabsList, TabsTrigger } from '../ui'
@@ -59,11 +59,11 @@ function InboxCard({ item }: { item: InboxItem }) {
         )}
         {item.type === 'approval' && (
           <div className="flex gap-2">
-            <Button variant="brand" size="sm" onClick={() => resolve(item.id)}>
+            <Button variant="brand" size="sm" onClick={() => resolve(item.id, 'approve')}>
               <Icon name="check" className="h-3.5 w-3.5" />
               批准
             </Button>
-            <Button variant="outline" size="sm" onClick={() => resolve(item.id)}>
+            <Button variant="outline" size="sm" onClick={() => resolve(item.id, 'reject')}>
               <Icon name="x" className="h-3.5 w-3.5" />
               驳回
             </Button>
@@ -76,7 +76,12 @@ function InboxCard({ item }: { item: InboxItem }) {
 
 export function InboxView() {
   const items = useInboxStore((s) => s.items)
+  const load = useInboxStore((s) => s.load)
   const [tab, setTab] = useState<InboxType | 'all'>('all')
+
+  useEffect(() => {
+    void load()
+  }, [load])
   const filtered = useMemo(() => items.filter((i) => tab === 'all' || i.type === tab), [items, tab])
 
   return (

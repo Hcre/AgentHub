@@ -3,7 +3,9 @@ import { useAgentStore } from '../../stores/agentStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useUIStore } from '../../stores/uiStore'
 import { Button, Dialog, DialogContent, Icon, Input, Textarea } from '../ui'
-import { providersApi, type ProviderInfo } from '../../api/providers'
+import { useApiKeyStore } from '../../stores/apiKeyStore'
+import { providersApi, type DefaultConfig, type ProviderInfo } from '../../api/providers'
+import { skillsApi } from '../../api/skills'
 import { type TemplateDetail } from '../../api/templates'
 import { useTemplateStore } from '../../stores/templateStore'
 import { CliIcon } from '../icons/cli/CliIcon'
@@ -245,6 +247,15 @@ export function CreateAgentModal({
   const [skillLoading, setSkillLoading] = useState(false)
   // Step 2
   const [agentSystem, setAgentSystem] = useState<string>('')
+  const [providerId, setProviderId] = useState('deepseek')
+  const [model, setModel] = useState('')
+  const [baseUrl, setBaseUrl] = useState('')
+  const [apiKey, setApiKey] = useState('')
+  const [selectedKeyId, setSelectedKeyId] = useState('')
+  // 连通性预检
+  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle')
+  const [testError, setTestError] = useState('')
+  const [testLatency, setTestLatency] = useState<number | null>(null)
   // Step 3
   const [status, setStatus] = useState<'idle' | 'creating' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
@@ -385,8 +396,8 @@ export function CreateAgentModal({
     if (!isCustom) return
     queueMicrotask(() => {
       setSkillLoading(true)
-      fetch('/api/skills/library?_=' + Date.now())
-        .then((r) => r.json())
+      skillsApi
+        .listLibrary()
         .then(setSkillList)
         .catch(() => setSkillList([]))
         .finally(() => setSkillLoading(false))
@@ -416,6 +427,14 @@ export function CreateAgentModal({
     setCustomSkills([])
     setSkillList([])
     setAgentSystem('')
+    setProviderId('deepseek')
+    setModel('')
+    setBaseUrl('')
+    setApiKey('')
+    setTestStatus('idle')
+    setError('')
+    setTestLatency(null)
+    setSelectedKeyId('')
     setStatus('idle')
     setErrorMsg('')
   }
@@ -481,13 +500,64 @@ export function CreateAgentModal({
     setStep(1)
   }
 
-  // Step 3: 创建
+// 连通性预检（创建前执行，失败不损失任何东西）
+  const doConnectivityTest = async () => {
+    if (agentSystem === 'mock') return
+    setTestStatus('testing')
+    setTestError('')
+    setTestLatency(null)
+    try {
+      // 注：model/api_key/base_url 仍传 ping 端点（探测连通用），但 spawn CLI 时不再注入
+      const data = await providersApi.ping({
+        agent_system: agentSystem,
+        provider: providerId,
+        model: model.trim(),
+        api_key: apiKey,
+        base_url: baseUrl.trim() || undefined,
+      })
+      if (data.ok) {
+        setTestStatus('ok')
+        setTestLatency(data.latency_ms ?? null)
+      } else {
+        setTestStatus('fail')
+        setTestError(data.error || '连通失败')
+      }
+    } catch (e) {
+      setTestStatus('fail')
+      setTestError(e instanceof Error ? e.message : '网络错误')
+    }
+  }
+
+  // Step 3: 创建（先连通测试，通过后再创建）
   const doCreate = async () => {
     if (!agentName.trim()) return
     setStep(3)
     setStatus('creating')
     setErrorMsg('')
 
+// 1. 连通性预检（非 mock 时自动执行）
+    if (agentSystem !== 'mock' && apiKey) {
+      try {
+        const data = await providersApi.ping({
+          agent_system: agentSystem,
+          provider: providerId,
+          model: model.trim(),
+          api_key: apiKey,
+          base_url: baseUrl.trim() || undefined,
+        })
+        if (!data.ok) {
+          setStatus('error')
+          setErrorMsg(`连通失败: ${data.error || '未知错误'}，请返回修改配置`)
+          return
+        }
+      } catch {
+        setStatus('error')
+        setErrorMsg('连通测试网络错误，请检查后端是否运行')
+        return
+      }
+    }
+
+    // 2. 创建 Agent
     try {
       const id = await createAgent({
         name: agentName.trim(),
@@ -796,8 +866,10 @@ export function CreateAgentModal({
                     onClick={() => {
                       setScanning(true)
                       providerScanned = false
+                      // 用 scan()（POST /api/providers/scan 强制重扫 PATH）而非 list()
+                      // （返回 1h scheduler 缓存）—— 用户刚装的新 CLI 立刻能被发现。
                       providersApi
-                        .list()
+                        .scan()
                         .then((list) => {
                           providerCache = list
                           providerScanned = true
@@ -889,9 +961,31 @@ export function CreateAgentModal({
             </div>
 
             <footer className="flex items-center justify-between border-t px-4 py-3">
-              <Button variant="outline" size="sm" onClick={goBack}>
-                上一步
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={goBack}>
+                  上一步
+                </Button>
+                {showProviderSection && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={doConnectivityTest}
+                      disabled={testStatus === 'testing' || !apiKey}
+                    >
+                      {testStatus === 'testing' ? '测试中…' : testStatus === 'ok' ? '✅ 连通成功' : testStatus === 'fail' ? '❌ 重试' : '🔄 连通测试'}
+                    </Button>
+                    {testStatus === 'ok' && (
+                      <span className="text-[11px] text-emerald-600">
+                        连通正常{testLatency != null ? ` · ${testLatency}ms` : ''}
+                      </span>
+                    )}
+                    {testStatus === 'fail' && (
+                      <span className="text-[11px] text-red-500 max-w-[200px] truncate">{testError}</span>
+                    )}
+                  </>
+                )}
+              </div>
               <Button variant="brand" size="sm" onClick={doCreate}>
                 创建队友
               </Button>

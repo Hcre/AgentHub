@@ -32,7 +32,8 @@ _TASK_COMPLETE_TOOL = "mcp__agenthub-step-tools__task_complete"
 # v4 完成协议（coordinator-v4-R1 §6.4）：task_complete 是唯一结构化信号。
 # worker 说话走正常 TEXT 推群聊；流结束没调 task_complete = not_done（没交卷，不是失败）。
 TASK_EXEC_CONTRACT = (
-    "你被分配了一个具体任务。请直接完成它（写代码/改文件/跑命令），不要闲聊或只回复。"
+    "你被分配了一个具体任务，请在群里用一句话报到：你收到了什么任务、打算怎么做。"
+    "报到后立刻动手（写代码/改文件/跑命令），不要停下来等批准。"
     "严格遵守下方约束与验收标准。\n\n"
     "完成后必须调用 `task_complete` 工具，summary 说明：做了什么、产物在哪、关键决策。\n"
     "如果信息不全、需要确认或等待回复，直接以文本说出来然后结束——"
@@ -51,11 +52,26 @@ _ABORT_SUMMARY_PROMPT = (
 )
 
 
+# 执行要求：必须放进每轮 content（不能只放 system_prompt）——worker 始终 --resume，
+# CLI 在 resume 时沿用原 session 的 system_prompt、丢弃本次传的，只有 content 每轮必达。
+# 否则报到/task_complete 指令永远到不了 worker（本会话「不报到、不交卷、面板不动」的根因）。
+_EXEC_REQUIREMENT = (
+    "## 执行要求（必须遵守）\n"
+    "1. 开工前先用一句自然的话说你打算做什么（像同事在群里随口说一声，"
+    "不要写「报到」「报告」这类前缀，也不要每条消息都重复说）。\n"
+    "2. 然后立刻动手（写代码/改文件/跑命令），不要停下来等批准。\n"
+    "3. **完成后必须调用 `task_complete` 工具交卷**（summary 写：做了什么、产物在哪、关键决策）。\n"
+    "   只用文字说\"完成/验收通过\"**不算交卷**，任务不会推进、面板不会更新——必须调用工具。\n"
+    "4. 信息不全/需要确认 → 直接以文本说出来再结束，不要凭猜测推进。"
+)
+
+
 def build_task_instruction(node: TaskNode) -> str:
     """TaskDef → 任务指令文本（D1）。
 
     v4 R4：注入上游 COMPLETED 节点的 task_complete summary（§6.7）——B 依赖 A 时，
     B 的指令里能看到 A 做了什么、产物在哪，不用自己读文件猜。
+    执行要求（报到/task_complete）随 content 每轮必达——worker --resume 会丢 system_prompt。
     """
     t = node.task
     parts = [f"# 任务：{t.title}", t.description or ""]
@@ -70,6 +86,7 @@ def build_task_instruction(node: TaskNode) -> str:
             "## 验收（你的产出必须让这些命令通过）\n"
             + "\n".join(f"- `{s}`" for s in mech)
         )
+    parts.append(_EXEC_REQUIREMENT)
     return "\n\n".join(p for p in parts if p)
 
 
@@ -220,12 +237,18 @@ class AgentExecutor:
                 chunks.append(evt.content)
         return "".join(chunks).strip()
 
-    async def _to_sink(self, evt: StreamEvent, agent_id: object) -> None:
-        """推 event_sink，给未标记的事件补上 worker 的 sender_agent_id（谁在说话）。"""
+    async def _to_sink(self, evt: StreamEvent, agent_id: object, task_id: str | None = None) -> None:
+        """推 event_sink，给未标记的事件补上 worker 的 sender_agent_id（谁在说话）
+        + taskId（哪一步在执行），让前端把活动归到对应步骤的实时进度。"""
         if self._sink is None:
             return
+        update: dict[str, object] = {}
         if evt.sender_agent_id is None:
-            evt = evt.model_copy(update={"sender_agent_id": agent_id})
+            update["sender_agent_id"] = agent_id
+        if task_id is not None and "taskId" not in evt.metadata:
+            update["metadata"] = {**evt.metadata, "taskId": task_id}
+        if update:
+            evt = evt.model_copy(update=update)
         await self._sink(evt)
 
     async def _consume(self, adapter: object, request: AgentRequest, node: TaskNode) -> WorkerOutcome:
@@ -242,7 +265,7 @@ class AgentExecutor:
         done_summary: str | None = None
         try:
             async for evt in adapter.stream(request):  # type: ignore[attr-defined]
-                await self._to_sink(evt, request.agent_id)  # TEXT 进群聊（sink 累积/flush）
+                await self._to_sink(evt, request.agent_id, node.task.id)  # TEXT/工具 → sink（带 taskId）
                 if evt.type == StreamEventType.TOOL_CALL and evt.tool_call:
                     if evt.tool_call.name == _TASK_COMPLETE_TOOL:
                         done_summary = evt.tool_call.arguments.get("summary", "")
@@ -256,7 +279,7 @@ class AgentExecutor:
                     return WorkerOutcome(ok=False, status="error", output="worker 需要审批（MVP 不支持）")
         finally:
             # 保证 sink 收到 DONE flush 本轮文本（正常流自带 DONE 时此处 buffer 已空，无副作用）。
-            await self._to_sink(StreamEvent(type=StreamEventType.DONE, seq=0), request.agent_id)
+            await self._to_sink(StreamEvent(type=StreamEventType.DONE, seq=0), request.agent_id, node.task.id)
 
         if done_summary is not None:
             return WorkerOutcome(ok=True, status="completed", output=done_summary)

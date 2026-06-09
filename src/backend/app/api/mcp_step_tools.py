@@ -37,21 +37,18 @@ _agent_id_ctx: ContextVar[str] = ContextVar("agenthub_step_agent_id", default=""
 _session_id_ctx: ContextVar[str] = ContextVar("agenthub_step_session_id", default="")
 _group_id_ctx: ContextVar[str] = ContextVar("agenthub_step_group_id", default="")
 
-# session_id → {agent_id, session_id, group_id} 映射（内存，进程级）
-_session_ctx_map: dict[str, dict[str, str]] = {}
-
-
 # ── ASGI wrapper（仿 mcp_memory._AgentMCPWrapper）───────────────────────────
 
 
 class _StepToolsMCPWrapper:
     """ASGI wrapper：从 SSE URL ?agent_id=&session_id=&group_id= 提取上下文，注入 tool。
 
-    FastMCP SSE transport 流程：
-      GET /sse?agent_id=X&session_id=Y&group_id=Z → 响应首个 SSE 事件含 mcp session_id
-      POST /messages/?session_id=<mcp_sid> → 工具调用
-    wrapper 在 SSE 响应流中找到 mcp session_id 后建立 session→上下文映射，
-    POST 时按 mcp session_id 查映射并注入三个 ContextVar。
+    **关键**：在 GET /sse 分支 set ContextVar，而不是 POST /messages 分支。
+    MCP SDK 的 `app.run()`（工具派发循环）在 GET /sse 处理协程里 inline 运行——
+    所有工具调用都在这条 SSE 连接的 async 任务内执行。ContextVar 在该任务内 set 后，
+    对任务内 await 的一切（含工具）可见。POST /messages 只是把消息写进流、在另一个任务，
+    在那 set ContextVar 跨不到工具执行处（此前 not resolved 的根因）。
+    一条 SSE 连接对应一个 worker，URL 自带其 agent_id，天然隔离、并发安全。
     """
 
     def __init__(self, mcp_asgi: Any) -> None:
@@ -69,38 +66,14 @@ class _StepToolsMCPWrapper:
         )
 
         if path.endswith("/sse"):
-            agent_id = params.get("agent_id", "")
-            session_id = params.get("session_id", "")
-            group_id = params.get("group_id", "")
-
-            async def _intercept_send(event: dict) -> None:
-                if event["type"] == "http.response.body" and (agent_id or session_id):
-                    body = event.get("body", b"").decode(errors="ignore")
-                    for line in body.splitlines():
-                        line = line.strip()
-                        if "session_id=" in line:
-                            # SSE 数据行格式: "data: /messages/?session_id=<uuid>"
-                            sid = line.split("session_id=")[-1].strip()
-                            if sid and sid not in _session_ctx_map:
-                                _session_ctx_map[sid] = {
-                                    "agent_id": agent_id,
-                                    "session_id": session_id,
-                                    "group_id": group_id,
-                                }
-                                logger.debug(
-                                    "MCP step-tools session %s → agent=%s session=%s group=%s",
-                                    sid, agent_id, session_id, group_id,
-                                )
-                await send(event)
-
-            await self._app(scope, receive, _intercept_send)
-
-        elif "/messages/" in path:
-            mcp_session_id = params.get("session_id", "")
-            ctx = _session_ctx_map.get(mcp_session_id, {})
-            t_agent = _agent_id_ctx.set(ctx.get("agent_id", ""))
-            t_sess = _session_id_ctx.set(ctx.get("session_id", ""))
-            t_group = _group_id_ctx.set(ctx.get("group_id", ""))
+            # 工具在本 GET 协程内派发 → 在此 set ContextVar，工具可见。
+            t_agent = _agent_id_ctx.set(params.get("agent_id", ""))
+            t_sess = _session_id_ctx.set(params.get("session_id", ""))
+            t_group = _group_id_ctx.set(params.get("group_id", ""))
+            logger.info(
+                "MCP step-tools SSE 连接 agent=%s session=%s group=%s",
+                params.get("agent_id", ""), params.get("session_id", ""), params.get("group_id", ""),
+            )
             try:
                 await self._app(scope, receive, send)
             finally:

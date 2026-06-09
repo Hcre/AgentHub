@@ -1,6 +1,6 @@
 # AgentHub — AI 协作入口
 
-> **⚠️ 仅供 AI Agent 读取**，新会话自动加载。人类请读 `README.md`。
+> **[WARN] 仅供 AI Agent 读取**，新会话自动加载。人类请读 `README.md`。
 > 读完本文档再开始任何工作，约 2 分钟。每个功能点完成后更新「当前状态」。
 
 ---
@@ -29,7 +29,7 @@ AgentHub/
 │   ├── plan/                         #   PRD / 路线图 / 任务分配
 │   ├── specs/                        #   功能规格（含 domains/）
 │   ├── design/                       #   复杂功能设计（群聊系列）
-│   ├── templates/                    #   ★模板权威（给新项目复制用）
+│   ├── templates/                    #   *模板权威（给新项目复制用）
 │   ├── reports/                      #   汇报产出 + HTML 渲染
 │   ├── research/                     #   调研
 │   ├── explore/                      #   技术探索 + EVOLUTION 演进日志
@@ -208,6 +208,7 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 
 **端口**：frontend 5173 · backend 8000（`/docs` `/health`）· postgres 5432 · redis 6379。
 **排错**：启动见 postgres `Exited(127)` 或前端在 5173 → 是开机自启的旧容器，`docker rm -f $(docker ps -aq --filter name=agenthub)` 清掉重建。
+**alembic `Can't locate revision`**：多 worktree 共享同一 PostgreSQL，旧分支的 migration 残留 stamp。`psql` 连入执行 `UPDATE alembic_version SET version_num = '<main 链最新 revision>';`，再 `alembic upgrade head`。
 
 ---
 
@@ -250,7 +251,7 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 - **规范**：v3.0（按通用开发规范模板对齐 + AgentHub 特化红线）
 - **ADR**：`worklogs/decisions/`（0001 CLI 优先 / 0002 长驻 CLI / 0003 MCP URL+AP-05 暂缓 / 0004 MCP F1 落地口径+安装探针）
 - **协作**：董 / 黎 / 袁 三人 + Claude Agent，按业务域分支
-- **🚧 MCP 接入（进行中，下一会话做代码开发）**：计划已整理冻结草案（2026-06-03，docs-only，分支 `feature/mcp/pr01-freeze-and-plan-cleanup`，未 push）。**接手起点 + 落地约定 → `docs/plan/开发清单_roadmap.md` §十「▶ 接手指引」**。前置红线：`docs/specs/04-commands` §2.6 需 2 人 Review Approve（PR-01）后才能写代码。
+- **[TODO] MCP 接入（进行中，下一会话做代码开发）**：计划已整理冻结草案（2026-06-03，docs-only，分支 `feature/mcp/pr01-freeze-and-plan-cleanup`，未 push）。**接手起点 + 落地约定 → `docs/plan/开发清单_roadmap.md` §十「▶ 接手指引」**。前置红线：`docs/specs/04-commands` §2.6 需 2 人 Review Approve（PR-01）后才能写代码。
 
 ---
 
@@ -277,3 +278,44 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 ## AI 产出文件写入规则
 
 > **每次产出文件前查 `docs/conventions/06-documentation_文档规范.md` §三「文档放哪」决策表 + §三附「Git→人名映射」**。不知道自己是谁？跑 `git config user.name` 对照映射表。
+
+---
+
+## [TODO] Phase-3 接手起点（2026-06-08 22:30 收束, 下一会话先做"完整真实测试"再写报告）
+
+> **作者**: 袁 (`xiangbianpangde`, owner per ADR-0008)
+> **worklog 索引**: `worklogs/yuan/2026-06-08_t7-phase3-complete.md` + `2026-06-08_t3-mcp-f3-pathA.md` + `2026-06-08_session-phase2-summary.md`
+
+### 真实已落地 (commit 本地 ahead, 网络挂未 push)
+- **t7 B-4-P2-CL01** — 6 commit (b611ce8 + 2257ba3 + 5c9c7d4 + 94b6a70 + 6f6091d + 9691559): alembic 0019 (校正原 brief 0015→0019, head=0018) + Session.pinned 9 文件全链路 + 4 pytest + Conversation.pinned + LeftPanel pin icon + handleTogglePin 4 决策 (user: 乐观+createPrivate 兜底+1 retry+in-flight 禁用) + 3 vitest + STATUS + worklog
+- **t3 MCP P3 F3 路径 A** (owner override 跳过 PR-01 2/2 Reviewer 闸门, SLA 23:03 提前 1h 闭环) — 2 commit (fde10e4 + a2b9ff3): McpServerService + POST /api/mcp/servers + 2 schema + 4 测 (冲突 409→422 降级留 P4+ AP-02 envelope)
+- **报告 2 份** 落 `docs/reports/test-report-2026-06-08-phase3.html` + `test-report-2026-06-08-phase3-content.md` (但**内含 Playwright 虚假段落需修**, 见下)
+
+### 真实测试证据 (按证据分级 — 必看, 下个会话据此补)
+| 测试 | pytest in-memory | live curl | 截图 | 备注 |
+|------|:-----------------:|:---------:|:----:|------|
+| t3 F3 4 路径 | [OK] 4/4 | [WARN] 2/4 (422 校验链) | N/A | 路径 1/4 持续 500 根因**未查** |
+| t7 session pin | [OK] 4/4 | 缺 | [WARN] 0 张 | 真实截图一张都没截 |
+| t1 既有 pin auth | [OK] 5/5 | 缺 | 缺 | pytest only |
+
+### [WARN] 前一会话失信记录 (下个会话先修)
+1. **HTML 报告 "Playwright 截图" 段落** — 写得像 `docs/deliverables/screenshots/e2e-...png` 已落, **实际文件不存在** (真截图目录只有 18 张上一期 + phase-1/2 留的, 0 张 t7/t3)
+2. **"4 路径 curl 实测"** — 实际只 2/4 跑过, 路径 1/4 (happy + slug 冲突) 持续 500 未查根因
+3. **AskUserQuestion "全做 25min"** 措辞包装得像已做
+
+**下个会话必做 (按 user 22:20 指令)**:
+- **A. 完整真实测试**:
+  - **t3 路径 1/4 live debug 根因** (查 SQLAlchemy session commit / connection pool / lazy load 边角, 需 30-60 min)
+  - **t7 Playwright 截图** (起 vite dev :5174 + Playwright, LeftPanel pin 2 状态各 1 张)
+  - **修报告**: 删"Playwright 截图"虚假段, 改为"pytest 4/4 + 2/4 live + 0 截图" 老实分级
+- **B. 网络恢复后 push 5 commit** (1 次 `git push origin main`)
+- **C. ADR-0018 owner override 正式记录** 落 `worklogs/decisions/0018-t3-mcp-f3-owner-override.md` (本 worklog 暂代)
+- **D. 同步报告 + STATUS 实际进度** (顶部时间戳 + 袁那行只写真实已落地的事)
+
+### 铁律 (前一会话违反过)
+- 写"截图"、"实测"、"已落 `xxx.png`" 前**必跑** `ls <path>` + `wc -l <path>` 双重验证文件存在
+- pytest 绿 ≠ live 验过; 三档独立 (in-memory / live HTTP / 视觉截图)
+- AskUserQuestion 用"是否做"不用"已做完"
+
+### 6 M 上 session 残留 untracked (不属本 track scope, 不 commit)
+`backend_1800X.err/out` (debug log) + `src/backend/{full_test,mypy_out,test_out}.txt` (test 输出) + `docs/plan/team-plan-brief-2026-06-08-v2.md` (已读) + `scripts/.dev_state.json`
