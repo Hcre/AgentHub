@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentHub · v2.0 真实验证 + Bug 修复报告 2026-06-10</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js" integrity="sha384-WmdflGW9aGfoBdHc4rRyWzYuAjEmDwMdGdiPNacbwfGKxBW/SO6guzuQ76qjnSlr" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    if (window.mermaid) {
+      mermaid.initialize({
+        startOnLoad: true, theme: 'base', securityLevel: 'loose',
+        themeVariables: {
+          primaryColor: '#F5F0E4', primaryTextColor: '#1F1D17', primaryBorderColor: '#8B3A1F',
+          lineColor: '#5A5447', secondaryColor: '#E8E1D2', tertiaryColor: '#FAF7F0',
+          fontFamily: '-apple-system, "PingFang SC", "Microsoft YaHei", sans-serif', fontSize: '13px'
+        },
+        flowchart: { curve: 'basis', useMaxWidth: true, htmlLabels: true },
+        sequence: { useMaxWidth: true, diagramMarginX: 20 }
+      });
+    }
+    document.querySelectorAll('.shot img').forEach(img => {
+      img.style.cursor = 'zoom-in';
+      img.addEventListener('click', () => {
+        const lb = document.createElement('div');
+        lb.className = 'lightbox';
+        lb.innerHTML = '<img src="' + img.src + '" alt=""><div class="hint">点任意处关闭</div>';
+        lb.addEventListener('click', () => lb.remove());
+        document.body.appendChild(lb);
+      });
+    });
+    const links = document.querySelectorAll('nav a[href^="#"]');
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          links.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + e.target.id));
+        }
+      });
+    }, { rootMargin: '-30% 0px -60% 0px' });
+    document.querySelectorAll('[id]').forEach(s => observer.observe(s));
+    document.querySelectorAll('.collapse-head').forEach(h => {
+      h.addEventListener('click', () => h.parentElement.classList.toggle('open'));
+    });
+  });
+</script>
+<style>
+  :root{
+    --bg:#FAFAF7;--bg-soft:#F4F2EC;--panel:#FFFFFF;--panel-2:#F8F6F0;
+    --line:#E0DCD0;--line-soft:#ECEAE2;--txt:#1F1D17;--txt-dim:#5A5447;--txt-faint:#9A9385;
+    --brand:#8B3A1F;--brand-2:#A85032;--accent:#2F5061;--accent-2:#3F6A82;
+    --gold:#A87A2E;--good:#3F6B3D;--warn:#B07F22;--bad:#9C3A2E;
+    --code-bg:#26241F;--code-fg:#E8E2D4;
+    --shadow:0 16px 40px -28px rgba(60,40,20,.32);--radius:14px;
+    --mono:'SFMono-Regular',ui-monospace,'Cascadia Code','Consolas','SF Mono',monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+    --serif:'Source Serif Pro','Iowan Old Style','Charter','Noto Serif CJK SC','Songti SC','STSong',serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;font-size:15px}
+  body{
+    font-family:var(--sans);
+    background:radial-gradient(1100px 700px at 86% -6%, #F2E8DC 0%, transparent 55%),
+               radial-gradient(900px 600px at -8% 14%, #EAE2D2 0%, transparent 50%), var(--bg);
+    color:var(--txt);line-height:1.7;-webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--brand);color:#fff}
+  .shell{display:flex;min-height:100vh}
+  .side{
+    position:fixed;top:0;left:0;bottom:0;width:240px;
+    background:linear-gradient(180deg,#FAF7F0,#F4F0E5);border-right:1px solid var(--line);
+    padding:22px 14px 28px;overflow-y:auto;z-index:50;
+  }
+  .side::-webkit-scrollbar{width:6px}
+  .side::-webkit-scrollbar-thumb{background:#DCD6C6;border-radius:8px}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px;padding:0 4px}
+  .brand .mark{
+    width:36px;height:36px;border-radius:9px;flex:0 0 auto;
+    background:linear-gradient(135deg,var(--brand),var(--brand-2));
+    display:grid;place-items:center;
+    font-family:var(--serif);font-weight:800;color:#fff;font-size:13px;letter-spacing:-.5px;
+    box-shadow:0 10px 24px -10px var(--brand);
+  }
+  .brand b{font-family:var(--serif);font-size:14.5px;letter-spacing:.3px;display:block;line-height:1.2;color:var(--txt)}
+  .brand span{font-size:9.5px;color:var(--txt-faint);letter-spacing:1.4px;font-family:var(--mono);text-transform:uppercase}
+  .side .meta{font-size:10px;color:var(--txt-faint);padding:8px 4px 12px;border-top:1px solid var(--line);margin:14px 0 4px;font-family:var(--mono);letter-spacing:.5px}
+  nav a{display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:7px;color:var(--txt-dim);text-decoration:none;font-size:12.2px;transition:.18s;margin-bottom:1px}
+  nav a .n{font-family:var(--mono);font-size:9.5px;color:var(--txt-faint);width:22px;text-align:center;flex:0 0 auto}
+  nav a:hover{background:#EBE5D5;color:var(--txt)}
+  nav a.active{background:linear-gradient(90deg,rgba(47,80,97,.13),transparent);color:#1A1813;box-shadow:inset 2px 0 0 var(--accent)}
+  nav a.active .n{color:var(--accent);font-weight:700}
+  nav .grp{font-size:9px;letter-spacing:2px;color:var(--txt-faint);text-transform:uppercase;margin:14px 0 5px 9px;font-family:var(--mono)}
+  .main{margin-left:240px;flex:1;padding:30px 44px 80px;max-width:1180px}
+  .hero{
+    background:linear-gradient(135deg,#FAF6EC 0%, #F2E8D8 50%, #EAD9C0 100%);
+    border:1px solid var(--line);border-radius:18px;padding:30px 36px;margin-bottom:28px;
+    box-shadow:var(--shadow);position:relative;overflow:hidden;
+  }
+  .hero::before{content:"";position:absolute;right:-40px;top:-40px;width:280px;height:280px;background:radial-gradient(circle, rgba(139,58,31,.10), transparent 70%);pointer-events:none}
+  .hero::after{content:"";position:absolute;left:-60px;bottom:-60px;width:240px;height:240px;background:radial-gradient(circle, rgba(47,80,97,.08), transparent 70%);pointer-events:none}
+  .hero .tag-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .hero h1{font-family:var(--serif);font-size:34px;font-weight:700;letter-spacing:-1.2px;line-height:1.15;margin:6px 0 10px;color:var(--txt)}
+  .hero .sub{font-family:var(--serif);font-size:15.5px;color:var(--txt-dim);max-width:820px;line-height:1.5;margin-bottom:18px}
+  .hero .meta-row{display:flex;gap:20px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--txt-faint);letter-spacing:.5px}
+  .hero .meta-row b{color:var(--txt-dim);font-weight:600}
+  .sec-head{margin-bottom:18px;margin-top:8px}
+  .sec-head .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:2px;color:var(--accent);margin-bottom:4px;font-weight:700}
+  .sec-head h2{font-family:var(--serif);font-size:26px;font-weight:700;letter-spacing:-.5px;margin:4px 0 8px;line-height:1.2}
+  .sec-head p{font-size:13px;color:var(--txt-dim);max-width:820px;line-height:1.7}
+  h3{font-size:15.5px;font-weight:700;margin:18px 0 9px;display:flex;align-items:center;gap:9px;color:var(--txt)}
+  h3 .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:0 0 auto}
+  .card{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--panel);box-shadow:var(--shadow)}
+  .card.hl{border-left:3px solid var(--accent)}
+  .card.brand{border-left:3px solid var(--brand)}
+  .card.good{border-left:3px solid var(--good)}
+  .card.gold{border-left:3px solid var(--gold)}
+  .card.bad{border-left:3px solid var(--bad)}
+  .card.warn{border-left:3px solid var(--warn)}
+  .card h4{font-size:13px;margin:0 0 6px}
+  .card p{font-size:12.4px;color:var(--txt-dim);margin:0 0 4px;line-height:1.65}
+  .card p:last-child{margin-bottom:0}
+  .grid{display:grid;gap:12px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr 1fr}
+  .tbl-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);margin:12px 0}
+  table{width:100%;border-collapse:collapse;font-size:12.4px}
+  thead{background:var(--bg-soft)}
+  th{padding:9px 12px;text-align:left;font-weight:700;font-size:11.5px;color:var(--txt-dim);border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:8px 12px;border-bottom:1px solid var(--line-soft);color:var(--txt-dim);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.ok{color:var(--good);font-weight:600} td.no{color:var(--bad);font-weight:600} td.warn{color:var(--warn);font-weight:600}
+  td.mono{font-family:var(--mono);font-size:11.5px}
+  td.center{text-align:center}
+  .b-pill{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;display:inline-block;font-family:var(--mono);letter-spacing:.3px}
+  .b-pill.ok{background:#DDE9D5;color:var(--good)}
+  .b-pill.mid{background:#F0E2C5;color:var(--warn)}
+  .b-pill.no{background:#EFD5CD;color:var(--bad)}
+  .b-pill.inf{background:rgba(47,80,97,.13);color:var(--accent)}
+  .b-pill.br{background:rgba(139,58,31,.13);color:var(--brand)}
+  .b-pill.lg{font-size:11.5px;padding:3px 10px}
+  .chip-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+  .chip{font-size:10.5px;padding:3px 9px;border-radius:5px;background:#EDE8DD;color:var(--txt-dim);font-family:var(--mono);border:1px solid var(--line)}
+  .chip.gd{background:rgba(63,107,61,.1);color:var(--good);border-color:rgba(63,107,61,.2)}
+  .chip.b{background:rgba(47,80,97,.1);color:var(--accent);border-color:rgba(47,80,97,.2)}
+  .chip.wn{background:rgba(176,127,34,.1);color:var(--warn);border-color:rgba(176,127,34,.25)}
+  .chip.bd{background:rgba(156,58,46,.1);color:var(--bad);border-color:rgba(156,58,46,.25)}
+  .tl{position:relative;padding:8px 0 8px 24px;margin:10px 0 14px}
+  .tl::before{content:"";position:absolute;left:7px;top:6px;bottom:6px;width:2px;background:linear-gradient(180deg,var(--brand),var(--accent))}
+  .tl-item{position:relative;margin:9px 0;padding:8px 0 0 14px}
+  .tl-item::before{content:"";position:absolute;left:-19px;top:14px;width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid var(--brand)}
+  .tl-item.gd::before{border-color:var(--good)}
+  .tl-item.wn::before{border-color:var(--warn)}
+  .tl-item h5{font-size:13px;font-weight:700;color:var(--txt);margin:0 0 3px;font-family:var(--sans)}
+  .tl-item p{font-size:11.8px;color:var(--txt-dim);margin:0 0 2px;line-height:1.55}
+  .tl-item .when{font-family:var(--mono);font-size:10px;color:var(--txt-faint);letter-spacing:.4px}
+  .note{padding:11px 14px;border-radius:9px;display:flex;gap:10px;align-items:flex-start;font-size:12.4px;margin:12px 0;border:1px solid;line-height:1.6}
+  .note .ico{font-size:13px;flex:0 0 auto;margin-top:1px;font-family:var(--serif);font-weight:700;width:18px;text-align:center}
+  .note.info{border-color:rgba(47,80,97,.3);background:rgba(47,80,97,.06);color:var(--accent-2)}
+  .note.warn{border-color:rgba(176,127,34,.3);background:rgba(176,127,34,.07);color:var(--warn)}
+  .note.good{border-color:rgba(63,107,61,.3);background:rgba(63,107,61,.07);color:var(--good)}
+  .note.bad{border-color:rgba(156,58,46,.3);background:rgba(156,58,46,.07);color:var(--bad)}
+  .note b{color:var(--txt);font-weight:700}
+  .mermaid-wrap{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:12px 0;box-shadow:var(--shadow);overflow-x:auto}
+  .mermaid-wrap .cap{font-family:var(--mono);font-size:10.5px;letter-spacing:1.5px;color:var(--accent);font-weight:700;margin-bottom:8px;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+  .mermaid-wrap .cap::before{content:"";width:18px;height:1.5px;background:var(--accent)}
+  .mermaid{display:flex;justify-content:center}
+  .mermaid svg{max-width:100%;height:auto}
+  .vs{display:grid;grid-template-columns:1fr 56px 1fr;gap:14px;align-items:stretch;margin:12px 0}
+  .vs-col{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+  .vs-col.old{border-top:3px solid var(--bad);background:linear-gradient(180deg,#FBEEEA,#FFF)}
+  .vs-col.new{border-top:3px solid var(--good);background:linear-gradient(180deg,#EFF3EA,#FFF)}
+  .vs-col h4{margin:0 0 6px;font-family:var(--serif);font-size:14px}
+  .vs-col.old h4{color:var(--bad)} .vs-col.new h4{color:var(--good)}
+  .vs-col p{font-size:12.2px;color:var(--txt-dim);margin:0 0 4px;line-height:1.55}
+  .vs-mid{display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:22px;color:var(--txt-faint);font-weight:700}
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:12px 0}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px 16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .kpi::after{content:"";position:absolute;top:0;right:0;width:32px;height:32px;background:radial-gradient(circle at top right, rgba(139,58,31,.08), transparent 70%)}
+  .kpi .num{font-family:var(--serif);font-size:30px;font-weight:700;line-height:1;color:var(--brand);letter-spacing:-1px;font-variant-numeric:tabular-nums}
+  .kpi .num small{font-size:18px;color:var(--txt-faint);font-weight:500;margin-left:2px}
+  .kpi .lbl{font-size:11px;color:var(--txt-dim);margin-top:5px;letter-spacing:.3px;font-weight:600}
+  .kpi .sub{font-size:10px;color:var(--txt-faint);margin-top:2px;font-family:var(--mono)}
+  .kpi.accent .num{color:var(--accent)}
+  .kpi.good .num{color:var(--good)}
+  .kpi.gold .num{color:var(--gold)}
+  .code-block{background:var(--code-bg);color:var(--code-fg);border-radius:10px;padding:13px 16px;font-family:var(--mono);font-size:11.5px;line-height:1.65;overflow-x:auto;white-space:pre;box-shadow:var(--shadow);margin:10px 0}
+  .code-block .hash{color:#D6B86C}
+  .code-block .cm{color:#7B8B98;font-style:italic}
+  .code-block .ad{color:#9AC58D}
+  .code-block .rm{color:#C7958A}
+  hr.div{height:1px;background:var(--line);margin:26px 0;border:none}
+  [id]{scroll-margin-top:24px}
+  code{font-family:var(--mono);font-size:11.5px;background:var(--bg-soft);padding:1px 5px;border-radius:3px;color:var(--accent)}
+  .shot-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:12px 0}
+  .shot{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:var(--shadow);transition:.2s}
+  .shot:hover{transform:translateY(-2px);box-shadow:0 22px 50px -28px rgba(60,40,20,.42)}
+  .shot .img-wrap{height:230px;background:#f1f5f9;display:flex;align-items:flex-start;justify-content:center;overflow:hidden;position:relative}
+  .shot img{max-width:100%;width:100%;height:auto;object-fit:cover;object-position:top}
+  .shot .cap{padding:9px 11px;font-size:11px;color:var(--txt-dim);background:#FAFAF7;border-top:1px solid var(--line);line-height:1.5}
+  .shot .cap .title{font-weight:700;color:var(--txt);display:block;margin-bottom:2px}
+  .lightbox{position:fixed;inset:0;background:rgba(24,18,12,.92);z-index:1000;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:30px;cursor:zoom-out}
+  .lightbox img{max-width:96vw;max-height:88vh;border-radius:6px;box-shadow:0 32px 80px rgba(0,0,0,.5)}
+  .lightbox .hint{color:#bbb;font-family:var(--mono);font-size:11px;letter-spacing:1.5px}
+  .collapse{border:1px solid var(--line);border-radius:11px;background:var(--panel);box-shadow:var(--shadow);margin:10px 0;overflow:hidden}
+  .collapse-head{padding:11px 16px;cursor:pointer;background:var(--bg-soft);display:flex;align-items:center;gap:10px;font-size:12.5px;font-weight:600;color:var(--txt);user-select:none;transition:.18s}
+  .collapse-head:hover{background:#EBE5D5}
+  .collapse-head .arrow{margin-left:auto;font-family:var(--mono);transition:.2s;font-size:12px;color:var(--txt-faint)}
+  .collapse.open .collapse-head .arrow{transform:rotate(90deg)}
+  .collapse-body{display:none;padding:14px 18px;border-top:1px solid var(--line)}
+  .collapse.open .collapse-body{display:block}
+  .pbar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--bg-soft);border:1px solid var(--line);margin:4px 0 2px}
+  .pbar .seg.ok{background:var(--good)}
+  .pbar-meta{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--txt-faint);margin-bottom:6px}
+  .doc-footer{margin-top:38px;padding:18px 22px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(135deg,#FAF6EC,#F4F0E5);box-shadow:var(--shadow)}
+  .doc-footer h3{margin:0 0 10px}
+  .doc-footer .row{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;color:var(--txt-faint);letter-spacing:.5px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+  ol, ul{margin:6px 0 10px 18px;font-size:12.4px;color:var(--txt-dim);line-height:1.75}
+  ol li, ul li{margin-bottom:3px}
+  @media(max-width:1080px){.g3{grid-template-columns:1fr 1fr}.kpi-row{grid-template-columns:1fr 1fr}.vs{grid-template-columns:1fr}.vs-mid{padding:6px 0;font-size:18px}.shot-grid{grid-template-columns:1fr}.main{padding:24px 18px 60px}}
+  @media(max-width:760px){.side{position:relative;width:100%;height:auto}.main{margin-left:0;padding:20px 14px 50px}.kpi-row,.g2,.g3{grid-template-columns:1fr}.hero h1{font-size:24px}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">
+      <div class="mark">v2</div>
+      <div><b>v2.0 真实验证 + 修复</b><span>2026-06-10</span></div>
+    </div>
+    <div class="meta">5 步执行 · 14 bug 修复 · 367 测试绿</div>
+    <nav>
+      <div class="grp">概览</div>
+      <a href="#kpi"><span class="n">§1</span> 速览数字</a>
+      <a href="#shots"><span class="n">§2</span> 真实截图</a>
+      <a href="#steps"><span class="n">§3</span> 5 步执行</a>
+      <div class="grp">修复</div>
+      <a href="#m4bugs"><span class="n">§4</span> M4 两个真 bug</a>
+      <a href="#tests"><span class="n">§5</span> 测试：6 新 + 12 修</a>
+      <a href="#m13"><span class="n">§6</span> M1#3 发送修复</a>
+      <div class="grp">收束</div>
+      <a href="#honest"><span class="n">§7</span> 诚实分级</a>
+      <a href="#commits"><span class="n">§8</span> 提交档案</a>
+      <a href="#signoff"><span class="n">§9</span> 签核</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="hero">
+      <div class="tag-row">
+        <span class="b-pill inf lg">5 步真实验证</span>
+        <span class="b-pill br lg">14 bug 修复</span>
+        <span class="b-pill ok lg">后端 367 passed · 0 failed</span>
+        <span class="b-pill mid lg">本地提交 · 未推</span>
+      </div>
+      <h1>v2.0 真实验证 + Bug 修复报告</h1>
+      <p class="sub">承接 <code>test-report-2026-06-10-v2-status.html</code> §9 五步计划，把「代码已落但单测/真实接口未跑」的诚实缺口逐一补齐 —— 过程中查出并修复 <b>M4 部署 API 完全不可用</b>的两个真 bug，新增 6 套单测、修复 12 例历史 stale 测试（后端套 0 失败），并修掉 M1#3「落地页点发送静默丢弃」。所有结论按证据分级，附 4 张真浏览器截图，绝不补拍不存在的界面。</p>
+      <div class="meta-row">
+        <span>报告时间 <b>2026-06-10 · 上海</b></span>
+        <span>分支 <b>feature/v2-status/m1-m3-m4-impl</b></span>
+        <span>本会话提交 <b>eb9663e → 8187fe2（5 个）</b></span>
+        <span>产出者 <b>袁</b></span>
+      </div>
+    </div>
+
+    <!-- §1 -->
+    <div id="kpi">
+      <div class="sec-head">
+        <div class="tag">§1 速览</div>
+        <h2>四个数字看完整盘</h2>
+        <p>本会话不是「再写代码」，而是「把上一会话写的代码真跑起来验证」—— 真跑才查出 M4 整条 API 不可达。所有提交在本地，未推（遵守「别擅自 push」）。</p>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi"><div class="num">5<small>/5</small></div><div class="lbl">计划步骤执行</div><div class="sub">4 完整 · 1 部分(M1#3)</div></div>
+        <div class="kpi good"><div class="num">367</div><div class="lbl">后端测试通过 · 0 失败</div><div class="sub">含 6 新 + 12 历史修复</div></div>
+        <div class="kpi accent"><div class="num">14</div><div class="lbl">bug / 缺口修复</div><div class="sub">M4×2 · 测试×12 · M1#3×1 (含回归)</div></div>
+        <div class="kpi gold"><div class="num">4</div><div class="lbl">真浏览器截图</div><div class="sub">M1#1 · M1#3×2 · M4 预览</div></div>
+      </div>
+      <div class="grid g2" style="margin-top:14px">
+        <div class="card bad">
+          <h4>最关键发现：M4 之前根本不可用</h4>
+          <p style="margin-top:4px">「编译过 + pytest 绿」都查不出的两个真 bug：① 部署路由从未注册（全 404）；② 后台任务复用请求 session 致永久卡 queued。真跑 live 才暴露，已修 + 闭环验证通过。</p>
+        </div>
+        <div class="card brand">
+          <h4>后端测试：12 failed → 0 failed</h4>
+          <div class="pbar-meta"><span>全后端套</span><span>367 / 369（2 skipped）</span></div>
+          <div class="pbar"><div class="seg ok" style="width:100%"></div></div>
+          <p style="font-size:11.5px;color:var(--txt-faint);margin-top:6px">6 套新单测 + 12 例历史 stale 测试对齐现设计，全绿。</p>
+        </div>
+      </div>
+    </div>
+
+    <hr class="div">
+
+    <!-- §2 -->
+    <div id="shots">
+      <div class="sec-head">
+        <div class="tag">§2 真实验证</div>
+        <h2>四张真浏览器截图</h2>
+        <p>Playwright 驱动 Chromium 跑 vite(:3000) + 后端容器(:8200)。每张都是真实运行界面，<b>非补拍</b>。</p>
+      </div>
+      <div class="shot-grid">
+        <div class="shot">
+          <div class="img-wrap"><img src="../deliverables/screenshots/v2-live-m1-1-three-panel.png" alt="M1#1 三栏 + 会话回灌"></div>
+          <div class="cap"><span class="title">M1#1 · 私聊死路修复（live）</span>36 个后端会话全部回灌进左栏「私聊」（每条标「已恢复会话」），三栏布局 + 空态 CTA 正常，无白屏。证实上一会话两个运行期 bug（DTO 字段序 + LeftPanel TDZ）已修。</div>
+        </div>
+        <div class="shot">
+          <div class="img-wrap"><img src="../deliverables/screenshots/v2-live-m1-3-message-actions.png" alt="M1#3 消息操作"></div>
+          <div class="cap"><span class="title">M1#3 · 消息操作（live，选中会话）</span>选中「对话 1」发消息 → 用户气泡 + Agent 气泡（WS 真实 round-trip 回话），每条带<b>置顶 / 回复 / 删除</b>消息操作按钮。M1#3 核心功能可用。</div>
+        </div>
+        <div class="shot">
+          <div class="img-wrap"><img src="../deliverables/screenshots/v2-live-m1-3-landing-send-fixed.png" alt="M1#3 落地页发送修复"></div>
+          <div class="cap"><span class="title">M1#3 · 落地页直接发（修复后）</span>修复前：落地页（无预选会话）点发送 0 请求、不渲染。修复后：自动建「对话 29」+ 渲染用户气泡 + 后端真实 round-trip（Agent「Drafting…」）。</div>
+        </div>
+        <div class="shot">
+          <div class="img-wrap"><img src="../deliverables/screenshots/v2-live-m4-deployed-preview.png" alt="M4 部署预览"></div>
+          <div class="cap"><span class="title">M4 · 部署产物真浏览器打开</span>POST 部署 → ready → 真浏览器打开 <code>/preview/{id}/</code> 渲染出部署的静态站点。配合 curl 实测：<code>/preview/{id}/index.html</code> 返 200 + 真实 HTML，package 返真 zip。</div>
+        </div>
+      </div>
+    </div>
+
+    <hr class="div">
+
+    <!-- §3 -->
+    <div id="steps">
+      <div class="sec-head">
+        <div class="tag">§3 执行</div>
+        <h2>5 步计划逐步落地</h2>
+      </div>
+      <div class="tl">
+        <div class="tl-item gd">
+          <h5>① 起数据库 + 跑迁移 <span class="b-pill ok">完成</span></h5>
+          <p>postgres/redis 在跑；DB <code>alembic_version=0024</code>（即 head，无 pending），<code>sessions.archived</code> 列 + <code>ix_sessions_archived</code> 索引已在库。</p>
+          <p class="when">验证手段：psql \d sessions + alembic_version 查询</p>
+        </div>
+        <div class="tl-item gd">
+          <h5>② 补 6 套单测 <span class="b-pill ok">完成 · 全绿</span></h5>
+          <p>归档持久化 / 路径穿越 + 静态托管 / 非 git 降级 / pptx 三路径 / 启发式抽取；并修 4 例被 M4 异步改造打破的 deploy 回归。</p>
+          <p class="when">21 个新用例 + deploy 16 例全绿</p>
+        </div>
+        <div class="tl-item wn">
+          <h5>③ 起前端 + M1#3 E2E <span class="b-pill mid">部分 → 修复</span></h5>
+          <p>vite(:3000) + 后端(:8200) 真浏览器：M1#1 验过 + 截图。M1#3 一度判「阻塞」（实为测试方法问题：未选会话），定位为真 bug 后修复，落地页/选中会话两路径均验过 + 截图。</p>
+          <p class="when">3 张 M1 截图 + 真实 WS round-trip</p>
+        </div>
+        <div class="tl-item gd">
+          <h5>④ M4 部署链路 live 验证 <span class="b-pill ok">完成 · 真闭环</span></h5>
+          <p>过程查出 2 个真 bug（见 §4），修复后：static_site POST→ready→<code>/preview/{id}/index.html</code> 200 + 真实 HTML；package→真 zip（含 app.js + index.html）。</p>
+          <p class="when">curl 实测全链路 + 真浏览器打开预览</p>
+        </div>
+        <div class="tl-item gd">
+          <h5>⑤ 整理 + 提交 <span class="b-pill ok">本地完成 · 等推</span></h5>
+          <p>5 个 commit 落本地分支，未推（遵守「别擅自 push」）。报告 + STATUS + worklog + 截图同步。</p>
+          <p class="when">eb9663e → 8187fe2</p>
+        </div>
+      </div>
+    </div>
+
+    <hr class="div">
+
+    <!-- §4 -->
+    <div id="m4bugs">
+      <div class="sec-head">
+        <div class="tag">§4 核心修复</div>
+        <h2>M4 部署：两个真 bug 让整条 API 此前不可用</h2>
+        <p>这两个 bug 是「真跑」才暴露的 —— 单测在同一事件循环里同步驱动，恰好绕过了它们；只有真 HTTP 请求 + 独立后台任务才触发。</p>
+      </div>
+      <div class="vs">
+        <div class="vs-col old">
+          <h4>Bug ① 路由从未注册</h4>
+          <p><code>main.py</code> 注册了十几个 router，却<b>漏了 <code>deploy.router</code></b>。</p>
+          <p>结果：所有 <code>POST/GET /api/deployments</code> 返 <b>404</b>，部署 API 整条不可达 —— 前端部署面板再正确也调不通。</p>
+          <p style="color:var(--bad);font-size:11px;margin-top:6px">「pytest 绿」查不出：单测直接调 service，不过 HTTP 路由</p>
+        </div>
+        <div class="vs-mid">→</div>
+        <div class="vs-col new">
+          <h4>Bug ② 后台任务复用请求 session</h4>
+          <p><code>start()</code> 用 <code>asyncio.create_task</code> 起后台推进，但复用了<b>请求作用域 DB session</b>。</p>
+          <p>请求一返回，session 即关闭 → 后台首个 <code>save</code> 失败 → 部署<b>永久卡 queued</b>、<code>/preview</code> 永远 404。</p>
+          <p style="color:var(--good);font-size:11px;margin-top:6px">修法：后台开独立 <code>session_factory()</code>（沿用 coordinator_run/ws 范式）+ 持 task 强引用防 GC</p>
+        </div>
+      </div>
+      <div class="mermaid-wrap">
+        <div class="cap">修复前后 · 部署闭环</div>
+        <pre class="mermaid">
+graph LR
+    subgraph BEFORE["修复前 — 不可用"]
+        B1["POST /api/deployments"] --> B2{"路由注册?"}
+        B2 -->|"否 → 404"| B3["整条 API 不可达"]
+    end
+    subgraph AFTER["修复后 — 真闭环"]
+        A1["POST → 202 queued"] --> A2["后台独立 session 推进"]
+        A2 --> A3["落盘 _assets/deploy/{id}/"]
+        A3 --> A4["mark_ready + 真 URL"]
+        A4 --> A5["GET /preview/{id}/ → 200 + 真 HTML"]
+    end
+    style BEFORE fill:#FBEEEA,stroke:#9C3A2E
+    style AFTER fill:#EFF3EA,stroke:#3F6B3D
+        </pre>
+      </div>
+      <div class="note good">
+        <span class="ico">✓</span>
+        <span><b>live 实测证据</b>：<code>POST /api/deployments</code>（static_site）→ 轮询 <code>ready</code>，<code>preview_url=http://127.0.0.1:8000/preview/&lt;uuid&gt;/</code>；<code>GET /preview/&lt;uuid&gt;/index.html</code> 返 <b>HTTP 200 + 真实 HTML</b>。package 目标 → download_url 返真 zip（容器内校验含 app.js + index.html）。</span>
+      </div>
+    </div>
+
+    <hr class="div">
+
+    <!-- §5 -->
+    <div id="tests">
+      <div class="sec-head">
+        <div class="tag">§5 测试</div>
+        <h2>6 套新单测 + 12 例历史修复 = 后端 0 失败</h2>
+        <p>新单测覆盖本期 M1/M3/M4 后端；历史 12 例是「代码已重构、测试未同步」的 stale 测试（同 TD-14 口径），对齐现设计后转绿。</p>
+      </div>
+      <h3><span class="dot"></span>6 套新单测（21 用例，全绿）</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>套</th><th>覆盖</th><th>关键断言</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">test_session_archived</td><td>M1#2 归档持久化</td><td>set True/False 落库 · 默认 False · 不破坏 pinned/title</td></tr>
+            <tr><td class="mono">test_static_host（穿越）</td><td>M4 路径穿越防御</td><td>拒 <code>..</code>/绝对路径/空键 · _safe_id 拒非法 id</td></tr>
+            <tr><td class="mono">test_static_host（托管）</td><td>M4 静态托管</td><td>真落盘 · 真 /preview/ URL · 真 zip · remove 清理</td></tr>
+            <tr><td class="mono">test_fs_endpoints_v2（pptx）</td><td>M3-B 抽页三路径</td><td>400 空 path · 404 不存在 · 415 非 pptx</td></tr>
+            <tr><td class="mono">test_fs_endpoints_v2（git）</td><td>M3-C 非 git 降级</td><td>非 git → is_git=False + 空列表 · file-at-rev 404</td></tr>
+            <tr><td class="mono">test_agent_draft</td><td>M1#4 启发式抽取</td><td>role/skills 命中 · 无关键词降级 · name 截断</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3><span class="dot"></span>12 例历史 stale 测试 · 根因与修法</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th style="width:200px">失败测试</th><th style="width:60px">数</th><th>根因（代码已变，测试未同步）</th><th>修法</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">test_chat_service<br>reflex_control_*</td><td class="center">9</td><td><code>ChatService._is_control</code>（v3 前门机械反射）已被 v4 ReactiveRouter 的 LLM <code>route_message</code> 取代（含「停一下不算 cancel」语义细分）</td><td class="ok">移除已废行为的 9 例</td></tr>
+            <tr><td class="mono">test_pi_agent_e2e<br>subprocess_lifecycle</td><td class="center">1</td><td><code>PiAgentRuntime.__init__</code> 签名变更：去掉 model/provider/api_key/base_url</td><td class="ok">改用现签名 agent_id/agent_name/timeout</td></tr>
+            <tr><td class="mono">test_pin_session_ownership<br>other_user_403 / anonymous_401</td><td class="center">2</td><td>pin 端点 repo-wide（main 与本分支一致）已改「不强制鉴权 + 不强制 owner」—— pin 是个人偏好</td><td class="ok">403 例→「任意 user 可 pin」；401 例移除（服务层 4 路径覆盖）</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note info">
+        <span class="ico">i</span>
+        <span><b>设计提示（需你知悉）</b>：pin 端点的「无鉴权」是 repo-wide 的明确产品决策（前端无登录流程，强行要求 JWT 会让功能不可用），并非本次引入。若后续要求 pin 必须登录/本人，那是一次独立的<b>代码</b>变更，不是测试问题。</span>
+      </div>
+    </div>
+
+    <hr class="div">
+
+    <!-- §6 -->
+    <div id="m13">
+      <div class="sec-head">
+        <div class="tag">§6 M1#3</div>
+        <h2>消息发送：落地页静默丢弃 → 兜底建会话</h2>
+      </div>
+      <div class="vs">
+        <div class="vs-col old">
+          <h4>修复前</h4>
+          <p><code>CenterPanel</code> 在 <code>activeConversationId=null</code> 时仍 fallback 到 <code>agents[0]</code> 渲染 ChatView。</p>
+          <p>而 <code>onSend</code> 头一行 <code>if (!activeConversationId) return</code> 直接静默返回。</p>
+          <p style="color:var(--bad);font-size:11px;margin-top:6px">落地页「直接发你想聊的」点发送 → 0 请求、输入清空、无气泡</p>
+        </div>
+        <div class="vs-mid">→</div>
+        <div class="vs-col new">
+          <h4>修复后</h4>
+          <p>新增 <code>ensureConversation()</code>：无活动会话则 <code>addConversation</code> + <code>openConversation</code> 建一个再发。</p>
+          <p>空态文案本就邀请「直接发」，行为终于和文案一致。</p>
+          <p style="color:var(--good);font-size:11px;margin-top:6px">落地页直接发 → 建会话 + 渲染气泡 + 后端真实 round-trip（见 §2 截图三）</p>
+        </div>
+      </div>
+      <div class="note warn">
+        <span class="ico">!</span>
+        <span><b>诚实更正</b>：上一份报告把 M1#3 标为「阻塞、无法触发」是<b>我的测试方法错误</b> —— 当时未点选会话就发送。真相是：选中会话时 M1#3 一直可用（WS 回话 + pin/reply/delete 按钮齐全）；只有落地页无会话这一路径有真 bug，现已修。</span>
+      </div>
+      <div class="note bad">
+        <span class="ico">!</span>
+        <span><b>仍存在的后端环境问题（与本前端修复无关）</b>：容器内 Claude CLI 以 root 运行，报 <code>--dangerously-skip-permissions cannot be used with root/sudo</code>，导致部分真实 agent 回话是错误内容。WS 管线本身已通（agent 能回「Drafting…」/错误信息）。这是后端容器<b>运行环境配置</b>问题，建议后续以非 root 用户跑 CLI 或调整 flag。</span>
+      </div>
+    </div>
+
+    <hr class="div">
+
+    <!-- §7 -->
+    <div id="honest">
+      <div class="sec-head">
+        <div class="tag">§7 诚实分级</div>
+        <h2>做到了什么 · 没做到什么</h2>
+        <p>按「严禁伪造证据」：编译过 ≠ 单测过 ≠ 真实接口验过 ≠ 视觉截图。逐项据实标。</p>
+      </div>
+      <div class="grid g2">
+        <div class="card good">
+          <h4>已达成（真证据）</h4>
+          <div class="chip-row" style="margin-top:6px">
+            <span class="chip gd">后端 367 测试 0 失败</span>
+            <span class="chip gd">M4 闭环 live 200 + 真 HTML</span>
+            <span class="chip gd">M4 package 真 zip</span>
+            <span class="chip gd">M1#1 真浏览器 + 截图</span>
+            <span class="chip gd">M1#3 两路径真浏览器 + 截图</span>
+            <span class="chip gd">DB 0024 列/索引在库</span>
+          </div>
+        </div>
+        <div class="card warn">
+          <h4>未达成 / 受限（据实标）</h4>
+          <div class="chip-row" style="margin-top:6px">
+            <span class="chip wn">CLI 以 root 跑 → agent 回话报错（后端环境）</span>
+            <span class="chip wn">M3-B/C 仅端点验证（缺 python-pptx/git 真出片）</span>
+            <span class="chip wn">M3-A 纯前端 prompt 组装未走 UI</span>
+            <span class="chip wn">M4 修复 docker cp 进 live 容器，永久生效需重建镜像</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <hr class="div">
+
+    <!-- §8 -->
+    <div id="commits">
+      <div class="sec-head">
+        <div class="tag">§8 提交</div>
+        <h2>本会话 5 个提交 · 本地未推</h2>
+      </div>
+      <div class="collapse open">
+        <div class="collapse-head"><span>提交时序（逆序）</span><span class="b-pill br">展开</span><span class="arrow">▶</span></div>
+        <div class="collapse-body">
+<div class="code-block"><span class="hash">8187fe2</span> fix(v2-status): M1#3 发送空会话兜底 <span class="cm">(落地页直接发不再静默丢弃 + 2 截图)</span>
+<span class="hash">48b4002</span> test(backend): 修复 12 例历史 stale 测试 <span class="cm">(367 passed / 0 failed)</span>
+<span class="hash">a9f551a</span> docs(v2-status): 5 步真实验证结果 + 证据 <span class="cm">(report/STATUS/worklog/截图)</span>
+<span class="hash">42aae98</span> fix(v2-status): 前端运行期修复 <span class="cm">(LeftPanel TDZ 白屏 + M1#4/M3 接线)</span>
+<span class="hash">eb9663e</span> fix(v2-status): M4 deploy 闭环修复 + 6 套单测 + 修 deploy 回归</div>
+        </div>
+      </div>
+      <div class="note info">
+        <span class="ico">i</span>
+        <span>所有提交在 <code>feature/v2-status/m1-m3-m4-impl</code>，本地未推。M4 两个修复的源码已入 commit；live 容器是 <code>docker cp</code> 临时生效，<b>永久生效需重建镜像</b>。待落 ADR-0019 记录这两个 M4 修复。</span>
+      </div>
+    </div>
+
+    <!-- §9 -->
+    <div id="signoff" class="doc-footer">
+      <h3 style="font-family:var(--serif);font-size:18px;font-weight:700;color:var(--txt);margin:0 0 12px">§9 签核与下一步</h3>
+      <div class="grid g2">
+        <div class="card hl" style="box-shadow:none">
+          <h4>签核</h4>
+          <p style="font-size:12px;line-height:1.75"><b>产出者</b> · 袁（xiangbianpangde）<br><b>验收者</b> · 等用户验收后推<br><b>验证档级</b> · 后端 367 测试全绿 · M4 闭环 live 验过 · 4 张真浏览器截图 · 受限项据实标</p>
+        </div>
+        <div class="card brand" style="box-shadow:none">
+          <h4>等你决定</h4>
+          <ol style="margin:6px 0 0 18px;font-size:12px;color:var(--txt-dim);line-height:1.75">
+            <li>是否 <b>push</b> 这 5 个 commit（含 M4/M1#3/测试修复）</li>
+            <li>M4 修复是否<b>重建后端镜像</b>让其永久生效</li>
+            <li>容器 Claude CLI <b>非 root 运行</b>修复（让 agent 真回话）</li>
+            <li>是否落 <b>ADR-0019</b> 记录 M4 两个修复</li>
+          </ol>
+        </div>
+      </div>
+      <div class="note good" style="margin:14px 0 0">
+        <span class="ico">✓</span>
+        <span><b>验收结论</b> · 5 步计划执行：4 完整 + 1 部分(M1#3 已转修复)。后端 12 failed → 0 failed（367 passed）。M4 两个致命 bug 已修 + 闭环 live 验证。M1#3 落地页发送已修。4 张真截图、0 张假证据。<b>代码就绪 · 等用户拍板 push。</b></span>
+      </div>
+      <div class="row">
+        <span>v2.0 真实验证 + Bug 修复报告 · 2026-06-10 上海 · 作者 袁</span>
+        <span>分支 feature/v2-status/m1-m3-m4-impl · HEAD 8187fe2</span>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>
