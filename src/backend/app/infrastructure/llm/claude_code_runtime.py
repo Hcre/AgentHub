@@ -28,6 +28,7 @@ import signal
 import tempfile
 import uuid
 from collections.abc import AsyncIterator
+from contextlib import suppress
 from functools import partial
 
 from app.core.config import settings
