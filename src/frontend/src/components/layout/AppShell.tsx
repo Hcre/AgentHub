@@ -31,6 +31,19 @@ export function AppShell() {
   const showRight = (inChat || section === 'group') && !rightPanelCollapsed
   const showLeftExpand = inChat && sidebarCollapsed
 
+  // ⌘B / Ctrl+B：折叠/展开预览侧边栏
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+        e.preventDefault()
+        e.stopPropagation()
+        useUIStore.getState().toggleRightPanel()
+      }
+    }
+    window.addEventListener('keydown', onKey, { capture: true })
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
+  }, [])
+
   // 移动端：抽屉打开时 Esc 关闭
   const [mobileLeftOpen, setMobileLeftOpen] = useState(false)
   const [mobileRightOpen, setMobileRightOpen] = useState(false)
