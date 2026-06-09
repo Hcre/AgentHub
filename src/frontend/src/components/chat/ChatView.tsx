@@ -7,7 +7,6 @@ import { useWebSocket } from '../../hooks/useWebSocket'
 import { Composer, type ComposerHandle } from './Composer'
 import { MessageBubble } from './MessageBubble'
 import { TypingIndicator } from './TypingIndicator'
-import { TerminalPanel } from './TerminalPanel'
 import { Icon } from '../ui'
 import type { Agent, ChatMessage, ReplyRef } from '../../types'
 
@@ -27,8 +26,6 @@ export function ChatView({ agent }: { agent: Agent }) {
   const [isAtBottom, setIsAtBottom] = useState(true)
   // 用户主动滚走后，新消息到来的计数（点 ↓ 时清零）
   const [pendingCount, setPendingCount] = useState(0)
-  const [showTerminal, setShowTerminal] = useState(false)
-
   const key = activeConversationId ? convKey(agent.id, activeConversationId) : null
   const list = key ? (messages[key] ?? []) : []
   const isTyping = key ? (typing[key] ?? false) : false
@@ -172,32 +169,18 @@ export function ChatView({ agent }: { agent: Agent }) {
             <span>回到最新</span>
           </button>
         )}
-        {/* 底部操作栏：终端 + 工作空间 */}
-        <div className="flex items-center justify-between gap-3 py-0.5">
-          <div className="flex items-center gap-1.5">
-            <Icon name="sparkle" className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
-            {workspacePath ? (
-              <span className="truncate text-[11px] text-muted-foreground">📁 {workspacePath}</span>
-            ) : (
-              <span className="text-[11px] text-muted-foreground/60">未设置工作目录</span>
-            )}
-          </div>
-          {sessionId && (
-            <button
-              type="button"
-              onClick={() => setShowTerminal(!showTerminal)}
-              title="toggle CLI log terminal"
-              className="flex items-center gap-1 rounded px-2 py-0.5 text-[11px] text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <Icon name="terminal" className="h-3 w-3" />
-              终端
-            </button>
+        {/* 工作空间 */}
+        <div className="flex items-center gap-1.5 py-0.5">
+          <Icon name="sparkle" className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+          {workspacePath ? (
+            <span className="truncate text-[11px] text-muted-foreground">📁 {workspacePath}</span>
+          ) : (
+            <span className="text-[11px] text-muted-foreground/60">未设置工作目录</span>
           )}
         </div>
       </div>
 
       <Composer ref={composerRef} agent={agent} onSend={onSend} onCreateSkill={handleCreateSkill} />
-      {showTerminal && sessionId && <TerminalPanel sessionId={sessionId} onClose={() => setShowTerminal(false)} />}
     </div>
   )
 }

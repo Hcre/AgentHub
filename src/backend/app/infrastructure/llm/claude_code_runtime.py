@@ -45,8 +45,7 @@ from app.infrastructure.llm.claude_code_process_pool import (
     ProcessHandle,
     get_pool,
 )
-from app.infrastructure.llm.cli_logger import get_log_path, spawn_visible_terminal
-from app.infrastructure.llm.process_registry import save_spawn_info
+from app.infrastructure.llm.cli_logger import get_log_path
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +127,9 @@ class ClaudeCodeRuntime(AgentRuntime):
         request = self._merge_delta_into_system_prompt_v0(request)
         prompt = self._extract_prompt(request)
         resume = request.has_history
-        logger.info("Session %s has_history=%s → %s", session_key, resume, "resume" if resume else "new")
+        logger.info(
+            "Session %s has_history=%s → %s", session_key, resume, "resume" if resume else "new"
+        )
         resume_gen = self._run_cli(prompt, request, session_key, resume=resume)
         async for event in resume_gen:
             if resume and (
@@ -165,8 +166,8 @@ class ClaudeCodeRuntime(AgentRuntime):
             return
         for send, grace in (
             (lambda: proc.send_signal(signal.SIGINT), 2.0),  # Ctrl+C
-            (proc.terminate, 2.0),                            # SIGTERM
-            (proc.kill, 2.0),                                 # SIGKILL 兜底
+            (proc.terminate, 2.0),  # SIGTERM
+            (proc.kill, 2.0),  # SIGKILL 兜底
         ):
             try:
                 send()
@@ -193,14 +194,12 @@ class ClaudeCodeRuntime(AgentRuntime):
         import subprocess as _sub
 
         if platform.system() == "Windows":
-            try:
+            with suppress(Exception):
                 _sub.run(
                     ["taskkill", "/F", "/T", "/PID", str(pid)],
                     capture_output=True,
                     timeout=10,
                 )
-            except Exception:
-                pass
         else:
             with suppress(Exception):
                 os.kill(pid, 9)
@@ -387,7 +386,6 @@ class ClaudeCodeRuntime(AgentRuntime):
                 env=env,
                 cwd=cwd,
             )
-            save_spawn_info(str(request.session_id), cmd=cmd, env=env, cwd=cwd, prompt_text=prompt)
         except FileNotFoundError:
             yield StreamEvent(
                 type=StreamEventType.ERROR,
@@ -402,11 +400,6 @@ class ClaudeCodeRuntime(AgentRuntime):
                 content=f"⚠️ Claude CLI 启动失败: {exc}",
             )
             return
-
-        # 尝试打开可见终端用于调试；失败静默回退 headless 模式
-        ok = spawn_visible_terminal(cmd, env, cwd, session_key, prompt)
-        if not ok:
-            logger.debug("Visible terminal unavailable for session=%s, continuing headless", session_key)
 
         assert self._process.stdin is not None
         self._process.stdin.write(prompt.encode())
@@ -632,9 +625,16 @@ class ClaudeCodeRuntime(AgentRuntime):
                     )
                     seq += 1
                 elif block_type == "thinking":
-                    # 扩展思考的内部推理块：不投递给用户（答案在随后的 text block）。
-                    # 预期行为，debug 级即可，不该用 warning 制造"数据丢失"错觉。
-                    logger.debug("跳过 thinking block (has_signature=%s)", bool(block.get("signature")))
+                    thinking_text = block.get("thinking", "")
+                    if thinking_text:
+                        events.append(
+                            StreamEvent(
+                                type=StreamEventType.THINKING,
+                                seq=seq,
+                                content=thinking_text,
+                            )
+                        )
+                        seq += 1
                 else:
                     # 真正未知的 block 类型才告警——可能是新协议字段，需排查。
                     preview = block.get("text") or block
@@ -666,7 +666,9 @@ class ClaudeCodeRuntime(AgentRuntime):
                     # content 可能是 string 或 list[{type,text}] → 统一转 string
                     if isinstance(raw_content, list):
                         raw_content = "\n".join(
-                            c.get("text", "") for c in raw_content if isinstance(c, dict) and c.get("type") == "text"
+                            c.get("text", "")
+                            for c in raw_content
+                            if isinstance(c, dict) and c.get("type") == "text"
                         )
                     elif not isinstance(raw_content, str):
                         raw_content = str(raw_content) if raw_content is not None else None

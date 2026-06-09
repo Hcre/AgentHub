@@ -15,6 +15,7 @@ import logging
 import os
 import re
 import shutil
+import tempfile
 from collections.abc import AsyncIterator
 from contextlib import suppress
 from datetime import UTC, datetime
@@ -28,7 +29,7 @@ from app.domain.llm.protocol import (
     ToolCall,
     ToolResult,
 )
-from app.infrastructure.llm.cli_logger import get_log_path, spawn_visible_terminal
+from app.infrastructure.llm.cli_logger import get_log_path
 
 logger = logging.getLogger(__name__)
 
@@ -104,8 +105,7 @@ class PiAgentRuntime(AgentRuntime):
         self._permission_mode = "bypassPermissions"
         self._max_turns = 10
 
-        self._session_dir = ""  # Pi CLI manages its own session directory
-        Path(self._session_dir).mkdir(parents=True, exist_ok=True)
+        self._session_dir = tempfile.mkdtemp(prefix="pi_agent_")
 
         self._process: asyncio.subprocess.Process | None = None
 
@@ -168,21 +168,7 @@ class PiAgentRuntime(AgentRuntime):
             )
             return
 
-        # 尝试打开可见终端用于调试；失败静默回退 headless 模式
-        ok = spawn_visible_terminal(cmd, env, cwd, session_key, prompt)
-        if not ok:
-            logger.debug("Visible terminal unavailable for session=%s, continuing headless", session_key)
-
         prompt_cmd = json.dumps({"type": "prompt", "message": prompt}) + "\n"
-        from app.infrastructure.llm.process_registry import save_spawn_info
-
-        save_spawn_info(
-            str(request.session_id),
-            cmd=cmd,
-            env=env,
-            cwd=cwd,
-            prompt_text=prompt_cmd,
-        )
         assert self._process.stdin is not None
         assert self._process.stdout is not None
 
@@ -289,14 +275,12 @@ class PiAgentRuntime(AgentRuntime):
         import subprocess as _sub
 
         if platform.system() == "Windows":
-            try:
+            with suppress(Exception):
                 _sub.run(
                     ["taskkill", "/F", "/T", "/PID", str(pid)],
                     capture_output=True,
                     timeout=10,
                 )
-            except Exception:
-                pass
         else:
             with suppress(Exception):
                 os.kill(pid, 9)
@@ -311,6 +295,7 @@ class PiAgentRuntime(AgentRuntime):
             return pi
         # fallback: 检查本地 clone（跨平台脚本）
         import platform
+
         local_dir = Path(__file__).parent.parent.parent.parent.parent.parent / "pi-agent"
         if platform.system() == "Windows":
             for ext in (".cmd", ".bat", ".ps1", ".sh"):
@@ -323,7 +308,9 @@ class PiAgentRuntime(AgentRuntime):
                 return str(local)
         return "pi"  # 最后 fallback
 
-    def _build_cmd(self, session_file: str, request: AgentRequest, sp: str | None = None) -> list[str]:
+    def _build_cmd(
+        self, session_file: str, request: AgentRequest, sp: str | None = None
+    ) -> list[str]:
         cmd = [
             self._pi_binary(),
             "--mode",
@@ -534,7 +521,11 @@ class PiAgentRuntime(AgentRuntime):
                 details = raw.get("details", {})
                 if isinstance(details, dict) and details.get("truncation"):
                     full_path = details.get("fullOutputPath", "")
-                    content_str += f"\n\n[输出已截断，完整内容: {full_path}]" if full_path else "\n\n[输出已截断]"
+                    content_str += (
+                        f"\n\n[输出已截断，完整内容: {full_path}]"
+                        if full_path
+                        else "\n\n[输出已截断]"
+                    )
                 if not content_str:
                     content_str = json.dumps(raw, ensure_ascii=False)
             elif isinstance(raw, str):
@@ -730,7 +721,11 @@ class PiAgentRuntime(AgentRuntime):
 
         elif delta_type == "toolcall_delta":
             # 工具调用参数增量 — 暂不单独产出事件，最终由 toolcall_end 产出完整 TOOL_CALL
-            logger.debug("Pi toolcall_delta: call_id=%s delta_len=%s", delta.get("id", "?"), len(delta.get("delta", "")))
+            logger.debug(
+                "Pi toolcall_delta: call_id=%s delta_len=%s",
+                delta.get("id", "?"),
+                len(delta.get("delta", "")),
+            )
 
         elif delta_type == "toolcall_end":
             tc = delta.get("toolCall", {})

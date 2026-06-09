@@ -25,8 +25,7 @@ from app.domain.llm.protocol import (
     ToolCall,
     ToolResult,
 )
-from app.infrastructure.llm.cli_logger import get_log_path, spawn_visible_terminal
-from app.infrastructure.llm.process_registry import save_spawn_info
+from app.infrastructure.llm.cli_logger import get_log_path
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +127,9 @@ class CodexRuntime(AgentRuntime):
         session_key = self._compute_session_key(request)
         logger.info(
             "Codex spawn: %s session_key=%s model=%s",
-            " ".join(cmd), session_key, self._model or "default",
+            " ".join(cmd),
+            session_key,
+            self._model or "default",
         )
 
         try:
@@ -143,13 +144,6 @@ class CodexRuntime(AgentRuntime):
         except (FileNotFoundError, OSError):
             yield StreamEvent(type=StreamEventType.ERROR, seq=0, content="Codex CLI not found")
             return
-
-        save_spawn_info(session_key, cmd=cmd, env=env, cwd=cwd, prompt_text=prompt)
-
-        # 尝试打开可见终端用于调试；失败静默回退 headless 模式
-        ok = spawn_visible_terminal(cmd, env, cwd, session_key, prompt)
-        if not ok:
-            logger.debug("Visible terminal unavailable for session=%s, continuing headless", session_key)
 
         assert self._process.stdin is not None
         self._process.stdin.write(prompt.encode())
@@ -222,10 +216,8 @@ class CodexRuntime(AgentRuntime):
                 pass
             if self._process.returncode is None:
                 self._process.terminate()
-                try:
+                with suppress(TimeoutError, ProcessLookupError):
                     await asyncio.wait_for(self._process.wait(), timeout=2)
-                except (TimeoutError, ProcessLookupError):
-                    pass
             if self._process.returncode is None:
                 self._process.kill()
                 try:
@@ -245,14 +237,12 @@ class CodexRuntime(AgentRuntime):
         import subprocess as _sub
 
         if platform.system() == "Windows":
-            try:
+            with suppress(Exception):
                 _sub.run(
                     ["taskkill", "/F", "/T", "/PID", str(pid)],
                     capture_output=True,
                     timeout=10,
                 )
-            except Exception:
-                pass
         else:
             with suppress(Exception):
                 os.kill(pid, 9)
@@ -320,10 +310,17 @@ class CodexRuntime(AgentRuntime):
             if text:
                 events.append(StreamEvent(type=StreamEventType.TEXT, seq=seq, content=text))
                 seq += 1
-            # 提取 content 数组中的 tool_use / thinking / tool_result blocks
+            # 提取 content 数组中的 text / tool_use / thinking / tool_result blocks
             for block in item.get("content", []) or []:
                 block_type = block.get("type", "")
-                if block_type == "tool_use":
+                if block_type == "text":
+                    block_text = block.get("text", "")
+                    if block_text:
+                        events.append(
+                            StreamEvent(type=StreamEventType.TEXT, seq=seq, content=block_text)
+                        )
+                        seq += 1
+                elif block_type == "tool_use":
                     events.append(
                         StreamEvent(
                             type=StreamEventType.TOOL_CALL,
@@ -404,9 +401,7 @@ class CodexRuntime(AgentRuntime):
             permission_denials = data.get("permission_denials", [])
             if permission_denials:
                 metadata["permission_denials"] = permission_denials
-            events.append(
-                StreamEvent(type=StreamEventType.DONE, seq=seq, metadata=metadata)
-            )
+            events.append(StreamEvent(type=StreamEventType.DONE, seq=seq, metadata=metadata))
 
         elif event_type == "error":
             # Codex 重连/网络错误消息 → THINKING 面板展示进度
@@ -417,7 +412,8 @@ class CodexRuntime(AgentRuntime):
                 )
 
         elif event_type in ("thread.started", "turn.started"):
-            pass  # 跳过元事件
+            label = "会话已启动" if event_type == "thread.started" else "分析中…"
+            events.append(StreamEvent(type=StreamEventType.THINKING, seq=seq, content=label))
 
         else:
             # 未知事件类型：记录 warning，若含 text/content/message 则回退为 TEXT

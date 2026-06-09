@@ -32,8 +32,7 @@ from app.domain.llm.protocol import (
     ToolCall,
     ToolResult,
 )
-from app.infrastructure.llm.cli_logger import get_log_path, spawn_visible_terminal
-from app.infrastructure.llm.process_registry import save_spawn_info
+from app.infrastructure.llm.cli_logger import get_log_path
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +201,6 @@ class OpenCodeRuntime(AgentRuntime):
             if self._process.stdin:
                 self._process.stdin.write(prompt.encode())
                 self._process.stdin.write_eof()
-            save_spawn_info(str(request.session_id), cmd=cmd, env=env, cwd=cwd, prompt_text=prompt)
         except FileNotFoundError:
             yield StreamEvent(type=StreamEventType.ERROR, seq=0, content="OpenCode CLI 启动失败")
             return
@@ -213,11 +211,6 @@ class OpenCodeRuntime(AgentRuntime):
                 content=f"OpenCode CLI 启动失败: {exc}",
             )
             return
-
-        # 尝试打开可见终端用于调试；失败静默回退 headless 模式
-        ok = spawn_visible_terminal(cmd, env, cwd, session_key, prompt)
-        if not ok:
-            logger.debug("Visible terminal unavailable for session=%s, continuing headless", session_key)
 
         assert self._process.stdout is not None
 
@@ -264,7 +257,9 @@ class OpenCodeRuntime(AgentRuntime):
 
         if timed_out:
             yield StreamEvent(
-                type=StreamEventType.ERROR, seq=seq, content=f"OpenCode 超时 ({self._timeout}s)，已强制终止。请重试。"
+                type=StreamEventType.ERROR,
+                seq=seq,
+                content=f"OpenCode 超时 ({self._timeout}s)，已强制终止。请重试。",
             )
             return
 
@@ -298,10 +293,8 @@ class OpenCodeRuntime(AgentRuntime):
                 pass
             if self._process.returncode is None:
                 self._process.terminate()
-                try:
+                with suppress(TimeoutError, ProcessLookupError):
                     await asyncio.wait_for(self._process.wait(), timeout=2)
-                except (TimeoutError, ProcessLookupError):
-                    pass
             if self._process.returncode is None:
                 self._process.kill()
                 try:
@@ -321,14 +314,12 @@ class OpenCodeRuntime(AgentRuntime):
         import subprocess as _sub
 
         if platform.system() == "Windows":
-            try:
+            with suppress(Exception):
                 _sub.run(
                     ["taskkill", "/F", "/T", "/PID", str(pid)],
                     capture_output=True,
                     timeout=10,
                 )
-            except Exception:
-                pass
         else:
             with suppress(Exception):
                 os.kill(pid, 9)
@@ -373,9 +364,7 @@ class OpenCodeRuntime(AgentRuntime):
                 return True
         # 短纯英文状态消息（≤5 词且不含中文）→ 很可能是进度提示
         words = text_stripped.split()
-        if len(words) <= 5 and not any("一" <= c <= "鿿" for c in text_stripped):
-            return True
-        return False
+        return bool(len(words) <= 5 and not any("一" <= c <= "\u9fff" for c in text_stripped))
 
     @staticmethod
     async def _read_lines(stdout: asyncio.StreamReader, session_id: str) -> AsyncIterator[str]:
@@ -431,9 +420,17 @@ class OpenCodeRuntime(AgentRuntime):
                 events.append(StreamEvent(type=StreamEventType.THINKING, seq=seq, content=text))
         elif event_type in ("tool_call", "tool_use"):
             # opencode v1.15 tool_use 格式：part.tool=工具名，part.callID=调用ID
-            call_id = str(part.get("callID") or part.get("id") or data.get("call_id") or data.get("id", ""))
+            call_id = str(
+                part.get("callID") or part.get("id") or data.get("call_id") or data.get("id", "")
+            )
             tool_name = str(part.get("tool") or part.get("name") or data.get("name", ""))
-            tool_args = part.get("state", {}).get("input") or part.get("arguments") or data.get("arguments") or data.get("args") or {}
+            tool_args = (
+                part.get("state", {}).get("input")
+                or part.get("arguments")
+                or data.get("arguments")
+                or data.get("args")
+                or {}
+            )
             events.append(
                 StreamEvent(
                     type=StreamEventType.TOOL_CALL,
@@ -489,32 +486,38 @@ class OpenCodeRuntime(AgentRuntime):
             draft_text = part.get("drafting") or part.get("status") or ""
             if not draft_text:
                 draft_text = "正在处理…"
-            events.append(
-                StreamEvent(type=StreamEventType.THINKING, seq=seq, content=draft_text)
-            )
+            events.append(StreamEvent(type=StreamEventType.THINKING, seq=seq, content=draft_text))
         elif event_type in ("done", "result", "complete", "exit"):
             # 从 data 中提取 usage / cost / duration 等元数据
             usage = data.get("usage") or part.get("usage") or {}
-            metadata: dict = {
-                "model": self._model,
-            }
-            if usage:
-                metadata["token_usage"] = usage
-            cost = data.get("total_cost_usd") or part.get("total_cost_usd")
-            if cost is not None:
-                metadata["total_cost_usd"] = cost
-            duration = data.get("duration_ms") or part.get("duration_ms")
-            if duration is not None:
-                metadata["duration_ms"] = duration
             is_error = data.get("is_error") or part.get("is_error", False)
             if is_error:
-                metadata["is_error"] = True
-            errors = data.get("errors") or part.get("errors") or []
-            if errors:
-                metadata["errors"] = errors
-            events.append(
-                StreamEvent(type=StreamEventType.DONE, seq=seq, metadata=metadata)
-            )
+                err_msg = (
+                    data.get("error")
+                    or part.get("error")
+                    or data.get("message")
+                    or part.get("message")
+                    or "OpenCode error"
+                )
+                events.append(
+                    StreamEvent(type=StreamEventType.ERROR, seq=seq, content=str(err_msg))
+                )
+            else:
+                metadata: dict = {
+                    "model": self._model,
+                }
+                if usage:
+                    metadata["token_usage"] = usage
+                cost = data.get("total_cost_usd") or part.get("total_cost_usd")
+                if cost is not None:
+                    metadata["total_cost_usd"] = cost
+                duration = data.get("duration_ms") or part.get("duration_ms")
+                if duration is not None:
+                    metadata["duration_ms"] = duration
+                errors = data.get("errors") or part.get("errors") or []
+                if errors:
+                    metadata["errors"] = errors
+                events.append(StreamEvent(type=StreamEventType.DONE, seq=seq, metadata=metadata))
         elif event_type == "step_finish":
             # 仅当 step 内产出过 text 时才视为终态；
             # 工具调用后的 step_finish（无 text）是中间态，不结束流
@@ -544,8 +547,6 @@ class OpenCodeRuntime(AgentRuntime):
 def _extract_session_id(line: str) -> str | None:
     m = re.search(r'"sessionID"\s*:\s*"([^"]+)"', line)
     return m.group(1) if m else None
-
-
 
 
 def _entry_to_opencode(entry: dict[str, Any]) -> tuple[str, dict[str, Any]]:
