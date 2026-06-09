@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from uuid import UUID
 
@@ -41,17 +42,38 @@ router = APIRouter()
 _adapter = build_adapter()  # 进程级单例
 
 
+# session_id → 当前正在流式执行的 task（用于 abort）
+_active_streams: dict[UUID, asyncio.Task[None]] = {}
+
+
 @router.websocket("/ws/sessions/{session_id}")
 async def session_ws(websocket: WebSocket, session_id: UUID) -> None:
     await ws_manager.connect(session_id, websocket)
     try:
         while True:
             data = await websocket.receive_json()
+            if data.get("type") == "abort":
+                # 打断当前流的 CLI 进程
+                task = _active_streams.pop(session_id, None)
+                if task and not task.done():
+                    task.cancel()
+                    logger.info("Aborted stream session=%s", session_id)
+                try:
+                    await websocket.send_json({"type": "aborted", "seq": -1})
+                except Exception:
+                    pass
+                continue
             if data.get("type") != "message":
                 continue
-            await _handle_message(websocket, session_id, data)
+            task = asyncio.create_task(
+                _handle_message(websocket, session_id, data)
+            )
+            _active_streams[session_id] = task
+            try:
+                await task
+            finally:
+                _active_streams.pop(session_id, None)
     except (WebSocketDisconnect, RuntimeError):
-        # RuntimeError: receive_json 在已关闭 WS 上调用（客户端先关）
         await ws_manager.disconnect(session_id, websocket)
     except Exception:
         logger.exception("WS 处理异常")

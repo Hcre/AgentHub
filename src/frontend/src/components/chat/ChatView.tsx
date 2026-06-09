@@ -4,6 +4,7 @@ import { convKey, useChatStore } from '../../stores/chatStore'
 import { useUIStore } from '../../stores/uiStore'
 import { sessionsApi } from '../../api/sessions'
 import { useWebSocket } from '../../hooks/useWebSocket'
+import { getPoolWs } from '../../hooks/wsPool'
 import { Composer, type ComposerHandle } from './Composer'
 import { MessageBubble } from './MessageBubble'
 import { TypingIndicator } from './TypingIndicator'
@@ -180,7 +181,22 @@ export function ChatView({ agent }: { agent: Agent }) {
         </div>
       </div>
 
-      <Composer ref={composerRef} agent={agent} onSend={onSend} onCreateSkill={handleCreateSkill} />
+      <Composer
+        ref={composerRef}
+        agent={agent}
+        onSend={onSend}
+        onCreateSkill={handleCreateSkill}
+        isTyping={isTyping}
+        onAbort={() => {
+          const poolKey = sessionId && key ? `${sessionId}:${key}` : null
+          if (poolKey) {
+            const ws = getPoolWs(poolKey)
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'abort' }))
+            }
+          }
+        }}
+      />
     </div>
   )
 }
