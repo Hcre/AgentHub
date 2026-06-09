@@ -401,7 +401,7 @@ def test_write_mcp_config_merges_memory_and_bound() -> None:
     from app.infrastructure.llm.claude_code_runtime import _write_mcp_config
 
     bound = [{"name": "fs", "type": "stdio", "command": "npx"}]
-    path = _write_mcp_config("agent-1", "https://mem/sse", bound)
+    path = _write_mcp_config("agent-1", "https://mem/sse", bound_servers=bound)
     assert path is not None
     with open(path, encoding="utf-8") as f:
         cfg = json.load(f)

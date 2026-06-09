@@ -17,10 +17,6 @@ class AgentCreateRequest(BaseModel):
     avatar: str = Field(max_length=512)
     role: str = Field(max_length=256)
     agent_system: AgentSystem = AgentSystem.MOCK
-    provider: str = Field(default="anthropic", max_length=64)
-    model: str = Field(default="", max_length=128)
-    api_key: str | None = Field(default=None, repr=False)
-    base_url: str | None = None
     skills: list[str] = []
     capability_tags: list[str] = []
     system_prompt: str | None = None
@@ -34,10 +30,6 @@ class AgentUpdateRequest(BaseModel):
     avatar: str | None = None
     role: str | None = None
     agent_system: AgentSystem | None = None
-    provider: str | None = None
-    model: str | None = None
-    api_key: str | None = Field(default=None, repr=False)
-    base_url: str | None = None
     skills: list[str] | None = None
     capability_tags: list[str] | None = None
     settings: dict | None = None
@@ -50,8 +42,6 @@ class AgentOut(BaseModel):
     avatar: str
     role: str
     agent_system: str
-    provider: str
-    model: str
     status: str
     skills: list[str]
     capability_tags: list[str]

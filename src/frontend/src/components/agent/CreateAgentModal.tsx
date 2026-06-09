@@ -1,21 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import {
-  resolveProviderConfig,
-  resolveModelFromTier,
-} from '../../data/cliProviderMatrix'
 import { useAgentStore } from '../../stores/agentStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useUIStore } from '../../stores/uiStore'
 import { Button, Dialog, DialogContent, Icon, Input, Textarea } from '../ui'
-import { useApiKeyStore } from '../../stores/apiKeyStore'
-import { providersApi, type DefaultConfig, type ProviderInfo } from '../../api/providers'
+import { providersApi, type ProviderInfo } from '../../api/providers'
 import { type TemplateDetail } from '../../api/templates'
 import { useTemplateStore } from '../../stores/templateStore'
 import { CliIcon } from '../icons/cli/CliIcon'
 import { StartChatModal } from '../chat/StartChatModal'
-
-const SELECT_CLS =
-  'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
 // =================================================================
 // B-4-P2-AG01：createAgent() 错误三段式分类（详见 docs/specs/04-commands §6.4.6）
@@ -74,7 +66,7 @@ export interface PreSelectedTemplate {
   systemPrompt: string
   skills: string[]
   capabilityTags: string[]
-  /** 推荐模型层级（opus / sonnet / haiku），配合 resolveModelFromTier 自动推导模型名 */
+  /** 推荐模型层级（opus / sonnet / haiku） */
   model?: string
   /** 模板 ID，用于将 Agent 关联回创建它的模板 */
   templateId?: string
@@ -168,15 +160,6 @@ function Label({ children }: { children: string }) {
   return <span className="text-[12px] font-medium text-muted-foreground">{children}</span>
 }
 
-/** 脱敏 api_key：保留前 4 + 后 4，中间用 • 替代，最多 24 字符宽度。
- *  特殊字符串 "(chatgpt-login)" 直接原样显示。 */
-function maskApiKey(key: string): string {
-  if (key === '(chatgpt-login)' || key.length < 12) return key
-  const head = key.slice(0, 4)
-  const tail = key.slice(-4)
-  return `${head}•••${tail}`
-}
-
 /** 跳转技能市场时暂存草稿，回来后恢复 */
 let wizardDraft: { name: string; prompt: string; skills: string[] } | null = null
 
@@ -184,20 +167,17 @@ let wizardDraft: { name: string; prompt: string; skills: string[] } | null = nul
 let providerCache: ProviderInfo[] | null = null
 let providerScanned = false
 
-/** 卡片用的 CLI 摘要（统一扫描结果 + 硬编码兜底两种来源的形状） */
+/** 卡片用的 CLI 摘要 */
 interface CliCardData {
   id: string
   label: string
   version: string | null
   available: boolean
-  /** 来自上次点击时缓存的默认 model（点过才有，未点过为 null → 卡片显示 "—"） */
-  model: string | null
 }
 
 function buildCards(
   scanned: ProviderInfo[] | null,
   scanning: boolean,
-  loadedDefaults: Record<string, DefaultConfig>,
 ): CliCardData[] {
   if (scanning) return []
   if (scanned) {
@@ -208,7 +188,6 @@ function buildCards(
         label: p.display_name,
         version: p.version,
         available: true,
-        model: loadedDefaults[p.name]?.model ?? null,
       }))
   }
   return []
@@ -228,7 +207,6 @@ export function CreateAgentModal({
   const conversations = useChatStore((s) => s.conversations)
   const openConversation = useUIStore((s) => s.openConversation)
   const setSection = useUIStore((s) => s.setSection)
-  const savedKeys = useApiKeyStore((s) => s.keys)
 
   // 创建成功后的 StartChatModal 状态
   const [showStartChat, setShowStartChat] = useState(false)
@@ -249,10 +227,7 @@ export function CreateAgentModal({
   // Wizard state
   const [scannedProviders, setScannedProviders] = useState<ProviderInfo[] | null>(null)
   const [scanning, setScanning] = useState(false)
-  const [loadedDefaults, setLoadedDefaults] = useState<Record<string, DefaultConfig>>({})
-  const [loadingDefault, setLoadingDefault] = useState<string | null>(null)
-  const [loadDefaultError, setLoadDefaultError] = useState<string | null>(null)
-  const cards = buildCards(scannedProviders, scanning, loadedDefaults)
+  const cards = buildCards(scannedProviders, scanning)
   const [step, setStep] = useState(1)
   const [agentName, setAgentName] = useState('')
 
@@ -269,14 +244,6 @@ export function CreateAgentModal({
   const [skillLoading, setSkillLoading] = useState(false)
   // Step 2
   const [agentSystem, setAgentSystem] = useState<string>('')
-  const [providerId, setProviderId] = useState('deepseek')
-  const [model, setModel] = useState('')
-  const [baseUrl, setBaseUrl] = useState('')
-  const [apiKey, setApiKey] = useState('')
-  const [selectedKeyId, setSelectedKeyId] = useState('')
-  // 连通性预检
-  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle')
-  const [testError, setTestError] = useState('')
   // Step 3
   const [status, setStatus] = useState<'idle' | 'creating' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
@@ -298,12 +265,6 @@ export function CreateAgentModal({
   const loadFavorites = useTemplateStore((s) => s.loadFavorites)
   const setFavorite = useTemplateStore((s) => s.setFavorite)
 
-  // CLI + Provider → 自动推导 base_url / 协议 / 模型
-  const derivedConfig = resolveProviderConfig(agentSystem, providerId)
-  const derivedBaseUrl = derivedConfig?.baseUrl ?? ''
-  const derivedModels = derivedConfig?.models ?? []
-  const derivedProtocol = derivedConfig?.protocol ?? ''
-
   // -- Load templates + favorites when entering Step 1 --
   useEffect(() => {
     if (step === 1 && open) {
@@ -312,32 +273,13 @@ export function CreateAgentModal({
     }
   }, [step, open, loadTemplates, loadFavorites])
 
-  // 选 CLI 或 Provider 变化时自动填默认值（setState 推迟到 microtask 避开 set-state-in-effect）
-  // 只依赖 agentSystem / providerId；baseUrl / model 用 ref 思路避免输入时频繁触发
-  useEffect(() => {
-    if (!derivedConfig) return
-    queueMicrotask(() => {
-      if (!baseUrl) setBaseUrl(derivedConfig.baseUrl)
-      if (!model || !derivedConfig.models.includes(model)) {
-        setModel(derivedConfig.models[0] ?? '')
-      }
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentSystem, providerId])
-
   // preSelectedTemplate: 外部传入模板数据时跳过 Step 1，直接从 Step 2 开始
   useEffect(() => {
     if (!open || !preSelectedTemplate) return
     queueMicrotask(() => {
       setStep(2)
       setAgentSystem('')
-      setModel('')
-      setBaseUrl('')
-      setApiKey('')
-      setSelectedKeyId('')
-      setLoadDefaultError(null)
-      setTestStatus('idle')
-      // 后台扫描 CLI（同上步逻辑）
+      // 后台扫描 CLI
       if (providerScanned && providerCache) {
         setScannedProviders(providerCache)
       } else {
@@ -437,34 +379,6 @@ export function CreateAgentModal({
     return list ? new Set(list) : null
   }, [selectedTemplate])
 
-  // 兼容的 Provider 集合（用于 Step 2 过滤下拉选项）
-  const compatibleProviderSet = useMemo(() => {
-    const list = selectedTemplate?.compatibleProviders
-    return list ? new Set(list) : null
-  }, [selectedTemplate])
-
-  // 模板推荐的 model tier → 当 CLI + Provider 都选定后自动推导具体模型名
-  const templateTier = selectedTemplate?.model
-  const resolvedTierModel = useMemo(() => {
-    if (!templateTier || !agentSystem || !providerId) return null
-    return resolveModelFromTier(
-      agentSystem,
-      providerId,
-      templateTier as 'opus' | 'sonnet' | 'haiku',
-    )
-  }, [templateTier, agentSystem, providerId])
-
-  // tier 自动推导模型 → 当 CLI 与 Provider 同时选定后，自动填入
-  useEffect(() => {
-    if (!resolvedTierModel || !agentSystem || providerId === '') return
-    queueMicrotask(() => {
-      if (!model || (derivedConfig && !derivedConfig.models.includes(model))) {
-        setModel(resolvedTierModel)
-      }
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedTierModel, agentSystem, providerId])
-
   // 自定义时加载 skill 列表 + 恢复草稿（setState 推迟到 microtask 避开 set-state-in-effect）
   useEffect(() => {
     if (!isCustom) return
@@ -490,9 +404,6 @@ export function CreateAgentModal({
     )
   }
 
-  // CLI subprocess 类型的 provider 需要显示配置区（key/model/base_url）
-  const showProviderSection = agentSystem !== 'mock'
-
   const reset = () => {
     setStep(1)
     setPickedIndex(null)
@@ -504,17 +415,8 @@ export function CreateAgentModal({
     setCustomSkills([])
     setSkillList([])
     setAgentSystem('')
-    setProviderId('deepseek')
-    setModel('')
-    setBaseUrl('')
-    setApiKey('')
-    setTestStatus('idle')
-    setTestError('')
-    setSelectedKeyId('')
     setStatus('idle')
     setErrorMsg('')
-    setLoadDefaultError(null)
-    // 不清 loadedDefaults / scannedProviders：模块级缓存，下一次进入 Step 2 仍可复用
   }
 
   const handleClose = () => {
@@ -536,24 +438,10 @@ export function CreateAgentModal({
 
   const goNext = () => {
     if (!canNext) return
-    // 进入 Step 2：清空上次的 CLI 选择与 model/base_url，让用户从卡片里挑。
     setAgentSystem('')
-    setModel('')
-    setBaseUrl('')
-    setApiKey('')
-    setSelectedKeyId('')
-    setLoadDefaultError(null)
     setStep(2)
 
-    // If dynamic template has compatible systems, auto-select the first one
-    if (hasDynamicTemplates && selectedTemplateData?.compatible_agent_systems?.length) {
-      const firstSystem = selectedTemplateData.compatible_agent_systems[0]
-      queueMicrotask(() => {
-        handlePickCli(firstSystem)
-      })
-    }
-
-    // 后台异步扫描 CLI，只显示实际检测到的；不自动选中第一个，等用户点。
+    // 后台异步扫描 CLI
     if (providerScanned && providerCache) {
       setScannedProviders(providerCache)
     } else {
@@ -573,44 +461,12 @@ export function CreateAgentModal({
     }
   }
 
-  // 卡片点击：选中 CLI + 调 default-config 端点回填 model/base_url/api_key/provider
-  const handlePickCli = async (id: string) => {
+  const handlePickCli = (id: string) => {
     setAgentSystem(id)
-    setLoadDefaultError(null)
-    setTestStatus('idle')
-    // mock 没有 default-config，直接清空
-    if (id === 'mock') {
-      setModel('')
-      setBaseUrl('')
-      setApiKey('')
-      setProviderId('system')
-      return
-    }
-    setLoadingDefault(id)
-    try {
-      const cfg = await providersApi.getDefaultConfig(id)
-      setLoadedDefaults((prev) => ({ ...prev, [id]: cfg }))
-      // CLI 运行时自带认证和模型配置，不把本地 CLI 的 config 填进表单
-      // 表单留空 = 让 CLI 自己读 ~/.claude/settings.json 等配置文件
-      setModel('')
-      setBaseUrl('')
-      setApiKey('')
-      // 已知 provider 才设置，未知的（如 opencode 的 "xx"）用默认 deepseek
-      const knownProviders = new Set(['anthropic','openai','deepseek','azure','minimax','mimo','chatgpt','system'])
-      if (cfg.provider && knownProviders.has(cfg.provider)) {
-        setProviderId(cfg.provider)
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : '加载默认配置失败'
-      setLoadDefaultError(msg)
-    } finally {
-      setLoadingDefault(null)
-    }
   }
 
   const goBack = () => {
     if (preSelectedTemplate) {
-      // 外部预填模板时无 Step 1 可回退；直接关闭
       reset()
       onClose()
       return
@@ -618,81 +474,18 @@ export function CreateAgentModal({
     setStep(1)
   }
 
-  // 连通性预检（创建前执行，失败不损失任何东西）
-  const doConnectivityTest = async () => {
-    if (agentSystem === 'mock') return
-    setTestStatus('testing')
-    setTestError('')
-    try {
-      const resp = await fetch('/api/providers/ping', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          agent_system: agentSystem,
-          provider: providerId,
-          // 注：model/api_key/base_url 仍传 ping 端点（探测连通用），但 spawn CLI 时不再注入
-          model: model.trim(),
-          api_key: apiKey,
-          base_url: baseUrl.trim() || undefined,
-        }),
-      })
-      const data = await resp.json()
-      if (data.ok) {
-        setTestStatus('ok')
-      } else {
-        setTestStatus('fail')
-        setTestError(data.error || '连通失败')
-      }
-    } catch (e) {
-      setTestStatus('fail')
-      setTestError(e instanceof Error ? e.message : '网络错误')
-    }
-  }
-
-  // Step 3: 创建（先连通测试，通过后再创建）
+  // Step 3: 创建
   const doCreate = async () => {
     if (!agentName.trim()) return
     setStep(3)
     setStatus('creating')
     setErrorMsg('')
 
-    // 1. 连通性预检（非 mock 时自动执行）
-    if (agentSystem !== 'mock' && apiKey) {
-      try {
-        const resp = await fetch('/api/providers/ping', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            agent_system: agentSystem,
-            provider: providerId,
-            model: model.trim(),
-            api_key: apiKey,
-            base_url: baseUrl.trim() || undefined,
-          }),
-        })
-        const data = await resp.json()
-        if (!data.ok) {
-          setStatus('error')
-          setErrorMsg(`连通失败: ${data.error || '未知错误'}，请返回修改配置`)
-          return
-        }
-      } catch {
-        setStatus('error')
-        setErrorMsg('连通测试网络错误，请检查后端是否运行')
-        return
-      }
-    }
-
-    // 2. 创建 Agent
     try {
       const id = await createAgent({
         name: agentName.trim(),
         role: isCustom ? (customRoleName || agentName.trim()) : (selectedTemplate?.name ?? agentName.trim()),
         agentSystem,
-        provider: providerId,
-        model: model || '',
-        baseUrl: baseUrl || undefined,
-        apiKey: apiKey,
         skills: selectedSkills,
         capabilityTags: selectedCapabilityTags,
         systemPrompt: agentSystemPrompt,
@@ -710,7 +503,6 @@ export function CreateAgentModal({
       }, 800)
     } catch (e) {
       setStatus('error')
-      // B-4-P2-AG01：5xx 隐藏 nginx HTML；4xx 保留 detail；网络错误给「请检查网络」
       setErrorMsg(classifyCreateAgentError(e))
     }
   }
@@ -1000,7 +792,6 @@ export function CreateAgentModal({
                           providerCache = list
                           providerScanned = true
                           setScannedProviders(list)
-                          // 重新扫描后保留当前选中；用户没点过的话不动
                         })
                         .catch((err) => {
                           console.error('CLI 重新扫描失败:', err)
@@ -1024,13 +815,10 @@ export function CreateAgentModal({
                   </Button>
                 </div>
 
-                {/* 卡片列表：每个 CLI 一张，点选后调 default-config 回填。
-                    兼容性过滤：模板声明了 compatibleAgentSystems 时，不在列表中的 CLI 灰显。 */}
+                {/* CLI 卡片列表：兼容性过滤 */}
                 <div className="grid grid-cols-2 gap-2">
                   {cards.map((c) => {
                     const picked = agentSystem === c.id
-                    const loading = loadingDefault === c.id
-                    // 兼容性判断：兼容集为 null（未声明）→ 全部兼容；不在集合中 → 不兼容
                     const isCompatible = !compatibleCliSet || compatibleCliSet.has(c.id) || c.id === 'mock'
                     return (
                       <button
@@ -1039,7 +827,7 @@ export function CreateAgentModal({
                         onClick={() => isCompatible && handlePickCli(c.id)}
                         data-picked={picked ? 'true' : undefined}
                         data-compatible={isCompatible ? 'true' : 'false'}
-                        disabled={loading || !isCompatible}
+                        disabled={!isCompatible}
                         title={isCompatible ? undefined : '此模板未针对该 CLI 优化'}
                         className={
                           'group flex items-start gap-2 rounded-lg border p-2.5 text-left transition-colors ' +
@@ -1069,13 +857,9 @@ export function CreateAgentModal({
                           <span className="truncate text-[10px] text-muted-foreground">
                             {!isCompatible
                               ? '此模板未针对该 CLI 优化'
-                              : loading
-                                ? '加载默认配置…'
-                                : c.model
-                                  ? c.model
-                                  : picked
-                                    ? '已选中'
-                                    : '点击加载默认 model'}
+                              : picked
+                                ? '已选中'
+                                : '点击选择'}
                           </span>
                         </div>
                       </button>
@@ -1088,183 +872,16 @@ export function CreateAgentModal({
                       ? '扫描中…'
                       : providerScanned
                         ? `扫描完成，${cards.filter((c) => c.id !== 'mock' && c.available).length} 个可用`
-                        : '尚未扫描（显示默认列表）'}
+                        : '尚未扫描'}
                   </span>
-                  {loadDefaultError && (
-                    <span className="text-red-500 truncate max-w-[200px]" title={loadDefaultError}>
-                      加载失败：{loadDefaultError}
-                    </span>
-                  )}
                 </div>
               </div>
-
-              {showProviderSection && (
-                <>
-                  <label className="flex flex-col gap-1">
-                    <div className="flex items-center justify-between">
-                      <Label>选择配置</Label>
-                      <button
-                        type="button"
-                        onClick={() => setSection('api-keys')}
-                        className="text-[11px] text-brand hover:underline"
-                      >
-                        管理配置 →
-                      </button>
-                    </div>
-                    {savedKeys.length > 0 ? (
-                      <select
-                        className={SELECT_CLS}
-                        value={selectedKeyId}
-                        onChange={(e) => {
-                          const id = e.target.value
-                          setSelectedKeyId(id)
-                          setTestStatus('idle')
-                          const found = savedKeys.find((k) => k.id === id)
-                          if (found) {
-                            setApiKey(found.apiKey)
-                            setProviderId(found.provider)
-                            // base_url 和 model 由 CLI×Provider 矩阵自动推导
-                            const derived = resolveProviderConfig(agentSystem, found.provider)
-                            if (derived) {
-                              setBaseUrl(derived.baseUrl)
-                              setModel(found.model && derived.models.includes(found.model) ? found.model : (derived.models[0] ?? ''))
-                            } else {
-                              setBaseUrl(found.baseUrl)
-                              setModel(found.model ?? '')
-                            }
-                          }
-                        }}
-                      >
-                        <option value="">选择已保存的配置…</option>
-                        {savedKeys
-                          .filter((k) => !compatibleProviderSet || compatibleProviderSet.has(k.provider))
-                          .map((k) => (
-                            <option key={k.id} value={k.id}>
-                              {k.name} · {k.keyPrefix}****
-                            </option>
-                          ))}
-                        {compatibleProviderSet && savedKeys.filter((k) => compatibleProviderSet.has(k.provider)).length === 0 && (
-                          <option value="" disabled>
-                            暂无兼容的 Provider 配置
-                          </option>
-                        )}
-                      </select>
-                    ) : (
-                      <div className="rounded-md border border-dashed p-3 text-center text-[12px] text-muted-foreground">
-                        还没有保存的配置，请先
-                        <button type="button" onClick={() => setSection('api-keys')} className="mx-0.5 text-brand underline">添加 Provider 配置</button>
-                        或下方手动填写
-                      </div>
-                    )}
-                  </label>
-
-                  {/* 卡片点选时从服务端加载的默认配置（只读回显）。
-                      用户选中保存的 Provider 配置后会用矩阵推导值覆盖此区。 */}
-                  {loadedDefaults[agentSystem] &&
-                    (loadedDefaults[agentSystem]?.model ||
-                      loadedDefaults[agentSystem]?.base_url ||
-                      loadedDefaults[agentSystem]?.api_key ||
-                      loadedDefaults[agentSystem]?.provider) && (
-                      <div className="rounded-md border border-dashed bg-muted/30 p-2.5 text-[12px] text-muted-foreground space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-foreground">从 {agentSystem} 默认加载</span>
-                          <span className="text-[10px]">只读 · 选 Provider 后会被矩阵值覆盖</span>
-                        </div>
-                        <div className="grid grid-cols-[auto,1fr] gap-x-2 gap-y-0.5">
-                          <span>model</span>
-                          <span className="font-mono text-foreground truncate">
-                            {loadedDefaults[agentSystem]?.model ?? '—'}
-                          </span>
-                          <span>base_url</span>
-                          <span className="font-mono text-foreground truncate">
-                            {loadedDefaults[agentSystem]?.base_url ?? '—'}
-                          </span>
-                          <span>provider</span>
-                          <span className="font-mono text-foreground truncate">
-                            {loadedDefaults[agentSystem]?.provider ?? '—'}
-                          </span>
-                          <span>api_key</span>
-                          <span
-                            className="font-mono text-foreground truncate"
-                            title={loadedDefaults[agentSystem]?.api_key ?? ''}
-                          >
-                            {loadedDefaults[agentSystem]?.api_key
-                              ? maskApiKey(loadedDefaults[agentSystem]!.api_key!)
-                              : '—'}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                  {/* 自动推导 + 可编辑的连接配置 */}
-                  {selectedKeyId && derivedConfig && (
-                    <div className="rounded-md border bg-muted/50 p-2.5 text-[12px] text-muted-foreground space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-foreground">连接配置</span>
-                        <span className="text-[10px]">{agentSystem} × {providerId} · {derivedProtocol}{derivedConfig.needsProxy ? ' (Proxy)' : ''}</span>
-                      </div>
-                      <label className="flex flex-col gap-0.5">
-                        <span>端点地址</span>
-                        <input
-                          className="h-7 w-full rounded border border-input bg-background px-2 text-[12px]"
-                          value={baseUrl}
-                          onChange={(e) => { setBaseUrl(e.target.value); setTestStatus('idle') }}
-                          placeholder={derivedBaseUrl}
-                        />
-                      </label>
-                      <label className="flex flex-col gap-0.5">
-                        <span>模型</span>
-                        <div className="flex gap-1">
-                          <select
-                            className="h-7 flex-1 rounded border border-input bg-background px-2 text-[12px]"
-                            value={derivedModels.includes(model) ? model : '__custom__'}
-                            onChange={(e) => { if (e.target.value !== '__custom__') setModel(e.target.value); setTestStatus('idle') }}
-                          >
-                            {derivedModels.map(m => <option key={m} value={m}>{m}</option>)}
-                            <option value="__custom__">自定义…</option>
-                          </select>
-                          {!derivedModels.includes(model) && (
-                            <input
-                              className="h-7 w-40 rounded border border-input bg-background px-2 text-[12px]"
-                              value={model}
-                              onChange={(e) => { setModel(e.target.value); setTestStatus('idle') }}
-                              placeholder="手填模型名"
-                            />
-                          )}
-                        </div>
-                      </label>
-                      {derivedConfig.note && (
-                        <div className="text-[11px] text-amber-600">⚠ {derivedConfig.note}</div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* 工作目录已外迁到「发起私聊」弹窗 */}
-                </>
-              )}
             </div>
 
             <footer className="flex items-center justify-between border-t px-4 py-3">
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={goBack}>
-                  上一步
-                </Button>
-                {showProviderSection && (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={doConnectivityTest}
-                      disabled={testStatus === 'testing' || !apiKey}
-                    >
-                      {testStatus === 'testing' ? '测试中…' : testStatus === 'ok' ? '✅ 连通成功' : testStatus === 'fail' ? '❌ 重试' : '🔄 连通测试'}
-                    </Button>
-                    {testStatus === 'fail' && (
-                      <span className="text-[11px] text-red-500 max-w-[200px] truncate">{testError}</span>
-                    )}
-                  </>
-                )}
-              </div>
+              <Button variant="outline" size="sm" onClick={goBack}>
+                上一步
+              </Button>
               <Button variant="brand" size="sm" onClick={doCreate}>
                 创建队友
               </Button>
@@ -1300,7 +917,7 @@ export function CreateAgentModal({
                 </div>
                 <div className="text-center">
                   <p className="text-[15px] font-medium">你的队友 "{agentName}" 上线中…</p>
-                  <p className="mt-1 text-[12px] text-muted-foreground">正在配置并验证连通性，请稍候</p>
+                  <p className="mt-1 text-[12px] text-muted-foreground">正在创建 Agent，请稍候</p>
                 </div>
               </>
             )}

@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from app.core.exceptions import DomainError
-from app.domain.enums import AgentStatus, AgentSystem, Provider
+from app.domain.enums import AgentStatus, AgentSystem
 
 
 def _now() -> datetime:
@@ -26,10 +26,6 @@ class Agent:
     avatar: str
     role: str
     agent_system: AgentSystem = AgentSystem.MOCK
-    provider: Provider = Provider.ANTHROPIC
-    model: str = ""
-    api_key_encrypted: str = ""
-    base_url: str | None = None
     template_name: str | None = None
     created_from_template_id: UUID | None = None
     id: UUID = field(default_factory=uuid4)
@@ -49,13 +45,6 @@ class Agent:
     def validate(self) -> None:
         if not self.name or not self.name.strip():
             raise DomainError("Agent name 不能为空")
-        # CLI 运行时（claude_code/pi_agent/opencode）和 mock 不需要 API key
-        needs_api_key = self.agent_system in (
-            AgentSystem.ANTHROPIC_API,
-            AgentSystem.OPENAI_API,
-        )
-        if not self.is_system and needs_api_key and not self.api_key_encrypted:
-            raise DomainError("API 模式 Agent 必须提供 api_key")
 
     def update(self, **changed: object) -> list[str]:
         """部分更新，返回实际变更的字段名列表（用于 AgentUpdated 事件）。"""
@@ -64,10 +53,6 @@ class Agent:
             "avatar",
             "role",
             "agent_system",
-            "provider",
-            "model",
-            "api_key_encrypted",
-            "base_url",
             "template_name",
             "skills",
             "capability_tags",

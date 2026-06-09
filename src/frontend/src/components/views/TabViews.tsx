@@ -44,13 +44,6 @@ export function SettingsView() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
         无配置
-        <button
-          type="button"
-          onClick={() => setSection('api-keys')}
-          className="text-[13px] text-brand hover:underline"
-        >
-          API 密钥管理 →
-        </button>
       </div>
     )
   }
@@ -75,13 +68,6 @@ export function SettingsView() {
           </div>
         ))}
       </div>
-      <button
-        type="button"
-        onClick={() => setSection('api-keys')}
-        className="text-[13px] text-brand hover:underline"
-      >
-        API 密钥管理 →
-      </button>
     </div>
   )
 }

@@ -9,7 +9,6 @@ from uuid import uuid4
 import pytest
 
 from app.domain.entities.agent import Agent
-from app.domain.enums import Provider
 from app.domain.llm.protocol import StreamEvent, StreamEventType, ToolCall
 from app.domain.task_engine.dag import Check, TaskDef, TaskNode
 from app.domain.task_engine.executor import (
@@ -20,7 +19,7 @@ from app.domain.task_engine.executor import (
 
 
 def _agent(name="前端Agent") -> Agent:
-    return Agent(name=name, avatar="x", role="dev", provider=Provider.ANTHROPIC, model="m")
+    return Agent(name=name, avatar="x", role="dev")
 
 
 def _node(worker="前端Agent") -> TaskNode:

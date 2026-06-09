@@ -7,12 +7,8 @@ export interface CreateAgentInput {
   role: string;
   /** 运行时：自动检测的 CLI (opencode/claude_code/pi_agent/codex/gemini/cursor_agent) 或 mock。 */
   agent_system: string;
-  provider: string;
-  model: string;
-  /** claude_code 经 proxy 透传的目标端点；anthropic_api/mock 可省略。 */
-  base_url?: string;
-  api_key: string;
   skills?: string[];
+  capability_tags?: string[];
   system_prompt?: string;
   settings?: Record<string, unknown>;
   template_name?: string;

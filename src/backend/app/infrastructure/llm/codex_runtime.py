@@ -12,8 +12,10 @@ import logging
 import os
 import re
 import shutil
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import suppress
+from datetime import UTC, datetime
 
 from app.domain.llm.protocol import (
     AgentRequest,
@@ -23,10 +25,12 @@ from app.domain.llm.protocol import (
     ToolCall,
     ToolResult,
 )
+from app.infrastructure.llm.cli_logger import get_log_path, spawn_visible_terminal
+from app.infrastructure.llm.process_registry import save_spawn_info
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_TIMEOUT = 120  # 秒
+_DEFAULT_TIMEOUT = 300  # 秒
 _DEFAULT_MAX_TURNS = 10
 _DEFAULT_PERMISSION_MODE = "bypassPermissions"
 
@@ -101,6 +105,9 @@ class CodexRuntime(AgentRuntime):
             cmd.extend(["-m", self._model])
         # 全部权限绕过（与 Claude Code bypassPermissions 对齐）
         cmd.append("--dangerously-bypass-approvals-and-sandbox")
+        # 最大轮次限制（防止无限工具循环耗竭预算）
+        if self._max_turns:
+            cmd.extend(["--max-turns", str(self._max_turns)])
 
         # 工作目录：从请求动态取（会话 workspace），通过 -C flag 传给 Codex
         cwd = _resolve_cwd(request.working_directory)
@@ -129,7 +136,11 @@ class CodexRuntime(AgentRuntime):
         elif self._api_key:
             env["OPENAI_API_KEY"] = self._api_key
 
-        logger.info("Codex spawn: %s (model=%s)", " ".join(cmd), self._model or "default")
+        session_key = self._compute_session_key(request)
+        logger.info(
+            "Codex spawn: %s session_key=%s model=%s",
+            " ".join(cmd), session_key, self._model or "default",
+        )
 
         try:
             self._process = await asyncio.create_subprocess_exec(
@@ -138,10 +149,18 @@ class CodexRuntime(AgentRuntime):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
+                cwd=cwd,
             )
-        except FileNotFoundError:
+        except (FileNotFoundError, OSError):
             yield StreamEvent(type=StreamEventType.ERROR, seq=0, content="Codex CLI not found")
             return
+
+        save_spawn_info(session_key, cmd=cmd, env=env, cwd=cwd, prompt_text=prompt)
+
+        # 尝试打开可见终端用于调试；失败静默回退 headless 模式
+        ok = spawn_visible_terminal(cmd, env, cwd, session_key, prompt)
+        if not ok:
+            logger.debug("Visible terminal unavailable for session=%s, continuing headless", session_key)
 
         assert self._process.stdin is not None
         self._process.stdin.write(prompt.encode())
@@ -169,7 +188,7 @@ class CodexRuntime(AgentRuntime):
         if self._process and self._process.stdout:
             watchdog_task = asyncio.create_task(_watchdog())
             try:
-                async for line in self._read_lines(self._process.stdout):
+                async for line in self._read_lines(self._process.stdout, str(request.session_id)):
                     events = self._parse_line(line, seq)
                     for evt in events:
                         yield evt
@@ -203,14 +222,25 @@ class CodexRuntime(AgentRuntime):
         self._process = None
 
     async def stop(self) -> None:
+        """3-tier graceful stop: SIGINT → SIGTERM → SIGKILL（对齐 ClaudeCodeRuntime）。"""
         if self._process and self._process.returncode is None:
-            self._process.kill()
+            import signal
+
             try:
-                await asyncio.wait_for(self._process.wait(), timeout=5)
-            except TimeoutError:
+                self._process.send_signal(signal.SIGINT)
+                await asyncio.wait_for(self._process.wait(), timeout=2)
+            except (TimeoutError, ProcessLookupError):
+                pass
+            if self._process.returncode is None:
                 self._process.terminate()
                 try:
-                    await asyncio.wait_for(self._process.wait(), timeout=3)
+                    await asyncio.wait_for(self._process.wait(), timeout=2)
+                except (TimeoutError, ProcessLookupError):
+                    pass
+            if self._process.returncode is None:
+                self._process.kill()
+                try:
+                    await asyncio.wait_for(self._process.wait(), timeout=2)
                 except TimeoutError:
                     await self._force_kill_subprocess()
             self._process = None
@@ -239,6 +269,13 @@ class CodexRuntime(AgentRuntime):
                 os.kill(pid, 9)
 
     @staticmethod
+    def _compute_session_key(request: AgentRequest) -> str:
+        """会话键：群聊使用 uuid5(session_id:agent_id) 避免跨 agent 污染（对齐 ClaudeCode）。"""
+        if request.is_group_chat and request.agent_id is not None:
+            return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{request.session_id}:{request.agent_id}"))
+        return str(request.session_id)
+
+    @staticmethod
     def _extract_prompt(request: AgentRequest) -> str:
         for msg in reversed(request.messages):
             if msg.get("role") == "user":
@@ -246,15 +283,25 @@ class CodexRuntime(AgentRuntime):
         return ""
 
     @staticmethod
-    async def _read_lines(stdout: asyncio.StreamReader) -> AsyncIterator[str]:
-        """读取 stdout 行，不做超时（超时由 watchdog task 杀进程 → EOF 来保证）。"""
-        while True:
-            line = await stdout.readline()
-            if not line:
-                break
-            decoded = line.decode(errors="replace").strip()
-            if decoded:
-                yield decoded
+    async def _read_lines(stdout: asyncio.StreamReader, session_id: str) -> AsyncIterator[str]:
+        """读取 stdout 行，不做超时（超时由 watchdog task 杀进程 → EOF 来保证）。
+
+        每行实时写入 CLI 日志文件（~/.agenthub/cli-logs/{session_id}.log），
+        前端可通过 API 获取路径进行 tail 查看。
+        """
+
+        log_path = get_log_path(session_id)
+        with open(log_path, "a", encoding="utf-8", errors="replace") as log_fh:
+            while True:
+                line = await stdout.readline()
+                if not line:
+                    break
+                decoded = line.decode(errors="replace").strip()
+                if decoded:
+                    ts = datetime.now(UTC).isoformat()
+                    log_fh.write(f"[{ts}] {decoded}\n")
+                    log_fh.flush()
+                    yield decoded
 
     @staticmethod
     def _parse_line(line: str, seq: int) -> list[StreamEvent]:
@@ -262,8 +309,11 @@ class CodexRuntime(AgentRuntime):
 
         codex JSONL 事件类型:
         - thread.started / turn.started → 跳过
-        - item.completed → 提取 item.text (TEXT) + item.content[] 中的 tool_use (TOOL_CALL)
-        - turn.completed → DONE 事件（含 usage / cost / duration）
+        - item.completed → 提取 item.text (TEXT) + item.content[] 中的
+          tool_use (TOOL_CALL) / thinking (THINKING) / tool_result (TOOL_RESULT)
+          + 每 item 的 usage 元数据
+        - turn.completed → DONE 事件（含 usage / cost / duration / permission_denials）
+        - 未知类型 → 记录 warning，若含 text/content 则回退为 TEXT
         """
         try:
             data = json.loads(line)
@@ -281,7 +331,7 @@ class CodexRuntime(AgentRuntime):
             if text:
                 events.append(StreamEvent(type=StreamEventType.TEXT, seq=seq, content=text))
                 seq += 1
-            # 提取 content 数组中的 tool_use / tool_result blocks
+            # 提取 content 数组中的 tool_use / thinking / tool_result blocks
             for block in item.get("content", []) or []:
                 block_type = block.get("type", "")
                 if block_type == "tool_use":
@@ -297,6 +347,18 @@ class CodexRuntime(AgentRuntime):
                         )
                     )
                     seq += 1
+                elif block_type == "thinking":
+                    # Codex 推理块 → THINKING 事件（前端 ThinkingBlock 渲染）
+                    thinking_text = block.get("thinking", "")
+                    if thinking_text:
+                        events.append(
+                            StreamEvent(
+                                type=StreamEventType.THINKING,
+                                seq=seq,
+                                content=thinking_text,
+                            )
+                        )
+                        seq += 1
                 elif block_type == "tool_result":
                     raw_content = block.get("content")
                     if isinstance(raw_content, list):
@@ -321,6 +383,13 @@ class CodexRuntime(AgentRuntime):
                         )
                     )
                     seq += 1
+            # 提取 per-item usage 元数据（附加到最后产生的事件上）
+            item_usage = item.get("usage", {})
+            if item_usage and events:
+                last = events[-1]
+                meta = dict(last.metadata or {})
+                meta["token_usage"] = item_usage
+                events[-1] = last.model_copy(update={"metadata": meta})
 
         elif event_type == "turn.completed":
             usage = data.get("usage", {})
@@ -342,8 +411,24 @@ class CodexRuntime(AgentRuntime):
             errors = data.get("errors", [])
             if errors:
                 metadata["errors"] = errors
+            # 提取 permission_denials（如 codex 提供）
+            permission_denials = data.get("permission_denials", [])
+            if permission_denials:
+                metadata["permission_denials"] = permission_denials
             events.append(
                 StreamEvent(type=StreamEventType.DONE, seq=seq, metadata=metadata)
             )
+
+        elif event_type in ("thread.started", "turn.started"):
+            pass  # 跳过元事件
+
+        else:
+            # 未知事件类型：记录 warning，若含 text/content 则回退为 TEXT
+            logger.debug("Codex 未知事件类型: %s keys=%s", event_type, list(data.keys())[:5])
+            fallback_text = data.get("text") or data.get("content")
+            if fallback_text and isinstance(fallback_text, str):
+                events.append(
+                    StreamEvent(type=StreamEventType.TEXT, seq=seq, content=fallback_text)
+                )
 
         return events

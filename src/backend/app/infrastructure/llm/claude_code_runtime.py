@@ -29,6 +29,7 @@ import tempfile
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import suppress
+from datetime import UTC, datetime
 from functools import partial
 
 from app.core.config import settings
@@ -44,6 +45,8 @@ from app.infrastructure.llm.claude_code_process_pool import (
     ProcessHandle,
     get_pool,
 )
+from app.infrastructure.llm.cli_logger import get_log_path, spawn_visible_terminal
+from app.infrastructure.llm.process_registry import save_spawn_info
 
 logger = logging.getLogger(__name__)
 
@@ -107,10 +110,11 @@ class ClaudeCodeRuntime(AgentRuntime):
 
     async def stream(self, request: AgentRequest) -> AsyncIterator[StreamEvent]:
         """按 settings.claude_code_long_running 分流到 V0 / V1。"""
+        session_key = self._compute_session_key(request)
         logger.info(
-            "Claude CLI request_id=%s session=%s mode=%s",
+            "Claude CLI request_id=%s session_key=%s mode=%s",
             request.request_id,
-            request.session_id,
+            session_key,
             "long" if settings.claude_code_long_running else "short",
         )
         if settings.claude_code_long_running:
@@ -123,7 +127,6 @@ class ClaudeCodeRuntime(AgentRuntime):
         # has_history=False → 首次对话 → --session-id 直接新建，省掉空跑
         request = self._merge_delta_into_system_prompt_v0(request)
         prompt = self._extract_prompt(request)
-        session_key = self._compute_session_key(request)
         resume = request.has_history
         logger.info("Session %s has_history=%s → %s", session_key, resume, "resume" if resume else "new")
         resume_gen = self._run_cli(prompt, request, session_key, resume=resume)
@@ -384,6 +387,7 @@ class ClaudeCodeRuntime(AgentRuntime):
                 env=env,
                 cwd=cwd,
             )
+            save_spawn_info(str(request.session_id), cmd=cmd, env=env, cwd=cwd, prompt_text=prompt)
         except FileNotFoundError:
             yield StreamEvent(
                 type=StreamEventType.ERROR,
@@ -391,6 +395,18 @@ class ClaudeCodeRuntime(AgentRuntime):
                 content=f"⚠️ 路径不存在或 claude 未安装: {cwd or '当前目录'}",
             )
             return
+        except OSError as exc:
+            yield StreamEvent(
+                type=StreamEventType.ERROR,
+                seq=0,
+                content=f"⚠️ Claude CLI 启动失败: {exc}",
+            )
+            return
+
+        # 尝试打开可见终端用于调试；失败静默回退 headless 模式
+        ok = spawn_visible_terminal(cmd, env, cwd, session_key, prompt)
+        if not ok:
+            logger.debug("Visible terminal unavailable for session=%s, continuing headless", session_key)
 
         assert self._process.stdin is not None
         self._process.stdin.write(prompt.encode())
@@ -418,7 +434,7 @@ class ClaudeCodeRuntime(AgentRuntime):
         if self._process and self._process.stdout:
             watchdog_task = asyncio.create_task(_watchdog())
             try:
-                async for line in self._read_lines(self._process.stdout):
+                async for line in self._read_lines(self._process.stdout, str(request.session_id)):
                     events = self._parse_line(line, seq)
                     for evt in events:
                         yield evt
@@ -552,15 +568,20 @@ class ClaudeCodeRuntime(AgentRuntime):
         return str(request.session_id)
 
     @staticmethod
-    async def _read_lines(stdout: asyncio.StreamReader) -> AsyncIterator[str]:
-        """读取 stdout 行，不做超时（超时由 watchdog task 杀进程 → EOF 来保证）。"""
-        while True:
-            line = await stdout.readline()
-            if not line:
-                break
-            decoded = line.decode(errors="replace").strip()
-            if decoded:
-                yield decoded
+    async def _read_lines(stdout: asyncio.StreamReader, session_id: str) -> AsyncIterator[str]:
+        """读取 stdout 行，同时写入 CLI 日志。不做超时（超时由 watchdog task 杀进程 → EOF 来保证）。"""
+        log_path = get_log_path(session_id)
+        with open(log_path, "a", encoding="utf-8", errors="replace") as log_f:
+            while True:
+                line = await stdout.readline()
+                if not line:
+                    break
+                decoded = line.decode(errors="replace").strip()
+                if decoded:
+                    ts = datetime.now(UTC).isoformat()
+                    log_f.write(f"[{ts}] {decoded}\n")
+                    log_f.flush()
+                    yield decoded
 
     @staticmethod
     def _parse_line(line: str, seq: int) -> list[StreamEvent]:
