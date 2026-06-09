@@ -18,18 +18,18 @@ P1 骨架 → P2 真链路过渡：旧同步桩代码保留 `_advance_synchronou
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import re
 from typing import Any
 from uuid import UUID
 
-from app.core.exceptions import NotFoundError
 from app.core.events import get_event_bus
 from app.domain.deploy.deployment import (
+    STAGE_SEQUENCES,
     Deployment,
     DeploymentPlan,
     DeploymentStage,
-    STAGE_SEQUENCES,
 )
 from app.domain.deploy.errors import DeployBuildError, DeployNotFoundError
 from app.domain.enums import DeploymentStatus, DeploymentTarget
@@ -43,6 +43,7 @@ _SAFE_FILE_KEY = re.compile(r"^[A-Za-z0-9_./\-]+$")
 
 # 本机开发默认 host（生产由 env 覆盖 DEPLOY_PUBLIC_HOST）
 import os as _os
+
 _PUBLIC_HOST = _os.environ.get("DEPLOY_PUBLIC_HOST", "http://127.0.0.1:8000")
 
 
@@ -67,8 +68,21 @@ def _publish_progress(deployment: Deployment, stage: str | None = None) -> None:
 
 
 class DeployService:
-    def __init__(self, repo: DeploymentRepository) -> None:
+    def __init__(
+        self,
+        repo: DeploymentRepository,
+        *,
+        bg_session_factory: Any = None,
+    ) -> None:
         self._repo = repo
+        # M4①.1 修复：后台推进任务必须用**独立 session**，不能复用请求作用域
+        # 的 session（请求返回即关闭，导致后台 save 失败、部署卡在 queued）。
+        # 生产默认开全局 session_factory 新 session；测试可注入复用同一 session 的
+        # 工厂以便 _drain_background 同步驱动后断言落库。
+        self._bg_session_factory = bg_session_factory
+        # 持有后台推进任务的强引用：fire-and-forget 的 create_task 可能被 GC 中途回收
+        # （会让部署再次停滞）。存进 set、完成时移除。
+        self._bg_tasks: set[asyncio.Task[None]] = set()
 
     # --- 用例 ---
 
@@ -106,7 +120,9 @@ class DeployService:
         await self._repo.save(deployment)
         _publish_progress(deployment, stage="queued")
         # 异步推进（M4①.1 真实化：避免同步阻塞，符合 CR-12）
-        asyncio.create_task(self._advance_async(deployment))
+        task = asyncio.create_task(self._advance_async(deployment))
+        self._bg_tasks.add(task)
+        task.add_done_callback(self._bg_tasks.discard)
         return deployment
 
     async def get(self, deployment_id: UUID) -> Deployment:
@@ -135,14 +151,38 @@ class DeployService:
     # --- 内部：异步推进（M4①.1 真链路）---
 
     async def _advance_async(self, deployment: Deployment) -> None:
-        """异步推进：queued → building → 落盘 → advance → ready（或 failed）。
+        """后台推进入口：开**独立 session** 再委托 _run_advance。
 
-        各阶段 publish 进度（WS 订阅端可见）。失败兜底为 failed 而非崩溃。
+        M4①.1 修复关键：请求作用域 session 在 POST 返回后即关闭，原实现复用它
+        导致后台首个 save 失败、部署永久卡在 queued。这里改为开新 session（生产
+        走全局 session_factory；测试注入复用同一 session 的工厂）。
         """
+        if self._bg_session_factory is not None:
+            cm = self._bg_session_factory()
+        else:
+            from app.infrastructure.db.base import session_factory
+
+            cm = session_factory()
+        async with cm as db:
+            from app.infrastructure.repositories import PostgresDeploymentRepository
+
+            repo = PostgresDeploymentRepository(db)
+            await self._run_advance(deployment, repo, db)
+
+    async def _run_advance(self, deployment: Deployment, repo, db) -> None:  # type: ignore[no-untyped-def]
+        """推进核心：queued → building → 落盘 → advance → ready（或 failed）。
+
+        每阶段 commit（让 GET 轮询看到中间态）+ publish 进度。失败兜底为 failed。
+        """
+
+        async def _save() -> None:
+            await repo.save(deployment)
+            await db.commit()
+
         try:
             # 1. building
             deployment.mark_building()
-            await self._repo.save(deployment)
+            await _save()
             _publish_progress(deployment, stage="building")
 
             # 2. 静态构建错预检（落盘前先校验 entry_file 引用的脚本存在）
@@ -155,31 +195,29 @@ class DeployService:
 
             # 4. 走 sequence 的剩余阶段（advance_stage 主要为审计日志）
             sequence = STAGE_SEQUENCES[deployment.target]
-            mid_stages = sequence[:-1]
-            for stage in mid_stages:
+            for stage in sequence[:-1]:
                 if stage == DeploymentStage.BUILDING:
                     continue  # 已在第 1 步处理
-                log_line = f"[{stage.value}] {deployment.id}"
-                deployment.advance_stage(stage, log=log_line)
-                await self._repo.save(deployment)
+                deployment.advance_stage(stage, log=f"[{stage.value}] {deployment.id}")
+                await _save()
                 _publish_progress(deployment, stage=stage.value)
 
             # 5. 终态：真 URL + 真 zip（M4①.1 真实化）
             preview_url = static_host.build_preview_url(deployment.id, host=_PUBLIC_HOST)
             download_url: str | None = None
             if deployment.target == DeploymentTarget.PACKAGE:
-                zip_path = static_host.make_zip(deployment.id, deployment.plan.files)
-                # 真下载 URL（FastAPI 后续可加 /api/deploy/{id}/download 端点；当前
-                # 落盘到 _assets/deploy/，可由 nginx 暴露或前端拼 download_url）
-                download_url = f"{_PUBLIC_HOST}/preview/{deployment.id}/deploy-{deployment.id}.zip"
+                static_host.make_zip(deployment.id, deployment.plan.files)
+                download_url = (
+                    f"{_PUBLIC_HOST}/preview/{deployment.id}/deploy-{deployment.id}.zip"
+                )
 
             deployment.mark_ready(preview_url=preview_url, download_url=download_url)
-            await self._repo.save(deployment)
+            await _save()
             _publish_progress(deployment, stage="ready")
         except DeployBuildError as exc:
             logger.warning("部署构建失败 %s: %s", deployment.id, exc)
             deployment.mark_failed(code=exc.code, message=str(exc))
-            await self._repo.save(deployment)
+            await _save()
             _publish_progress(deployment, stage="failed")
         except Exception as exc:  # 兜底
             logger.exception("部署未预期错误 %s", deployment.id)
@@ -187,7 +225,8 @@ class DeployService:
                 code="E_DEPLOY_INTERNAL",
                 message=f"内部错误：{type(exc).__name__}: {exc}",
             )
-            await self._repo.save(deployment)
+            with contextlib.suppress(Exception):
+                await _save()
             _publish_progress(deployment, stage="failed")
 
     # --- 旧同步骨架（保留作回滚参考，M4①.1 不再调用）---

@@ -11,29 +11,51 @@ domain 规则：DeploymentPlan.validate() 拦截空 files / 缺 entry_file。
 
 from __future__ import annotations
 
-import pytest
+import asyncio
+from contextlib import asynccontextmanager
 from uuid import uuid4
+
+import pytest
 
 from app.application.services import DeployService
 from app.domain.deploy.deployment import (
+    STAGE_SEQUENCES,
     Deployment,
     DeploymentPlan,
     DeploymentStage,
-    STAGE_SEQUENCES,
     transition_deployment,
 )
 from app.domain.deploy.errors import (
-    DeployBuildError,
     DeployInvalidTransitionError,
     DeployValidationError,
 )
 from app.domain.enums import DeploymentStatus, DeploymentTarget
-from app.infrastructure.db.models import DeploymentModel
+from app.infrastructure.deploy import static_host
 from app.infrastructure.repositories import PostgresDeploymentRepository
 
 
 def _svc(db):  # type: ignore[no-untyped-def]
-    return DeployService(PostgresDeploymentRepository(db))
+    # 后台推进注入「复用同一 test session」的工厂：生产开新 session，测试复用以便
+    # _drain_background 后能在同一 in-memory DB 断言落库（不真关闭、不真新建）。
+    @asynccontextmanager
+    async def _reuse(db=db):  # type: ignore[no-untyped-def]
+        yield db
+
+    return DeployService(
+        PostgresDeploymentRepository(db), bg_session_factory=lambda: _reuse()
+    )
+
+
+async def _drain_background() -> None:
+    """M4①.1：start() 改异步 create_task 后台推进，测试需排空后台任务再断言。
+
+    先 sleep(0) 让 create_task 真正被调度，再 gather 所有非当前任务到完成。
+    串行等待避免与后台任务并发使用同一 AsyncSession。
+    """
+    await asyncio.sleep(0)
+    pending = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
 
 
 # ============ 1. domain 规则（无 DB）============
@@ -104,7 +126,7 @@ def test_stage_sequences_target_specific() -> None:
 
 @pytest.mark.asyncio
 async def test_start_static_site_reaches_ready_with_preview_url(db_session):  # type: ignore[no-untyped-def]
-    """路径 1：合法静态站点 → 同步推进到 ready + preview_url。"""
+    """路径 1：合法静态站点 → 异步后台推进到 ready + 真 preview_url（M4①.1）。"""
     svc = _svc(db_session)
     sid = uuid4()
     deployment = await svc.start(
@@ -117,10 +139,16 @@ async def test_start_static_site_reaches_ready_with_preview_url(db_session):  # 
             "app.js": "console.log('hi')",
         },
     )
+    # start() 立刻返回 queued，后台 create_task 推进
+    await _drain_background()
+    static_host.remove(deployment.id)  # 清理落盘
+
     assert deployment.status == DeploymentStatus.READY
     assert deployment.progress == 1.0
     assert deployment.preview_url is not None
-    assert deployment.preview_url.startswith("https://agenthub-deploy.com/d")
+    # M4①.1 真实化：真 /preview/{id}/ 路径，不再是旧假域名
+    assert deployment.preview_url.startswith("http://127.0.0.1:8000/preview/")
+    assert "agenthub-deploy.com" not in deployment.preview_url
     assert deployment.download_url is None
     assert deployment.error_code is None
     # 持久化校验
@@ -134,7 +162,7 @@ async def test_start_static_site_reaches_ready_with_preview_url(db_session):  # 
 
 @pytest.mark.asyncio
 async def test_start_package_target_returns_download_url(db_session):  # type: ignore[no-untyped-def]
-    """路径 2：源码打包 → ready + download_url（不返 preview_url）。"""
+    """路径 2：源码打包 → ready + 真 .zip download_url（M4①.1）。"""
     svc = _svc(db_session)
     deployment = await svc.start(
         session_id=uuid4(),
@@ -143,10 +171,13 @@ async def test_start_package_target_returns_download_url(db_session):  # type: i
         framework=None,
         files={"index.html": "x", "app.js": "y"},
     )
+    await _drain_background()
+    static_host.remove(deployment.id)  # 清理落盘 + zip
+
     assert deployment.status == DeploymentStatus.READY
     assert deployment.download_url is not None
     assert deployment.download_url.endswith(".zip")
-    assert deployment.preview_url is not None  # placeholder 仍写
+    assert deployment.preview_url is not None  # 真 URL 仍写
 
 
 # ============ 3. 服务：start → failed（构建错）============
@@ -154,7 +185,7 @@ async def test_start_package_target_returns_download_url(db_session):  # type: i
 
 @pytest.mark.asyncio
 async def test_start_static_site_missing_asset_fails(db_session):  # type: ignore[no-untyped-def]
-    """路径 3：index.html 引用不存在的脚本 → 同步失败。"""
+    """路径 3：index.html 引用不存在的脚本 → 异步后台失败（M4①.1）。"""
     svc = _svc(db_session)
     deployment = await svc.start(
         session_id=uuid4(),
@@ -165,6 +196,9 @@ async def test_start_static_site_missing_asset_fails(db_session):  # type: ignor
             "index.html": "<html><body><script src='missing.js'></script></body></html>",
         },
     )
+    await _drain_background()
+    static_host.remove(deployment.id)
+
     assert deployment.status == DeploymentStatus.FAILED
     assert deployment.error_code == "E_DEPLOY_BUILD_MISSING_ASSET"
     assert "missing.js" in (deployment.error_message or "")
@@ -210,6 +244,8 @@ async def test_get_and_delete_deployment(db_session):  # type: ignore[no-untyped
         framework=None,
         files={"a.txt": "x"},
     )
+    await _drain_background()  # 等后台推进到 ready（delete 仅允许从终态）
+    static_host.remove(deployment.id)
     fetched = await svc.get(deployment.id)
     assert fetched.id == deployment.id
 
@@ -243,7 +279,10 @@ async def test_list_by_session_excludes_deleted(db_session):  # type: ignore[no-
         framework=None,
         files={"b.txt": "y"},
     )
-    await svc.delete(d1.id)
+    await _drain_background()  # 等两个后台任务到终态（避免 flaky）
+    static_host.remove(d1.id)
+    static_host.remove(d2.id)
+    await svc.delete(d1.id)  # 仅允许从终态删
 
     items = await svc.list_by_session(sid)
     assert len(items) == 1

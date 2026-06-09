@@ -55,8 +55,8 @@ class SessionResponse:
     agent_id: UUID | None
     workspace_path: str
     pinned: bool
-    archived: bool = False  # M1#2
     created_at: datetime
+    archived: bool = False  # M1#2
     updated_at: datetime | None = None  # M1#1 前端排序用
 
     @classmethod

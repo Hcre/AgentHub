@@ -16,6 +16,7 @@ from app.api.routers import (
     agents,
     attachments,
     cli,
+    deploy,
     groups,
     inbox,
     mcp,
@@ -126,6 +127,7 @@ app.include_router(attachments.router)  # 附件上传/下载（P0-3）
 app.include_router(usage.router)  # Token 消耗监控（P1-2，t9 track）
 app.include_router(FS_ROUTER)
 app.include_router(inbox.router)
+app.include_router(deploy.router)  # M4①.1 部署卡 REST（/api/deployments/*）
 app.include_router(mcp.router)  # MCP 市场/安装/绑定 REST（/api/mcp/*，§2.6 冻结契约）
 app.include_router(ws_router)
 # MCP 记忆协议服务端（SSE）独占 /api/mcp-memory，与上面 /api/mcp REST 分离，
@@ -140,7 +142,9 @@ if _step_tools_asgi is not None:
 # M4①.1：部署真链路 — 把 _assets/deploy/{id}/ 暴露为 /preview/{id}/
 # （静态托管走 FastAPI StaticFiles，生产可改 nginx 同路径反向代理）
 import os as _os  # noqa: E402
+
 from fastapi.staticfiles import StaticFiles as _StaticFiles  # noqa: E402
+
 _DEPLOY_ROOT = _os.path.abspath("_assets/deploy")
 _os.makedirs(_DEPLOY_ROOT, exist_ok=True)
 app.mount("/preview", _StaticFiles(directory=_DEPLOY_ROOT, html=True, check_dir=False), name="deploy-preview")
