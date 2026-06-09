@@ -1,97 +1,75 @@
 import { useCallback, useEffect, useRef } from "react";
 import { WS_BASE } from "../api/client";
 import { useChatStore } from "../stores/chatStore";
+import { getPoolWs, setPoolWs } from "./wsPool";
 import type { Attachment, ReplyRef, StreamEvent } from "../types";
 
 const MAX_RECONNECT_DELAY = 10000;
 const BASE_DELAY = 1000;
 
-/**
- * 会话 WebSocket（key-aware）。服务端 StreamEvent 按 convKey 路由到对应消息桶。
- * @param sessionId 后端 Session id；为 null 时不连接（mock 降级）
- * @param convKey   chatStore 消息桶键（agentId:conversationId）
- */
 export function useWebSocket(sessionId: string | null, convKey: string | null) {
-  const wsRef = useRef<WebSocket | null>(null);
-  // convKey 用 ref 持有，避免重连闭包捕获旧值；在 effect 中同步（不在 render 期写）
-  const keyRef = useRef<string | null>(convKey);
-  useEffect(() => {
-    keyRef.current = convKey;
-  }, [convKey]);
-
   const applyStreamEvent = useChatStore((s) => s.applyStreamEvent);
   const setConnected = useChatStore((s) => s.setConnected);
   const addUserMessage = useChatStore((s) => s.addUserMessage);
+  const keyRef = useRef(convKey);
+  keyRef.current = convKey;
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || !convKey) return;
+    const poolKey = `${sessionId}:${convKey}`;
+
+    // 已有活跃连接 → 复用
+    const existing = getPoolWs(poolKey);
+    if (existing && existing.readyState === WebSocket.OPEN) {
+      setConnected(true);
+      return;
+    }
+
     let attempts = 0;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let closed = false;
 
     const connect = () => {
       const ws = new WebSocket(`${WS_BASE}/ws/sessions/${sessionId}`);
-      wsRef.current = ws;
+      setPoolWs(poolKey, ws);
 
-      ws.onopen = () => {
-        setConnected(true);
-        attempts = 0;
-      };
-
+      ws.onopen = () => { setConnected(true); attempts = 0; };
       ws.onclose = () => {
         setConnected(false);
-        if (closed) return;
         const delay = Math.min(BASE_DELAY * 2 ** attempts, MAX_RECONNECT_DELAY);
         attempts += 1;
         reconnectTimer = setTimeout(connect, delay);
       };
-
       ws.onmessage = (e) => {
-        const key = keyRef.current;
-        if (!key) return;
         try {
-          const event = JSON.parse(e.data as string) as StreamEvent;
-          applyStreamEvent(key, event);
-        } catch {
-          // 忽略非 JSON 帧
-        }
+          applyStreamEvent(keyRef.current!, JSON.parse(e.data) as StreamEvent);
+        } catch { /* ignore */ }
       };
     };
 
     connect();
 
     return () => {
-      closed = true;
+      // 组件卸载不关 WS — 后台继续收流
       if (reconnectTimer) clearTimeout(reconnectTimer);
-      wsRef.current?.close();
-      wsRef.current = null;
     };
-  }, [sessionId, applyStreamEvent, setConnected]);
+  }, [sessionId, convKey, applyStreamEvent, setConnected]);
 
-  /**
-   * 发送用户消息。返回 false 表示未连接，调用方可降级到 mock。
-   * @param attachment 可选附件（仅本地回显，WS 文本末尾追加 URL 一行让后端能看到）
-   * @param replyTo P1-1 reply/quote：被引用消息的最小快照（id/author/snippet）
-   */
   const sendMessage = useCallback(
     (content: string, attachment?: Attachment, replyTo?: ReplyRef): boolean => {
-      const ws = wsRef.current;
-      const key = keyRef.current;
-      if (!ws || ws.readyState !== WebSocket.OPEN || !key) return false;
-      addUserMessage(key, content, attachment, replyTo);
-      const wireContent = attachment?.url
-        ? `${content}\n\n[attachment] ${attachment.name} ${attachment.url}`
-        : content;
-      ws.send(
-        JSON.stringify({
-          type: "message",
-          content: wireContent,
-          ...(replyTo ? { reply_to_id: replyTo.id } : {}),
-        }),
-      );
+      if (!sessionId || !convKey) return false;
+      const ws = getPoolWs(`${sessionId}:${convKey}`);
+      if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+      addUserMessage(convKey, content, attachment, replyTo);
+      ws.send(JSON.stringify({
+        type: "message",
+        content: attachment?.url
+          ? `${content}\n\n[attachment] ${attachment.name} ${attachment.url}`
+          : content,
+        ...(replyTo ? { reply_to_id: replyTo.id } : {}),
+      }));
       return true;
     },
-    [addUserMessage],
+    [addUserMessage, sessionId, convKey],
   );
 
   return { sendMessage };

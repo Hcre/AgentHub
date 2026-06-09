@@ -109,6 +109,11 @@ export const useChatStore = create<ChatState>()(
 
   removeConversation: (agentId, conversationId) => {
     const key = convKey(agentId, conversationId)
+    // 关闭该会话的持久 WS 连接
+    import("../../hooks/wsPool").then(({ closePoolWs }) => {
+      const sid = get().sessionIds[key]
+      if (sid) closePoolWs(`${sid}:${key}`)
+    })
     set((s) => {
       const existing = s.conversations[agentId] ?? []
       const filtered = existing.filter((c) => c.id !== conversationId)
