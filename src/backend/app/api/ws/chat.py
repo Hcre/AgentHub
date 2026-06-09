@@ -96,9 +96,9 @@ async def _handle_message(ws: WebSocket, session_id: UUID, data: dict) -> None:
                 await ws.send_json(event.model_dump(mode="json"))
             await db.commit()
         except WebSocketDisconnect:
-            # 客户端 mid-stream 关闭：刷新/切走/网络抖动 —— 不算服务端错误，回滚后让外层 while 退出
-            await db.rollback()
-            logger.info("WS 客户端中途断开，停止 stream session=%s", session_id)
+            # 客户端 mid-stream 关闭：刷新/切走/网络抖动 —— 提交已持久化的消息，不丢数据
+            await db.commit()
+            logger.info("WS 客户端中途断开，已提交部分数据 session=%s", session_id)
             raise
         except AgentHubError as exc:
             await db.rollback()
