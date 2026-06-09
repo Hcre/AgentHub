@@ -12,9 +12,11 @@ import type { Agent, ChatMessage, ReplyRef } from '../../types'
 
 export function ChatView({ agent }: { agent: Agent }) {
   const activeConversationId = useUIStore((s) => s.activeConversationId)
+  const openConversation = useUIStore((s) => s.openConversation)
   const messages = useChatStore((s) => s.messages)
   const typing = useChatStore((s) => s.typing)
   const send = useChatStore((s) => s.send)
+  const addConversation = useChatStore((s) => s.addConversation)
   const sessionIds = useChatStore((s) => s.sessionIds)
   const setSessionId = useChatStore((s) => s.setSessionId)
   const clearUnread = useChatStore((s) => s.clearUnread)
@@ -91,17 +93,27 @@ export function ChatView({ agent }: { agent: Agent }) {
     setPendingCount(0)
   }
 
+  // 落地页/fallback 到 agents[0] 时 activeConversationId 可能为 null（CenterPanel 无会话
+  // 也渲染 ChatView）。空态文案明说「直接发你想聊的」，所以发送不能静默丢弃——没有活动
+  // 会话就先建一个再发，避免「点发送 0 请求、不渲染气泡」。返回确定要用的 convId。
+  const ensureConversation = (): string => {
+    if (activeConversationId) return activeConversationId
+    const convId = addConversation(agent.id)
+    openConversation(agent.id, convId)
+    return convId
+  }
+
   const onSend = (payload: { text: string; attachment?: { name: string; size: string; url?: string }; replyTo?: ReplyRef }) => {
-    if (!activeConversationId) return
+    const convId = ensureConversation()
     const { text, attachment, replyTo } = payload
-    // 优先走真实 WS；未连接（mock agent / 后端不可用）则降级假回复
-    if (!sendMessage(text, attachment, replyTo)) send(agent.id, activeConversationId, text, attachment, replyTo)
+    // 优先走真实 WS；未连接（新会话尚无 session / mock agent / 后端不可用）则降级本地渲染
+    if (!sendMessage(text, attachment, replyTo)) send(agent.id, convId, text, attachment, replyTo)
   }
 
   const handleCreateSkill = () => {
-    if (!activeConversationId) return
+    const convId = ensureConversation()
     const text = '请帮我创建一个新的 Skill'
-    if (!sendMessage(text)) send(agent.id, activeConversationId, text)
+    if (!sendMessage(text)) send(agent.id, convId, text)
   }
 
   // P1-1 reply/quote：MessageBubble 点的回复按钮 → 调 composerRef.setReplyTo
