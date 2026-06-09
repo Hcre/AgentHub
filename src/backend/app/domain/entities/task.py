@@ -33,6 +33,11 @@ class Task:
     session_id: UUID | None = None
     retry_count: int = 0
     assigned_worker: UUID | None = None
+    # 展示层字段（看板 CRUD 用）：assignee 可为任意 Agent id / 标签字符串，
+    # due 为自由文本（"Today" / "Wed" / "05-30"），与 assignee_id/due_date 解耦，
+    # 编排引擎不依赖这两个字段（追加可选，默认空）。
+    assignee_label: str | None = None
+    due_label: str | None = None
     created_at: datetime = field(default_factory=_now)
     updated_at: datetime = field(default_factory=_now)
 

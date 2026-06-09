@@ -3,6 +3,7 @@
 from app.domain.repositories.agent_repository import AgentRepository
 from app.domain.repositories.deployment_repository import DeploymentRepository
 from app.domain.repositories.group_repository import GroupRepository
+from app.domain.repositories.inbox_repository import InboxRepository
 from app.domain.repositories.mcp_repository import (
     McpBindingRepository,
     McpInstallationRepository,
@@ -19,6 +20,7 @@ __all__ = [
     "AgentRepository",
     "DeploymentRepository",
     "GroupRepository",
+    "InboxRepository",
     "McpBindingRepository",
     "McpInstallationRepository",
     "McpServerRepository",
