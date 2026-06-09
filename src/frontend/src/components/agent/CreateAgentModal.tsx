@@ -3,10 +3,10 @@ import { useAgentStore } from '../../stores/agentStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useUIStore } from '../../stores/uiStore'
 import { Button, Dialog, DialogContent, Icon, Input, Textarea } from '../ui'
-import { providersApi, type ProviderInfo } from '../../api/providers'
+
 import { type TemplateDetail } from '../../api/templates'
 import { useTemplateStore } from '../../stores/templateStore'
-import { CliIcon } from '../icons/cli/CliIcon'
+
 import { StartChatModal } from '../chat/StartChatModal'
 
 // =================================================================
@@ -163,36 +163,6 @@ function Label({ children }: { children: string }) {
 /** 跳转技能市场时暂存草稿，回来后恢复 */
 let wizardDraft: { name: string; prompt: string; skills: string[] } | null = null
 
-/** CLI provider 扫描缓存（模块级，页面不刷新则保留） */
-let providerCache: ProviderInfo[] | null = null
-let providerScanned = false
-
-/** 卡片用的 CLI 摘要 */
-interface CliCardData {
-  id: string
-  label: string
-  version: string | null
-  available: boolean
-}
-
-function buildCards(
-  scanned: ProviderInfo[] | null,
-  scanning: boolean,
-): CliCardData[] {
-  if (scanning) return []
-  if (scanned) {
-    return scanned
-      .filter((p) => p.available && p.name !== 'mock')
-      .map((p) => ({
-        id: p.name,
-        label: p.display_name,
-        version: p.version,
-        available: true,
-      }))
-  }
-  return []
-}
-
 export function CreateAgentModal({
   open,
   onClose,
@@ -226,9 +196,6 @@ export function CreateAgentModal({
   } = useTemplateStore()
 
   // Wizard state
-  const [scannedProviders, setScannedProviders] = useState<ProviderInfo[] | null>(null)
-  const [scanning, setScanning] = useState(false)
-  const cards = buildCards(scannedProviders, scanning)
   const [step, setStep] = useState(1)
   const [agentName, setAgentName] = useState('')
 
@@ -241,8 +208,6 @@ export function CreateAgentModal({
   const [customPrompt, setCustomPrompt] = useState('')
   const [customRoleName, setCustomRoleName] = useState('')
   const [customSkills, setCustomSkills] = useState<string[]>([])
-  const [skillList, setSkillList] = useState<{name:string}[]>([])
-  const [skillLoading, setSkillLoading] = useState(false)
   // Step 2
   const [agentSystem, setAgentSystem] = useState<string>('')
   // Step 3
@@ -280,26 +245,7 @@ export function CreateAgentModal({
     queueMicrotask(() => {
       setStep(2)
       setAgentSystem('')
-      // 后台扫描 CLI
-      if (providerScanned && providerCache) {
-        setScannedProviders(providerCache)
-      } else {
-        setScanning(true)
-        providersApi
-          .list()
-          .then((list) => {
-            providerCache = list
-            providerScanned = true
-            setScannedProviders(list)
-          })
-          .catch((err) => {
-            console.error('CLI 扫描失败 (preSelected):', err)
-            setScannedProviders(null)
-          })
-          .finally(() => setScanning(false))
-      }
     })
-    // 仅在 open 和 preSelectedTemplate 变化时触发
   }, [open, preSelectedTemplate])
 
   // -- Determine mode: dynamic (API) vs legacy (fallback) --
@@ -374,22 +320,11 @@ export function CreateAgentModal({
   const selectedSkills = isCustom ? customSkills : (selectedTemplate?.skills ?? [])
   const selectedCapabilityTags = selectedTemplate?.capabilityTags ?? []
 
-  // 兼容的 CLI 集合（用于 Step 2 灰显不兼容卡片）
-  const compatibleCliSet = useMemo(() => {
-    const list = selectedTemplate?.compatibleAgentSystems
-    return list ? new Set(list) : null
-  }, [selectedTemplate])
 
-  // 自定义时加载 skill 列表 + 恢复草稿（setState 推迟到 microtask 避开 set-state-in-effect）
+  // 自定义时恢复草稿（从技能市场返回）
   useEffect(() => {
     if (!isCustom) return
     queueMicrotask(() => {
-      setSkillLoading(true)
-      fetch('/api/skills/library?_=' + Date.now())
-        .then((r) => r.json())
-        .then(setSkillList)
-        .catch(() => setSkillList([]))
-        .finally(() => setSkillLoading(false))
       if (wizardDraft) {
         setAgentName(wizardDraft.name)
         setCustomPrompt(wizardDraft.prompt)
@@ -398,12 +333,6 @@ export function CreateAgentModal({
       }
     })
   }, [isCustom])
-
-  const toggleSkill = (name: string) => {
-    setCustomSkills((prev) =>
-      prev.includes(name) ? prev.filter((s) => s !== name) : [...prev, name],
-    )
-  }
 
   const reset = () => {
     setStep(1)
@@ -414,7 +343,6 @@ export function CreateAgentModal({
     setCustomPrompt('')
     setCustomRoleName('')
     setCustomSkills([])
-    setSkillList([])
     setAgentSystem('')
     setStatus('idle')
     setErrorMsg('')
@@ -447,29 +375,6 @@ export function CreateAgentModal({
     if (isCustom && (!customPrompt.trim() || !customRoleName.trim())) return
     setAgentSystem('')
     setStep(2)
-
-    // 后台异步扫描 CLI
-    if (providerScanned && providerCache) {
-      setScannedProviders(providerCache)
-    } else {
-      setScanning(true)
-      providersApi
-        .list()
-        .then((list) => {
-          providerCache = list
-          providerScanned = true
-          setScannedProviders(list)
-        })
-        .catch((err) => {
-          console.error('CLI 扫描失败 (初始):', err)
-          setScannedProviders(null)
-        })
-        .finally(() => setScanning(false))
-    }
-  }
-
-  const handlePickCli = (id: string) => {
-    setAgentSystem(id)
   }
 
   const goBack = () => {
@@ -713,27 +618,16 @@ export function CreateAgentModal({
                         浏览技能市场 →
                       </button>
                     </div>
-                    {skillLoading ? (
-                      <span className="text-[12px] text-muted-foreground">加载中…</span>
-                    ) : skillList.length === 0 ? (
-                      <span className="text-[12px] text-muted-foreground">暂无可用 Skill</span>
-                    ) : (
-                      <div className="flex flex-col gap-1 rounded-md border p-2">
-                        {skillList.map((s) => (
-                          <label
-                            key={s.name}
-                            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-[13px] hover:bg-accent"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={customSkills.includes(s.name)}
-                              onChange={() => toggleSkill(s.name)}
-                              className="h-3.5 w-3.5 accent-brand"
-                            />
-                            <span>{s.name.replace('.md', '')}</span>
-                          </label>
+                    {customSkills.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {customSkills.map((s) => (
+                          <span key={s} className="rounded bg-brand/10 px-1.5 py-0.5 text-[11px] text-brand">
+                            {s}
+                          </span>
                         ))}
                       </div>
+                    ) : (
+                      <span className="text-[12px] text-muted-foreground">暂未选择 Skill，可前往技能市场挑选</span>
                     )}
                   </div>
                 </div>
@@ -751,7 +645,7 @@ export function CreateAgentModal({
           </>
         )}
 
-        {/* === Step 2: 配置 === */}
+        {/* === Step 2: 确认创建 === */}
         {step === 2 && (
           <>
             <header className="flex items-center justify-between border-b px-4 py-3">
@@ -759,131 +653,43 @@ export function CreateAgentModal({
                 <Button variant="ghost" size="iconSm" onClick={goBack} title="返回">
                   <Icon name="chevronLeft" className="h-3.5 w-3.5" />
                 </Button>
-                <h3 className="text-[15px] font-medium">配置 "{agentName}"</h3>
-                <span className="text-[11px] text-muted-foreground ml-1">2/3</span>
+                <h3 className="text-[15px] font-medium">确认创建 "{agentName}"</h3>
+                <span className="text-[11px] text-muted-foreground ml-1">2/2</span>
               </div>
               <Button variant="ghost" size="iconSm" onClick={() => { reset(); onClose() }}>
                 <Icon name="x" className="h-3.5 w-3.5" />
               </Button>
             </header>
 
-            <div className="flex flex-col gap-3 overflow-y-auto p-4" style={{ maxHeight: '55vh' }}>
+            <div className="flex flex-col gap-4 overflow-y-auto p-4" style={{ maxHeight: '55vh' }}>
 
-              {/* -- Template compatibility info banner -- */}
-              {hasDynamicTemplates && selectedTemplateData && compatibleCliSet && (
-                <div className="rounded-md border border-brand/20 bg-brand/5 px-3 py-2 text-[12px] text-muted-foreground">
-                  <span className="font-medium text-brand">
-                    {selectedTemplateData.display_name_zh || selectedTemplateData.name}
-                  </span>
-                  <span className="mx-1">模板兼容：</span>
-                  <span className="text-foreground">
-                    {selectedTemplateData.compatible_agent_systems?.join(' / ') || '全部 CLI'}
-                  </span>
-                  {selectedTemplateData.model_tier !== 'inherit' && (
-                    <span className="ml-1 rounded bg-muted px-1 py-px text-[10px]">
-                      {selectedTemplateData.model_tier}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <Label>运行依赖</Label>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setScanning(true)
-                      providerScanned = false
-                      providersApi
-                        .list()
-                        .then((list) => {
-                          providerCache = list
-                          providerScanned = true
-                          setScannedProviders(list)
-                        })
-                        .catch((err) => {
-                          console.error('CLI 重新扫描失败:', err)
-                          setScannedProviders(null)
-                        })
-                        .finally(() => setScanning(false))
-                    }}
-                    disabled={scanning}
-                  >
-                    {scanning ? (
-                      <span className="flex items-center gap-1">
-                        <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        扫描中
-                      </span>
-                    ) : (
-                      '重新扫描'
-                    )}
-                  </Button>
-                </div>
-
-                {/* CLI 卡片列表：兼容性过滤 */}
-                <div className="grid grid-cols-2 gap-2">
-                  {cards.map((c) => {
-                    const picked = agentSystem === c.id
-                    const isCompatible = !compatibleCliSet || compatibleCliSet.has(c.id) || c.id === 'mock'
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => isCompatible && handlePickCli(c.id)}
-                        data-picked={picked ? 'true' : undefined}
-                        data-compatible={isCompatible ? 'true' : 'false'}
-                        disabled={!isCompatible}
-                        title={isCompatible ? undefined : '此模板未针对该 CLI 优化'}
-                        className={
-                          'group flex items-start gap-2 rounded-lg border p-2.5 text-left transition-colors ' +
-                          (isCompatible
-                            ? 'hover:border-brand/40 data-[picked=true]:border-brand data-[picked=true]:bg-brand/5'
-                            : 'opacity-40 cursor-not-allowed')
-                        }
-                      >
-                        <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md bg-background">
-                          <CliIcon agentSystem={c.id} size={18} />
-                        </div>
-                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="truncate text-[12px] font-medium">{c.label}</span>
-                            {!isCompatible ? (
-                              <span className="shrink-0 rounded bg-amber-100 px-1 py-px text-[9px] text-amber-600 dark:bg-amber-950 dark:text-amber-400">
-                                不兼容
-                              </span>
-                            ) : c.version ? (
-                              <span className="shrink-0 rounded bg-muted px-1 py-px text-[9px] text-muted-foreground">
-                                {c.version}
-                              </span>
-                            ) : c.available ? null : (
-                              <span className="shrink-0 text-[9px] text-muted-foreground">—</span>
-                            )}
-                          </div>
-                          <span className="truncate text-[10px] text-muted-foreground">
-                            {!isCompatible
-                              ? '此模板未针对该 CLI 优化'
-                              : picked
-                                ? '已选中'
-                                : '点击选择'}
+              {/* 模板摘要 */}
+              <div className="rounded-lg border bg-muted/30 p-4">
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <span className="text-[11px] text-muted-foreground">模板</span>
+                    <p className="text-[13px] font-medium">
+                      {isCustom ? (customRoleName || '自定义') : (selectedTemplate?.name ?? '—')}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-muted-foreground">System Prompt</span>
+                    <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground whitespace-pre-wrap line-clamp-6">
+                      {agentSystemPrompt || '（无）'}
+                    </p>
+                  </div>
+                  {selectedSkills.length > 0 && (
+                    <div>
+                      <span className="text-[11px] text-muted-foreground">Skills</span>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {selectedSkills.map((s) => (
+                          <span key={s} className="rounded bg-brand/10 px-1.5 py-0.5 text-[11px] text-brand">
+                            {s}
                           </span>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                  <span>
-                    {scanning
-                      ? '扫描中…'
-                      : providerScanned
-                        ? `扫描完成，${cards.filter((c) => c.id !== 'mock' && c.available).length} 个可用`
-                        : '尚未扫描'}
-                  </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
