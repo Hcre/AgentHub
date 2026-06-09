@@ -1,7 +1,8 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Reply, X } from 'lucide-react'
+import { Reply, Square, X } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { useAgentStore } from '../../stores/agentStore'
+import { useGroupStore } from '../../stores/groupStore'
 import { Button, Icon } from '../ui'
 import type { SendGroupOptions } from '../../stores/groupStore'
 import type { Group, ReplyRef } from '../../types'
@@ -71,6 +72,14 @@ export function GroupComposer({
   const agents = useAgentStore((s) => s.agents)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // 检测是否有 agent 正在回复（消息带 streaming:true）
+  const isStreaming = useGroupStore((s) => {
+    const msgs = s.messagesByGroup[group.id] ?? []
+    return msgs.some((m) => m.streaming === true)
+  })
+  // 停止：textarea 为空 + 有 streaming → 显示停止按钮
+  const showStop = isStreaming && !val.trim()
+
   // 当前 @mention 片段信息
   const [mentionInfo, setMentionInfo] = useState<{
     atIdx: number
@@ -125,6 +134,13 @@ export function GroupComposer({
     setMentionInfo(null)
     setRequiresApproval(false)
     setReplyTo(null)
+  }
+
+  const handleStop = () => {
+    const ws = useGroupStore.getState().ws
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'cancel' }))
+    }
   }
 
   const cancelReply = () => setReplyTo(null)
@@ -293,10 +309,25 @@ export function GroupComposer({
           </Button>
         </div>
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[11px] text-muted-foreground">Enter 发送</span>
-          <Button variant="brand" size="iconSm" className="h-7 w-7" onClick={send}>
-            <Icon name="send" className="h-3.5 w-3.5" />
-          </Button>
+          {showStop ? (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleStop}
+              title="停止生成"
+              className="h-7 gap-1.5 px-2 text-[12px]"
+            >
+              <Square className="h-3 w-3" fill="currentColor" />
+              停止
+            </Button>
+          ) : (
+            <>
+              <span className="font-mono text-[11px] text-muted-foreground">Enter 发送</span>
+              <Button variant="brand" size="iconSm" className="h-7 w-7" onClick={send}>
+                <Icon name="send" className="h-3.5 w-3.5" />
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -5,7 +5,7 @@ import {
   useState,
   type ChangeEvent,
 } from 'react'
-import { Code2, Reply, X } from 'lucide-react'
+import { Code2, Reply, Square, X } from 'lucide-react'
 import { Button, Icon } from '../ui'
 import {
   MonacoEditor,
@@ -38,8 +38,14 @@ export type ComposerPayload = {
 
 export const Composer = forwardRef<
   ComposerHandle,
-  { agent: Agent; onSend: (payload: ComposerPayload) => void; onCreateSkill?: () => void }
->(function Composer({ agent, onSend, onCreateSkill }, ref) {
+  {
+    agent: Agent
+    onSend: (payload: ComposerPayload) => void
+    onCreateSkill?: () => void
+    isStreaming?: boolean
+    onCancel?: () => void
+  }
+>(function Composer({ agent, onSend, onCreateSkill, isStreaming = false, onCancel }, ref) {
   const [val, setVal] = useState('')
   const [attachment, setAttachment] = useState<Attachment | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -357,16 +363,31 @@ export const Composer = forwardRef<
           </Button>
         </div>
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[11px] text-muted-foreground">↵ 发送</span>
-          <Button
-            variant="brand"
-            size="iconSm"
-            className="h-7 w-7"
-            onClick={send}
-            disabled={uploading || (!val.trim() && !attachment)}
-          >
-            <Icon name="send" className="h-3.5 w-3.5" />
-          </Button>
+          {isStreaming && !val.trim() && !attachment ? (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={onCancel}
+              title="停止生成"
+              className="h-7 gap-1.5 px-2 text-[12px]"
+            >
+              <Square className="h-3 w-3" fill="currentColor" />
+              停止
+            </Button>
+          ) : (
+            <>
+              <span className="font-mono text-[11px] text-muted-foreground">↵ 发送</span>
+              <Button
+                variant="brand"
+                size="iconSm"
+                className="h-7 w-7"
+                onClick={send}
+                disabled={uploading || (!val.trim() && !attachment)}
+              >
+                <Icon name="send" className="h-3.5 w-3.5" />
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>

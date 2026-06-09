@@ -2,12 +2,14 @@
 
 协议（客户端 → 服务端）：
     {"type": "message", "content": "...", "mentions": [], "reply_to": null}
+    {"type": "cancel"}  ← 停止当前流式生成
 协议（服务端 → 客户端）：逐 StreamEvent 推送：
     {"type": "text", "seq": 0, "content": "片段"} ... {"type": "done", ...}
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from uuid import UUID
 
@@ -44,18 +46,47 @@ _adapter = build_adapter()  # 进程级单例
 @router.websocket("/ws/sessions/{session_id}")
 async def session_ws(websocket: WebSocket, session_id: UUID) -> None:
     await ws_manager.connect(session_id, websocket)
+    current_task: asyncio.Task | None = None
+
+    async def _run_stream(data: dict) -> None:
+        nonlocal current_task
+        try:
+            await _handle_message(websocket, session_id, data)
+        except asyncio.CancelledError:
+            await _safe_send_json(websocket, {"type": "done", "seq": -1})
+        except WebSocketDisconnect:
+            pass  # 客户端已断开，无需再发
+        finally:
+            current_task = None
+
     try:
         while True:
             data = await websocket.receive_json()
-            if data.get("type") != "message":
+            msg_type = data.get("type")
+
+            if msg_type == "cancel":
+                if current_task is not None and not current_task.done():
+                    current_task.cancel()
                 continue
-            await _handle_message(websocket, session_id, data)
+
+            if msg_type != "message":
+                continue
+
+            # 已有流式在执行 → 跳过（单 session 单流）
+            if current_task is not None and not current_task.done():
+                continue
+
+            current_task = asyncio.create_task(_run_stream(data))
     except (WebSocketDisconnect, RuntimeError):
         # RuntimeError: receive_json 在已关闭 WS 上调用（客户端先关）
         await ws_manager.disconnect(session_id, websocket)
     except Exception:
         logger.exception("WS 处理异常")
         await ws_manager.disconnect(session_id, websocket)
+    finally:
+        # 清理：取消还在跑的流式 task
+        if current_task is not None and not current_task.done():
+            current_task.cancel()
 
 
 async def _handle_message(ws: WebSocket, session_id: UUID, data: dict) -> None:
@@ -95,6 +126,9 @@ async def _handle_message(ws: WebSocket, session_id: UUID, data: dict) -> None:
             async for event in chat.send_and_stream(cmd):
                 await ws.send_json(event.model_dump(mode="json"))
             await db.commit()
+        except asyncio.CancelledError:
+            await db.rollback()
+            raise
         except WebSocketDisconnect:
             # 客户端 mid-stream 关闭：刷新/切走/网络抖动 —— 不算服务端错误，回滚后让外层 while 退出
             await db.rollback()
@@ -107,6 +141,14 @@ async def _handle_message(ws: WebSocket, session_id: UUID, data: dict) -> None:
             await db.rollback()
             logger.exception("流式执行失败")
             await _safe_send_error(ws, str(exc))
+
+
+async def _safe_send_json(ws: WebSocket, payload: dict) -> None:
+    """尽力把 JSON 送回 WS；客户端已关时静默吞掉。"""
+    try:
+        await ws.send_json(payload)
+    except (WebSocketDisconnect, RuntimeError):
+        pass
 
 
 async def _safe_send_error(ws: WebSocket, message: str) -> None:

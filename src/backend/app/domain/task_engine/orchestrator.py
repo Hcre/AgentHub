@@ -13,7 +13,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from app.domain.enums import TaskStatus
-from app.domain.task_engine.dag import TaskDef, TaskGraph, TaskNode, build_graph
+from app.domain.task_engine.dag import TaskDef, TaskGraph, TaskNode, build_graph, topological_order
 from app.domain.task_engine.fsm import TaskFSM
 from app.domain.task_engine.ports import (
     Executor,
@@ -457,6 +457,8 @@ class Orchestrator:
             await self._progress(event_type, payload)
 
     async def _emit_plan(self) -> None:
+        assert self.graph is not None
+        order = topological_order(self.graph)
         steps = [
             {
                 "id": n.task.id,
@@ -465,7 +467,8 @@ class Orchestrator:
                 "depends": list(n.task.depends_on),
                 "status": "pending",
             }
-            for n in self.graph.nodes.values()
+            for tid in order
+            if (n := self.graph.nodes.get(tid))
         ]
         await self._emit("task_plan", {"plan": {"summary": "", "steps": steps, "watchouts": []}})
 

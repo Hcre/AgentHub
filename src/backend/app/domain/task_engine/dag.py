@@ -112,6 +112,26 @@ def _validate(tasks: list[TaskDef], available_workers: set[str]) -> None:
         raise DagValidationError(f"检测到循环依赖: {' → '.join(cycle)}")
 
 
+def topological_order(graph: TaskGraph) -> list[str]:
+    """Kahn 算法：返回 DAG 节点的拓扑序列表（无依赖在前，同级按 id 确定性排）。
+
+    用于前端 emit 时保持 DAG 逻辑顺序而非 LLM 产出原始顺序。"""
+    in_degree: dict[str, int] = {tid: len(node.task.depends_on) for tid, node in graph.nodes.items()}
+    queue = sorted(tid for tid, deg in in_degree.items() if deg == 0)
+    result: list[str] = []
+    while queue:
+        tid = queue.pop(0)
+        result.append(tid)
+        # 下游节点入度减一
+        for n in graph.nodes.values():
+            if tid in n.task.depends_on:
+                in_degree[n.task.id] -= 1
+                if in_degree[n.task.id] == 0:
+                    queue.append(n.task.id)
+                    queue.sort()  # 确定性
+    return result
+
+
 def _find_cycle(tasks: list[TaskDef]) -> list[str] | None:
     """DFS 环检测，返回环路径（用于报错），无环返回 None。"""
     graph = {t.id: t.depends_on for t in tasks}

@@ -33,6 +33,7 @@ export function ChatView({ agent }: { agent: Agent }) {
   const key = activeConversationId ? convKey(agent.id, activeConversationId) : null
   const list = key ? (messages[key] ?? []) : []
   const isTyping = key ? (typing[key] ?? false) : false
+  const isStreaming = list.some((m) => m.streaming === true)
   const sessionId = key ? (sessionIds[key] ?? null) : null
 
   // 首次进入会话：创建后端 Session 并恢复 workspace。
@@ -63,7 +64,7 @@ export function ChatView({ agent }: { agent: Agent }) {
     }
   }, [key, sessionId, agent.id, setSessionId, activeConversationId])
 
-  const { sendMessage } = useWebSocket(sessionId, key)
+  const { sendMessage, cancel } = useWebSocket(sessionId, key)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -211,7 +212,14 @@ export function ChatView({ agent }: { agent: Agent }) {
         </div>
       </div>
 
-      <Composer ref={composerRef} agent={agent} onSend={onSend} onCreateSkill={handleCreateSkill} />
+      <Composer
+        ref={composerRef}
+        agent={agent}
+        onSend={onSend}
+        onCreateSkill={handleCreateSkill}
+        isStreaming={isStreaming}
+        onCancel={cancel}
+      />
       {showTerminal && sessionId && <TerminalPanel sessionId={sessionId} onClose={() => setShowTerminal(false)} />}
     </div>
   )
