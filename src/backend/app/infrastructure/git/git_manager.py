@@ -23,6 +23,8 @@ def _run_git(
             text=True,
             timeout=timeout,
             cwd=cwd,
+            encoding="utf-8",
+            errors="replace",
         )
     except subprocess.TimeoutExpired as e:
         raise SyncError(f"git command timed out: {' '.join(args)}") from e

@@ -46,6 +46,7 @@ def _list_tree(workspace: str, max_depth: int = _TREE_DEPTH) -> str:
             result = subprocess.run(
                 ["git", "ls-files"], cwd=root,
                 capture_output=True, text=True, timeout=10, check=False,
+                encoding="utf-8", errors="replace",
             )
             files = result.stdout.strip().split("\n") if result.stdout.strip() else []
         except (OSError, subprocess.SubprocessError):

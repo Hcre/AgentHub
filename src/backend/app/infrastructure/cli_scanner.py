@@ -42,6 +42,8 @@ def _probe_version(bin_path: str, timeout: float = 3.0) -> str | None:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
+                encoding="utf-8",
+                errors="replace",
             )
             output = (proc.stdout or "").strip() or (proc.stderr or "").strip()
             if output:

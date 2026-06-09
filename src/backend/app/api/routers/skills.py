@@ -992,7 +992,7 @@ async def fs_git_diff(path: str, staged: bool = False) -> dict:
     if staged:
         args.append("--staged")
     try:
-        proc = _sp.run(args, capture_output=True, text=True, timeout=10)
+        proc = _sp.run(args, capture_output=True, text=True, timeout=10, encoding="utf-8", errors="replace")
     except FileNotFoundError:
         return {"ok": False, "reason": "git 未安装或不在 PATH"}
     except _sp.TimeoutExpired:

@@ -193,7 +193,8 @@ def spawn_visible_terminal(
                 "xterm",
             ):
                 which = subprocess.run(
-                    ["which", term], capture_output=True, text=True
+                    ["which", term], capture_output=True, text=True,
+                    encoding="utf-8", errors="replace",
                 )
                 if which.returncode == 0:
                     cmd_line = f'{term} -e bash -c "{bash_cmd}"'
