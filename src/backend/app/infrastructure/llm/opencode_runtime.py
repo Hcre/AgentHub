@@ -37,7 +37,7 @@ from app.infrastructure.llm.process_registry import save_spawn_info
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_TIMEOUT = 300
+_DEFAULT_TIMEOUT = 120
 _DEFAULT_MAX_TURNS = 10
 _DEFAULT_PERMISSION_MODE = "bypassPermissions"
 
