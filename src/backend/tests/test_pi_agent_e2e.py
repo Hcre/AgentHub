@@ -40,7 +40,7 @@ async def test_factory_routing():
     if not shutil.which("pi"):
         pytest.skip("Pi CLI 未安装（per TD-04：v4 R2 起 factory 硬依赖 CLI）")
     from app.domain.entities.agent import Agent
-    from app.domain.enums import AgentStatus, AgentSystem, Provider
+    from app.domain.enums import AgentStatus, AgentSystem
     from app.infrastructure.llm.factory import build_adapter_for_agent
 
     agent = Agent(
@@ -68,12 +68,11 @@ async def test_subprocess_lifecycle():
     """测试2: 子进程启动/停止"""
     from app.infrastructure.llm.pi_agent_runtime import PiAgentRuntime
 
+    # PiAgentRuntime 现签名：agent_id / agent_name / thinking_level / timeout
+    # （model/provider/api_key/base_url 已不再由构造器接收，运行时内部置默认）
     runtime = PiAgentRuntime(
-        model="claude-sonnet-4-20250514",
         agent_id=str(uuid4()),
-        provider="anthropic",
-        api_key="",  # 无 API key — 验证错误处理
-        base_url="",
+        agent_name="pi-e2e",
         timeout=30,
     )
 
@@ -119,10 +118,8 @@ async def test_rpc_protocol():
     from app.infrastructure.llm.pi_agent_runtime import PiAgentRuntime
 
     runtime = PiAgentRuntime(
-        model="claude-sonnet-4-20250514",
         agent_id=str(uuid4()),
-        provider="anthropic",
-        api_key=api_key,
+        agent_name="pi-rpc",
         timeout=60,
     )
 

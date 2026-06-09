@@ -417,17 +417,10 @@ async def test_group_discuss_does_not_spawn(db_session) -> None:  # type: ignore
     CoordinatorRegistry.clear()
 
 
-# === v3 步1：前门机械反射（迁移自 test_coordinator_gate）===
-
-
-@pytest.mark.parametrize("text", ["停", "取消", "停止", "  cancel ", "STOP"])
-def test_reflex_control_hits(text: str) -> None:
-    assert ChatService._is_control(text) is True
-
-
-@pytest.mark.parametrize("text", ["继续", "帮我加个功能", "停车场在哪", "停站点信息"])
-def test_reflex_control_misses(text: str) -> None:
-    assert ChatService._is_control(text) is False
+# 注：v3「前门机械反射」(ChatService._is_control 关键词命中即取消) 已在 v4 移除——
+# 取消/停止判定改由 ReactiveRouter 的 LLM route_message 工具承担（含「停一下/等一下
+# 不算 cancel，应 relay 讨论」的语义细分），机械关键词命中不再适用。原
+# test_reflex_control_hits/misses 测的是已删行为，随之移除。
 
 
 def _umsg(content: str, *, from_agent: bool = False) -> Message:
