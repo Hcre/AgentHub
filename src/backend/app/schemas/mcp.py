@@ -158,3 +158,52 @@ class McpBindingOut(BaseModel):
             status=str(b.status),
             created_at=b.created_at,
         )
+
+
+# ── F3 创建（路径 A, owner 特批 @2026-06-08 23:03 SLA 落地）──
+
+
+class McpServerCreateRequest(BaseModel):
+    """04-commands §2.6 F3 POST /api/mcp/servers 入参。"""
+
+    name: str = Field(min_length=1, max_length=128)
+    slug: str = Field(min_length=1, max_length=128)
+    description: str = ""
+    transport: str = Field(pattern="^(stdio|sse|streamable_http)$")
+    config_json: dict = Field(default_factory=dict)
+    version: str = "1.0.0"
+    tags: list[str] = Field(default_factory=list)
+    template_id: UUID | None = None
+    dry_run: bool = True
+
+
+class McpServerOut(BaseModel):
+    mcp_id: UUID
+    name: str
+    slug: str
+    description: str
+    transport: str
+    version: str
+    tags: list[str]
+    status: str
+    created_by: UUID | None
+    dry_run_result: dict | None
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_domain(cls, s: McpServer, dry_run_result: dict | None = None) -> McpServerOut:
+        return cls(
+            mcp_id=s.id,
+            name=s.name,
+            slug=s.slug,
+            description=s.description,
+            transport=str(s.transport),
+            version=s.version,
+            tags=s.tags,
+            status=str(s.status),
+            created_by=s.created_by,
+            dry_run_result=dry_run_result if dry_run_result is not None else s.dry_run_result,
+            created_at=s.created_at,
+            updated_at=s.updated_at,
+        )

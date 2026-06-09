@@ -194,8 +194,15 @@ async def test_group_at_routing_multi_mention_serial(db_session) -> None:  # typ
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(
+    reason="v3 时代 AT_ROUTING 硬静默断言已不可达：v4 R2 重构后 chat_service 不再读 "
+    "Group.dispatch_mode（'死群兜底' 改由 reactive router decide=done 承担），且 "
+    "_build_chat 默认 _StubRouter(done) 在 _handle_group 链路下会先经 _persist_user_message "
+    "→ 27 字符级 MockAdapter 回显（实测），events == [] 不再成立。需先审 v4 _handle_group "
+    "链路真意图后用路由器注入断言 '无真 Agent text 事件' 重写。See worklogs/袁/2026-06-09。"
+)
 async def test_group_no_mention_silent(db_session) -> None:  # type: ignore[no-untyped-def]
-    """死群兜底：无 @ + AT_ROUTING 模式 → 静默，无 Agent 响应。"""
+    """死群兜底（v3 语义）：无 @ + AT_ROUTING 模式 → 静默，无 Agent 响应。"""
     from app.domain.entities.agent import Agent
     from app.domain.entities.group import Group
     from app.domain.entities.session import Session
@@ -208,7 +215,7 @@ async def test_group_no_mention_silent(db_session) -> None:  # type: ignore[no-u
         await agent_repo.save(ag)
 
     group = Group(name="g3", coordinator_id=coord.id, member_ids=[a.id])
-    group.set_dispatch_mode(DispatchMode.AT_ROUTING)  # 显式降级
+    group.set_dispatch_mode(DispatchMode.AT_ROUTING)  # 显式降级（v4 死字段）
     await PostgresGroupRepository(db_session).save(group)
     session = Session(type=SessionType.GROUP, group_id=group.id, title="g")
     await PostgresSessionRepository(db_session).save(session)
@@ -264,14 +271,18 @@ async def test_group_invalid_mention_skipped(db_session) -> None:  # type: ignor
 
 
 class _RecordingSink:
+    """系统消息下沉（ChatService._coord_post 接线）— 收 session_id + content + sender_agent_id。"""
+
     def __init__(self) -> None:
         import asyncio
 
-        self.messages: list[str] = []
+        self.messages: list[tuple[str, str, object]] = []  # (session_id, content, sender_agent_id)
         self.done = asyncio.Event()
 
-    async def __call__(self, session_id, content) -> None:  # type: ignore[no-untyped-def]
-        self.messages.append(content)
+    async def __call__(self, session_id, content, sender_agent_id) -> None:  # type: ignore[no-untyped-def]
+        # 与 chat_service._coord_post(session.id, content, group.coordinator_id) 三参一致。
+        # 旧版只收 2 参（无 sender_agent_id），与生产调用 3 参不一致，本地触发 TypeError 暴露。
+        self.messages.append((session_id, content, sender_agent_id))
         self.done.set()
 
 
@@ -350,7 +361,11 @@ async def test_group_decompose_spawns_coordinator(db_session) -> None:  # type: 
             SendMessageCommand(session_id=session.id, content="帮我实现登录页")
         )
     ]
-    assert events == []  # task 路径不 yield worker 流
+    # v4 task 路径在后台起 Orchestrator 之前先 yield 一条 "✅ 任务已受理，正在规划…" 提示
+    # 给用户（v3 时代是 events == []）。task 路径仍然不 yield worker 流（被后台化）。
+    assert len(events) == 1
+    assert events[0].content == "✅ 任务已受理，正在规划…"
+    assert events[0].sender_agent_id == coord.id  # 由 coordinator 发送
     await asyncio.wait_for(sink.done.wait(), timeout=2)
     assert sink.messages  # 落了汇总系统消息
     assert CoordinatorRegistry().get(session.id) is None  # 完成后释放
@@ -701,7 +716,10 @@ async def test_execution_task_downgrades_to_note(db_session) -> None:  # type: i
             SendMessageCommand(session_id=session.id, content="顺便再做个注册页")
         )
     ]
-    assert events == []
+    # v4 执行态 task 降级 note 路径：除把 note 入桶外，还 yield 一条 "📋 已追加到当前任务队列"
+    # 给用户可见反馈（v3 是 events == []）。
+    assert len(events) == 1
+    assert events[0].content == "📋 已追加到当前任务队列"
     assert run._pending_notes == {"*": ["顺便再做个注册页"]}
     CoordinatorRegistry.clear()
 

@@ -1,6 +1,7 @@
 import { useState, type KeyboardEvent } from 'react'
 import { Button, Dialog, DialogContent, Icon, Input, Textarea } from '../ui'
 import { cn } from '../../lib/cn'
+import { skillsApi } from '../../api/skills'
 
 function Spinner() {
   return (
@@ -25,16 +26,6 @@ export interface CreateSkillDialogProps {
   onClose: () => void
   /** Optional callback when a skill was created successfully */
   onCreated?: () => void
-}
-
-async function safeJson(r: Response) {
-  const text = await r.text()
-  try {
-    return JSON.parse(text)
-  } catch {
-    const preview = text.trim().slice(0, 80)
-    throw new Error(preview || 'HTTP ' + r.status)
-  }
 }
 
 export function CreateSkillDialog({ open, onClose, onCreated }: CreateSkillDialogProps) {
@@ -112,19 +103,13 @@ export function CreateSkillDialog({ open, onClose, onCreated }: CreateSkillDialo
         ? examples.split('\n').filter((l) => l.trim())
         : []
 
-      const r = await fetch('/api/skills/library/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim(),
-          triggers,
-          instructions: instructions.trim(),
-          examples: exampleList,
-        }),
+      await skillsApi.createLibrary({
+        name: name.trim(),
+        description: description.trim(),
+        triggers,
+        instructions: instructions.trim(),
+        examples: exampleList,
       })
-      const data = await safeJson(r)
-      if (!r.ok) throw new Error(data.detail || '创建失败')
       reset()
       onClose()
       onCreated?.()
@@ -144,13 +129,7 @@ export function CreateSkillDialog({ open, onClose, onCreated }: CreateSkillDialo
     setError('')
     setGenerated(null)
     try {
-      const r = await fetch('/api/skills/library/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: aiPrompt.trim() }),
-      })
-      const data = await safeJson(r)
-      if (!r.ok) throw new Error(data.detail || 'AI 生成失败')
+      const data = await skillsApi.generateLibrary(aiPrompt.trim())
       // Pre-fill form fields from generated data
       const fields: GeneratedFields = {
         name: data.name || '',

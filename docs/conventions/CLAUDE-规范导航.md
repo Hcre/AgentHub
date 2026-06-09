@@ -88,8 +88,8 @@
 | T-05 | Adapter 必测 成功/限流/超时/key失效/流式中断 |
 | T-06 | FSM 必测 合法/非法/幂等/边界 |
 
-### 文档红线（D-01 ~ D-12，见 06 §一）
-全部对齐 `scripts/check_docs.py` 自动检测，详见 06。
+### 文档红线（D-01 ~ D-13，见 06 §一）
+全部对齐 `scripts/check_docs.py` + `markdownlint-cli2` 自动检测，详见 06。
 
 ---
 
