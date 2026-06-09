@@ -207,6 +207,7 @@ docs/plan/开发清单_roadmap.md ──驱动──→ STATUS.md ──被解�
 
 **端口**：frontend 5173 · backend 8000（`/docs` `/health`）· postgres 5432 · redis 6379。
 **排错**：启动见 postgres `Exited(127)` 或前端在 5173 → 是开机自启的旧容器，`docker rm -f $(docker ps -aq --filter name=agenthub)` 清掉重建。
+**alembic `Can't locate revision`**：多 worktree 共享同一 PostgreSQL，旧分支的 migration 残留 stamp。`psql` 连入执行 `UPDATE alembic_version SET version_num = '<main 链最新 revision>';`，再 `alembic upgrade head`。
 
 ---
 

@@ -6,14 +6,12 @@ import { useChatStore } from '../../stores/chatStore'
 import { Avatar, Icon } from '../ui'
 import type { IconName } from '../../types'
 import { HelpModal } from '../settings/HelpModal'
-import { TokenMonitorPanel } from '../settings/TokenMonitorPanel'
 
-/** 4 个主功能 + 1 个用量入口。help/usage 不映射到 section，弹模态。 */
+/** 4 个主功能 + 设置入口 */
 interface RailItem {
   key: string
   icon: IconName
   label: string
-  /** 命中后高亮的 uiStore.section；undefined = 弹模态而非路由 */
   section?: Section
 }
 
@@ -22,14 +20,12 @@ const RAIL_ITEMS: RailItem[] = [
   { key: 'agent', icon: 'users', label: 'AI 队友', section: 'agent-detail' },
   { key: 'group', icon: 'channels', label: '群组', section: 'groups' },
   { key: 'skill', icon: 'lock', label: 'Skill', section: 'skills-market' },
-  { key: 'usage', icon: 'activity', label: '用量' },
 ]
 
 export function NavRail() {
   const { section, setSection, theme, toggleTheme } = useUIStore()
   const unreadByConv = useChatStore((s) => s.unreadByConv)
   const [helpOpen, setHelpOpen] = useState(false)
-  const [usageOpen, setUsageOpen] = useState(false)
   // 总未读（任意会话有新消息）—— 给 chat 入口加红点
   const totalUnread = Object.values(unreadByConv).reduce((a, b) => a + b, 0)
 
@@ -51,9 +47,7 @@ export function NavRail() {
             const showUnread = item.key === 'chat' && totalUnread > 0
             const onClick = item.section
               ? () => setSection(item.section!)
-              : item.key === 'usage'
-                ? () => setUsageOpen(true)
-                : undefined
+              : undefined
             return (
               <button
                 key={item.key}
@@ -115,11 +109,11 @@ export function NavRail() {
             <Icon name="info" className="h-[clamp(14px,1.1vw,18px)] w-[clamp(14px,1.1vw,18px)]" />
           </button>
           <button
-            onClick={() => setSection('api-keys')}
+            onClick={() => setSection('settings')}
             title="设置"
             aria-label="设置"
-            aria-current={section === 'api-keys' ? 'page' : undefined}
-            data-active={section === 'api-keys' ? 'true' : undefined}
+            aria-current={section === 'settings' ? 'page' : undefined}
+            data-active={section === 'settings' ? 'true' : undefined}
             className={cn(
               'group relative grid h-[clamp(36px,2.6vw,44px)] w-[clamp(36px,2.6vw,44px)] place-items-center rounded-lg text-muted-foreground transition-colors',
               'hover:bg-accent hover:text-foreground',
@@ -127,19 +121,18 @@ export function NavRail() {
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background',
             )}
           >
-            {section === 'api-keys' && (
+            {section === 'settings' && (
               <span
                 aria-hidden
                 className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-brand"
               />
             )}
-            <Icon name="settings" className="h-[clamp(14px,1.1vw,18px)] w-[clamp(14px,1.1vw,18px)]" strokeWidth={section === 'api-keys' ? 2.25 : 1.75} />
+            <Icon name="settings" className="h-[clamp(14px,1.1vw,18px)] w-[clamp(14px,1.1vw,18px)]" strokeWidth={section === 'settings' ? 2.25 : 1.75} />
           </button>
         </div>
       </aside>
 
       <HelpModal open={helpOpen} onOpenChange={setHelpOpen} />
-      <TokenMonitorPanel open={usageOpen} onOpenChange={setUsageOpen} />
     </>
   )
 }

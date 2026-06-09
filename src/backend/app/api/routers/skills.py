@@ -816,11 +816,14 @@ async def fs_browse(path: str = "") -> dict:
             letters = [d.rstrip("\\").rstrip("/") for d in drives]
         else:
             letters = [f"{c}:\\" for c in "CDEFGHIJKLMNOPQRSTUVWXYZ" if _os.path.isdir(f"{c}:\\")]
-        return {
-            "path": "",
-            "parent": "",
-            "items": [{"name": l, "path": l, "type": "drive"} for l in letters],
-        }
+        # Linux/macOS fallback：无盘符 → 浏览根目录
+        if letters:
+            return {
+                "path": "",
+                "parent": "",
+                "items": [{"name": l, "path": l, "type": "drive"} for l in letters],
+            }
+        path = "/"
     real = _resolve_path(path)
     if not _os.path.isdir(real):
         raise HTTPException(status_code=404, detail=f"目录不存在：{real}")
@@ -859,6 +862,30 @@ async def fs_read(body: FsReadRequest) -> dict:
             return {"path": real, "content": f.read(), "size": size}
     except UnicodeDecodeError:
         raise HTTPException(status_code=415, detail="二进制文件不支持预览")
+
+
+@FS_ROUTER.get("/raw")
+async def fs_raw(path: str):
+    """Serve raw file content with proper MIME type (for images, etc.)."""
+    import os as _os
+    import mimetypes
+
+    from fastapi.responses import FileResponse
+
+    if not path:
+        raise HTTPException(status_code=400, detail="path 必填")
+    real = _resolve_path(path)
+    if not _os.path.isfile(real):
+        raise HTTPException(status_code=404, detail=f"文件不存在：{real}")
+    size = _os.path.getsize(real)
+    if size > 10 * 1024 * 1024:  # 10 MB
+        raise HTTPException(status_code=413, detail="文件超过 10MB")
+
+    mime_type, _ = mimetypes.guess_type(real)
+    if not mime_type:
+        mime_type = "application/octet-stream"
+
+    return FileResponse(real, media_type=mime_type)
 
 
 @FS_ROUTER.post("/mkdir")

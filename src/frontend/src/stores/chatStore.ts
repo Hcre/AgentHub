@@ -149,6 +149,7 @@ export const useChatStore = create<ChatState>()(
           })
           if (event.type === 'text') {
             const chunk = event.content ?? ''
+            if (!chunk) return {}
             const idx = list.findIndex((m) => m.id === streamingId(key))
             if (idx >= 0) {
               const cur = list[idx]!
@@ -233,6 +234,10 @@ export const useChatStore = create<ChatState>()(
               name: tc.name,
               args: tc.arguments ?? {},
               status: 'pending',
+            }
+            // 文件修改类工具 → 通知 FilePreview 刷新
+            if (/^(Write|Edit|Bash|write|edit|bash|write_to_file|replace_in_file)$/i.test(tc.name)) {
+              queueMicrotask(() => window.dispatchEvent(new CustomEvent('file-changed')))
             }
             const idx = list.findIndex((m) => m.id === streamingId(key))
             if (idx >= 0) {
@@ -370,6 +375,38 @@ export const useChatStore = create<ChatState>()(
               time: nowStamp(),
               text: '',
               taskPlan: tpData,
+              streaming: true,
+            }
+            return {
+              messages: { ...s.messages, [key]: [...list, seeded] },
+              typing: { ...s.typing, [key]: false },
+              ...bumpUnread(),
+            }
+          }
+
+          // ── task_update：协调者任务进度更新（orchestrator 推送）──
+          if (event.type === 'task_update') {
+            const updateText = event.content ?? '任务进度更新'
+            const idx = list.findIndex((m) => m.id === streamingId(key))
+            if (idx >= 0) {
+              const cur = list[idx]!
+              const next = [...list]
+              // 追加到 thinking 字段，让进度信息在 ThinkingBlock 中可见
+              next[idx] = {
+                ...cur,
+                thinking: (cur.thinking ?? '') + '\n🔄 ' + updateText,
+              }
+              return {
+                messages: { ...s.messages, [key]: next },
+                typing: { ...s.typing, [key]: false },
+              }
+            }
+            const seeded: ChatMessage = {
+              id: streamingId(key),
+              from: 'agent',
+              time: nowStamp(),
+              text: '',
+              thinking: '🔄 ' + updateText,
               streaming: true,
             }
             return {

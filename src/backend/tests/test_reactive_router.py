@@ -12,14 +12,14 @@ import pytest
 from app.application.services.reactive_router import PlannerDecision, ReactiveRouter
 from app.application.services.session_state import PlanView, SessionState, StepView
 from app.domain.entities.agent import Agent
-from app.domain.enums import AgentSystem, Provider
+from app.domain.enums import AgentSystem
 
 
 def _agent(name: str, tags: list[str]) -> Agent:
     return Agent(
         name=name, role="dev", avatar="",
-        agent_system=AgentSystem.CLAUDE_CODE, provider=Provider.ANTHROPIC, model="m",
-        api_key_encrypted="x", capability_tags=tags, system_prompt="",
+        agent_system=AgentSystem.CLAUDE_CODE,
+        capability_tags=tags, system_prompt="",
     )
 
 

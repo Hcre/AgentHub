@@ -98,7 +98,7 @@ class TestConstructor:
         runtime = ClaudeCodeRuntime()
         assert runtime._model == ""
         assert runtime._proxy_url == ""
-        assert runtime._permission_mode == "acceptEdits"
+        assert runtime._permission_mode == "bypassPermissions"
         assert runtime._max_turns == 10
 
     def test_full_config(self) -> None:

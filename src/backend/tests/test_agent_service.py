@@ -21,9 +21,6 @@ async def test_create_agent(db_session) -> None:  # type: ignore[no-untyped-def]
             name="FrontendAgent",
             avatar="http://x/a.png",
             role="前端专家",
-            provider="anthropic",
-            model="claude-sonnet-4-20250514",
-            api_key="sk-secret",
         )
     )
     assert resp.name == "FrontendAgent"
@@ -39,9 +36,6 @@ async def test_duplicate_name_rejected(db_session) -> None:  # type: ignore[no-u
         name="Dup",
         avatar="a",
         role="r",
-        provider="openai",
-        model="gpt-4o",
-        api_key="k",
     )
     await svc.create(cmd)
     with pytest.raises(DomainError):
@@ -56,9 +50,6 @@ async def test_update_agent(db_session) -> None:  # type: ignore[no-untyped-def]
             name="A",
             avatar="a",
             role="r",
-            provider="anthropic",
-            model="m",
-            api_key="k",
         )
     )
     updated = await svc.update(UpdateAgentCommand(agent_id=created.id, role="新角色"))

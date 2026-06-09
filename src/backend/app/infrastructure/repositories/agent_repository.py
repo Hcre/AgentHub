@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities.agent import Agent
-from app.domain.enums import AgentStatus, AgentSystem, Provider
+from app.domain.enums import AgentStatus, AgentSystem
 from app.domain.repositories import AgentRepository
 from app.infrastructure.db.models import AgentModel
 
@@ -20,10 +20,6 @@ def _to_domain(m: AgentModel) -> Agent:
         avatar=m.avatar,
         role=m.role,
         agent_system=AgentSystem(m.agent_system),
-        provider=Provider(m.provider),
-        model=m.model,
-        base_url=m.base_url,
-        api_key_encrypted=m.api_key_encrypted,
         status=AgentStatus(m.status),
         workload=m.workload,
         is_system=m.is_system,
@@ -93,10 +89,6 @@ def _to_model(a: Agent) -> AgentModel:
         avatar=a.avatar,
         role=a.role,
         agent_system=str(a.agent_system),
-        provider=str(a.provider),
-        model=a.model,
-        api_key_encrypted=a.api_key_encrypted,
-        base_url=a.base_url,
         status=str(a.status),
         workload=a.workload,
         is_system=a.is_system,
@@ -114,10 +106,6 @@ def _update_model(m: AgentModel, a: Agent) -> None:
     m.avatar = a.avatar
     m.role = a.role
     m.agent_system = str(a.agent_system)
-    m.provider = str(a.provider)
-    m.model = a.model
-    m.api_key_encrypted = a.api_key_encrypted
-    m.base_url = a.base_url
     m.status = str(a.status)
     m.workload = a.workload
     m.skills = a.skills

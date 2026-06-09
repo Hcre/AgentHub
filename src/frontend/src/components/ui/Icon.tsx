@@ -48,6 +48,8 @@ import {
   X,
   Zap,
   Menu,
+  WrapText,
+  Terminal,
   type LucideIcon,
 } from 'lucide-react'
 import type { IconName } from '../../types'
@@ -102,6 +104,8 @@ const MAP: Record<IconName, LucideIcon> = {
   rocket: Rocket,
   folderOpen: FolderOpen,
   menu: Menu,
+  wrapText: WrapText,
+  terminal: Terminal,
 }
 
 export interface IconProps {

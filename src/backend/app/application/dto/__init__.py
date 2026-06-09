@@ -18,8 +18,6 @@ class AgentResponse:
     avatar: str
     role: str
     agent_system: str
-    provider: str
-    model: str
     status: str
     skills: list[str]
     capability_tags: list[str]
@@ -28,7 +26,6 @@ class AgentResponse:
     settings: dict
     template_name: str | None = None
     created_from_template_id: UUID | None = None
-    # 注意：绝不返回 api_key
 
     @classmethod
     def from_domain(cls, a: Agent) -> AgentResponse:
@@ -38,8 +35,6 @@ class AgentResponse:
             avatar=a.avatar,
             role=a.role,
             agent_system=str(a.agent_system),
-            provider=str(a.provider),
-            model=a.model,
             status=str(a.status),
             skills=a.skills,
             capability_tags=a.capability_tags,

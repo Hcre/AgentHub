@@ -17,6 +17,7 @@ import re
 import shutil
 from collections.abc import AsyncIterator
 from contextlib import suppress
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.domain.llm.protocol import (
@@ -27,6 +28,7 @@ from app.domain.llm.protocol import (
     ToolCall,
     ToolResult,
 )
+from app.infrastructure.llm.cli_logger import get_log_path, spawn_visible_terminal
 
 logger = logging.getLogger(__name__)
 
@@ -124,22 +126,22 @@ class PiAgentRuntime(AgentRuntime):
         if request.group_delta_text:
             sp = "\n\n".join(filter(None, [sp, request.group_delta_text]))
 
-        logger.info(
-            "Pi Agent request_id=%s session=%s provider=%s model=%s",
-            request.request_id,
-            request.session_id,
-            self._provider,
-            self._model,
-        )
-
         prompt = self._extract_prompt(request)
         if not prompt:
             yield StreamEvent(type=StreamEventType.ERROR, seq=0, content="Pi Agent: 无用户消息")
             return
 
-        # 群聊：uuid5(session_id:agent_id) 确定性映射，避免跨 agent 会话污染
+        # 群聊：agent_id 后缀确定性映射，避免跨 agent 会话污染
         session_key = self._compute_session_key(request)
         session_file = str(Path(self._session_dir) / f"{session_key}.jsonl")
+
+        logger.info(
+            "Pi Agent request_id=%s session_key=%s provider=%s model=%s",
+            request.request_id,
+            session_key,
+            self._provider,
+            self._model,
+        )
 
         cmd = self._build_cmd(session_file, request, sp)
         env = self._build_env()
@@ -169,31 +171,80 @@ class PiAgentRuntime(AgentRuntime):
                 content=f"⚠️ pi CLI 未安装或路径不存在: {cwd or '当前目录'}",
             )
             return
+        except OSError as exc:
+            yield StreamEvent(
+                type=StreamEventType.ERROR,
+                seq=0,
+                content=f"⚠️ pi CLI 启动失败: {exc}",
+            )
+            return
+
+        # 尝试打开可见终端用于调试；失败静默回退 headless 模式
+        ok = spawn_visible_terminal(cmd, env, cwd, session_key, prompt)
+        if not ok:
+            logger.debug("Visible terminal unavailable for session=%s, continuing headless", session_key)
+
+        prompt_cmd = json.dumps({"type": "prompt", "message": prompt}) + "\n"
+        from app.infrastructure.llm.process_registry import save_spawn_info
+
+        save_spawn_info(
+            str(request.session_id),
+            cmd=cmd,
+            env=env,
+            cwd=cwd,
+            prompt_text=prompt_cmd,
+        )
         assert self._process.stdin is not None
         assert self._process.stdout is not None
 
         # 发送 prompt command
-        prompt_cmd = json.dumps({"type": "prompt", "message": prompt}) + "\n"
         self._process.stdin.write(prompt_cmd.encode())
         await self._process.stdin.drain()
 
         # 读取并解析 stdout JSONL
+        # Windows 上 asyncio.wait_for 无法取消子进程管道 readline（底层 I/O 不支持 cancellation），
+        # 所以用并行 watchdog task：超时后 force-kill 子进程 → stdout 关闭 → readline 返回 EOF。
         seq = 0
-        try:
-            async for line in self._read_lines_with_timeout(self._process.stdout):
-                events = self._parse_line(line, seq)
-                for evt in events:
-                    yield evt
-                    seq = evt.seq + 1
-                if events and events[-1].type in (StreamEventType.DONE, StreamEventType.ERROR):
-                    break
-        except TimeoutError:
+        watchdog_task: asyncio.Task[None] | None = None
+        timed_out = False
+
+        async def _watchdog() -> None:
+            nonlocal timed_out
+            try:
+                await asyncio.sleep(self._timeout)
+                timed_out = True
+                logger.warning(
+                    "Pi Agent 超时 (%ss)，强制终止子进程 pid=%s",
+                    self._timeout,
+                    self._process.pid if self._process else "?",
+                )
+                await self.stop()
+            except asyncio.CancelledError:
+                pass  # 正常完成，取消 watchdog
+
+        if self._process and self._process.stdout:
+            watchdog_task = asyncio.create_task(_watchdog())
+            try:
+                async for line in self._read_lines(self._process.stdout, str(request.session_id)):
+                    events = self._parse_line(line, seq)
+                    for evt in events:
+                        yield evt
+                        seq = evt.seq + 1
+                    if events and events[-1].type in (StreamEventType.DONE, StreamEventType.ERROR):
+                        break
+            finally:
+                # 确保 watchdog 被取消（正常完成或异常退出）
+                if watchdog_task and not watchdog_task.done():
+                    watchdog_task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await watchdog_task
+
+        if timed_out:
             yield StreamEvent(
                 type=StreamEventType.ERROR,
                 seq=seq,
-                content=f"Pi Agent 超时 ({self._timeout}s)",
+                content=f"Pi Agent 超时 ({self._timeout}s)，已强制终止。请重试或简化任务。",
             )
-            await self.stop()
             return
 
         # 关闭 stdin 并等待退出
@@ -231,7 +282,35 @@ class PiAgentRuntime(AgentRuntime):
                 await asyncio.wait_for(self._process.wait(), timeout=5)
             except TimeoutError:
                 self._process.kill()
+                try:
+                    await asyncio.wait_for(self._process.wait(), timeout=3)
+                except TimeoutError:
+                    await self._force_kill_subprocess()
             self._process = None
+
+    async def _force_kill_subprocess(self) -> None:
+        """跨平台强制杀子进程 — Windows taskkill / Unix kill -9。
+        在 asyncio wait_for 无法取消 Windows 子进程管道 I/O 时兜底。"""
+        if self._process is None:
+            return
+        pid = self._process.pid
+        if pid is None:
+            return
+        import platform
+        import subprocess as _sub
+
+        if platform.system() == "Windows":
+            try:
+                _sub.run(
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    capture_output=True,
+                    timeout=10,
+                )
+            except Exception:
+                pass
+        else:
+            with suppress(Exception):
+                os.kill(pid, 9)
 
     # --- 内部方法 ---
 
@@ -241,10 +320,18 @@ class PiAgentRuntime(AgentRuntime):
         pi = shutil.which("pi")
         if pi:
             return pi
-        # fallback: 检查本地 clone
-        local = Path(__file__).parent.parent.parent.parent.parent.parent / "pi-agent" / "pi-test.sh"
-        if local.exists():
-            return str(local)
+        # fallback: 检查本地 clone（跨平台脚本）
+        import platform
+        local_dir = Path(__file__).parent.parent.parent.parent.parent.parent / "pi-agent"
+        if platform.system() == "Windows":
+            for ext in (".cmd", ".bat", ".ps1", ".sh"):
+                local = local_dir / f"pi-test{ext}"
+                if local.exists():
+                    return str(local)
+        else:
+            local = local_dir / "pi-test.sh"
+            if local.exists():
+                return str(local)
         return "pi"  # 最后 fallback
 
     def _build_cmd(self, session_file: str, request: AgentRequest, sp: str | None = None) -> list[str]:
@@ -259,21 +346,34 @@ class PiAgentRuntime(AgentRuntime):
         pi_provider = _PROVIDER_MAP.get(self._provider, "anthropic")
         cmd.extend(["--provider", pi_provider])
 
+        # 模型选择：通过 --model CLI flag（PI_MODEL 环境变量无效，pi 不读取）
+        if self._model:
+            cmd.extend(["--model", self._model])
+
         if self._thinking_level != "off":
             cmd.extend(["--thinking", self._thinking_level])
 
-        # 权限模式（可配置）
-        cmd.extend(["--permission-mode", self._permission_mode])
-        cmd.extend(["--max-turns", str(self._max_turns)])
+        # 无界面服务器模式：禁用上下文文件 + 用户扩展，确保确定性行为
+        cmd.extend(["--no-context-files", "--no-extensions"])
 
         if sp:
             if self._agent_name:
                 sp = f"你的名字是{self._agent_name}。\n\n{sp}"
+            # Windows 命令行长度限制 8191 字符：长 system_prompt 有风险，记录警告
+            if len(sp) > 7000:
+                logger.warning(
+                    "Pi Agent system_prompt 长度 %s 接近 Windows 命令行限制 8191，可能被截断",
+                    len(sp),
+                )
             cmd.extend(["--system-prompt", sp])
 
         # API key：代理模式下不暴露在命令行（由 _build_env 注入环境变量）
         if self._api_key and not self._proxy_url:
             cmd.extend(["--api-key", self._api_key])
+
+        # 工具允许列表映射（如果上游支持 --tools flag）
+        if request.available_tools:
+            cmd.extend(["--tools", ",".join(request.available_tools)])
 
         # NB-02: MCP 注入 seam — blocked on upstream pi CLI MCP support（见 ADR-06 §2.3 / RT-MCP §3）
         # 解除条件：确认 pi CLI 的 MCP config 或 extension 通道存在 → 按 ADR-06 统一原则把
@@ -284,22 +384,26 @@ class PiAgentRuntime(AgentRuntime):
     def _build_env(self) -> dict[str, str]:
         """构造 CLI 子进程环境变量。
 
-        - 任意模式：注入 model（让 CLI 知道用什么模型）
-        - 代理模式（proxy_url 非空）：额外注入 API key / base URL
-          把请求重定向到 AgentHub 代理（认证/限流）
+        - 代理模式（proxy_url 非空）：通过 provider-specific 环境变量注入 API key
+          和 base URL，把请求重定向到 AgentHub 代理（认证/限流）
         - 全局模式：不覆盖 API key / base URL，CLI 沿用自身配置
         """
         env = os.environ.copy()
-        # 注入模型：通过 provider 对应的 env var（如 ANTHROPIC_MODEL、DEEPSEEK_API_KEY 等）
-        if self._model:
-            env["PI_MODEL"] = self._model
         if self._proxy_url:
             # 代理模式：API key 通过环境变量注入（不在命令行暴露）
             env_key = _PROVIDER_ENV_KEY.get(self._provider, "")
             if env_key:
-                env[env_key] = "agenthub-proxy"
+                # 占位 key：代理服务端会替换为真实 key
+                env[env_key] = self._proxy_url + "/key" if env_key else ""
             # 注入代理 base URL
-            env["PI_BASE_URL"] = self._proxy_url
+            base_env_keys = {
+                "anthropic": "ANTHROPIC_BASE_URL",
+                "openai": "OPENAI_BASE_URL",
+                "deepseek": "DEEPSEEK_BASE_URL",
+            }
+            base_key = base_env_keys.get(self._provider)
+            if base_key:
+                env[base_key] = self._proxy_url
         elif self._api_key:
             # 非代理模式：如果有 API key，注入环境变量
             env_key = _PROVIDER_ENV_KEY.get(self._provider, "")
@@ -324,21 +428,30 @@ class PiAgentRuntime(AgentRuntime):
             return f"{request.session_id}_{request.agent_id}"
         return str(request.session_id)
 
-    async def _read_lines_with_timeout(self, stdout: asyncio.StreamReader) -> AsyncIterator[str]:
-        deadline = asyncio.get_event_loop().time() + self._timeout
-        while True:
-            remaining = deadline - asyncio.get_event_loop().time()
-            if remaining <= 0:
-                raise TimeoutError
-            try:
-                line = await asyncio.wait_for(stdout.readline(), timeout=remaining)
-            except TimeoutError:
-                raise
-            if not line:
-                break
-            decoded = line.decode(errors="replace").strip()
-            if decoded:
-                yield decoded
+    @staticmethod
+    async def _read_lines(stdout: asyncio.StreamReader, session_id: str = "") -> AsyncIterator[str]:
+        """读取 stdout 行，不做超时（超时由 watchdog task 杀进程 → EOF 来保证）。
+        同时将输出写入 cli_logger 日志文件。"""
+        log_fh = None
+        if session_id:
+            log_path = get_log_path(session_id)
+            log_fh = open(log_path, "a", encoding="utf-8", errors="replace")
+            log_fh.write(f"\n=== Pi Agent {datetime.now(UTC).isoformat()} ===\n")
+            log_fh.flush()
+        try:
+            while True:
+                line = await stdout.readline()
+                if not line:
+                    break
+                decoded = line.decode(errors="replace").strip()
+                if decoded:
+                    if log_fh:
+                        log_fh.write(decoded + "\n")
+                        log_fh.flush()
+                    yield decoded
+        finally:
+            if log_fh:
+                log_fh.close()
 
     def _parse_line(self, line: str, seq: int) -> list[StreamEvent]:
         """解析一行 Pi RPC JSONL 输出，映射为 StreamEvent 列表。
@@ -346,12 +459,20 @@ class PiAgentRuntime(AgentRuntime):
         Pi RPC 事件 → StreamEventType:
         - message_update.text_delta    → TEXT
         - message_update.thinking_delta → THINKING
+        - message_update.toolcall_delta → (累积，最终由 toolcall_end 产出 TOOL_CALL)
         - message_update.toolcall_end  → TOOL_CALL
         - message_update.done          → DONE (turn 结束)
         - message_update.error         → ERROR
+        - tool_execution_start         → (无事件产出)
+        - tool_execution_update        → TEXT（流式工具输出增量）
         - tool_execution_end           → TOOL_RESULT
+        - agent_start                  → THINKING（前端显示忙碌指示器）
         - agent_end                    → DONE (流结束)
         - extension_ui_request         → REQUEST_APPROVAL
+        - extension_error              → ERROR
+        - compaction_start/end         → THINKING（进度指示）
+        - auto_retry_start             → THINKING（进度指示）
+        - auto_retry_end               → ERROR（最终失败时）
         """
         try:
             data = json.loads(line)
@@ -381,17 +502,57 @@ class PiAgentRuntime(AgentRuntime):
                 else:
                     events = self._extract_message_content(msg, seq)
 
+        elif event_type == "agent_start":
+            # Agent 启动 → THINKING 事件，让前端显示忙碌指示器
+            events = [
+                StreamEvent(
+                    type=StreamEventType.THINKING,
+                    seq=seq,
+                    content="Pi Agent 正在启动…",
+                )
+            ]
+
         elif event_type == "tool_execution_start":
-            pass  # 不产出事件，等待 tool_execution_end
+            pass  # 不产出事件，等待 tool_execution_update / tool_execution_end
+
+        elif event_type == "tool_execution_update":
+            # 流式工具输出增量 → 作为 TEXT 事件递送（实时显示工具输出）
+            delta = data.get("delta", data.get("output", ""))
+            if delta:
+                call_id = data.get("toolCallId", "")
+                events = [
+                    StreamEvent(
+                        type=StreamEventType.TEXT,
+                        seq=seq,
+                        content=f"[工具输出] {delta}" if call_id else delta,
+                    )
+                ]
 
         elif event_type == "tool_execution_end":
             te = data
             is_error = te.get("isError", False)
             raw = te.get("result")
+            # RPC 规范：result 是对象 { content: [{type, text}...], details: {truncation, fullOutputPath} }
+            content_str = ""
             if isinstance(raw, dict):
-                raw = json.dumps(raw, ensure_ascii=False)
-            elif not isinstance(raw, str):
-                raw = str(raw) if raw is not None else ""
+                content_arr = raw.get("content", [])
+                if isinstance(content_arr, list):
+                    parts = []
+                    for c in content_arr:
+                        if isinstance(c, dict) and c.get("type") == "text":
+                            parts.append(c.get("text", ""))
+                    content_str = "\n".join(parts)
+                # 截断提示：如果输出被截断，附加提示
+                details = raw.get("details", {})
+                if isinstance(details, dict) and details.get("truncation"):
+                    full_path = details.get("fullOutputPath", "")
+                    content_str += f"\n\n[输出已截断，完整内容: {full_path}]" if full_path else "\n\n[输出已截断]"
+                if not content_str:
+                    content_str = json.dumps(raw, ensure_ascii=False)
+            elif isinstance(raw, str):
+                content_str = raw
+            elif raw is not None:
+                content_str = str(raw)
             events = [
                 StreamEvent(
                     type=StreamEventType.TOOL_RESULT,
@@ -399,9 +560,72 @@ class PiAgentRuntime(AgentRuntime):
                     tool_result=ToolResult(
                         call_id=te.get("toolCallId", ""),
                         success=not is_error,
-                        content=raw if not is_error else None,
-                        error=raw if is_error else None,
+                        content=content_str if not is_error else None,
+                        error=content_str if is_error else None,
                     ),
+                )
+            ]
+
+        elif event_type == "compaction_start":
+            # 上下文压缩开始 → THINKING（进度指示）
+            logger.info("Pi Agent 压缩中 (session=%s)", data.get("sessionId", "?"))
+            events = [
+                StreamEvent(
+                    type=StreamEventType.THINKING,
+                    seq=seq,
+                    content="正在压缩上下文…",
+                )
+            ]
+
+        elif event_type == "compaction_end":
+            # 压缩完成：检查是否有错误
+            if not data.get("success", True):
+                err = data.get("error", "压缩失败")
+                logger.warning("Pi Agent 压缩失败: %s", err)
+                events = [
+                    StreamEvent(
+                        type=StreamEventType.ERROR,
+                        seq=seq,
+                        content=f"上下文压缩失败: {err}",
+                    )
+                ]
+            else:
+                logger.debug("Pi Agent 压缩完成")
+
+        elif event_type == "auto_retry_start":
+            attempt = data.get("attempt", 1)
+            max_attempts = data.get("maxAttempts", "?")
+            events = [
+                StreamEvent(
+                    type=StreamEventType.THINKING,
+                    seq=seq,
+                    content=f"正在重试 ({attempt}/{max_attempts})…",
+                )
+            ]
+
+        elif event_type == "auto_retry_end":
+            if not data.get("success", True):
+                err = data.get("error", "重试耗尽")
+                logger.warning("Pi Agent 自动重试失败: %s", err)
+                events = [
+                    StreamEvent(
+                        type=StreamEventType.ERROR,
+                        seq=seq,
+                        content=f"自动重试失败: {err}",
+                    )
+                ]
+            else:
+                logger.debug("Pi Agent 自动重试成功")
+
+        elif event_type == "extension_error":
+            ext_name = data.get("extensionName", data.get("name", "unknown"))
+            err_msg = data.get("error", data.get("message", "扩展错误"))
+            logger.warning("Pi 扩展错误 [%s]: %s", ext_name, err_msg)
+            events = [
+                StreamEvent(
+                    type=StreamEventType.ERROR,
+                    seq=seq,
+                    content=f"扩展 [{ext_name}] 错误: {err_msg}",
                 )
             ]
 
@@ -515,6 +739,10 @@ class PiAgentRuntime(AgentRuntime):
                     content=delta.get("delta", ""),
                 )
             )
+
+        elif delta_type == "toolcall_delta":
+            # 工具调用参数增量 — 暂不单独产出事件，最终由 toolcall_end 产出完整 TOOL_CALL
+            logger.debug("Pi toolcall_delta: call_id=%s delta_len=%s", delta.get("id", "?"), len(delta.get("delta", "")))
 
         elif delta_type == "toolcall_end":
             tc = delta.get("toolCall", {})

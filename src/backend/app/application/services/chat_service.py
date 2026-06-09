@@ -79,7 +79,7 @@ _DISCUSS_SOFT_LIMIT = 10
 
 # Phase 5 接线：可注入的协作者组装器 + 后台系统消息 sink（生产默认在 coordinator_run）
 OrchestratorBuilder = Callable[..., Awaitable[Orchestrator]]
-SystemMessageSink = Callable[[uuid.UUID, str], Awaitable[None]]
+SystemMessageSink = Callable[..., Awaitable[None]]
 
 
 def _format_replan_confirmation(diff: ReplanDiff, requirement: str) -> str:
@@ -262,13 +262,29 @@ class ChatService:
                     # 已有 DAG 在跑 → 新任务降级 note（单 Orchestrator/session，design §7）
                     logger.info("执行态 decide=task，降级 note session=%s", session.id)
                     run.enqueue_note(text)
+                    yield StreamEvent(
+                        type=StreamEventType.TEXT,
+                        seq=0,
+                        content="📋 已追加到当前任务队列",
+                    )
                 else:
+                    yield StreamEvent(
+                        type=StreamEventType.TEXT,
+                        seq=0,
+                        content="✅ 任务已受理，正在规划…",
+                        sender_agent_id=group.coordinator_id,  # 协调者身份，避免前端 unknown
+                    )
                     await self._start_coordinator(session, group, trigger)
                 return
 
             if decision.action == "replan":
                 if run is None:
                     # 纯对话态误判 replan（无任务在跑）→ 当新任务起
+                    yield StreamEvent(
+                        type=StreamEventType.TEXT,
+                        seq=0,
+                        content="✅ 已受理，正在重新规划…",
+                    )
                     await self._start_coordinator(session, group, trigger)
                 else:
                     await self._handle_replan(session, group, run, decision.requirement or text)
@@ -301,7 +317,17 @@ class ChatService:
                     )
                 continue  # 回完群聊讨论 → 再 decide（多轮）
 
-            # done → 收敛退出
+            # done → 收敛退出。但如果原因是路由错误（LLM 失败/非法 action），
+            # 必须告知用户，不能静默吞掉。
+            if decision.reason and (
+                decision.reason.startswith("llm error")
+                or decision.reason.startswith("invalid action")
+            ):
+                yield StreamEvent(
+                    type=StreamEventType.TEXT,
+                    seq=0,
+                    content="⚠️ 消息路由暂时不可用，请稍后重试或 @ 指定成员。",
+                )
             return
 
     # --- v3 前门反射 + 轻执行（步1）---
@@ -357,9 +383,11 @@ class ChatService:
         run.start(
             orchestrator,
             on_done=lambda r: self._coord_post(
-                session.id, r.summary or f"任务结束: {r.reason}"
+                session.id, r.summary or f"任务结束: {r.reason}", group.coordinator_id
             ),
-            on_error=lambda e: self._coord_post(session.id, f"任务执行失败: {e}"),
+            on_error=lambda e: self._coord_post(
+                session.id, f"任务执行失败: {e}", group.coordinator_id
+            ),
             registry=self._registry,
         )
         logger.info("Coordinator 启动 run=%s session=%s", run.run_id, session.id)

@@ -15,7 +15,7 @@ from app.core.events import EventBus
 from app.core.exceptions import DomainError, NotFoundError
 from app.core.security import encrypt_secret
 from app.domain.entities.agent import Agent
-from app.domain.enums import AgentSystem, Provider
+from app.domain.enums import AgentSystem
 from app.domain.events import AgentCreated, AgentDeleted, AgentUpdated
 from app.domain.repositories import AgentRepository
 
@@ -38,10 +38,6 @@ class AgentService:
             avatar=cmd.avatar,
             role=cmd.role,
             agent_system=AgentSystem(cmd.agent_system),
-            provider=Provider(cmd.provider),
-            model=cmd.model,
-            api_key_encrypted=encrypt_secret(cmd.api_key) if cmd.api_key else "",
-            base_url=cmd.base_url,
             skills=skills,
             capability_tags=cmd.capability_tags,
             system_prompt=cmd.system_prompt,
@@ -54,8 +50,6 @@ class AgentService:
             AgentCreated(
                 agent_id=agent.id,
                 name=agent.name,
-                provider=str(agent.provider),
-                model=agent.model,
             )
         )
         return AgentResponse.from_domain(agent)
@@ -69,8 +63,6 @@ class AgentService:
             "name": cmd.name,
             "avatar": cmd.avatar,
             "role": cmd.role,
-            "model": cmd.model,
-            "base_url": cmd.base_url,
             "skills": cmd.skills,
             "capability_tags": cmd.capability_tags,
             "settings": cmd.settings,
@@ -78,10 +70,6 @@ class AgentService:
         }
         if cmd.agent_system is not None:
             changes["agent_system"] = AgentSystem(cmd.agent_system)
-        if cmd.provider is not None:
-            changes["provider"] = Provider(cmd.provider)
-        if cmd.api_key is not None:
-            changes["api_key_encrypted"] = encrypt_secret(cmd.api_key)
 
         changed_fields = agent.update(**changes)
         if changed_fields:
@@ -107,6 +95,23 @@ class AgentService:
     ) -> list[AgentResponse]:
         agents = await self._repo.list(status=status, capability=capability)
         return [AgentResponse.from_domain(a) for a in agents]
+
+    async def update_coordinator_credential(
+        self, *, provider: str, api_key: str, model: str
+    ) -> int:
+        """将协调者凭证同步写入所有 is_system=true 的 Agent 的 settings。返回更新行数。"""
+        agents = await self._repo.list()
+        count = 0
+        for a in agents:
+            if a.is_system:
+                creds = dict(a.settings.get("coordinator_credential", {}))
+                creds["provider"] = provider
+                creds["api_key_encrypted"] = encrypt_secret(api_key)
+                creds["model"] = model
+                a.settings["coordinator_credential"] = creds
+                await self._repo.save(a)
+                count += 1
+        return count
 
     @staticmethod
     def _now() -> datetime:

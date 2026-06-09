@@ -168,7 +168,7 @@ async def test_e2e_orchestrator_real_executor_verifier(tmp_path):
     planner = FakePlanner([_t("t1")])
     executor = AgentExecutor(
         resolve_agent=lambda n: Agent(
-            name=n, avatar="x", role="d", provider=Provider.ANTHROPIC, model="m"
+            name=n, avatar="x", role="d", 
         ),
         adapter_factory=lambda a: FakeAdapter(),
         session_id=uuid4(), group_id=uuid4(), workspace=str(tmp_path),

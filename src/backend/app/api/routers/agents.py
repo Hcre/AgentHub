@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from app.api.deps import get_agent_service
 from app.application.commands import (
@@ -29,10 +29,6 @@ async def create_agent(body: AgentCreateRequest, svc: ServiceDep) -> AgentOut:
             avatar=body.avatar,
             role=body.role,
             agent_system=str(body.agent_system),
-            provider=str(body.provider),
-            model=body.model,
-            api_key=body.api_key,
-            base_url=body.base_url,
             skills=body.skills,
             system_prompt=body.system_prompt,
             settings=body.settings,
@@ -67,10 +63,6 @@ async def update_agent(agent_id: UUID, body: AgentUpdateRequest, svc: ServiceDep
             avatar=body.avatar,
             role=body.role,
             agent_system=str(body.agent_system) if body.agent_system else None,
-            provider=str(body.provider) if body.provider else None,
-            model=body.model,
-            api_key=body.api_key,
-            base_url=body.base_url,
             skills=body.skills,
             capability_tags=body.capability_tags,
             settings=body.settings,
@@ -84,3 +76,29 @@ async def update_agent(agent_id: UUID, body: AgentUpdateRequest, svc: ServiceDep
 async def delete_agent(agent_id: UUID, svc: ServiceDep) -> Response:
     await svc.delete(DeleteAgentCommand(agent_id=agent_id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# -- 协调者凭证：前端点星后写入所有 is_system=true 的 Agent --
+
+
+@router.put("/coordinator/credential")
+async def set_coordinator_credential(
+    body: dict,
+    svc: ServiceDep,
+) -> dict:
+    """前端点星设置协调者凭证 → 同步写入到所有系统 Agent。"""
+    provider = body.get("provider", "")
+    api_key = body.get("api_key", "")
+    model = body.get("model", "")
+    if not provider or not api_key:
+        raise HTTPException(status_code=400, detail="provider and api_key are required")
+    count = await svc.update_coordinator_credential(
+        provider=str(provider), api_key=str(api_key), model=str(model)
+    )
+    # 同步更新内存中的全局凭证（ReactiveRouter 实时读取）
+    from app.application.services.reactive_router import _coordinator_credential
+
+    _coordinator_credential["provider"] = str(provider)
+    _coordinator_credential["api_key"] = str(api_key)
+    _coordinator_credential["model"] = str(model)
+    return {"updated": count}
