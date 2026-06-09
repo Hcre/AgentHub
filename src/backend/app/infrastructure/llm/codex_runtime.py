@@ -98,10 +98,6 @@ class CodexRuntime(AgentRuntime):
             cmd.extend(["-m", self._model])
         # 全部权限绕过（与 Claude Code bypassPermissions 对齐）
         cmd.append("--dangerously-bypass-approvals-and-sandbox")
-        # 最大轮次限制（防止无限工具循环耗竭预算）
-        if self._max_turns:
-            cmd.extend(["--max-turns", str(self._max_turns)])
-
         # 工作目录：从请求动态取（会话 workspace），通过 -C flag 传给 Codex
         cwd = _resolve_cwd(request.working_directory)
         if not cwd and self._workspace:

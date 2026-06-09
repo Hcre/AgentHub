@@ -336,10 +336,9 @@ class PiAgentRuntime(AgentRuntime):
             session_file,
         ]
 
-        pi_provider = _PROVIDER_MAP.get(self._provider, "anthropic")
-        cmd.extend(["--provider", pi_provider])
-
-        # 模型选择：通过 --model CLI flag（PI_MODEL 环境变量无效，pi 不读取）
+        # provider/model 不传——让 CLI 读自己的 ~/.pi/agent/settings.json
+        if self._provider:
+            cmd.extend(["--provider", _PROVIDER_MAP.get(self._provider, self._provider)])
         if self._model:
             cmd.extend(["--model", self._model])
 
