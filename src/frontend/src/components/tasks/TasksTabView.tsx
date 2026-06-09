@@ -1,4 +1,4 @@
-import { useMemo, useState, type DragEvent } from 'react'
+import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import { cn } from '../../lib/cn'
 import { agents } from '../../data/mock'
 import { useTaskStore } from '../../stores/taskStore'
@@ -13,10 +13,14 @@ const STATUS_ORDER: TaskStatus[] = ['todo', 'doing', 'blocked', 'done']
 const agentsById = Object.fromEntries(agents.map((a) => [a.id, a]))
 
 export function TasksTabView() {
-  const { tasks, view, showClosed, filter, setView, setShowClosed, moveTask, addTask } =
+  const { tasks, view, showClosed, filter, setView, setShowClosed, moveTask, addTask, load } =
     useTaskStore()
   const [createOpen, setCreateOpen] = useState(false)
   const [dragOver, setDragOver] = useState<TaskStatus | null>(null)
+
+  useEffect(() => {
+    void load()
+  }, [load])
 
   const filtered = useMemo(
     () =>
