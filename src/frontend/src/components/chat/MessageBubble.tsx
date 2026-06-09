@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Copy, Pin, RefreshCw, Reply } from 'lucide-react'
+import { Copy, Pin, RefreshCw, Reply, Trash2 } from 'lucide-react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -101,6 +101,12 @@ export function MessageBubble({
    * 不传则按钮 disabled（避免 mock 场景乱发）。
    */
   onReply,
+  /**
+   * 删除消息：hover 出删除按钮 → 确认后触发此回调，父组件 ChatView 调
+   * sessionsApi.deleteMessage + chatStore.removeMessage。不传则按钮不渲染
+   * （避免在没绑后端的 mock 消息上发 404）。
+   */
+  onDelete,
 }: {
   msg: ChatMessage
   agent: Agent
@@ -112,6 +118,7 @@ export function MessageBubble({
    */
   sessionId?: string
   onReply?: (msg: ChatMessage) => void
+  onDelete?: (msg: ChatMessage) => void
 }) {
   const isAgent = msg.from === 'agent'
   // 乐观更新本地 Pin 状态；初始值用 msg.pinned（后端真值），点击后立刻翻转，再
@@ -176,6 +183,13 @@ export function MessageBubble({
 
   const handleReply = () => {
     onReply?.(msg)
+  }
+
+  const handleDelete = () => {
+    if (!onDelete) return
+    if (window.confirm('确定删除这条消息？该操作不可恢复。')) {
+      onDelete(msg)
+    }
   }
 
   const togglePin = async () => {
@@ -301,6 +315,23 @@ export function MessageBubble({
           >
             <Reply className="h-3.5 w-3.5" strokeWidth={1.75} />
           </button>
+          {/* 删除按钮：hover message 才出现；onDelete 未传（mock 消息）则不渲染 */}
+          {onDelete && (
+            <button
+              type="button"
+              data-testid="delete-btn"
+              aria-label="删除消息"
+              title="删除消息"
+              onClick={handleDelete}
+              className={
+                'inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-all ' +
+                'opacity-0 group-hover/msg:opacity-100 focus-visible:opacity-100 ' +
+                'hover:bg-destructive/10 hover:text-destructive'
+              }
+            >
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+            </button>
+          )}
           {error && (
             <span
               data-testid="pin-error"

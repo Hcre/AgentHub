@@ -9,6 +9,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { Button, Dialog, DialogContent, Icon, Input, Textarea } from '../ui'
 import { useApiKeyStore } from '../../stores/apiKeyStore'
 import { providersApi, type DefaultConfig, type ProviderInfo } from '../../api/providers'
+import { skillsApi } from '../../api/skills'
 import { type TemplateDetail } from '../../api/templates'
 import { useTemplateStore } from '../../stores/templateStore'
 import { CliIcon } from '../icons/cli/CliIcon'
@@ -277,6 +278,7 @@ export function CreateAgentModal({
   // 连通性预检
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle')
   const [testError, setTestError] = useState('')
+  const [testLatency, setTestLatency] = useState<number | null>(null)
   // Step 3
   const [status, setStatus] = useState<'idle' | 'creating' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
@@ -470,8 +472,8 @@ export function CreateAgentModal({
     if (!isCustom) return
     queueMicrotask(() => {
       setSkillLoading(true)
-      fetch('/api/skills/library?_=' + Date.now())
-        .then((r) => r.json())
+      skillsApi
+        .listLibrary()
         .then(setSkillList)
         .catch(() => setSkillList([]))
         .finally(() => setSkillLoading(false))
@@ -510,6 +512,7 @@ export function CreateAgentModal({
     setApiKey('')
     setTestStatus('idle')
     setTestError('')
+    setTestLatency(null)
     setSelectedKeyId('')
     setStatus('idle')
     setErrorMsg('')
@@ -623,22 +626,19 @@ export function CreateAgentModal({
     if (agentSystem === 'mock') return
     setTestStatus('testing')
     setTestError('')
+    setTestLatency(null)
     try {
-      const resp = await fetch('/api/providers/ping', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          agent_system: agentSystem,
-          provider: providerId,
-          // 注：model/api_key/base_url 仍传 ping 端点（探测连通用），但 spawn CLI 时不再注入
-          model: model.trim(),
-          api_key: apiKey,
-          base_url: baseUrl.trim() || undefined,
-        }),
+      // 注：model/api_key/base_url 仍传 ping 端点（探测连通用），但 spawn CLI 时不再注入
+      const data = await providersApi.ping({
+        agent_system: agentSystem,
+        provider: providerId,
+        model: model.trim(),
+        api_key: apiKey,
+        base_url: baseUrl.trim() || undefined,
       })
-      const data = await resp.json()
       if (data.ok) {
         setTestStatus('ok')
+        setTestLatency(data.latency_ms ?? null)
       } else {
         setTestStatus('fail')
         setTestError(data.error || '连通失败')
@@ -659,18 +659,13 @@ export function CreateAgentModal({
     // 1. 连通性预检（非 mock 时自动执行）
     if (agentSystem !== 'mock' && apiKey) {
       try {
-        const resp = await fetch('/api/providers/ping', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            agent_system: agentSystem,
-            provider: providerId,
-            model: model.trim(),
-            api_key: apiKey,
-            base_url: baseUrl.trim() || undefined,
-          }),
+        const data = await providersApi.ping({
+          agent_system: agentSystem,
+          provider: providerId,
+          model: model.trim(),
+          api_key: apiKey,
+          base_url: baseUrl.trim() || undefined,
         })
-        const data = await resp.json()
         if (!data.ok) {
           setStatus('error')
           setErrorMsg(`连通失败: ${data.error || '未知错误'}，请返回修改配置`)
@@ -994,8 +989,10 @@ export function CreateAgentModal({
                     onClick={() => {
                       setScanning(true)
                       providerScanned = false
+                      // 用 scan()（POST /api/providers/scan 强制重扫 PATH）而非 list()
+                      // （返回 1h scheduler 缓存）—— 用户刚装的新 CLI 立刻能被发现。
                       providersApi
-                        .list()
+                        .scan()
                         .then((list) => {
                           providerCache = list
                           providerScanned = true
@@ -1259,6 +1256,11 @@ export function CreateAgentModal({
                     >
                       {testStatus === 'testing' ? '测试中…' : testStatus === 'ok' ? '✅ 连通成功' : testStatus === 'fail' ? '❌ 重试' : '🔄 连通测试'}
                     </Button>
+                    {testStatus === 'ok' && (
+                      <span className="text-[11px] text-emerald-600">
+                        连通正常{testLatency != null ? ` · ${testLatency}ms` : ''}
+                      </span>
+                    )}
                     {testStatus === 'fail' && (
                       <span className="text-[11px] text-red-500 max-w-[200px] truncate">{testError}</span>
                     )}

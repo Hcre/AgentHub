@@ -72,6 +72,8 @@ interface AgentState {
   /** 创建 Agent：先同步后端取真实 UUID；后端不可用则本地降级 mock。 */
   createAgent: (input: CreateAgentInput) => Promise<string>
   removeAgent: (id: string) => Promise<void>
+  /** 编辑 Agent：PATCH 后端 + 同步本地 agents/profiles。失败抛出由调用方处理。 */
+  updateAgent: (id: string, patch: { name?: string; role?: string; systemPrompt?: string }) => Promise<void>
   updateConfig: (id: string, patch: Partial<AgentProfile['config']>) => void
 }
 
@@ -137,6 +139,25 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     } catch {
       // 后端不可用或 mock agent（不在后端）→ 本地已删，忽略
     }
+  },
+
+  updateAgent: async (id, patch) => {
+    const updated = await agentsApi.update(id, {
+      name: patch.name,
+      role: patch.role,
+      system_prompt: patch.systemPrompt,
+    })
+    set((s) => ({
+      agents: s.agents.map((a) =>
+        a.id === id ? { ...a, name: updated.name, role: updated.role } : a,
+      ),
+      profiles: s.profiles[id]
+        ? {
+            ...s.profiles,
+            [id]: { ...s.profiles[id], bio: patch.systemPrompt?.trim() || updated.role },
+          }
+        : s.profiles,
+    }))
   },
 
   updateConfig: (id, patch) =>

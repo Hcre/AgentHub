@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useState } from 'react'
 import { Button, Icon } from '../ui'
+import { skillsApi } from '../../api/skills'
 
 // ── 类型 ──────────────────────────────────────────────────────────────
 
@@ -84,21 +85,13 @@ export function SkillMdPreview({
     setSaving(true)
     setError('')
     try {
-      const resp = await fetch('/api/skills/library/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: data.name,
-          description: data.description ?? '',
-          triggers: data.triggers ?? '',
-          version: data.version ?? '1.0.0',
-          body: data.body,
-        }),
+      await skillsApi.createLibrary({
+        name: data.name,
+        description: data.description ?? '',
+        triggers: data.triggers ?? '',
+        version: data.version ?? '1.0.0',
+        body: data.body,
       })
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}))
-        throw new Error(err.detail ?? `保存失败 (${resp.status})`)
-      }
       setSaved(true)
       onSaveSuccess?.()
     } catch (e) {

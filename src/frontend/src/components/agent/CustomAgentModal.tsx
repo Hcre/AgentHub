@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useUIStore } from '../../stores/uiStore'
+import { skillsApi } from '../../api/skills'
 import { Button, Dialog, DialogContent, Icon, Input, Textarea } from '../ui'
 
 interface SkillItem {
@@ -35,8 +36,8 @@ export function CustomAgentModal({
     // setState 推迟到 microtask 避开 react-hooks/set-state-in-effect
     queueMicrotask(() => {
       setLoading(true)
-      fetch('/api/skills/library?_=' + Date.now())
-        .then((r) => r.json())
+      skillsApi
+        .listLibrary()
         .then(setSkills)
         .catch(() => setSkills([]))
         .finally(() => setLoading(false))
