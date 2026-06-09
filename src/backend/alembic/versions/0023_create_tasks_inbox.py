@@ -1,8 +1,11 @@
 """add task display cols + create inbox_items table (M3 看板 CRUD + M4 收件箱审批流)
 
-Revision ID: 0020
-Revises: 0019
+Revision ID: 0023
+Revises: 0022
 Create Date: 2026-06-09
+
+注：原编号 0020 与 main 链上 0020_add_agent_provider_model_columns 冲突
+（preview-tabs 分支独立编号撞车），合并后重排为 0023（接在 0022 之后）。
 
 - tasks 表（0001 create_all 已建）：补两个展示层列 assignee_label / due_label，
   容纳看板 UI 的自由文本 assignee/due（与领域列 assignee_id/due_date 解耦）。
@@ -18,8 +21,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0020"
-down_revision: str | None = "0019"
+revision: str = "0023"
+down_revision: str | None = "0022"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
