@@ -42,6 +42,9 @@ class GroupOut(BaseModel):
     coordinator: GroupCoordinatorOut
     members: list[GroupMemberOut]
     created_at: datetime
+    # 快速方案：复用 backing Session.pinned（避免给 Group 实体加列 + alembic 0024）
+    pinned: bool = False
+    session_id: UUID | None = None
 
 
 class NameCheckOut(BaseModel):

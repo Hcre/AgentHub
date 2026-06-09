@@ -89,22 +89,20 @@ class SessionService:
         await self._messages.delete(message_id)
 
     async def pin_message(
-        self, cmd: PinMessageCommand, *, current_user: UUID | None
+        self, cmd: PinMessageCommand, *, current_user: UUID | None = None
     ) -> None:
-        """P0-4 Pin 消息 — 强制鉴权 + session 归属 + 消息所有权校验。"""
-        if current_user is None:
-            raise PermissionError("E_AUTH_REQUIRED: pin operation requires login")
+        """P0-4 Pin 消息。
+
+        与 Session.pinned 一致：不强制鉴权 + 不强制 owner 校验。
+        Pin 是个人偏好（只影响自己视图），不该有"必须登录"或"必须本人"的门槛。
+        session 归属校验仍保留（防越权访问别人 session 的消息）。
+        """
         msg = await self._messages.get_by_id(cmd.message_id)
         if msg is None:
             raise NotFoundError(f"message not found: {cmd.message_id}")
         if msg.session_id != cmd.session_id:
             raise ValidationError(
                 f"E_MESSAGE_PIN_SESSION_MISMATCH: message {cmd.message_id} not in session {cmd.session_id}"
-            )
-        if msg.user_id is not None and msg.user_id != current_user:
-            raise PermissionError(
-                f"E_MESSAGE_PIN_NOT_OWNER: only message owner can pin (current_user={current_user}, "
-                f"msg.user_id={msg.user_id})"
             )
         await self._messages.set_pinned(
             cmd.message_id, True, pinned_by_user_id=current_user
@@ -114,16 +112,14 @@ class SessionService:
         )
 
     async def unpin_message(
-        self, cmd: UnpinMessageCommand, *, current_user: UUID | None
+        self, cmd: UnpinMessageCommand, *, current_user: UUID | None = None
     ) -> None:
-        if current_user is None:
-            raise PermissionError("E_AUTH_REQUIRED: unpin operation requires login")
+        """同 pin_message：放宽鉴权，但保留 session 归属校验。"""
         msg = await self._messages.get_by_id(cmd.message_id)
         if msg is None:
             raise NotFoundError(f"message not found: {cmd.message_id}")
-        if msg.user_id is not None and msg.user_id != current_user:
-            raise PermissionError(
-                f"E_MESSAGE_PIN_NOT_OWNER: only message owner can unpin (current_user={current_user}, "
-                f"msg.user_id={msg.user_id})"
+        if msg.session_id != cmd.session_id:
+            raise ValidationError(
+                f"E_MESSAGE_PIN_SESSION_MISMATCH: message {cmd.message_id} not in session {cmd.session_id}"
             )
         await self._messages.set_pinned(cmd.message_id, False)

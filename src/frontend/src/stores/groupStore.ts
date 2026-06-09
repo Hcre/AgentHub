@@ -2,7 +2,21 @@ import { create } from 'zustand'
 import { groupsApi, type CreateGroupInput } from '../api/groups'
 import { sessionsApi, type MessageOut } from '../api/sessions'
 import { nowStamp, uid } from '../lib/id'
-import type { ApiGroup, ApprovalRequestData, CoordinatorPlan, DAGLivePlan, Group, GroupMessage, LivePlanStep, ReplyRef, StepStatus, StreamEvent, TaskPlanData, ToolCallEntry, ToolResultEntry } from '../types'
+import type {
+  ApiGroup,
+  ApprovalRequestData,
+  CoordinatorPlan,
+  DAGLivePlan,
+  Group,
+  GroupMessage,
+  LivePlanStep,
+  ReplyRef,
+  StepStatus,
+  StreamEvent,
+  TaskPlanData,
+  ToolCallEntry,
+  ToolResultEntry,
+} from '../types'
 
 export interface SendGroupOptions {
   requiresApproval?: boolean
@@ -11,8 +25,7 @@ export interface SendGroupOptions {
 }
 
 /** 流式哨兵 id 前缀；按 sender 区分多人独立聚合。 */
-const streamingKey = (groupId: string, senderId: string) =>
-  `__streaming__${groupId}:${senderId}`
+const streamingKey = (groupId: string, senderId: string) => `__streaming__${groupId}:${senderId}`
 
 /** 解析 @mention，返回被点名的名字列表（去掉 @）。 */
 function parseMentions(text: string): string[] {
@@ -29,6 +42,9 @@ function toUiGroup(g: ApiGroup): Group {
     coordinatorId: g.coordinator.id,
     coordinatorName: g.coordinator.name,
     coordinatorRole: g.coordinator.role,
+    // t7 拓展：群组置顶复用 backing Session.pinned（schema 已是 optional，不破坏旧调用）
+    pinned: g.pinned ?? false,
+    sessionId: g.session_id ?? null,
   }
 }
 
@@ -73,6 +89,8 @@ interface GroupState {
   createGroup: (input: CreateGroupInput) => Promise<string>
   renameGroup: (id: string, name: string) => Promise<void>
   deleteGroup: (id: string) => Promise<void>
+  // t7 拓展：群组置顶（复用 backing Session.pinned）
+  toggleGroupPin: (groupId: string, nextPinned: boolean) => Promise<void>
 
   // Session / 流式
   setGroupSession: (groupId: string, sessionId: string) => void
@@ -164,6 +182,27 @@ export const useGroupStore = create<GroupState>((set, get) => ({
     }
   },
 
+  // t7 拓展：群组置顶（复用 backing Session.pinned，无 sessionId 时先 findOrCreate）
+  // 模式与 LeftPanel.handleTogglePin 一致：乐观更新 + 失败 console.warn（不 rollback）
+  toggleGroupPin: async (groupId, nextPinned) => {
+    const target = get().groups.find((g) => g.id === groupId)
+    const prevPinned = target?.pinned ?? false
+    // (1) 乐观更新
+    set((s) => ({
+      groups: s.groups.map((g) => (g.id === groupId ? { ...g, pinned: nextPinned } : g)),
+    }))
+    try {
+      // (2) PATCH 透传到 backing session（无 sid 时 groupsApi.togglePin 内部 findOrCreate）
+      await groupsApi.togglePin(groupId, target?.sessionId, nextPinned)
+    } catch (err) {
+      // (3) 失败回滚 + 警告（不引 toast 库，与私聊 handleTogglePin 同 pattern）
+      console.warn('[group-pin] toggle failed', err)
+      set((s) => ({
+        groups: s.groups.map((g) => (g.id === groupId ? { ...g, pinned: prevPinned } : g)),
+      }))
+    }
+  },
+
   setGroupSession: (groupId, sessionId) =>
     set((s) => ({
       sessionIdsByGroup: { ...s.sessionIdsByGroup, [groupId]: sessionId },
@@ -195,7 +234,11 @@ export const useGroupStore = create<GroupState>((set, get) => ({
         // 后台完整发言（worker 报到/交卷、协调者里程碑）：直接 append 独立完成消息，不走流式哨兵
         if (event.metadata?.final) {
           const finalMsg: GroupMessage = {
-            id: uid('gm'), from: 'agent', who: senderId, time: nowStamp(), text: chunk,
+            id: uid('gm'),
+            from: 'agent',
+            who: senderId,
+            time: nowStamp(),
+            text: chunk,
           }
           return { messagesByGroup: { ...s.messagesByGroup, [groupId]: [...list, finalMsg] } }
         }
@@ -298,7 +341,7 @@ export const useGroupStore = create<GroupState>((set, get) => ({
         const resultEntry: ToolResultEntry = {
           id: uid('tr'),
           callId: tr.call_id,
-          content: tr.content ?? (tr.error ?? ''),
+          content: tr.content ?? tr.error ?? '',
           isError: !tr.success,
         }
         const idx = list.findIndex((m) => m.id === sentinelId)
@@ -331,8 +374,9 @@ export const useGroupStore = create<GroupState>((set, get) => ({
       // ── request_approval：审批请求卡 ──
       if (event.type === 'request_approval') {
         const deniedOps = event.metadata?.denied_ops as unknown[]
-        const desc = (event.content ?? '以下操作需要你的确认')
-          + (deniedOps?.length ? `\n\n${JSON.stringify(deniedOps, null, 2)}` : '')
+        const desc =
+          (event.content ?? '以下操作需要你的确认') +
+          (deniedOps?.length ? `\n\n${JSON.stringify(deniedOps, null, 2)}` : '')
         const arData: ApprovalRequestData = {
           id: uid('ar'),
           action: 'approve_operations',
@@ -360,13 +404,17 @@ export const useGroupStore = create<GroupState>((set, get) => ({
 
       // ── task_plan：任务计划 → message + activePlan ──
       if (event.type === 'task_plan') {
-        const tpData: TaskPlanData = event.task_plan ?? (() => {
-          try {
-            return event.content ? JSON.parse(event.content) : { summary: event.content ?? '', steps: [] }
-          } catch {
-            return { summary: event.content ?? '', steps: [] }
-          }
-        })()
+        const tpData: TaskPlanData =
+          event.task_plan ??
+          (() => {
+            try {
+              return event.content
+                ? JSON.parse(event.content)
+                : { summary: event.content ?? '', steps: [] }
+            } catch {
+              return { summary: event.content ?? '', steps: [] }
+            }
+          })()
         // 从 metadata.plan 取 live steps（含 status）；fallback 到 task_plan.steps
         const rawSteps: LivePlanStep[] =
           (event.metadata?.plan as { steps?: LivePlanStep[] } | undefined)?.steps?.map(
@@ -379,18 +427,33 @@ export const useGroupStore = create<GroupState>((set, get) => ({
         const msgPlan: CoordinatorPlan = {
           summary: tpData.summary,
           steps: rawSteps.map((s) => ({
-            id: s.id, who: s.who, label: s.label, eta: s.eta ?? 0, depends: s.depends,
+            id: s.id,
+            who: s.who,
+            label: s.label,
+            eta: s.eta ?? 0,
+            depends: s.depends,
           })),
           watchouts: [],
         }
         const idx = list.findIndex((m) => m.id === sentinelId)
         const seed = (m: Partial<GroupMessage>): GroupMessage => ({
-          id: sentinelId, from: 'agent', who: senderId, time: nowStamp(),
-          kind: 'plan', plan: msgPlan, streaming: true, ...m,
+          id: sentinelId,
+          from: 'agent',
+          who: senderId,
+          time: nowStamp(),
+          kind: 'plan',
+          plan: msgPlan,
+          streaming: true,
+          ...m,
         })
-        const msgs = idx >= 0
-          ? (() => { const n = [...list]; n[idx] = { ...list[idx]!, kind: 'plan', plan: msgPlan }; return n })()
-          : [...list, seed({})]
+        const msgs =
+          idx >= 0
+            ? (() => {
+                const n = [...list]
+                n[idx] = { ...list[idx]!, kind: 'plan', plan: msgPlan }
+                return n
+              })()
+            : [...list, seed({})]
         return {
           messagesByGroup: { ...s.messagesByGroup, [groupId]: msgs },
           activePlanByGroup: { ...s.activePlanByGroup, [groupId]: dagPlan },
@@ -418,7 +481,8 @@ export const useGroupStore = create<GroupState>((set, get) => ({
         const cur = s.activePlanByGroup[groupId]
         if (!cur) return {}
         const nextSteps = cur.steps.map(
-          (st): LivePlanStep => (st.id === taskId ? { ...st, status, reason: reason ?? st.reason } : st),
+          (st): LivePlanStep =>
+            st.id === taskId ? { ...st, status, reason: reason ?? st.reason } : st,
         )
         // 不自动清空：保留卡片让用户看到最终结果，新任务的 task_plan 会覆盖。
         return {

@@ -78,6 +78,8 @@ export function LeftPanel() {
   const [openDM, setOpenDM] = useState(true)
   const renameGroup = useGroupStore((s) => s.renameGroup)
   const deleteGroup = useGroupStore((s) => s.deleteGroup)
+  // t7 拓展：群组置顶（复用 backing Session.pinned，复用私聊 trade-off 模式）
+  const toggleGroupPin = useGroupStore((s) => s.toggleGroupPin)
   const [groupCreateOpen, setGroupCreateOpen] = useState(false)
   const [menu, setMenu] = useState<{ groupId: string; x: number; y: number } | null>(null)
   const [deleteConfirming, setDeleteConfirming] = useState<string | null>(null) // groupId to delete
@@ -141,6 +143,12 @@ export function LeftPanel() {
     }
   }
 
+  // t7 拓展：群组置顶（4 trade-off 同 handleTogglePin：乐观 + 兜底 + 失败 console.warn）
+  // 实现委托给 groupStore.toggleGroupPin（它走 backing session PATCH）
+  const handleToggleGroupPin = async (groupId: string, nextPinned: boolean): Promise<void> => {
+    await toggleGroupPin(groupId, nextPinned)
+  }
+
   const exitDmBatch = () => {
     setDmBatchMode(false)
     setDmSelected(new Set())
@@ -173,7 +181,9 @@ export function LeftPanel() {
     }
     // 如果删除的是当前会话，切换到下一个
     if (currentWasDeleted && activeAgentId) {
-      const remaining = conversations[activeAgentId]?.filter((c) => !deletedKeys.has(`${activeAgentId}:${c.id}`)) ?? []
+      const remaining =
+        conversations[activeAgentId]?.filter((c) => !deletedKeys.has(`${activeAgentId}:${c.id}`)) ??
+        []
       if (remaining.length > 0) {
         openConversation(activeAgentId, remaining[remaining.length - 1].id)
       }
@@ -272,7 +282,7 @@ export function LeftPanel() {
                   }}
                   data-active={section === 'group' && activeGroupId === g.id ? 'true' : undefined}
                   className={cn(
-                    'flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+                    'group flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
                     'data-[active=true]:bg-accent data-[active=true]:font-medium data-[active=true]:text-foreground',
                   )}
                 >
@@ -283,6 +293,26 @@ export function LeftPanel() {
                       {lastText}
                     </div>
                   </div>
+                  {/* t7 拓展：群组置顶按钮（hover 显示 + 已 pin 时始终显示） */}
+                  <span
+                    role="button"
+                    tabIndex={-1}
+                    onClick={(e: MouseEvent) => {
+                      e.stopPropagation()
+                      handleToggleGroupPin(g.id, !g.pinned)
+                    }}
+                    data-testid={`pin-group-${g.id}`}
+                    data-pinned={g.pinned ? 'true' : 'false'}
+                    title={g.pinned ? '取消置顶群组' : '置顶群组'}
+                    className={cn(
+                      'flex-shrink-0 rounded p-0.5 transition-all',
+                      g.pinned
+                        ? 'text-brand opacity-100'
+                        : 'text-muted-foreground/40 opacity-0 group-hover:opacity-100 hover:bg-accent/50 hover:text-muted-foreground',
+                    )}
+                  >
+                    <Icon name="pin" className="h-3 w-3" />
+                  </span>
                 </button>
               )
             })}
@@ -375,7 +405,8 @@ export function LeftPanel() {
                       }
                       className={cn(
                         'flex-shrink-0 rounded p-0.5 transition-all',
-                        inFlightPins.has(convKey(agent.id, conv.id)) && 'cursor-not-allowed opacity-50',
+                        inFlightPins.has(convKey(agent.id, conv.id)) &&
+                          'cursor-not-allowed opacity-50',
                         pinError && !conv.pinned && 'text-destructive opacity-100',
                         conv.pinned && !inFlightPins.has(convKey(agent.id, conv.id))
                           ? 'text-brand opacity-100'

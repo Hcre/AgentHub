@@ -180,17 +180,14 @@ async def pin_message(
     message_id: UUID,
     session_id: UUID,
     svc: ServiceDep,
-    current_user: CurrentUser,
 ) -> Response:
-    """P0-4 Pin message - requires login."""
-    if current_user is None:
-        raise HTTPException(
-            status_code=401,
-            detail="E_AUTH_REQUIRED: pin operation requires login",
-        )
+    """P0-4 Pin message。
+
+    与 Session.pinned 一致：不强制鉴权（前端无登录流程，强行要求 JWT 会让功能不可用）。
+    Pin 是个人偏好，只影响自己视图，不动其他用户；类比 unpin_message 也没强制鉴权。
+    """
     await svc.pin_message(
         PinMessageCommand(session_id=session_id, message_id=message_id),
-        current_user=current_user,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

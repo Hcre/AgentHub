@@ -15,6 +15,8 @@ from app.application.commands import (
 )
 from app.application.dto import GroupResponse
 from app.application.services import GroupService
+from app.infrastructure.db.base import session_factory
+from app.infrastructure.db.models import SessionModel
 from app.schemas.group import (
     GroupCoordinatorOut,
     GroupCreateRequest,
@@ -23,13 +25,18 @@ from app.schemas.group import (
     GroupRenameRequest,
     NameCheckOut,
 )
+from sqlalchemy import select
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
 
 ServiceDep = Annotated[GroupService, Depends(get_group_service)]
 
 
-def _to_out(resp: GroupResponse) -> GroupOut:
+def _to_out(
+    resp: GroupResponse,
+    pinned: bool = False,
+    session_id: UUID | None = None,
+) -> GroupOut:
     return GroupOut(
         id=resp.id,
         name=resp.name,
@@ -37,6 +44,8 @@ def _to_out(resp: GroupResponse) -> GroupOut:
         coordinator=GroupCoordinatorOut(**resp.coordinator.__dict__),
         members=[GroupMemberOut(**m.__dict__) for m in resp.members],
         created_at=resp.created_at,
+        pinned=pinned,
+        session_id=session_id,
     )
 
 
@@ -60,7 +69,26 @@ async def create_group(body: GroupCreateRequest, svc: ServiceDep) -> GroupOut:
 
 @router.get("", response_model=list[GroupOut])
 async def list_groups(svc: ServiceDep) -> list[GroupOut]:
-    return [_to_out(r) for r in await svc.list()]
+    """列出群组；从 Session 表附加 pinned + session_id（复用 t7 B-4-P2-CL01）。"""
+    groups = await svc.list()
+    pinned_map: dict[UUID, tuple[bool, UUID]] = {}
+    async with session_factory() as db:
+        result = await db.execute(
+            select(SessionModel.id, SessionModel.group_id, SessionModel.pinned).where(
+                SessionModel.type == "group"
+            )
+        )
+        for sid, gid, pinned in result.all():
+            if gid:
+                pinned_map[gid] = (pinned, sid)
+    return [
+        _to_out(
+            g,
+            pinned=pinned_map.get(g.id, (False, None))[0],
+            session_id=pinned_map.get(g.id, (False, None))[1],
+        )
+        for g in groups
+    ]
 
 
 @router.patch("/{group_id}", response_model=GroupOut)

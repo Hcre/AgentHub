@@ -252,6 +252,11 @@ export interface Group {
   pinnedTask?: string
   /** 群组工作目录（必填），用作群聊上下文的根。 */
   workdir?: string
+  // t7 拓展：群组置顶复用 backing Session.pinned（避免给 Group 实体加列 + alembic）
+  // 代价：删 group 重建会丢 pin 状态；当前为比赛阶段接受此权衡
+  pinned?: boolean
+  // t7 拓展：群组对应的后端 Session id（pin 操作 PATCH 此 session 的 pinned 字段）
+  sessionId?: string | null
 }
 
 /** 协调者分发方案中的单个子任务步骤。 */
@@ -528,6 +533,10 @@ export interface ApiGroup {
   coordinator: ApiGroupCoordinator
   members: ApiGroupMember[]
   created_at: string
+  // t7 拓展：群组置顶来自 backing Session.pinned（GET /api/groups 一次查 join 返回）
+  pinned?: boolean
+  // t7 拓展：群组对应的 backing Session id
+  session_id?: string | null
 }
 
 /** 对应 backend `SessionOut`（schemas/session.py）。 */

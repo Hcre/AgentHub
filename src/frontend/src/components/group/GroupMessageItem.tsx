@@ -86,7 +86,6 @@ export function GroupMessageItem({
   // 初始值用 msg.pinned（后端真值），点击立刻翻转；后端 200 保留，非 2xx 回滚。
   const [pinned, setPinned] = useState<boolean>(msg.pinned ?? false)
   const [pinPending, setPinPending] = useState(false)
-  const [pinError, setPinError] = useState<string | null>(null)
   // P0-5 群聊复制代码：与 MessageBubble 同 pattern（inline status，2.5s 自清）。
   const [copyStatus, setCopyStatus] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null)
 
@@ -150,8 +149,9 @@ export function GroupMessageItem({
     }
     const willPin = !pinned
     const prev = pinned
+    // 乐观更新：先翻状态，失败再回滚
+    // 与 MessageBubble 同 pattern：失败仅 console.error，不显示 inline "Pin 失败"
     setPinned(willPin)
-    setPinError(null)
     setPinPending(true)
     const url = `/api/messages/${msg.id}/pin?session_id=${encodeURIComponent(sessionId)}`
     try {
@@ -162,7 +162,6 @@ export function GroupMessageItem({
     } catch (e) {
       setPinned(prev)
       const txt = e instanceof Error ? e.message : 'Pin 操作失败'
-      setPinError(txt)
       console.error('[GroupMessageItem] pin toggle failed:', txt)
     } finally {
       setPinPending(false)
@@ -188,11 +187,13 @@ export function GroupMessageItem({
       text.startsWith('开始执行') ||
       text.startsWith('全部完成'))
   if (isMilestone) {
-    const colorClass =
-      text.startsWith('✅ ') ? 'text-emerald-600 dark:text-emerald-400' :
-      text.startsWith('❌ ') ? 'text-red-600 dark:text-red-400' :
-      text.startsWith('⚠️ ') ? 'text-amber-600 dark:text-amber-400' :
-      'text-muted-foreground'
+    const colorClass = text.startsWith('✅ ')
+      ? 'text-emerald-600 dark:text-emerald-400'
+      : text.startsWith('❌ ')
+        ? 'text-red-600 dark:text-red-400'
+        : text.startsWith('⚠️ ')
+          ? 'text-amber-600 dark:text-amber-400'
+          : 'text-muted-foreground'
     return (
       <div className="flex items-center gap-3 py-1">
         <hr className="flex-1 border-border/40" />
@@ -222,12 +223,8 @@ export function GroupMessageItem({
           >
             <Reply className="mt-0.5 h-3 w-3 flex-shrink-0 text-brand" strokeWidth={2} />
             <div className="min-w-0 flex-1">
-              <div className="truncate font-medium text-foreground/80">
-                {msg.replyTo.author}
-              </div>
-              <div className="line-clamp-2 break-words">
-                {truncateSnippet(msg.replyTo.snippet)}
-              </div>
+              <div className="truncate font-medium text-foreground/80">{msg.replyTo.author}</div>
+              <div className="line-clamp-2 break-words">{truncateSnippet(msg.replyTo.snippet)}</div>
             </div>
           </div>
         )}
@@ -282,16 +279,6 @@ export function GroupMessageItem({
           >
             <Reply className="h-3.5 w-3.5" strokeWidth={1.75} />
           </button>
-          {pinError && (
-            <span
-              data-testid="group-pin-error"
-              role="alert"
-              className="font-mono text-[10.5px] text-destructive"
-              title={pinError}
-            >
-              Pin 失败
-            </span>
-          )}
         </div>
         {/* ── CLI 流式块：思考过程（主文本之上）── */}
         {msg.thinking && <ThinkingBlock text={msg.thinking} streaming={msg.streaming} />}
@@ -304,45 +291,42 @@ export function GroupMessageItem({
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeHighlight]}
-              components={{
-                p: ({ children }) => (
-                  <p className="mb-2 last:mb-0">{highlightMentions(children)}</p>
-                ),
-                li: ({ children }) => <li>{highlightMentions(children)}</li>,
-                pre: ({ children }) => (
-                  <pre className="my-2 overflow-x-auto rounded-lg border border-slate-700/50 bg-slate-800 p-3 text-[12px] leading-[1.5] text-slate-100">
-                    {children}
-                  </pre>
-                ),
-                code: ({ className, children, ...props }) => {
-                  const text = String(children ?? '')
-                  const isBlock =
-                    text.includes('\n') ||
-                    (typeof className === 'string' && className.includes('language-'))
-                  return isBlock ? (
-                    <code className={className} {...props}>
+              components={
+                {
+                  p: ({ children }) => (
+                    <p className="mb-2 last:mb-0">{highlightMentions(children)}</p>
+                  ),
+                  li: ({ children }) => <li>{highlightMentions(children)}</li>,
+                  pre: ({ children }) => (
+                    <pre className="my-2 overflow-x-auto rounded-lg border border-slate-700/50 bg-slate-800 p-3 text-[12px] leading-[1.5] text-slate-100">
                       {children}
-                    </code>
-                  ) : (
-                    <code
-                      className="rounded bg-muted/50 px-1 py-0.5 font-mono text-[12px] text-foreground"
-                      {...props}
-                    >
+                    </pre>
+                  ),
+                  code: ({ className, children, ...props }) => {
+                    const text = String(children ?? '')
+                    const isBlock =
+                      text.includes('\n') ||
+                      (typeof className === 'string' && className.includes('language-'))
+                    return isBlock ? (
+                      <code className={className} {...props}>
+                        {children}
+                      </code>
+                    ) : (
+                      <code
+                        className="rounded bg-muted/50 px-1 py-0.5 font-mono text-[12px] text-foreground"
+                        {...props}
+                      >
+                        {children}
+                      </code>
+                    )
+                  },
+                  a: ({ href, children }) => (
+                    <a href={href} target="_blank" rel="noopener" className="text-brand underline">
                       {children}
-                    </code>
-                  )
-                },
-                a: ({ href, children }) => (
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener"
-                    className="text-brand underline"
-                  >
-                    {children}
-                  </a>
-                ),
-              } satisfies Components}
+                    </a>
+                  ),
+                } satisfies Components
+              }
             >
               {msg.text}
             </ReactMarkdown>
@@ -358,9 +342,7 @@ export function GroupMessageItem({
         )}
 
         {/* ── CLI 流式块：审批请求（阻断性 CTA）── */}
-        {msg.approvalRequest && (
-          <ApprovalRequestBlock data={msg.approvalRequest} />
-        )}
+        {msg.approvalRequest && <ApprovalRequestBlock data={msg.approvalRequest} />}
 
         {/* P0-5 群聊复制代码：仅在文本含代码围栏时显示。视觉与 MessageBubble 同步。 */}
         {codePayload && (

@@ -125,7 +125,6 @@ export function MessageBubble({
   // 调后端 200 则保持；非 2xx 回滚 + console.error 提示。
   const [pinned, setPinned] = useState<boolean>(msg.pinned ?? false)
   const [pending, setPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   // P0-5: 复制代码 / 重新生成 状态。copyStatus = null = idle, { kind: 'ok' | 'err', msg: string } = 显示中。
   // 不引第三方 toast 库，直接在 actions 行旁 inline 显示（与 pin 错误同 pattern），简单可靠。
   const [copyStatus, setCopyStatus] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null)
@@ -204,7 +203,6 @@ export function MessageBubble({
     const prev = pinned
     // 乐观更新：先翻状态，失败再回滚
     setPinned(willPin)
-    setError(null)
     setPending(true)
     // 对齐后端实际路由：src/backend/app/api/routers/sessions.py:91-99
     //   @router.post("/messages/{message_id}/pin", ...)
@@ -217,10 +215,11 @@ export function MessageBubble({
         throw new Error(`API ${resp.status}`)
       }
     } catch (e) {
-      // 回滚 + 错误提示
+      // 回滚 + console.error（不显示 inline 错误）
+      // 与 LeftPanel handleTogglePin 对齐：乐观失败只 console.warn，不打扰 chat 视觉
+      // setError 之前的"P0-4 Pin 失败"inline显示会和 timestamp 挤一起，破坏阅读流
       setPinned(prev)
       const msgText = e instanceof Error ? e.message : 'Pin 操作失败'
-      setError(msgText)
       console.error('[MessageBubble] pin toggle failed:', msgText)
     } finally {
       setPending(false)
@@ -263,12 +262,8 @@ export function MessageBubble({
           >
             <Reply className="mt-0.5 h-3 w-3 flex-shrink-0 text-brand" strokeWidth={2} />
             <div className="min-w-0 flex-1">
-              <div className="truncate font-medium text-foreground/80">
-                {msg.replyTo.author}
-              </div>
-              <div className="line-clamp-2 break-words">
-                {truncateSnippet(msg.replyTo.snippet)}
-              </div>
+              <div className="truncate font-medium text-foreground/80">{msg.replyTo.author}</div>
+              <div className="line-clamp-2 break-words">{truncateSnippet(msg.replyTo.snippet)}</div>
             </div>
           </div>
         )}
@@ -332,16 +327,6 @@ export function MessageBubble({
               <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
             </button>
           )}
-          {error && (
-            <span
-              data-testid="pin-error"
-              role="alert"
-              className="font-mono text-[10.5px] text-destructive"
-              title={error}
-            >
-              Pin 失败
-            </span>
-          )}
         </div>
         {/* ── CLI 流式块：思考过程（主文本之上）── */}
         {msg.thinking && <ThinkingBlock text={msg.thinking} streaming={msg.streaming} />}
@@ -373,9 +358,7 @@ export function MessageBubble({
         )}
 
         {/* ── CLI 流式块：审批请求（阻断性 CTA，置于底部醒目位置）── */}
-        {msg.approvalRequest && (
-          <ApprovalRequestBlock data={msg.approvalRequest} />
-        )}
+        {msg.approvalRequest && <ApprovalRequestBlock data={msg.approvalRequest} />}
 
         {previewUrls.map((u) => (
           <WebPreviewCard key={u} url={u} />
