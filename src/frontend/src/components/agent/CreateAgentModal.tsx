@@ -203,6 +203,7 @@ export function CreateAgentModal({
   preSelectedTemplate?: PreSelectedTemplate
 }) {
   const createAgent = useAgentStore((s) => s.createAgent)
+  const agents = useAgentStore((s) => s.agents)
   const addConversation = useChatStore((s) => s.addConversation)
   const conversations = useChatStore((s) => s.conversations)
   const openConversation = useUIStore((s) => s.openConversation)
@@ -230,6 +231,7 @@ export function CreateAgentModal({
   const cards = buildCards(scannedProviders, scanning)
   const [step, setStep] = useState(1)
   const [agentName, setAgentName] = useState('')
+  const [nameError, setNameError] = useState('')
 
   // Step 1: dynamic template selection
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
@@ -428,11 +430,15 @@ export function CreateAgentModal({
   // Step 1 → Step 2
   const hasAnySelection = selectedTemplateId !== null || pickedIndex !== null
 
+  const existingNames = agents.map((a) => a.name.toLowerCase())
+
   const canNext = (() => {
     if (preSelectedTemplate) return true
-    if (!hasAnySelection) return false
-    if (!agentName.trim()) return false
+    if (!hasAnySelection) { setNameError('请选择一个模板'); return false }
+    if (!agentName.trim()) { setNameError('请输入队友名称'); return false }
+    if (existingNames.includes(agentName.trim().toLowerCase())) { setNameError('该名称已被使用，请换一个'); return false }
     if (isCustom && (!customPrompt.trim() || !customRoleName.trim())) return false
+    setNameError('')
     return true
   })()
 
@@ -531,10 +537,13 @@ export function CreateAgentModal({
 
               <Input
                 value={agentName}
-                onChange={(e) => setAgentName(e.target.value)}
+                onChange={(e) => { setAgentName(e.target.value); setNameError('') }}
                 placeholder="例如：我的代码助手"
                 autoFocus
               />
+              {nameError && (
+                <p className="text-[11px] text-red-500 -mt-1">{nameError}</p>
+              )}
 
               <div className="border-t border-border/60 my-1" />
 
