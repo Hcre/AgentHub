@@ -6,6 +6,7 @@ import { cn } from '../../lib/cn'
 import { fsApi } from '../../api/fs'
 import { Button, Icon } from '../ui'
 import { FileTree } from './FileTree'
+import { SelectionEditPopover, type SelectionInfo } from './SelectionEditPopover'
 import { useUIStore } from '../../stores/uiStore'
 
 /** 文件树固定宽度（与 AppShell 全局拖拽的右栏宽度解耦） */
@@ -220,6 +221,7 @@ function Breadcrumb({
 function CodeView({ content, path }: { content: string; path?: string }) {
   const [flash, setFlash] = useState(true)
   const [wrap, setWrap] = useState(false)
+  const [selection, setSelection] = useState<SelectionInfo | null>(null)
   const lines = content.split('\n')
 
   // 挂载时触发闪动，短暂延迟后移除
@@ -227,6 +229,35 @@ function CodeView({ content, path }: { content: string; path?: string }) {
     const t = setTimeout(() => setFlash(false), 800)
     return () => clearTimeout(t)
   }, [])
+
+  // M3-A：框选 → 浮层（M3-artifact-preview-v2.0/设计.md §二·功能点3）
+  const handleMouseUp = (e: React.MouseEvent<HTMLPreElement>) => {
+    const sel = window.getSelection()
+    if (!sel || sel.isCollapsed) {
+      setSelection(null)
+      return
+    }
+    const range = sel.getRangeAt(0)
+    const pre = e.currentTarget
+    // 计算选区相对 pre 起点的字符偏移 → 推算起止行号
+    const preRange = document.createRange()
+    preRange.selectNodeContents(pre)
+    preRange.setEnd(range.startContainer, range.startOffset)
+    const startLine = preRange.toString().split('\n').length
+    const selectedText = sel.toString()
+    if (!selectedText.trim()) {
+      setSelection(null)
+      return
+    }
+    const endLine = startLine + selectedText.split('\n').length - 1
+    setSelection({
+      relPath: path ?? '',
+      startLine,
+      endLine,
+      selectedText,
+      workdir: '', // 由 FilePreview 注入（workdir prop）
+    })
+  }
 
   // highlight.js 高亮（memo 避免大文件重复计算）
   const highlighted = useMemo(() => {
@@ -280,6 +311,7 @@ function CodeView({ content, path }: { content: string; path?: string }) {
         </div>
         {/* 高亮代码 */}
         <pre
+          onMouseUp={handleMouseUp}
           className={cn(
             'min-w-0 flex-1 overflow-x-auto px-4 py-3 bg-white dark:bg-black',
             wrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre',
@@ -288,6 +320,17 @@ function CodeView({ content, path }: { content: string; path?: string }) {
           <code dangerouslySetInnerHTML={{ __html: highlighted }} />
         </pre>
       </div>
+      {/* M3-A：框选 → 浮层（依赖 FilePreview 注入 workdir + WS） */}
+      <SelectionEditPopover
+        selection={selection}
+        sessionWorkdir={undefined}
+        onSubmit={async (prompt) => {
+          // 占位：FilePreview 不持有会话上下文，全功能 wire-in 需 RightPanel 注入 sessionWorkdir + sendMessage
+          // 当前先打 console 标记 TODO，便于后续 wire-in 验证
+          console.info('[M3-A] selection edit prompt:', prompt)
+        }}
+        onClose={() => setSelection(null)}
+      />
     </div>
   )
 }

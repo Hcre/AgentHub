@@ -38,8 +38,7 @@ export function SelectionEditPopover({ selection, sessionWorkdir, onSubmit, onCl
 
   if (!selection) return null
 
-  const dirMismatch =
-    !!sessionWorkdir && selection.workdir && selection.workdir !== sessionWorkdir
+  const dirMismatch = !!sessionWorkdir && selection.workdir && selection.workdir !== sessionWorkdir
 
   const handleSubmit = async () => {
     if (!instruction.trim() || submitting) return
