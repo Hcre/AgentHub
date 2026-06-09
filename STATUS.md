@@ -1,6 +1,6 @@
 # 当前状态
 
-> 更新:2026-06-091:40整合版 (整理而非瘦身) +2026-06-0900:45 真测补完标注 (per [test-report-2026-06-09-comprehensive.html](docs/reports/test-report-2026-06-09-comprehensive.html)) + **2026-06-091:40 后端 ↔ 前端缺口盘点 (per袁1:28a~1:31a inventory + 本轮 grep复核)**
+> 更新:2026-06-091:40整合版 (整理而非瘦身) +2026-06-0900:45 真测补完标注 (per [test-report-2026-06-09-comprehensive.html](docs/reports/test-report-2026-06-09-comprehensive.html)) + **2026-06-091:40 后端 ↔ 前端缺口盘点 (per袁1:28a~1:31a inventory + 本轮 grep复核)** + **2026-06-092:40 预览面板 4 tab 真实 UI 落地 (袁, 分支 feature/frontend/preview-tabs; Diff + Deploy 新建, Files/Webpage 验证; 后端 fs/git-diff 端点新增; Playwright 7 截图)**
 > - 数据源: `docs/plan/背景.md` (PRD +考察要点 +交付物) + git `200aba4:STATUS.md` (旧198 行) +3 新 ADR (0016/0017/0018) + worklogs/{袁,董,黎}/ + **本轮 grep16 router ×8 client ×7 nav实证**
 > - 规则: 每次 push 或开始/结束任务时, 更新你自己那一行
 > - 强约束: pre-push markdownlint-cli2 (D-13) — MD024/036/041 严, MD013 关 (per 2026-06-08 决策"不要瘦身")
@@ -14,7 +14,7 @@
 |----|--------|--------|-----------|
 | **黎** (oldmanpushbike) | 网页侧栏预览 + 版本稳定 push main | 无 | Template v4 (192 模板+favorites) ✅ + CLI streaming 全线 (5 种流式事件 UI+折叠组) ✅ + 图标居中 ✅ + 弹窗关闭修复 ✅ + bypassPermissions ✅ + scanner 精简 ✅ + 网页侧栏预览 ✅ + 删除确认弹窗 ✅ + 会话最近消息 ✅ |
 | **董** (yii.d) | 协调者+任务编排部分 | 无 | 群聊全栈实现 ✅ + CLI 多模型代理 ✅ + ADR-02 长驻 CLI ✅ + 前端群聊 ✅ + 记忆系统 B 方向设计 ✅ + B1 后端实现 ✅ + B2 详细设计 ✅ + Agent 创建全链路 6 处 bug 修复 + 9 个测试 ✅ + MCP save_memory 端到端打通 ✅ + 前端记忆面板 ✅ + 记忆分支合并 main ✅ |
-| **袁** (xiangbianpangde) | t7 phase-3 push + t3 MCP F3 路径 A 等 push | 🟢 t3 23:03 SLA 路径 A 已闭环, 等 push | t3 MCP P3 F3 路径 A @22:00 (2 commit fde10e4 + a2b9ff3) ✅ + t7 phase-3 @21:14 (4 commit pushed) ✅ + t7 partial @20:29 + t12 @19:43 + t6 @19:38 + t1/t2/t4 @19:18 + t8+t9 @18:45 + **2026-06-09 00:45 真测补完** (mcp.py 重复路由修复 + 4 路径 live curl + t7 pin Playwright 3 截图, 3 真 bug 暴露, pytest 332/351 + vitest 106/108 + live API 12/13 端点, 详见 [test-report-2026-06-09-comprehensive.html](docs/reports/test-report-2026-06-09-comprehensive.html)) |
+| **袁** (xiangbianpangde) | 预览面板 4 tab UI (feature/frontend/preview-tabs) | 🟢 4 tab 全完, 等 push | t3 MCP P3 F3 路径 A @22:00 (2 commit fde10e4 + a2b9ff3) ✅ + t7 phase-3 @21:14 (4 commit pushed) ✅ + t7 partial @20:29 + t12 @19:43 + t6 @19:38 + t1/t2/t4 @19:18 + t8+t9 @18:45 + **2026-06-09 00:45 真测补完** (mcp.py 重复路由修复 + 4 路径 live curl + t7 pin Playwright 3 截图, 3 真 bug 暴露, pytest 332/351 + vitest 106/108 + live API 12/13 端点) + **2026-06-09 02:40 预览面板 4 tab 真实 UI** (Diff tab 新建 `DiffPanel.tsx` + 后端 `GET /api/fs/git-diff` + Deploy tab 新建 `DeployPanel.tsx` + `api/deploy.ts` + Files/Webpage 验证; tsc+eslint 绿; live git-diff 3 路径; Playwright 7 截图 `preview-tabs-0X-*.png`; 1 真 bug 暴露+修 `_os` NameError) |
 
 ---
 
@@ -88,11 +88,11 @@
 
 | # | 后端端点 (router) | 前端现状 | 影响 (per PRD6 大功能) |接手起点 |
 |---|------------------|---------|----------------------|---------|
-| **1** | **MCP** (`mcp.py`) 全套10端点: `GET /api/mcp/market`, `/market/templates`, `/market/{id}`, `POST /api/mcp/installations`, `DELETE /installations/{id}`, `POST /api/mcp/bindings`, `DELETE /bindings/{id}`, **`POST /api/mcp/servers` (袁6/8 fde10e4+a2b9ff3)** | ❌ **0 调用** — `api/mcp.ts`10 函数全空, 主导航无 MCP入口, NavRail5 项不含 | **PRD §3 多 Agent接入 + §4产物 (MCP工具调用产物)** 的核心展示区全缺 | 在 NavRail 加 MCP入口 → 新建 `McpMarketPage.tsx` (复用 SkillMarketplacePage模式) → 接 mcpApi.listMarket + install + bind;优先级 P0 (per [ADR-0017](worklogs/decisions/0017-prd-core-feature-25pct-gate-audit.md) MCP25%闸门) |
+| **1** | **MCP** (`mcp.py`) 全套10端点: `GET /api/mcp/market`, `/market/templates`, `/market/{id}`, `POST /api/mcp/installations`, `DELETE /installations/{id}`, `POST /api/mcp/bindings`, `DELETE /bindings/{id}`, **`POST /api/mcp/servers` (袁6/8 fde10e4+a2b9ff3)** | ✅ **已落地** (袁 6/9, `9a0e631`) — `api/mcp.ts` 10 函数全包 + `SkillMarketplacePage.tsx` 加 "MCP 服务" tab (市场/已安装/MCP 三 tab) + 7 截图 | **PRD §3 多 Agent接入 + §4产物** 展示区已补 | ✅ DONE (后续可独立 McpMarketPage 拆分, 当前内嵌 SkillMarketplacePage 够用) |
 | **2** | **Tasks任务列表** (`tasks.py`) `GET /api/tasks` (返 mock `{items:[],total:0,note:"M3 实现"}`) | ⚠️ **UI 已写但 mock-driven** — `TasksTabView.tsx` + `CreateTaskModal` + `TaskCard` + `taskStore.ts` 全从 `data/mock`读, 无 `tasksApi`, 不打 `/api/tasks` | **PRD §2 Orchestrator失败降级/冲突处理** 主载体缺 (TaskCard "派发"按钮注释待 M3 Coordinator 接 `POST /api/tasks`) | 在 `api/` 加 `tasks.ts` (list/create/update/delete) +替换 taskStore.ts fetch; 后端骨架需先填 (M3 TODO移除) |
 | **3** | **Inbox收件箱** (`inbox.py`) `GET /api/inbox`, `GET /api/inbox/unread-count` (返 `{items:[],unread_count:0,note:"M4 实现"}`) | ⚠️ **UI 是 mock** — `inboxStore.ts`注释"items来自 GET /api/inbox; resolve 对应批准/驳回 POST" 但无实现; `InboxView.tsx`注释"M4 TODO" | **PRD §2 Orchestrator失败降级 + 用户审批流**缺 (S5 inbox3 重 gap per [ADR-0010](worklogs/decisions/0010-integration-verify-downscope-e.md)) | 新建 `api/inbox.ts` +替换 inboxStore mock + InboxView 接审批 modal (post approve/reject); 后端骨架需 M4填 |
 | **4** | **CLI PATH扫描刷新** (`cli.py`) `GET /api/cli/scan`, `POST /api/cli/scan/refresh` (`CliScheduler` 每1h 自动扫, scheduler 已落) | ❌ **无手动 trigger按钮** — CreateAgentModal调 `providersApi.scan()` 是间接路径 | PRD §3 "多 Agent接入" UX: 用户装新 CLI 后不能手动重扫,需等1h scheduler | 在 `api/` 加 `cli.ts` (scan + refresh) + 在 Provider卡片加 "刷新扫描"按钮 |
-| **5** | **Deploy列表/详情/删除** (`deploy.py`) `POST /api/deploy`, **`GET /api/deploy`** (list), **`GET /api/deploy/{id}`** (detail), `DELETE /api/deploy/{id}` | ❌ **后端3/4端点无 UI** — `DeployCard.tsx` 仅展示内联卡片, 无 list面板 (看不到历史部署), 无删除按钮 | **PRD §5部署发布 P2** 部分项缺:列表 + 删除 (per STATUS §🎯 PRD §5 ⚠️ 部分 "端点已落,真实部署流水线未跑 E2E") | 新建 `api/deploy.ts` (list/get/delete) + 在 settings 加 DeployHistoryPanel; DeployCard 加删除确认 |
+| **5** | **Deploy列表/详情/删除** (`deploy.py`) `POST /api/deployments`, **`GET /api/deployments`** (list), **`GET /api/deployments/{id}`** (detail), `DELETE /api/deployments/{id}` | ✅ **已落地** (袁 6/9, feature/frontend/preview-tabs) — 新建 `api/deploy.ts` (list/get/start/remove) + `DeployPanel.tsx` (预览面板 "部署" tab: 历史列表 + 4 状态色 + 展开 build_logs + preview/download 链接 + 删除确认弹窗 + 3s 自动刷新) + 接入 RightPanel ActiveTabContent | **PRD §5部署发布 P2** 列表 + 删除已补 | ✅ DONE (Playwright `preview-tabs-06-deploy-empty.png` 验空态; 真实数据待 DB seed) |
 | **6** | **Usage 全局** (`usage.py`) `GET /api/usage`, `/global`, `/agents/{id}`, `/sessions/{id}` | ⚠️ **TD-11: `/api/usage`端点未注册 main.py** — `TokenMonitorPanel.tsx` fetch `/api/usage/global` 直接404, pytest158 + vitest106绿但 main.py漏 import | **PRD §3 多 Agent接入** 的成本可视化缺 (用户看不到 token花费) | 单独立30min ticket "register usage router in main.py" (per TD-11), 然后验证 TokenMonitorPanel 不再404 |
 | **7** | **Templates sync/source/export** (`templates.py`) `POST /api/templates/sync`, `GET /api/templates/source/status`, `GET /api/templates/{id}/export` | ⚠️ **部分有 UI** — `templateStore.ts` fetch sync/source 已调, 但 export 仅在 `TemplatePreviewPanel` 单卡片触发; **无 "刷新源"按钮** (用户感知不到同步状态) | PRD §1 IM聊天式交互的"模板扩展"半缺 | 在 TemplateManagementTab 加"同步源"按钮 (走 templatesApi.sync) + 显示 source/last_synced |
 | **8** | **Skills library高级操作** (`skills.py`) `POST /api/skills/library/create`, `/generate`, `/batch-delete`, `DELETE /library/{name}` | ⚠️ **直接 fetch 无 client wrapper** — `SkillMarketplacePage.tsx` (5 处) + `CreateSkillDialog.tsx` (2 处) + `SkillMdPreview.tsx` + `CustomAgentModal.tsx` 全用 `fetch('/api/skills/...')` |维护性债 (后端改路径需 grep 多处); PRD §3适配器层不受影响 | 新建 `api/skills.ts`包装5端点 +替换4 文件 fetch 调用 |
@@ -102,11 +102,26 @@
 | **12** | **Provider ping UI反馈** (`providers.py`) `POST /api/providers/ping` | ⚠️ **`providersApi.ts` 无 ping fn** — `CreateAgentModal.tsx` line627+662 直接 fetch 但**结果未 toast化** (成功/失败用户看不到) | PRD §3 创建 Agent流程 UX: 用户填完 form 点 "测试连接" 后无明确反馈 | CreateAgentModal 把 ping 返回 toast化 + `providersApi.ping(system)` 加包装 |
 | **13** | **Proxy debug面板** (`proxy.py`) `/proxy/agents/{id}/{path:path}` (通配转发 CLI →第三方) | ❌ **无 debug/diagnose UI** — proxy 是 CLI链路基础设施, 用户不直接调用 | PRD §3 多 Agent接入的"故障排查"缺 (用户看不到 proxy 是否通) | (低优先级) settings 加 ProxyStatusPanel 显示最近 N 次代理成功/失败 |
 
-**整体盘点结论**:
-- **P0必做 (直接影响 demo视频 +答辩)**: #1 MCP UI (10端点全缺, PRD §3核心), #2 Tasks (UI mock, M3 TODO移除), #5 Deploy list/delete (PRD §5 P2)
-- **P1重要 (影响 UX完整性)**: #3 Inbox (M4 TODO), #6 Usage 注册 main.py (TD-1130min), #9 Agents PATCH, #10 Message DELETE
+**整体盘点结论** (2026-06-09 02:40 更新):
+- **P0 已闭环**: ✅ #1 MCP UI (袁 6/9, SkillMarketplacePage MCP tab) · ✅ #5 Deploy list/delete (袁 6/9, DeployPanel 预览面板 tab) · ⏳ #2 Tasks (UI mock, M3 TODO 移除仍待做)
+- **P1重要 (影响 UX完整性)**: #3 Inbox (M4 TODO), #6 Usage 注册 main.py (✅ 已注册 main.py:124, TD-11 可关), #9 Agents PATCH, #10 Message DELETE
 - **P2维护性债 (不改不崩, 但留 grep负担)**: #4 CLI refresh button, #7 Templates sync按钮, #8 Skills client wrapper, #11 Memory update, #12 Provider ping toast, #13 Proxy debug
-- **覆盖率**: 后端端点57 → 前端实际调用 ~35, **真覆盖率 ≈60%** (per袁1:28a inventory: "Frontend Views Gap: Only2 Tabs (Skills, Settings) vs57 Backend Endpoint Groups")
+- **覆盖率**: 后端端点57 → 前端实际调用持续上升 (MCP 10 + Deploy 4 + fs/git-diff 1 本轮新接), MCP/Deploy 两大 P0 区已补齐
+
+### 🆕 预览面板 4 tab 真实 UI (袁 2026-06-09 02:40, 分支 feature/frontend/preview-tabs)
+
+> Composer "+" 菜单 / 右栏预览面板的 4 个 PreviewMode (`previewModes.ts`) 全部接真实 UI:
+
+| tab | 状态 | 实现 | 证据 |
+|-----|------|------|------|
+| 项目文件 (files) | ✅ 验证 | 既有 `FilePreview.tsx` + `fsApi.browse/read` | `preview-tabs-03-files-tree.png` (真实目录树) |
+| 审查 diff (diff) | ✅ **新建** | `DiffPanel.tsx` + 后端 `GET /api/fs/git-diff` (subprocess git diff, 非 repo/超时优雅降级 200+ok:false) + 复用 `DiffView` (react-diff-viewer emerald/rose) + staged 切换 + 刷新 | `preview-tabs-04-diff-real.png` (真实 git diff 表格) + live 3 路径 (repo ok / 非 git ok:false / 不存在 404) |
+| 部署 (deploy) | ✅ **新建** | `api/deploy.ts` + `DeployPanel.tsx` (历史列表 + 4 状态色 + build_logs 折叠 + 删除确认 + 3s 自动刷新) | `preview-tabs-06-deploy-empty.png` (isUuid 校验空态) |
+| 网页 (webpage) | ✅ 验证 | 既有 `WebPageView` (iframe sandbox + URL bar) | `preview-tabs-05-webpage.png` (example.com iframe) |
+
+- **接入点**: `RightPanel.tsx` `ActiveTabContent` switch 加 diff/deploy 2 case + `sessionId={activeConversationId ?? activeGroupId}` 注入
+- **质量**: tsc 绿 + eslint 绿 (4 处 set-state-in-effect 按项目惯例 disable) + 后端 app import OK (81 routes) + 1 真 bug 暴露+修 (`fs_git_diff` 漏 `import os as _os` → NameError, live test 发现)
+- **7 截图**: `docs/deliverables/screenshots/preview-tabs-0{0..6}-*.png` (menu/diff-empty/files-empty/files-tree/diff-real/webpage/deploy-empty)
 
 ---
 

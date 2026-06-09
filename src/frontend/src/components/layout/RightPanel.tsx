@@ -5,6 +5,8 @@ import { uid } from '../../lib/id'
 import { Icon } from '../ui'
 import { PREVIEW_MODES, type PreviewMode } from '../preview/previewModes'
 import { FilePreview } from '../preview/FilePreview'
+import { DiffPanel } from '../preview/DiffPanel'
+import { DeployPanel } from '../preview/DeployPanel'
 import { useCurrentWorkdir } from './previewContext'
 import { useUIStore, type PreviewTab } from '../../stores/uiStore'
 
@@ -38,6 +40,9 @@ export function RightPanel() {
   const addPreviewTab = useUIStore((s) => s.addPreviewTab)
   const removePreviewTab = useUIStore((s) => s.removePreviewTab)
   const setActivePreviewTab = useUIStore((s) => s.setActivePreviewTab)
+  // 用于 DeployPanel 注入 session_id（chat 用 conversationId，group 用 groupId）
+  const activeConversationId = useUIStore((s) => s.activeConversationId)
+  const activeGroupId = useUIStore((s) => s.activeGroupId)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null)
   const plusRef = useRef<HTMLButtonElement>(null)
@@ -130,7 +135,11 @@ export function RightPanel() {
 
       <div className="min-h-0 flex-1">
         {activeTab ? (
-          <ActiveTabContent tab={activeTab} onOpenFile={openFilePath} />
+          <ActiveTabContent
+            tab={activeTab}
+            onOpenFile={openFilePath}
+            sessionId={activeConversationId ?? activeGroupId}
+          />
         ) : (
           <EmptyState onPickFirst={togglePlus} />
         )}
@@ -279,9 +288,11 @@ function TabButton({
   )
 }
 
-function ActiveTabContent({ tab, onOpenFile }: { tab: PreviewTab; onOpenFile: (path: string) => void }) {
+function ActiveTabContent({ tab, onOpenFile, sessionId }: { tab: PreviewTab; onOpenFile: (path: string) => void; sessionId?: string | null }) {
   if (tab.type === 'files') return <FilePreview workdir={tab.workdir} initialPath={tab.filePath} onOpenFile={onOpenFile} />
   if (tab.type === 'webpage') return <WebPageView tab={tab} />
+  if (tab.type === 'diff') return <DiffPanel workdir={tab.workdir} />
+  if (tab.type === 'deploy') return <DeployPanel sessionId={sessionId} />
   return (
     <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted-foreground">
       <div>
@@ -300,6 +311,7 @@ function WebPageView({ tab }: { tab: PreviewTab }) {
 
   // 外部 url 变化（如从消息卡片推入、切换 tab）同步到输入框
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setInputUrl(tab.url ?? '')
   }, [tab.url])
 
