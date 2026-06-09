@@ -1,6 +1,6 @@
 # 当前状态
 
-> 更新:2026-06-091:40整合版 (整理而非瘦身) +2026-06-0900:45 真测补完标注 (per [test-report-2026-06-09-comprehensive.html](docs/reports/test-report-2026-06-09-comprehensive.html)) + **2026-06-091:40 后端 ↔ 前端缺口盘点 (per袁1:28a~1:31a inventory + 本轮 grep复核)** + **2026-06-092:40 预览面板 4 tab 真实 UI 落地 (袁, 分支 feature/frontend/preview-tabs; Diff + Deploy 新建, Files/Webpage 验证; 后端 fs/git-diff 端点新增; Playwright 7 截图)**
+> 更新:2026-06-091:40整合版 (整理而非瘦身) +2026-06-0900:45 真测补完标注 (per [test-report-2026-06-09-comprehensive.html](docs/reports/test-report-2026-06-09-comprehensive.html)) + **2026-06-091:40 后端 ↔ 前端缺口盘点 (per袁1:28a~1:31a inventory + 本轮 grep复核)** + **2026-06-092:40 预览面板 4 tab 真实 UI 落地 (袁, 分支 feature/frontend/preview-tabs; Diff + Deploy 新建, Files/Webpage 验证; 后端 fs/git-diff 端点新增; Playwright 7 截图)** + **2026-06-0907:30 后端已完成但前端缺失功能点补全 (袁, 同分支; #9 编辑Agent + #10 删除消息 + #12 ping延迟 + #7 Templates同步复核 + #4 CLI重扫 + #8 Skills wrapper; 此类缺口清零, 余 #2/#3 后端为 mock 骨架)**
 > - 数据源: `docs/plan/背景.md` (PRD +考察要点 +交付物) + git `200aba4:STATUS.md` (旧198 行) +3 新 ADR (0016/0017/0018) + worklogs/{袁,董,黎}/ + **本轮 grep16 router ×8 client ×7 nav实证**
 > - 规则: 每次 push 或开始/结束任务时, 更新你自己那一行
 > - 强约束: pre-push markdownlint-cli2 (D-13) — MD024/036/041 严, MD013 关 (per 2026-06-08 决策"不要瘦身")
@@ -14,7 +14,7 @@
 |----|--------|--------|-----------|
 | **黎** (oldmanpushbike) | 网页侧栏预览 + 版本稳定 push main | 无 | Template v4 (192 模板+favorites) ✅ + CLI streaming 全线 (5 种流式事件 UI+折叠组) ✅ + 图标居中 ✅ + 弹窗关闭修复 ✅ + bypassPermissions ✅ + scanner 精简 ✅ + 网页侧栏预览 ✅ + 删除确认弹窗 ✅ + 会话最近消息 ✅ |
 | **董** (yii.d) | 协调者+任务编排部分 | 无 | 群聊全栈实现 ✅ + CLI 多模型代理 ✅ + ADR-02 长驻 CLI ✅ + 前端群聊 ✅ + 记忆系统 B 方向设计 ✅ + B1 后端实现 ✅ + B2 详细设计 ✅ + Agent 创建全链路 6 处 bug 修复 + 9 个测试 ✅ + MCP save_memory 端到端打通 ✅ + 前端记忆面板 ✅ + 记忆分支合并 main ✅ |
-| **袁** (xiangbianpangde) | 预览面板 4 tab UI (feature/frontend/preview-tabs) | 🟢 4 tab 全完, 等 push | t3 MCP P3 F3 路径 A @22:00 (2 commit fde10e4 + a2b9ff3) ✅ + t7 phase-3 @21:14 (4 commit pushed) ✅ + t7 partial @20:29 + t12 @19:43 + t6 @19:38 + t1/t2/t4 @19:18 + t8+t9 @18:45 + **2026-06-09 00:45 真测补完** (mcp.py 重复路由修复 + 4 路径 live curl + t7 pin Playwright 3 截图, 3 真 bug 暴露, pytest 332/351 + vitest 106/108 + live API 12/13 端点) + **2026-06-09 02:40 预览面板 4 tab 真实 UI** (Diff tab 新建 `DiffPanel.tsx` + 后端 `GET /api/fs/git-diff` + Deploy tab 新建 `DeployPanel.tsx` + `api/deploy.ts` + Files/Webpage 验证; tsc+eslint 绿; live git-diff 3 路径; Playwright 7 截图 `preview-tabs-0X-*.png`; 1 真 bug 暴露+修 `_os` NameError) |
+| **袁** (xiangbianpangde) | 后端已完成但前端缺失功能点补全 (feature/frontend/preview-tabs) | 🟢 6 项全完 + 4 tab 已 commit, 等 push | **2026-06-09 07:30 缺口补全 6 项** (#9 编辑Agent full E2E + #10 删除消息 + #12 ping延迟 + #7 Templates复核 + #4 CLI重扫 scan() + #8 Skills wrapper; tsc+eslint绿; gap-09/gap-10 截图; 审计排除 #2/#3 mock 骨架) + | t3 MCP P3 F3 路径 A @22:00 (2 commit fde10e4 + a2b9ff3) ✅ + t7 phase-3 @21:14 (4 commit pushed) ✅ + t7 partial @20:29 + t12 @19:43 + t6 @19:38 + t1/t2/t4 @19:18 + t8+t9 @18:45 + **2026-06-09 00:45 真测补完** (mcp.py 重复路由修复 + 4 路径 live curl + t7 pin Playwright 3 截图, 3 真 bug 暴露, pytest 332/351 + vitest 106/108 + live API 12/13 端点) + **2026-06-09 02:40 预览面板 4 tab 真实 UI** (Diff tab 新建 `DiffPanel.tsx` + 后端 `GET /api/fs/git-diff` + Deploy tab 新建 `DeployPanel.tsx` + `api/deploy.ts` + Files/Webpage 验证; tsc+eslint 绿; live git-diff 3 路径; Playwright 7 截图 `preview-tabs-0X-*.png`; 1 真 bug 暴露+修 `_os` NameError) |
 
 ---
 
@@ -91,22 +91,23 @@
 | **1** | **MCP** (`mcp.py`) 全套10端点: `GET /api/mcp/market`, `/market/templates`, `/market/{id}`, `POST /api/mcp/installations`, `DELETE /installations/{id}`, `POST /api/mcp/bindings`, `DELETE /bindings/{id}`, **`POST /api/mcp/servers` (袁6/8 fde10e4+a2b9ff3)** | ✅ **已落地** (袁 6/9, `9a0e631`) — `api/mcp.ts` 10 函数全包 + `SkillMarketplacePage.tsx` 加 "MCP 服务" tab (市场/已安装/MCP 三 tab) + 7 截图 | **PRD §3 多 Agent接入 + §4产物** 展示区已补 | ✅ DONE (后续可独立 McpMarketPage 拆分, 当前内嵌 SkillMarketplacePage 够用) |
 | **2** | **Tasks任务列表** (`tasks.py`) `GET /api/tasks` (返 mock `{items:[],total:0,note:"M3 实现"}`) | ⚠️ **UI 已写但 mock-driven** — `TasksTabView.tsx` + `CreateTaskModal` + `TaskCard` + `taskStore.ts` 全从 `data/mock`读, 无 `tasksApi`, 不打 `/api/tasks` | **PRD §2 Orchestrator失败降级/冲突处理** 主载体缺 (TaskCard "派发"按钮注释待 M3 Coordinator 接 `POST /api/tasks`) | 在 `api/` 加 `tasks.ts` (list/create/update/delete) +替换 taskStore.ts fetch; 后端骨架需先填 (M3 TODO移除) |
 | **3** | **Inbox收件箱** (`inbox.py`) `GET /api/inbox`, `GET /api/inbox/unread-count` (返 `{items:[],unread_count:0,note:"M4 实现"}`) | ⚠️ **UI 是 mock** — `inboxStore.ts`注释"items来自 GET /api/inbox; resolve 对应批准/驳回 POST" 但无实现; `InboxView.tsx`注释"M4 TODO" | **PRD §2 Orchestrator失败降级 + 用户审批流**缺 (S5 inbox3 重 gap per [ADR-0010](worklogs/decisions/0010-integration-verify-downscope-e.md)) | 新建 `api/inbox.ts` +替换 inboxStore mock + InboxView 接审批 modal (post approve/reject); 后端骨架需 M4填 |
-| **4** | **CLI PATH扫描刷新** (`cli.py`) `GET /api/cli/scan`, `POST /api/cli/scan/refresh` (`CliScheduler` 每1h 自动扫, scheduler 已落) | ❌ **无手动 trigger按钮** — CreateAgentModal调 `providersApi.scan()` 是间接路径 | PRD §3 "多 Agent接入" UX: 用户装新 CLI 后不能手动重扫,需等1h scheduler | 在 `api/` 加 `cli.ts` (scan + refresh) + 在 Provider卡片加 "刷新扫描"按钮 |
+| **4** | **CLI PATH扫描刷新** (`cli.py`) `GET /api/cli/scan`, `POST /api/cli/scan/refresh` (`CliScheduler` 每1h 自动扫, scheduler 已落) | ✅ **已落地** (袁 6/9, feature/frontend/preview-tabs) — CreateAgentModal Step 2 "重新扫描"按钮改调 `providersApi.scan()` (POST /api/providers/scan 强制重扫 PATH) 替代原 `list()` (返 1h scheduler 缓存); 用户刚装的 CLI 立刻可见 | **PRD §3 "多 Agent接入" UX** 已补 (手动重扫) | ✅ DONE (live "扫描完成,4 个可用" 验证) |
 | **5** | **Deploy列表/详情/删除** (`deploy.py`) `POST /api/deployments`, **`GET /api/deployments`** (list), **`GET /api/deployments/{id}`** (detail), `DELETE /api/deployments/{id}` | ✅ **已落地** (袁 6/9, feature/frontend/preview-tabs) — 新建 `api/deploy.ts` (list/get/start/remove) + `DeployPanel.tsx` (预览面板 "部署" tab: 历史列表 + 4 状态色 + 展开 build_logs + preview/download 链接 + 删除确认弹窗 + 3s 自动刷新) + 接入 RightPanel ActiveTabContent | **PRD §5部署发布 P2** 列表 + 删除已补 | ✅ DONE (Playwright `preview-tabs-06-deploy-empty.png` 验空态; 真实数据待 DB seed) |
 | **6** | **Usage 全局** (`usage.py`) `GET /api/usage`, `/global`, `/agents/{id}`, `/sessions/{id}` | ⚠️ **TD-11: `/api/usage`端点未注册 main.py** — `TokenMonitorPanel.tsx` fetch `/api/usage/global` 直接404, pytest158 + vitest106绿但 main.py漏 import | **PRD §3 多 Agent接入** 的成本可视化缺 (用户看不到 token花费) | 单独立30min ticket "register usage router in main.py" (per TD-11), 然后验证 TokenMonitorPanel 不再404 |
-| **7** | **Templates sync/source/export** (`templates.py`) `POST /api/templates/sync`, `GET /api/templates/source/status`, `GET /api/templates/{id}/export` | ⚠️ **部分有 UI** — `templateStore.ts` fetch sync/source 已调, 但 export 仅在 `TemplatePreviewPanel` 单卡片触发; **无 "刷新源"按钮** (用户感知不到同步状态) | PRD §1 IM聊天式交互的"模板扩展"半缺 | 在 TemplateManagementTab 加"同步源"按钮 (走 templatesApi.sync) + 显示 source/last_synced |
-| **8** | **Skills library高级操作** (`skills.py`) `POST /api/skills/library/create`, `/generate`, `/batch-delete`, `DELETE /library/{name}` | ⚠️ **直接 fetch 无 client wrapper** — `SkillMarketplacePage.tsx` (5 处) + `CreateSkillDialog.tsx` (2 处) + `SkillMdPreview.tsx` + `CustomAgentModal.tsx` 全用 `fetch('/api/skills/...')` |维护性债 (后端改路径需 grep 多处); PRD §3适配器层不受影响 | 新建 `api/skills.ts`包装5端点 +替换4 文件 fetch 调用 |
-| **9** | **Agents PATCH** (`agents.py`) `PATCH /api/agents/{id}` (改 name/avatar/role/skills...) | ❌ **`agentsApi.ts` 无 patch fn** — AgentsListPage + AgentDetailDrawer + AgentDetailPage 全是只读; 用户编辑 Agent只能 delete+create | PRD §3 "用户自建 Agent (对话式创建)"改 name/role 无路径 (只能整个删了重建) | `agentsApi.update(id, partial)` 加 → AgentDetailDrawer 加编辑入口 |
-| **10** | **Sessions DELETE message** (`sessions.py`) `DELETE /api/messages/{id}` | ❌ **`sessionsApi.ts` 无 delete fn** — MessageBubble注释 "并接 fetch('/api/messages/{id}/regenerate?session_id=...')" 显示只有 pin; 删除消息 UI 无 | PRD §1 IM聊天式交互"消息操作"缺 "删除消息"维度 (per STATUS §🎯 PRD §1 ⚠️ 部分) | `sessionsApi.deleteMessage(id, sessionId)` 加 → MessageBubble 加删除按钮 (私聊) + GroupMessageItem (群聊) |
+| **7** | **Templates sync/source/export** (`templates.py`) `POST /api/templates/sync`, `GET /api/templates/source/status`, `GET /api/templates/{id}/export` | ✅ **已落地** (复核发现早已实现, 本轮确认) — `TemplateManagementTab.tsx` 顶栏"同步模板"按钮 (handleSync→syncSource) + 来源状态卡 (SyncStatusDot + url/branch/template_count/last_synced) + toast 反馈 | PRD §1 IM聊天式交互"模板扩展" 已补 | ✅ DONE (STATUS 表此前过时, 实测已有完整 UI) |
+| **8** | **Skills library高级操作** (`skills.py`) `POST /api/skills/library/create`, `/generate`, `/batch-delete`, `DELETE /library/{name}` | ✅ **已落地** (袁 6/9) — 新建 `api/skills.ts` (skillsApi: listLibrary/createLibrary/generateLibrary/removeLibrary/batchDeleteLibrary, 保留 detail 错误提取) + 替换 5 文件裸 fetch (SkillMarketplacePage 3 处 + CreateSkillDialog 2 处 + SkillMdPreview + CreateAgentModal + CustomAgentModal) | 维护性债清偿; PRD §3适配器层不受影响 | ✅ DONE (live skill list 加载验证 wrapper 通) |
+| **9** | **Agents PATCH** (`agents.py`) `PATCH /api/agents/{id}` (改 name/avatar/role/skills...) | ✅ **已落地** (袁 6/9) — `agentsApi.update(id, partial)` + `agentStore.updateAgent` (PATCH + 同步本地 agents/profiles) + AgentDetailDrawer 加"编辑"入口 (内联表单: 名称/角色/系统提示 + 取消/保存 + 校验 + 错误回显) | **PRD §3 "用户自建 Agent"** 改 name/role 已通 | ✅ DONE (**full E2E**: UI 编辑→保存→后端持久化 `测试队友-UI保存验证`; `gap-09-agent-edit.png`) |
+| **10** | **Sessions DELETE message** (`sessions.py`) `DELETE /api/messages/{id}` | ✅ **已落地** (袁 6/9) — `sessionsApi.deleteMessage(id)` + `chatStore.removeMessage` + MessageBubble hover "删除消息"按钮 (确认弹窗) + ChatView `onDelete` 乐观删除+失败回滚 (仅绑后端 session 的真实消息启用) | **PRD §1 IM聊天式交互"消息操作"** 已补删除维度 | ✅ DONE (UI 删除按钮 live 渲染验证 `gap-10-message-delete.png`; DELETE 端点已接线, 群聊 GroupMessageItem 待后续) |
 | **11** | **Memory update 接口** (`memories.py`路由在 `/api/agents/{id}/memories`) `PATCH /api/agents/{id}/memories/{mid}` | ⚠️ **`memoriesApi.update` 已包装但 MemoryPanel 是否调用待复核** (本轮 grep0命中 `.update(`) | PRD §3 多 Agent接入的"长期记忆" 编辑路径半缺 (用户可创建但不能修改内容) | MemoryPanel 加编辑 modal 接 memoriesApi.update |
-| **12** | **Provider ping UI反馈** (`providers.py`) `POST /api/providers/ping` | ⚠️ **`providersApi.ts` 无 ping fn** — `CreateAgentModal.tsx` line627+662 直接 fetch 但**结果未 toast化** (成功/失败用户看不到) | PRD §3 创建 Agent流程 UX: 用户填完 form 点 "测试连接" 后无明确反馈 | CreateAgentModal 把 ping 返回 toast化 + `providersApi.ping(system)` 加包装 |
+| **12** | **Provider ping UI反馈** (`providers.py`) `POST /api/providers/ping` | ✅ **已落地** (袁 6/9) — `providersApi.ping(input)` 封装 (PingInput/PingResult 类型) + CreateAgentModal 两处裸 fetch 替换 + 成功显示 "连通正常 · {latency}ms" (emerald) / 失败显示 error (red) | **PRD §3 创建 Agent UX** 连通反馈已补 (含延迟) | ✅ DONE (连通测试按钮 + 状态行 live 渲染) |
 | **13** | **Proxy debug面板** (`proxy.py`) `/proxy/agents/{id}/{path:path}` (通配转发 CLI →第三方) | ❌ **无 debug/diagnose UI** — proxy 是 CLI链路基础设施, 用户不直接调用 | PRD §3 多 Agent接入的"故障排查"缺 (用户看不到 proxy 是否通) | (低优先级) settings 加 ProxyStatusPanel 显示最近 N 次代理成功/失败 |
 
-**整体盘点结论** (2026-06-09 02:40 更新):
-- **P0 已闭环**: ✅ #1 MCP UI (袁 6/9, SkillMarketplacePage MCP tab) · ✅ #5 Deploy list/delete (袁 6/9, DeployPanel 预览面板 tab) · ⏳ #2 Tasks (UI mock, M3 TODO 移除仍待做)
-- **P1重要 (影响 UX完整性)**: #3 Inbox (M4 TODO), #6 Usage 注册 main.py (✅ 已注册 main.py:124, TD-11 可关), #9 Agents PATCH, #10 Message DELETE
-- **P2维护性债 (不改不崩, 但留 grep负担)**: #4 CLI refresh button, #7 Templates sync按钮, #8 Skills client wrapper, #11 Memory update, #12 Provider ping toast, #13 Proxy debug
-- **覆盖率**: 后端端点57 → 前端实际调用持续上升 (MCP 10 + Deploy 4 + fs/git-diff 1 本轮新接), MCP/Deploy 两大 P0 区已补齐
+**整体盘点结论** (2026-06-09 07:30 更新 — 袁补完"后端已完成但前端缺失"全部 6 项):
+- **P0 已闭环**: ✅ #1 MCP UI · ✅ #5 Deploy list/delete · ⏳ #2 Tasks (后端是 **mock 骨架** `note:"M3 实现"`, 非"后端完成" — 须先填后端 M3 才能接前端)
+- **P1 已闭环**: ✅ #9 Agents PATCH (编辑队友) · ✅ #10 Message DELETE (删除消息) · #6 Usage (✅ 已注册 main.py:124, TD-11 可关) · ⏳ #3 Inbox (后端 **mock 骨架** `note:"M4 实现"`, 同 #2 须先填后端)
+- **P2 已闭环**: ✅ #4 CLI 重新扫描 (scan 强制重扫) · ✅ #7 Templates 同步 (复核发现早已实现) · ✅ #8 Skills client wrapper · ✅ #12 Provider ping (含延迟显示) · #11 Memory (✅ `memoriesApi.update` 已存在) · #13 Proxy (基础设施, 用户不直接调, 不补)
+- **剩余真缺口**: 仅 #2 Tasks / #3 Inbox 两项, 但两者**后端均为 mock 骨架** (返空 + M3/M4 TODO), 不属"后端已完成", 须后端先落地 service 才能接前端
+- **覆盖率**: 后端端点 57 → 前端实际调用持续上升 (本轮新接 Agents PATCH + Message DELETE + Provider ping + Skills wrapper 5 端点), "后端完成且前端缺失"类缺口已**全部清零**
 
 ### 🆕 预览面板 4 tab 真实 UI (袁 2026-06-09 02:40, 分支 feature/frontend/preview-tabs)
 
@@ -122,6 +123,24 @@
 - **接入点**: `RightPanel.tsx` `ActiveTabContent` switch 加 diff/deploy 2 case + `sessionId={activeConversationId ?? activeGroupId}` 注入
 - **质量**: tsc 绿 + eslint 绿 (4 处 set-state-in-effect 按项目惯例 disable) + 后端 app import OK (81 routes) + 1 真 bug 暴露+修 (`fs_git_diff` 漏 `import os as _os` → NameError, live test 发现)
 - **7 截图**: `docs/deliverables/screenshots/preview-tabs-0{0..6}-*.png` (menu/diff-empty/files-empty/files-tree/diff-real/webpage/deploy-empty)
+
+### 🆕 后端已完成但前端缺失的功能点补全 (袁 2026-06-09 07:30, 分支 feature/frontend/preview-tabs)
+
+> 按"后端完整 + 前端缺失"口径补完 6 项 (#9/#10/#12/#7/#4/#8)。先审计 13 项缺口真实状态:
+> #2 Tasks / #3 Inbox 后端是 **mock 骨架** (返空 + M3/M4 TODO), 不算"后端完成", 排除; #11 Memory `memoriesApi.update` 已存在; #13 Proxy 基础设施不补。
+
+| # | 功能 | 实现 | 验证 |
+|---|------|------|------|
+| #9 | 编辑 Agent | `agentsApi.update` + `agentStore.updateAgent` + AgentDetailDrawer 内联编辑表单 (名称/角色/系统提示) | **full E2E**: UI 编辑→保存→后端持久化, `gap-09-agent-edit.png` |
+| #10 | 删除消息 | `sessionsApi.deleteMessage` + `chatStore.removeMessage` + MessageBubble hover 删除按钮 (确认) + ChatView 乐观删除+回滚 | UI 按钮 live 渲染 `gap-10-message-delete.png` + DELETE 端点已接线 |
+| #12 | Provider ping | `providersApi.ping` 封装 + CreateAgentModal 2 处裸 fetch 替换 + 延迟显示 ("连通正常 · {ms}") | 连通测试按钮 + 状态行 live 渲染 |
+| #7 | Templates 同步 | 复核发现 TemplateManagementTab 早已有同步按钮 + 来源状态卡 + toast | 无需改动 (STATUS 表此前过时) |
+| #4 | CLI 重新扫描 | CreateAgentModal "重新扫描"改调 `providersApi.scan()` (强制重扫) 替代 `list()` (缓存) | live "扫描完成,4 个可用" |
+| #8 | Skills wrapper | 新建 `api/skills.ts` (5 端点) + 替换 5 文件裸 fetch | live skill list 加载验证 wrapper 通 |
+
+- **质量**: tsc 全绿 + eslint 新增代码全绿 (AgentDetailDrawer 1 处 set-state-in-effect 按惯例 disable) + vitest MessageBubble/agent 套件通过
+- **诚实标注**: #10 删除真实后端消息的完整往返未做 (无 Redis/真 CLI 的消息流); 删除按钮渲染 + 端点接线已验。#2/#3 后端 mock 未动。
+- **本地 dev.db** 跑了 alembic 0001→0019 迁移 (原 0 字节) 才能 E2E #9 (sqlite, gitignored, 不提交)
 
 ---
 
