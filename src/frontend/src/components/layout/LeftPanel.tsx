@@ -76,6 +76,8 @@ export function LeftPanel() {
   const messages = useChatStore((s) => s.messages)
   const [openGroup_, setOpenGroup] = useState(true)
   const [openDM, setOpenDM] = useState(true)
+  // 「已归档」分区折叠态（默认收起，归档为低频项）
+  const [openArchived, setOpenArchived] = useState(false)
   const renameGroup = useGroupStore((s) => s.renameGroup)
   const deleteGroup = useGroupStore((s) => s.deleteGroup)
   // t7 拓展：群组置顶（复用 backing Session.pinned，复用私聊 trade-off 模式）
@@ -88,6 +90,7 @@ export function LeftPanel() {
   const [dmBatchDeleteConfirm, setDmBatchDeleteConfirm] = useState(false)
   const removeConversations = useChatStore((s) => s.removeConversations)
   const setConversationPinned = useChatStore((s) => s.setConversationPinned)
+  const setConversationArchived = useChatStore((s) => s.setConversationArchived)
   const sessionIds = useChatStore((s) => s.sessionIds)
   const setSessionId = useChatStore((s) => s.setSessionId)
   // t7 B-4-P2-CL01：搜索（300ms debounce）+ 置顶
@@ -192,12 +195,25 @@ export function LeftPanel() {
     exitDmBatch()
   }
 
-  // 扁平私聊列表：每 Agent 内会话倒序（最新在前），跨 Agent 保持 store 顺序
+  // t7 拓展：归档/取消归档（local-only，复用 conversations 持久化；不走后端 session）
+  const handleToggleArchive = (agentId: string, convId: string, nextArchived: boolean): void => {
+    setConversationArchived(agentId, convId, nextArchived)
+    // 归档当前打开的会话 → 切到剩余非归档会话的最近一个（避免停留在已隐藏会话）
+    if (nextArchived && activeAgentId === agentId && activeConversationId === convId) {
+      const remaining = (conversations[agentId] ?? []).filter(
+        (c) => c.id !== convId && !c.archived,
+      )
+      if (remaining.length > 0) openConversation(agentId, remaining[remaining.length - 1].id)
+    }
+  }
+
+  // 扁平私聊列表：每 Agent 内会话倒序（最新在前），跨 Agent 保持 store 顺序；归档项排除在主列表外
   const dmList = useMemo(() => {
     const list = agents.flatMap((a) =>
       (conversations[a.id] ?? [])
         .slice()
         .reverse()
+        .filter((c) => !c.archived)
         .map((c) => ({ agent: a, conv: c, key: `${a.id}:${c.id}` })),
     )
     // 按最近消息时间排序（最新的在前）
@@ -229,6 +245,21 @@ export function LeftPanel() {
     })
     return pinnedFirst
   }, [dmList, debouncedQuery])
+
+  // 已归档会话扁平列表（受同一搜索词过滤，方便在归档堆里找）
+  const archivedList = useMemo(() => {
+    const list = agents.flatMap((a) =>
+      (conversations[a.id] ?? [])
+        .filter((c) => c.archived)
+        .map((c) => ({ agent: a, conv: c, key: `${a.id}:${c.id}` })),
+    )
+    if (!debouncedQuery) return list
+    return list.filter(
+      ({ agent, conv }) =>
+        conv.name.toLowerCase().includes(debouncedQuery) ||
+        agent.name.toLowerCase().includes(debouncedQuery),
+    )
+  }, [agents, conversations, debouncedQuery])
 
   return (
     <aside className="glass-panel flex h-full w-full flex-col overflow-hidden rounded-2xl border shadow-sm">
@@ -384,6 +415,22 @@ export function LeftPanel() {
                         {lastText}
                       </div>
                     </div>
+                    {/* 归档按钮（hover 显示，归档后该会话从主列表移除，仅在「已归档」分区可见） */}
+                    {!dmBatchMode && (
+                      <span
+                        role="button"
+                        tabIndex={-1}
+                        onClick={(e: MouseEvent) => {
+                          e.stopPropagation()
+                          handleToggleArchive(agent.id, conv.id, true)
+                        }}
+                        data-testid={`archive-conv-${conv.id}`}
+                        title="归档会话"
+                        className="flex-shrink-0 rounded p-0.5 text-muted-foreground/40 opacity-0 transition-all group-hover:opacity-100 hover:bg-accent/50 hover:text-muted-foreground"
+                      >
+                        <Icon name="archive" className="h-3 w-3" />
+                      </span>
+                    )}
                     {/* t7 B-4-P2-CL01：pin 图标（置顶/取消置顶 + in-flight 禁用 + 错误标记） */}
                     <span
                       role="button"
@@ -455,6 +502,58 @@ export function LeftPanel() {
               </div>
             )}
           </div>
+        )}
+
+        {/* 已归档（仅在有归档项时显示，默认收起） */}
+        {archivedList.length > 0 && (
+          <>
+            <SectionHeader
+              label={`已归档 (${archivedList.length})`}
+              collapsed={!openArchived}
+              onToggle={() => setOpenArchived((v) => !v)}
+            />
+            {openArchived && (
+              <div className="space-y-px">
+                {archivedList.map(({ agent, conv, key }) => (
+                  <button
+                    key={key}
+                    onClick={() => openConversation(agent.id, conv.id)}
+                    data-testid={`archived-conv-${conv.id}`}
+                    className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <Avatar
+                      initial={agent.name[0] ?? '?'}
+                      color={agent.color}
+                      size={24}
+                      online={false}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-[12px]">{conv.name}</span>
+                        <span className="flex-shrink-0 truncate font-mono text-[9px] uppercase tracking-wider text-muted-foreground/50">
+                          {agent.name}
+                        </span>
+                      </div>
+                    </div>
+                    {/* 取消归档：恢复到主列表 */}
+                    <span
+                      role="button"
+                      tabIndex={-1}
+                      onClick={(e: MouseEvent) => {
+                        e.stopPropagation()
+                        handleToggleArchive(agent.id, conv.id, false)
+                      }}
+                      data-testid={`unarchive-conv-${conv.id}`}
+                      title="取消归档"
+                      className="flex-shrink-0 rounded p-0.5 text-muted-foreground/40 opacity-0 transition-all group-hover:opacity-100 hover:bg-accent/50 hover:text-muted-foreground"
+                    >
+                      <Icon name="archiveRestore" className="h-3 w-3" />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </nav>
 

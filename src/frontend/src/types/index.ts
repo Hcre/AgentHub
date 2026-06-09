@@ -53,6 +53,8 @@ export interface Conversation {
   workdir?: string
   /** t7 B-4-P2-CL01：会话置顶 — true 时排在列表最前。 */
   pinned?: boolean
+  /** 会话归档 — true 时从主列表移除，仅在「已归档」分区可见。 */
+  archived?: boolean
 }
 
 export interface CenterTab {
@@ -488,6 +490,8 @@ export type IconName =
   | 'menu'
   | 'wrapText'
   | 'terminal'
+  | 'archive'
+  | 'archiveRestore'
 
 // ── 后端 API DTO（与 backend schema 对齐，字段为 snake_case）──
 

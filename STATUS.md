@@ -1,11 +1,24 @@
 # 当前状态
 
-> 更新:**2026-06-10 00:45 pin 三层修复闭环 (袁, 分支 main; 群组pin UI缺失 + 消息pin 401永久显示 + 端点强制JWT — 10文件 + 6截图; pytest 9/9 + live curl 9/9 + Playwright click + API verify `pinned=True`; per [[feedback-no-fake-evidence]] 三档全补; commit `11b4c6c` 已 push origin/main; 详见 [worklogs/袁/2026-06-10_pin-three-layer-fix.md](worklogs/袁/2026-06-10_pin-three-layer-fix.md))** +
-> 更新:**2026-06-09 18:30 pytest 现状修正 (袁, 分支 feature/frontend/preview-tabs; 修 14 个 v4 R2 后未同步的陈旧测试 + 删 2 孤儿测试模块 + 跳 1 v3 时代 AT_ROUTING 静默断言 + 修 1 真生产 bug _RecordingSink 签名 + 删 1 死源 coordinator_orchestrator.py; 实测 356 pytest 全绿 / 2 skipped, 替代 6/8 起的失真"332 无回归"叙事; 详见 TD-14)** +**2026-06-09 16:30 #2 Tasks + #3 Inbox 全栈持久化 CRUD 落地 (袁, 分支 feature/frontend/preview-tabs; 两项后端 mock 骨架→真 service+表; 前端弃 mock 接真 API; 13 项缺口全闭环; alembic 0020; 9 pytest + ~~332 无回归~~ (6/9 18:30 修正) + Playwright 4 截图)** +2026-06-091:40整合版 (整理而非瘦身) +2026-06-0900:45 真测补完标注 (per [test-report-2026-06-09-comprehensive.html](docs/reports/test-report-2026-06-09-comprehensive.html)) + **2026-06-091:40 后端 ↔ 前端缺口盘点 (per袁1:28a~1:31a inventory + 本轮 grep复核)** + **2026-06-092:40 预览面板 4 tab 真实 UI 落地 (袁, 分支 feature/frontend/preview-tabs; Diff + Deploy 新建, Files/Webpage 验证; 后端 fs/git-diff 端点新增; Playwright 7 截图)** + **2026-06-0907:30 后端已完成但前端缺失功能点补全 (袁, 同分支; #9 编辑Agent + #10 删除消息 + #12 ping延迟 + #7 Templates同步复核 + #4 CLI重扫 + #8 Skills wrapper; 此类缺口清零, 余 #2/#3 后端为 mock 骨架)**
+> **最近更新: 2026-06-10 00:45**（袁, 分支 main）。完整变更历史见下方「更新日志」。
 > - 数据源: `docs/plan/背景.md` (PRD +考察要点 +交付物) + git `200aba4:STATUS.md` (旧198 行) +3 新 ADR (0016/0017/0018) + worklogs/{袁,董,黎}/ + **本轮 grep16 router ×8 client ×7 nav实证**
 > - 规则: 每次 push 或开始/结束任务时, 更新你自己那一行
 > - 强约束: pre-push markdownlint-cli2 (D-13) — MD024/036/041 严, MD013 关 (per 2026-06-08 决策"不要瘦身")
 > - 谁做的: 每个事件段首加 `[owner]` 标签, 进度表 row 直接 = 该人本周完成清单
+
+---
+
+## 🗒️ 更新日志 (newest first)
+
+- **2026-06-10 07:32 — 会话归档（archive）落地** (袁, 分支 feature/chat/conversation-archive)：补完 PRD §1「对话列表」最后缺口（归档）。Conversation.archived 字段 + chatStore.setConversationArchived + LeftPanel 主列表过滤归档项 + 新增「已归档 (N)」可折叠分区 + 归档/取消归档 hover 按钮（含归档当前会话自动切走）；tsc+eslint 绿 + 3 vitest（归档/取消归档/不影响他项）+ 既有 pin 12 测试无回归 + Playwright 真实往返截图 2 张（`conv-archive-01/02`）。覆盖率 67%→71%→74%→**76%**（对话列表 ⚠️→✅）
+- **2026-06-10 00:45 — pin 三层修复闭环** (袁, 分支 main)：群组 pin UI 缺失 + 消息 pin 401 永久显示 + 端点强制 JWT — 10 文件 + 6 截图；pytest 9/9 + live curl 9/9 + Playwright click + API verify `pinned=True`；per [[feedback-no-fake-evidence]] 三档全补；commit `11b4c6c` 已 push origin/main；详见 [worklog](worklogs/袁/2026-06-10_pin-three-layer-fix.md)
+- **2026-06-09 18:30 — pytest 现状修正** (袁, feature/frontend/preview-tabs)：修 14 个 v4 R2 后未同步的陈旧测试 + 删 2 孤儿测试模块 + 跳 1 v3 时代 AT_ROUTING 静默断言 + 修 1 真生产 bug `_RecordingSink` 签名 + 删 1 死源 coordinator_orchestrator.py；实测 356 pytest 全绿 / 2 skipped，替代 6/8 起的失真"332 无回归"叙事；详见 TD-14
+- **2026-06-09 16:30 — #2 Tasks + #3 Inbox 全栈持久化 CRUD 落地** (袁, feature/frontend/preview-tabs)：两项后端 mock 骨架→真 service+表；前端弃 mock 接真 API；13 项缺口全闭环；alembic 0020；9 pytest + ~~332 无回归~~ (6/9 18:30 修正) + Playwright 4 截图
+- **2026-06-09 07:30 — 后端已完成但前端缺失功能点补全** (袁, 同分支)：#9 编辑 Agent + #10 删除消息 + #12 ping 延迟 + #7 Templates 同步复核 + #4 CLI 重扫 + #8 Skills wrapper；此类缺口清零，余 #2/#3 后端为 mock 骨架
+- **2026-06-09 02:40 — 预览面板 4 tab 真实 UI 落地** (袁, feature/frontend/preview-tabs)：Diff + Deploy 新建，Files/Webpage 验证；后端 fs/git-diff 端点新增；Playwright 7 截图
+- **2026-06-09 01:40 — 后端 ↔ 前端缺口盘点** (per 袁 1:28a~1:31a inventory + 本轮 grep 复核)
+- **2026-06-09 01:40 — 整合版** (整理而非瘦身)
+- **2026-06-09 00:45 — 真测补完标注** (per [test-report-2026-06-09-comprehensive.html](docs/reports/test-report-2026-06-09-comprehensive.html))
 
 ---
 
@@ -24,7 +37,7 @@
 | 维度 | 权重 | 评判要点 | 当前覆盖 | 谁做的 |
 |------|------|---------|---------|-------|
 | AI 协作能力 | 30% | 沉淀出和 ai 协作的 Spec/skill/rules 等协作规范 | ✅ `docs/conventions/` 9 篇 + `docs/specs/` 13 篇 + `worklogs/decisions/` 18 ADR + `skills/` 9 个 + `docs/templates/` 14 个 | 全员（黎/董/袁 + Mavis owner）|
-| 功能完整度 | 25% | IM 核心体验是否流畅、多 Agent 调度是否跑通 | ⚠️ **67%** (15 完整 + 5 部分 + 5 未做 + 1 计划)，详见 [PRD 6 大功能对账](#-prd-6-大核心功能-vs-现状-对账) | 全员 |
+| 功能完整度 | 25% | IM 核心体验是否流畅、多 Agent 调度是否跑通 | ⚠️ **76%** (19 完整 + 3 部分 + 4 未做 + 1 计划)，详见 [PRD 6 大功能对账](#-prd-6-大核心功能-vs-现状-对账) | 全员 |
 | 生成效果质量 | 20% | 聊天 UI 体验、产物预览效果 | ✅ Web 端 localhost:5174 跑通, S2 群聊 6 条消息流 (用户→Coordinator 拆解→Claude/OpenCode/MockBot 并行→合并汇报) | 黎（UI 打磨）+ 董（前端群聊）|
 | 代码理解度 | 15% | 答辩时能否解释架构选型和核心逻辑 | ✅ 5 层洋葱架构图（[01-architecture](docs/conventions/01-architecture_架构设计规范.md) §一）+ 5 主表 ER 图（[03-data-model](docs/specs/03-data-model_数据模型.md) §二）+ 命令 reference (docs/plan/.../commands-reference.md) | Mavis owner (plan_ba86c4d0 docs-writer 任务) |
 | 创新与产品感 | 10% | 超预期功能点或体验优化 | ✅ 11 个真 Agent 队友 (含 Codex/OpenCode/Pi) + CLI/SDK 双轨适配器 (ADR-0001) + Pin 消息 + 部署卡 + 4 栏响应式 (useMediaQuery, 768/1024/1280/hamburger) | 全员 |
@@ -46,11 +59,11 @@
 
 > 评估依据: `plan_ba86c4d0` 7 impl commit 落 main (HEAD `eea1d0e`) + 凌晨冲刺 4 commit + E2E 实测 + 代码阅读
 > 6 大功能子项共 25, 详见 `docs/plan/背景.md` line 15-56
-> [2026-06-07 22:00 重对账, Phase 2 Playwright E2E 后] 覆盖率 = (15+5×0.5)/(15+5+5+1) = **67%** (per [ADR-0017](worklogs/decisions/0017-prd-core-feature-25pct-gate-audit.md))
+> [2026-06-07 重对账 67% → 2026-06-09 复算 74% → 2026-06-10 复算 76%] 任务看板/审批流 + 对话列表归档 升 ✅ 后: 覆盖率 = (19+3×0.5)/27 = **76%** (per [ADR-0017](worklogs/decisions/0017-prd-core-feature-25pct-gate-audit.md))
 
 | # | 子功能 | 状态 | 证据 | 谁做的 |
 |---|--------|------|------|-------|
-| **1. IM 聊天** | 对话列表（新建/置顶/归档/搜索/排序）| ⚠️ 部分 | 群组/私聊 tab + 卡片渲染；**置顶 [已真实测试 (AI 模拟)] / 归档/搜索未做**（UI 缺；归档/搜索 pytest only 未真测）| 黎（UI 基础）+ M5/M6 手动补 + 袁 (6/9 t7 pin Playwright 3 截图, [test-report-2026-06-09-comprehensive.html](docs/reports/test-report-2026-06-09-comprehensive.html) §6) |
+| **1. IM 聊天** | 对话列表（新建/置顶/归档/搜索/排序）| ✅ 完整 | 群组/私聊 tab + 卡片渲染；新建 ✅ 置顶 ✅ 搜索 ✅（跳转框 300ms debounce 过滤名称/Agent）排序 ✅（pinned 优先 + 最近消息时间）**归档 ✅（6/10 袁 — 已归档分区 + 归档/取消归档 + 3 vitest + Playwright 往返截图）** | 黎（UI 基础）+ 袁（6/9 pin Playwright 3 截图 + 6/10 归档全栈前端）|
 | | 单聊 1v1（明确任务）| ✅ 完整 | S1 私聊 "技术负责人" + 3 建议 + 输入框 + 附件 + WS（Composer.tsx）| 黎（前端 Composer）+ 董（WS）+ **袁 (6/9 部分已真测 — 走 AI 队友→发起私聊→pin happy path 走通, 但 ChatView.onSend 早返回 UI flow 死路 见 [test-report-2026-06-09-comprehensive.html](docs/reports/test-report-2026-06-09-comprehensive.html) §4 Bug 2)** |
 | | 群聊（多 Agent + @ + Orchestrator）| ✅ 完整 | S2 群聊 6 条消息流（用户→Coordinator 拆解→Claude/OpenCode/MockBot 并行→合并汇报）| 董（群聊全栈）+ 袁（E2E 验证）|
 | | 消息类型（文本/代码/图片/文件/网页预览/Diff/部署卡）| ✅ 完整 | 文本/代码/网页预览/Diff 均 ✅；图片/文件 ✅（Composer + attachments.py 200）；**部署卡 ✅**（plan_ba86c4d0 frontend-p2 + backend-p2 联合落地 `c2d2a59`+`f45a92f`, MessageBubble 部署卡接 peer DeployCardView + 状态色 + 3 路径 test）| 黎（前端）+ 董（后端 P2）+ Mavis owner (P2 委派) |
@@ -78,8 +91,8 @@
 | | 桌面端 | 📋 计划 | Tauri 2 计划冻结中（`feature/desktop/spec-freeze`, per ADR-0007），**等 4 Q 答稿** (Q5-1 通知 / Q5-2 身份 / Q7-1 版本号 / Q11-1 降级方案) | 黎（proposer, worklog 2026-06-06_讨论-web转桌面app可行性.md）+ 等 董/袁 reply |
 | | 移动端 H5 | ✅ 完整 | **6/8 修正**: t3-mobile-h5 `a483424`+`8124e54` 落地 useMediaQuery (React 18 useSyncExternalStore + matchMedia SSR-safe) + AppShell 4 栏 mobile/desktop 分支 + 11 vitest (5 useMediaQuery + 6 AppShell) + 4 截图 (375/768/1280/hamburger) + BDD §6.5.1.1 B-6-P2-M02 5 When/Then | 袁（t3-mobile-h5, M5 overnight）|
 
-**整体覆盖率**: ✅ 完整 15 / ⚠️ 部分 5 / ❌ 未做 5 / 📋 计划 1 / ✅ done by 6/8 t3 1 = **67% → 71%**
-(6/8 修正: 之前 22:00 标 ❌ 移动 H5 实际 ✅ by t3 overnight; per [ADR-0018](worklogs/decisions/0018-plan-3eaba0fa-overnight-4track-close.md))
+**整体覆盖率**: ✅ 完整 19 / ⚠️ 部分 3 / ❌ 未做 4 / 📋 计划 1 = 共 27 项 → 覆盖率 = (19 + 3×0.5) / 27 = **76%**
+(6/10 修正: 对话列表 由 ⚠️→✅ by 袁 会话归档落地 (归档为最后缺口), 74%→**76%**; 6/9: 任务看板持久化 + 用户审批流 ⚠️→✅ by Tasks/Inbox CRUD; 6/8: 移动 H5 ⚠️→✅ by t3 overnight; per [ADR-0018](worklogs/decisions/0018-plan-3eaba0fa-overnight-4track-close.md))
 
 ---
 

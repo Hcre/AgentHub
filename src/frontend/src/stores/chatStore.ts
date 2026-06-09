@@ -70,6 +70,10 @@ interface ChatState {
   removeConversation: (agentId: string, conversationId: string) => void
   /** 批量删除会话 */
   removeConversations: (agentId: string, conversationIds: string[]) => void
+  /** 置顶/取消置顶一个会话 */
+  setConversationPinned: (agentId: string, conversationId: string, pinned: boolean) => void
+  /** 归档/取消归档一个会话 */
+  setConversationArchived: (agentId: string, conversationId: string, archived: boolean) => void
 }
 
 export const useChatStore = create<ChatState>()(
@@ -530,6 +534,14 @@ export const useChatStore = create<ChatState>()(
         set((s) => {
           const existing = s.conversations[agentId] ?? []
           const next = existing.map((c) => (c.id === conversationId ? { ...c, pinned } : c))
+          return { conversations: { ...s.conversations, [agentId]: next } }
+        })
+      },
+
+      setConversationArchived: (agentId, conversationId, archived) => {
+        set((s) => {
+          const existing = s.conversations[agentId] ?? []
+          const next = existing.map((c) => (c.id === conversationId ? { ...c, archived } : c))
           return { conversations: { ...s.conversations, [agentId]: next } }
         })
       },

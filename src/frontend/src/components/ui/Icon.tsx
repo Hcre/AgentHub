@@ -1,5 +1,7 @@
 import {
   Activity,
+  Archive,
+  ArchiveRestore,
   AtSign,
   Bold,
   Brain,
@@ -106,6 +108,8 @@ const MAP: Record<IconName, LucideIcon> = {
   menu: Menu,
   wrapText: WrapText,
   terminal: Terminal,
+  archive: Archive,
+  archiveRestore: ArchiveRestore,
 }
 
 export interface IconProps {
