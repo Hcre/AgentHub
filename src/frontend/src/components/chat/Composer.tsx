@@ -60,13 +60,13 @@ export const Composer = forwardRef<
   const monacoRef = useRef<MonacoEditorHandle>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // ESC 打断当前回复
+  // ESC 打断当前回复（与 props isStreaming / onCancel 保持一致，commit 4931d3c 重命名后 useEffect 未同步）
   useEffect(() => {
-    if (!isTyping || !onAbort) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onAbort() }
+    if (!isStreaming || !onCancel) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isTyping, onAbort])
+  }, [isStreaming, onCancel])
 
   useImperativeHandle(ref, () => ({
     setText: (text: string) => {

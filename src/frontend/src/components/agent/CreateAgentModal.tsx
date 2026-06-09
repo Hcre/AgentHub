@@ -3,12 +3,10 @@ import { useAgentStore } from '../../stores/agentStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useUIStore } from '../../stores/uiStore'
 import { Button, Dialog, DialogContent, Icon, Input, Textarea } from '../ui'
-import { useApiKeyStore } from '../../stores/apiKeyStore'
-import { providersApi, type DefaultConfig, type ProviderInfo } from '../../api/providers'
-import { skillsApi } from '../../api/skills'
+
 import { type TemplateDetail } from '../../api/templates'
 import { useTemplateStore } from '../../stores/templateStore'
-import { CliIcon } from '../icons/cli/CliIcon'
+
 import { StartChatModal } from '../chat/StartChatModal'
 
 // =================================================================
@@ -165,33 +163,6 @@ function Label({ children }: { children: string }) {
 /** 跳转技能市场时暂存草稿，回来后恢复 */
 let wizardDraft: { name: string; prompt: string; skills: string[] } | null = null
 
-/** CLI provider 扫描缓存（模块级，页面不刷新则保留） */
-let providerCache: ProviderInfo[] | null = null
-let providerScanned = false
-
-/** 卡片用的 CLI 摘要 */
-interface CliCardData {
-  id: string
-  label: string
-  version: string | null
-  available: boolean
-}
-
-function buildCards(scanned: ProviderInfo[] | null, scanning: boolean): CliCardData[] {
-  if (scanning) return []
-  if (scanned) {
-    return scanned
-      .filter((p) => p.available && p.name !== 'mock')
-      .map((p) => ({
-        id: p.name,
-        label: p.display_name,
-        version: p.version,
-        available: true,
-      }))
-  }
-  return []
-}
-
 export function CreateAgentModal({
   open,
   onClose,
@@ -202,6 +173,7 @@ export function CreateAgentModal({
   preSelectedTemplate?: PreSelectedTemplate
 }) {
   const createAgent = useAgentStore((s) => s.createAgent)
+  const agents = useAgentStore((s) => s.agents)
   const addConversation = useChatStore((s) => s.addConversation)
   const conversations = useChatStore((s) => s.conversations)
   const openConversation = useUIStore((s) => s.openConversation)
@@ -224,9 +196,6 @@ export function CreateAgentModal({
   } = useTemplateStore()
 
   // Wizard state
-  const [scannedProviders, setScannedProviders] = useState<ProviderInfo[] | null>(null)
-  const [scanning, setScanning] = useState(false)
-  const cards = buildCards(scannedProviders, scanning)
   const [step, setStep] = useState(1)
   const [agentName, setAgentName] = useState('')
 
@@ -239,19 +208,8 @@ export function CreateAgentModal({
   const [customPrompt, setCustomPrompt] = useState('')
   const [customRoleName, setCustomRoleName] = useState('')
   const [customSkills, setCustomSkills] = useState<string[]>([])
-  const [skillList, setSkillList] = useState<{ name: string }[]>([])
-  const [skillLoading, setSkillLoading] = useState(false)
   // Step 2
   const [agentSystem, setAgentSystem] = useState<string>('')
-  const [providerId, setProviderId] = useState('deepseek')
-  const [model, setModel] = useState('')
-  const [baseUrl, setBaseUrl] = useState('')
-  const [apiKey, setApiKey] = useState('')
-  const [selectedKeyId, setSelectedKeyId] = useState('')
-  // 连通性预检
-  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle')
-  const [testError, setTestError] = useState('')
-  const [testLatency, setTestLatency] = useState<number | null>(null)
   // Step 3
   const [status, setStatus] = useState<'idle' | 'creating' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
@@ -287,26 +245,7 @@ export function CreateAgentModal({
     queueMicrotask(() => {
       setStep(2)
       setAgentSystem('')
-      // 后台扫描 CLI
-      if (providerScanned && providerCache) {
-        setScannedProviders(providerCache)
-      } else {
-        setScanning(true)
-        providersApi
-          .list()
-          .then((list) => {
-            providerCache = list
-            providerScanned = true
-            setScannedProviders(list)
-          })
-          .catch((err) => {
-            console.error('CLI 扫描失败 (preSelected):', err)
-            setScannedProviders(null)
-          })
-          .finally(() => setScanning(false))
-      }
     })
-    // 仅在 open 和 preSelectedTemplate 变化时触发
   }, [open, preSelectedTemplate])
 
   // -- Determine mode: dynamic (API) vs legacy (fallback) --
@@ -339,6 +278,7 @@ export function CreateAgentModal({
     setSelectedTemplateData(null)
     setPickedIndex(LEGACY_TEMPLATES.length)
   }
+
 
   // -- Derived: is custom mode? --
   const isCustom = preSelectedTemplate
@@ -374,34 +314,17 @@ export function CreateAgentModal({
       }
     }
     return null
-  }, [
-    preSelectedTemplate,
-    hasDynamicTemplates,
-    selectedTemplateData,
-    selectedTemplateId,
-    pickedIndex,
-  ])
+  }, [preSelectedTemplate, hasDynamicTemplates, selectedTemplateData, selectedTemplateId, pickedIndex])
 
   const agentSystemPrompt = isCustom ? customPrompt : (selectedTemplate?.systemPrompt ?? '')
   const selectedSkills = isCustom ? customSkills : (selectedTemplate?.skills ?? [])
   const selectedCapabilityTags = selectedTemplate?.capabilityTags ?? []
 
-  // 兼容的 CLI 集合（用于 Step 2 灰显不兼容卡片）
-  const compatibleCliSet = useMemo(() => {
-    const list = selectedTemplate?.compatibleAgentSystems
-    return list ? new Set(list) : null
-  }, [selectedTemplate])
 
-  // 自定义时加载 skill 列表 + 恢复草稿（setState 推迟到 microtask 避开 set-state-in-effect）
+  // 自定义时恢复草稿（从技能市场返回）
   useEffect(() => {
     if (!isCustom) return
     queueMicrotask(() => {
-      setSkillLoading(true)
-      skillsApi
-        .listLibrary()
-        .then(setSkillList)
-        .catch(() => setSkillList([]))
-        .finally(() => setSkillLoading(false))
       if (wizardDraft) {
         setAgentName(wizardDraft.name)
         setCustomPrompt(wizardDraft.prompt)
@@ -410,12 +333,6 @@ export function CreateAgentModal({
       }
     })
   }, [isCustom])
-
-  const toggleSkill = (name: string) => {
-    setCustomSkills((prev) =>
-      prev.includes(name) ? prev.filter((s) => s !== name) : [...prev, name],
-    )
-  }
 
   const reset = () => {
     setStep(1)
@@ -426,16 +343,7 @@ export function CreateAgentModal({
     setCustomPrompt('')
     setCustomRoleName('')
     setCustomSkills([])
-    setSkillList([])
     setAgentSystem('')
-    setProviderId('deepseek')
-    setModel('')
-    setBaseUrl('')
-    setApiKey('')
-    setTestStatus('idle')
-    setError('')
-    setTestLatency(null)
-    setSelectedKeyId('')
     setStatus('idle')
     setErrorMsg('')
   }
@@ -449,41 +357,24 @@ export function CreateAgentModal({
   // Step 1 → Step 2
   const hasAnySelection = selectedTemplateId !== null || pickedIndex !== null
 
+  const existingNames = agents.map((a) => a.name.toLowerCase())
+
   const canNext = (() => {
     if (preSelectedTemplate) return true
     if (!hasAnySelection) return false
     if (!agentName.trim()) return false
+    if (existingNames.includes(agentName.trim().toLowerCase())) return false
     if (isCustom && (!customPrompt.trim() || !customRoleName.trim())) return false
     return true
   })()
 
   const goNext = () => {
-    if (!canNext) return
+    if (!agentName.trim()) return
+    if (existingNames.includes(agentName.trim().toLowerCase())) return
+    if (!hasAnySelection) return
+    if (isCustom && (!customPrompt.trim() || !customRoleName.trim())) return
     setAgentSystem('')
     setStep(2)
-
-    // 后台异步扫描 CLI
-    if (providerScanned && providerCache) {
-      setScannedProviders(providerCache)
-    } else {
-      setScanning(true)
-      providersApi
-        .list()
-        .then((list) => {
-          providerCache = list
-          providerScanned = true
-          setScannedProviders(list)
-        })
-        .catch((err) => {
-          console.error('CLI 扫描失败 (初始):', err)
-          setScannedProviders(null)
-        })
-        .finally(() => setScanning(false))
-    }
-  }
-
-  const handlePickCli = (id: string) => {
-    setAgentSystem(id)
   }
 
   const goBack = () => {
@@ -495,70 +386,17 @@ export function CreateAgentModal({
     setStep(1)
   }
 
-  // 连通性预检（创建前执行，失败不损失任何东西）
-  const doConnectivityTest = async () => {
-    if (agentSystem === 'mock') return
-    setTestStatus('testing')
-    setTestError('')
-    setTestLatency(null)
-    try {
-      // 注：model/api_key/base_url 仍传 ping 端点（探测连通用），但 spawn CLI 时不再注入
-      const data = await providersApi.ping({
-        agent_system: agentSystem,
-        provider: providerId,
-        model: model.trim(),
-        api_key: apiKey,
-        base_url: baseUrl.trim() || undefined,
-      })
-      if (data.ok) {
-        setTestStatus('ok')
-        setTestLatency(data.latency_ms ?? null)
-      } else {
-        setTestStatus('fail')
-        setTestError(data.error || '连通失败')
-      }
-    } catch (e) {
-      setTestStatus('fail')
-      setTestError(e instanceof Error ? e.message : '网络错误')
-    }
-  }
-
-  // Step 3: 创建（先连通测试，通过后再创建）
+  // Step 3: 创建
   const doCreate = async () => {
     if (!agentName.trim()) return
     setStep(3)
     setStatus('creating')
     setErrorMsg('')
 
-    // 1. 连通性预检（非 mock 时自动执行）
-    if (agentSystem !== 'mock' && apiKey) {
-      try {
-        const data = await providersApi.ping({
-          agent_system: agentSystem,
-          provider: providerId,
-          model: model.trim(),
-          api_key: apiKey,
-          base_url: baseUrl.trim() || undefined,
-        })
-        if (!data.ok) {
-          setStatus('error')
-          setErrorMsg(`连通失败: ${data.error || '未知错误'}，请返回修改配置`)
-          return
-        }
-      } catch {
-        setStatus('error')
-        setErrorMsg('连通测试网络错误，请检查后端是否运行')
-        return
-      }
-    }
-
-    // 2. 创建 Agent
     try {
       const id = await createAgent({
         name: agentName.trim(),
-        role: isCustom
-          ? customRoleName || agentName.trim()
-          : (selectedTemplate?.name ?? agentName.trim()),
+        role: isCustom ? (customRoleName || agentName.trim()) : (selectedTemplate?.name ?? agentName.trim()),
         agentSystem,
         skills: selectedSkills,
         capabilityTags: selectedCapabilityTags,
@@ -588,692 +426,503 @@ export function CreateAgentModal({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-        <DialogContent>
-          {/* === Step 1: 选模板 === */}
-          {step === 1 && (
-            <>
-              <header className="flex items-center justify-between border-b px-4 py-3">
-                <h3 className="text-[15px] font-medium">创建你的新 AI 队友</h3>
-                <Button variant="ghost" size="iconSm" onClick={handleClose}>
-                  <Icon name="x" className="h-3.5 w-3.5" />
-                </Button>
-              </header>
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
+      <DialogContent>
+        {/* === Step 1: 选模板 === */}
+        {step === 1 && (
+          <>
+            <header className="flex items-center justify-between border-b px-4 py-3">
+              <h3 className="text-[15px] font-medium">创建你的新 AI 队友</h3>
+              <Button variant="ghost" size="iconSm" onClick={handleClose}>
+                <Icon name="x" className="h-3.5 w-3.5" />
+              </Button>
+            </header>
 
-              <div
-                className="flex flex-col gap-3 overflow-y-auto p-4"
-                style={{ maxHeight: '60vh' }}
-              >
-                <p className="text-[13px] text-muted-foreground">给 AI 队友取个名字吧</p>
+            <div className="flex flex-col gap-3 overflow-y-auto p-4" style={{ maxHeight: '60vh' }}>
+              <p className="text-[13px] text-muted-foreground">给 AI 队友取个名字吧</p>
 
-                <Input
-                  value={agentName}
-                  onChange={(e) => setAgentName(e.target.value)}
-                  placeholder="例如：我的代码助手"
-                  autoFocus
-                />
+              <Input
+                value={agentName}
+                onChange={(e) => setAgentName(e.target.value)}
+                placeholder="例如：我的代码助手"
+                autoFocus
+              />
+              {agentName.trim() && existingNames.includes(agentName.trim().toLowerCase()) && (
+                <p className="text-[11px] text-red-500 -mt-1">该名称已被使用，请换一个</p>
+              )}
 
-                <div className="border-t border-border/60 my-1" />
+              <div className="border-t border-border/60 my-1" />
 
-                <p className="text-[13px] text-muted-foreground">选择身份模板</p>
+              <p className="text-[13px] text-muted-foreground">选择身份模板</p>
 
-                {/* -- Loading skeletons -- */}
-                {tplLoading && !hasDynamicTemplates && (
-                  <div className="grid grid-cols-2 gap-2">
-                    {Array.from({ length: 6 }).map((_, i) => (
-                      <div
-                        key={`skel-${i}`}
-                        className="flex flex-col gap-1 rounded-lg border p-3 animate-pulse"
-                      >
-                        <div className="h-3 w-20 rounded bg-muted" />
-                        <div className="h-2 w-full rounded bg-muted/60" />
-                        <div className="h-2 w-3/4 rounded bg-muted/60" />
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* -- Error banner -- */}
-                {tplError && !tplLoading && !hasDynamicTemplates && (
-                  <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600">
-                    <span className="truncate mr-2">加载模板失败：{tplError}</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => loadTemplates()}
-                      className="shrink-0"
-                    >
-                      重试
-                    </Button>
-                  </div>
-                )}
-
-                {/* -- Empty state (API succeeded but no templates) -- */}
-                {!tplLoading && !tplError && templates.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <Icon name="files" className="mb-2 h-8 w-8 text-muted-foreground/30" />
-                    <p className="text-[13px] font-medium">暂无可用模板</p>
-                    <p className="mt-1 text-[12px] text-muted-foreground">
-                      模板仓库尚未同步，请先同步获取最新模板
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-3"
-                      onClick={() => syncSource()}
-                    >
-                      <Icon name="zap" className="mr-1 h-3 w-3" />
-                      同步模板
-                    </Button>
-                  </div>
-                )}
-
-                {/* -- 8 个身份模板（始终显示） -- */}
+              {/* -- Loading skeletons -- */}
+              {tplLoading && !hasDynamicTemplates && (
                 <div className="grid grid-cols-2 gap-2">
-                  {LEGACY_TEMPLATES.map((t, i) => {
-                    const picked = pickedIndex === i && !isCustom
-                    return (
-                      <button
-                        key={t.name}
-                        type="button"
-                        onClick={() => {
-                          setPickedIndex(i)
-                          setSelectedTemplateId(null)
-                          setSelectedTemplateData(null)
-                        }}
-                        data-picked={picked ? 'true' : undefined}
-                        className="flex flex-col gap-1 rounded-lg border p-3 text-left transition-colors hover:border-brand/40 data-[picked=true]:border-brand data-[picked=true]:bg-brand/5"
-                      >
-                        <span className="text-[13px] font-medium">{t.name}</span>
-                        <span className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
-                          {t.systemPrompt}
-                        </span>
-                      </button>
-                    )
-                  })}
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div
+                      key={`skel-${i}`}
+                      className="flex flex-col gap-1 rounded-lg border p-3 animate-pulse"
+                    >
+                      <div className="h-3 w-20 rounded bg-muted" />
+                      <div className="h-2 w-full rounded bg-muted/60" />
+                      <div className="h-2 w-3/4 rounded bg-muted/60" />
+                    </div>
+                  ))}
                 </div>
+              )}
 
-                {/* -- 常用模板（favorites） -- */}
-                {favorites.length > 0 && (
-                  <>
-                    <div className="flex items-center justify-between border-t border-border/60 pt-3">
-                      <span className="text-[13px] text-muted-foreground">常用模板</span>
-                      <button
-                        type="button"
-                        onClick={() => setFavManageOpen(true)}
-                        className="text-[11px] text-brand hover:underline"
-                      >
-                        管理常用模板 →
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {favorites.map((fav) => {
-                        const favPicked = selectedTemplateId === fav.id && !isCustom
-                        return (
-                          <button
-                            key={fav.id}
-                            type="button"
-                            onClick={async () => {
-                              setPickedIndex(null)
-                              setSelectedTemplateId(fav.id)
-                              const detail = await loadTemplateDetail(fav.id)
-                              setSelectedTemplateData(detail)
-                            }}
-                            data-picked={favPicked ? 'true' : undefined}
-                            className="flex flex-col gap-1 rounded-lg border p-3 text-left transition-colors hover:border-brand/40 data-[picked=true]:border-brand data-[picked=true]:bg-brand/5"
-                          >
-                            <span className="text-[13px] font-medium">
-                              {fav.favorite_name || fav.display_name_zh || fav.name}
-                            </span>
-                            <span className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
-                              {fav.favorite_description ||
-                                fav.description_zh ||
-                                fav.description ||
-                                '暂无描述'}
-                            </span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </>
-                )}
+              {/* -- Error banner -- */}
+              {tplError && !tplLoading && !hasDynamicTemplates && (
+                <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600">
+                  <span className="truncate mr-2">加载模板失败：{tplError}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadTemplates()}
+                    className="shrink-0"
+                  >
+                    重试
+                  </Button>
+                </div>
+              )}
 
-                {/* -- 自定义 -- */}
-                <button
-                  onClick={handleCustomClick}
-                  data-picked={isCustom ? 'true' : undefined}
-                  className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed p-3 text-muted-foreground transition-colors hover:border-brand/40 hover:text-brand data-[picked=true]:border-brand data-[picked=true]:bg-brand/5 data-[picked=true]:text-brand"
-                >
-                  <Icon name="plus" className="h-5 w-5" />
-                  <span className="text-[12px]">自定义（从零创建）</span>
-                </button>
+              {/* -- Empty state (API succeeded but no templates) -- */}
+              {!tplLoading && !tplError && templates.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <Icon name="files" className="mb-2 h-8 w-8 text-muted-foreground/30" />
+                  <p className="text-[13px] font-medium">暂无可用模板</p>
+                  <p className="mt-1 text-[12px] text-muted-foreground">
+                    模板仓库尚未同步，请先同步获取最新模板
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => syncSource()}
+                  >
+                    <Icon name="zap" className="mr-1 h-3 w-3" />
+                    同步模板
+                  </Button>
+                </div>
+              )}
 
-                {isCustom && (
-                  <div className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1.5">
-                      <span className="text-[12px] font-medium text-muted-foreground">
-                        身份（模板名）
+              {/* -- 8 个身份模板（始终显示） -- */}
+              <div className="grid grid-cols-2 gap-2">
+                {LEGACY_TEMPLATES.map((t, i) => {
+                  const picked = pickedIndex === i && !isCustom
+                  return (
+                    <button
+                      key={t.name}
+                      type="button"
+                      onClick={() => {
+                        setPickedIndex(i)
+                        setSelectedTemplateId(null)
+                        setSelectedTemplateData(null)
+                      }}
+                      data-picked={picked ? 'true' : undefined}
+                      className="flex flex-col gap-1 rounded-lg border p-3 text-left transition-colors hover:border-brand/40 data-[picked=true]:border-brand data-[picked=true]:bg-brand/5"
+                    >
+                      <span className="text-[13px] font-medium">{t.name}</span>
+                      <span className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
+                        {t.systemPrompt}
                       </span>
-                      <Input
-                        value={customRoleName}
-                        onChange={(e) => setCustomRoleName(e.target.value)}
-                        placeholder="例如：全栈工程师、DevOps 专家"
-                      />
-                    </label>
-                    <Textarea
-                      value={customPrompt}
-                      onChange={(e) => setCustomPrompt(e.target.value)}
-                      placeholder="描述这个队友的职责与边界（system prompt）…"
-                      className="min-h-[60px]"
-                    />
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center justify-between">
-                        <Label>Skill</Label>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            wizardDraft = {
-                              name: agentName,
-                              prompt: customPrompt,
-                              skills: customSkills,
-                            }
-                            onClose()
-                            setTimeout(() => setSection('skills-market'), 0)
-                          }}
-                          className="text-[11px] text-brand hover:underline"
-                        >
-                          浏览技能市场 →
-                        </button>
-                      </div>
-                      {skillLoading ? (
-                        <span className="text-[12px] text-muted-foreground">加载中…</span>
-                      ) : skillList.length === 0 ? (
-                        <span className="text-[12px] text-muted-foreground">暂无可用 Skill</span>
-                      ) : (
-                        <div className="flex flex-col gap-1 rounded-md border p-2">
-                          {skillList.map((s) => (
-                            <label
-                              key={s.name}
-                              className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-[13px] hover:bg-accent"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={customSkills.includes(s.name)}
-                                onChange={() => toggleSkill(s.name)}
-                                className="h-3.5 w-3.5 accent-brand"
-                              />
-                              <span>{s.name.replace('.md', '')}</span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                    </button>
+                  )
+                })}
               </div>
 
-              <footer className="flex justify-end gap-2 border-t px-4 py-3">
-                <Button variant="outline" size="sm" onClick={handleClose}>
-                  取消
-                </Button>
-                <Button variant="brand" size="sm" onClick={goNext} disabled={!canNext}>
-                  下一步
-                </Button>
-              </footer>
-            </>
-          )}
-
-          {/* === Step 2: 配置 === */}
-          {step === 2 && (
-            <>
-              <header className="flex items-center justify-between border-b px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="iconSm" onClick={goBack} title="返回">
-                    <Icon name="chevronLeft" className="h-3.5 w-3.5" />
-                  </Button>
-                  <h3 className="text-[15px] font-medium">配置 "{agentName}"</h3>
-                  <span className="text-[11px] text-muted-foreground ml-1">2/3</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="iconSm"
-                  onClick={() => {
-                    reset()
-                    onClose()
-                  }}
-                >
-                  <Icon name="x" className="h-3.5 w-3.5" />
-                </Button>
-              </header>
-
-              <div
-                className="flex flex-col gap-3 overflow-y-auto p-4"
-                style={{ maxHeight: '55vh' }}
-              >
-                {/* -- Template compatibility info banner -- */}
-                {hasDynamicTemplates && selectedTemplateData && compatibleCliSet && (
-                  <div className="rounded-md border border-brand/20 bg-brand/5 px-3 py-2 text-[12px] text-muted-foreground">
-                    <span className="font-medium text-brand">
-                      {selectedTemplateData.display_name_zh || selectedTemplateData.name}
-                    </span>
-                    <span className="mx-1">模板兼容：</span>
-                    <span className="text-foreground">
-                      {selectedTemplateData.compatible_agent_systems?.join(' / ') || '全部 CLI'}
-                    </span>
-                    {selectedTemplateData.model_tier !== 'inherit' && (
-                      <span className="ml-1 rounded bg-muted px-1 py-px text-[10px]">
-                        {selectedTemplateData.model_tier}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label>运行依赖</Label>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setScanning(true)
-                        providerScanned = false
-                        // 用 scan()（POST /api/providers/scan 强制重扫 PATH）而非 list()
-                        // （返回 1h scheduler 缓存）—— 用户刚装的新 CLI 立刻能被发现。
-                        providersApi
-                          .scan()
-                          .then((list) => {
-                            providerCache = list
-                            providerScanned = true
-                            setScannedProviders(list)
-                          })
-                          .catch((err) => {
-                            console.error('CLI 重新扫描失败:', err)
-                            setScannedProviders(null)
-                          })
-                          .finally(() => setScanning(false))
-                      }}
-                      disabled={scanning}
+              {/* -- 常用模板（favorites） -- */}
+              {favorites.length > 0 && (
+                <>
+                  <div className="flex items-center justify-between border-t border-border/60 pt-3">
+                    <span className="text-[13px] text-muted-foreground">常用模板</span>
+                    <button
+                      type="button"
+                      onClick={() => setFavManageOpen(true)}
+                      className="text-[11px] text-brand hover:underline"
                     >
-                      {scanning ? (
-                        <span className="flex items-center gap-1">
-                          <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            />
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                            />
-                          </svg>
-                          扫描中
-                        </span>
-                      ) : (
-                        '重新扫描'
-                      )}
-                    </Button>
+                      管理常用模板 →
+                    </button>
                   </div>
-
-                  {/* CLI 卡片列表：兼容性过滤 */}
                   <div className="grid grid-cols-2 gap-2">
-                    {cards.map((c) => {
-                      const picked = agentSystem === c.id
-                      const isCompatible =
-                        !compatibleCliSet || compatibleCliSet.has(c.id) || c.id === 'mock'
+                    {favorites.map((fav) => {
+                      const favPicked = selectedTemplateId === fav.id && !isCustom
                       return (
                         <button
-                          key={c.id}
+                          key={fav.id}
                           type="button"
-                          onClick={() => isCompatible && handlePickCli(c.id)}
-                          data-picked={picked ? 'true' : undefined}
-                          data-compatible={isCompatible ? 'true' : 'false'}
-                          disabled={!isCompatible}
-                          title={isCompatible ? undefined : '此模板未针对该 CLI 优化'}
-                          className={
-                            'group flex items-start gap-2 rounded-lg border p-2.5 text-left transition-colors ' +
-                            (isCompatible
-                              ? 'hover:border-brand/40 data-[picked=true]:border-brand data-[picked=true]:bg-brand/5'
-                              : 'opacity-40 cursor-not-allowed')
-                          }
+                          onClick={async () => {
+                            setPickedIndex(null)
+                            setSelectedTemplateId(fav.id)
+                            const detail = await loadTemplateDetail(fav.id)
+                            setSelectedTemplateData(detail)
+                          }}
+                          data-picked={favPicked ? 'true' : undefined}
+                          className="flex flex-col gap-1 rounded-lg border p-3 text-left transition-colors hover:border-brand/40 data-[picked=true]:border-brand data-[picked=true]:bg-brand/5"
                         >
-                          <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md bg-background">
-                            <CliIcon agentSystem={c.id} size={18} />
-                          </div>
-                          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                            <div className="flex items-center justify-between gap-1">
-                              <span className="truncate text-[12px] font-medium">{c.label}</span>
-                              {!isCompatible ? (
-                                <span className="shrink-0 rounded bg-amber-100 px-1 py-px text-[9px] text-amber-600 dark:bg-amber-950 dark:text-amber-400">
-                                  不兼容
-                                </span>
-                              ) : c.version ? (
-                                <span className="shrink-0 rounded bg-muted px-1 py-px text-[9px] text-muted-foreground">
-                                  {c.version}
-                                </span>
-                              ) : c.available ? null : (
-                                <span className="shrink-0 text-[9px] text-muted-foreground">—</span>
-                              )}
-                            </div>
-                            <span className="truncate text-[10px] text-muted-foreground">
-                              {!isCompatible
-                                ? '此模板未针对该 CLI 优化'
-                                : picked
-                                  ? '已选中'
-                                  : '点击选择'}
-                            </span>
-                          </div>
+                          <span className="text-[13px] font-medium">
+                            {fav.favorite_name || fav.display_name_zh || fav.name}
+                          </span>
+                          <span className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
+                            {fav.favorite_description || fav.description_zh || fav.description || '暂无描述'}
+                          </span>
                         </button>
                       )
                     })}
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span>
-                      {scanning
-                        ? '扫描中…'
-                        : providerScanned
-                          ? `扫描完成，${cards.filter((c) => c.id !== 'mock' && c.available).length} 个可用`
-                          : '尚未扫描'}
-                    </span>
-                  </div>
-                </div>
-              </div>
+                </>
+              )}
 
-              <footer className="flex items-center justify-between border-t px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={goBack}>
-                    上一步
-                  </Button>
-                  {showProviderSection && (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={doConnectivityTest}
-                        disabled={testStatus === 'testing' || !apiKey}
+              {/* -- 自定义 -- */}
+              <button
+                onClick={handleCustomClick}
+                data-picked={isCustom ? 'true' : undefined}
+                className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed p-3 text-muted-foreground transition-colors hover:border-brand/40 hover:text-brand data-[picked=true]:border-brand data-[picked=true]:bg-brand/5 data-[picked=true]:text-brand"
+              >
+                <Icon name="plus" className="h-5 w-5" />
+                <span className="text-[12px]">自定义（从零创建）</span>
+              </button>
+
+              {isCustom && (
+                <div className="flex flex-col gap-3">
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-[12px] font-medium text-muted-foreground">身份（模板名）</span>
+                    <Input
+                      value={customRoleName}
+                      onChange={(e) => setCustomRoleName(e.target.value)}
+                      placeholder="例如：全栈工程师、DevOps 专家"
+                    />
+                  </label>
+                  <Textarea
+                    value={customPrompt}
+                    onChange={(e) => setCustomPrompt(e.target.value)}
+                    placeholder="描述这个队友的职责与边界（system prompt）…"
+                    className="min-h-[60px]"
+                  />
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between">
+                      <Label>Skill</Label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          wizardDraft = {
+                            name: agentName,
+                            prompt: customPrompt,
+                            skills: customSkills,
+                          }
+                          onClose()
+                          setTimeout(() => setSection('skills-market'), 0)
+                        }}
+                        className="text-[11px] text-brand hover:underline"
                       >
-                        {testStatus === 'testing'
-                          ? '测试中…'
-                          : testStatus === 'ok'
-                            ? '✅ 连通成功'
-                            : testStatus === 'fail'
-                              ? '❌ 重试'
-                              : '🔄 连通测试'}
-                      </Button>
-                      {testStatus === 'ok' && (
-                        <span className="text-[11px] text-emerald-600">
-                          连通正常{testLatency != null ? ` · ${testLatency}ms` : ''}
-                        </span>
-                      )}
-                      {testStatus === 'fail' && (
-                        <span className="text-[11px] text-red-500 max-w-[200px] truncate">
-                          {testError}
-                        </span>
-                      )}
-                    </>
-                  )}
+                        浏览技能市场 →
+                      </button>
+                    </div>
+                    {customSkills.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {customSkills.map((s) => (
+                          <span key={s} className="rounded bg-brand/10 px-1.5 py-0.5 text-[11px] text-brand">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-[12px] text-muted-foreground">暂未选择 Skill，可前往技能市场挑选</span>
+                    )}
+                  </div>
                 </div>
-                <Button variant="brand" size="sm" onClick={doCreate}>
-                  创建队友
-                </Button>
-              </footer>
-            </>
-          )}
-
-          {/* === Step 3: 上线中 === */}
-          {step === 3 && (
-            <div className="flex flex-col items-center justify-center gap-4 px-6 py-12">
-              {status === 'creating' && (
-                <>
-                  <div className="grid h-12 w-12 place-items-center">
-                    <svg
-                      className="animate-spin h-8 w-8 text-brand"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                      />
-                    </svg>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[15px] font-medium">你的队友 "{agentName}" 上线中…</p>
-                    <p className="mt-1 text-[12px] text-muted-foreground">正在创建 Agent，请稍候</p>
-                  </div>
-                </>
-              )}
-
-              {status === 'success' && (
-                <>
-                  <div className="grid h-12 w-12 place-items-center rounded-full bg-emerald-100 text-emerald-600">
-                    <Icon name="check" className="h-6 w-6" />
-                  </div>
-                  <p className="text-[15px] font-medium">"{agentName}" 已上线！</p>
-                </>
-              )}
-
-              {status === 'error' && (
-                <>
-                  <div className="grid h-12 w-12 place-items-center rounded-full bg-red-100 text-red-500">
-                    <Icon name="x" className="h-6 w-6" />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[15px] font-medium">配置失败</p>
-                    <p className="mt-1 text-[12px] text-muted-foreground">
-                      {errorMsg || '未知错误'}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={handleClose}>
-                      关闭
-                    </Button>
-                    <Button variant="brand" size="sm" onClick={doRetry}>
-                      重试
-                    </Button>
-                  </div>
-                </>
               )}
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
-      {/* Favorite dialog */}
-      <Dialog open={favDialogOpen} onOpenChange={(o) => !o && setFavDialogOpen(false)}>
-        <DialogContent className="w-[420px]">
-          <header className="flex items-center justify-between border-b px-4 py-3">
-            <h3 className="text-[15px] font-medium">添加到常用</h3>
-            <Button variant="ghost" size="iconSm" onClick={() => setFavDialogOpen(false)}>
-              <Icon name="x" className="h-3.5 w-3.5" />
-            </Button>
-          </header>
+            <footer className="flex justify-end gap-2 border-t px-4 py-3">
+              <Button variant="outline" size="sm" onClick={handleClose}>
+                取消
+              </Button>
+              <Button variant="brand" size="sm" onClick={goNext} disabled={!canNext}>
+                下一步
+              </Button>
+            </footer>
+          </>
+        )}
 
-          <div className="flex flex-col gap-3 p-4">
-            {favError && (
-              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600">
-                {favError}
+        {/* === Step 2: 确认创建 === */}
+        {step === 2 && (
+          <>
+            <header className="flex items-center justify-between border-b px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="iconSm" onClick={goBack} title="返回">
+                  <Icon name="chevronLeft" className="h-3.5 w-3.5" />
+                </Button>
+                <h3 className="text-[15px] font-medium">确认创建 "{agentName}"</h3>
+                <span className="text-[11px] text-muted-foreground ml-1">2/2</span>
               </div>
+              <Button variant="ghost" size="iconSm" onClick={() => { reset(); onClose() }}>
+                <Icon name="x" className="h-3.5 w-3.5" />
+              </Button>
+            </header>
+
+            <div className="flex flex-col gap-4 overflow-y-auto p-4" style={{ maxHeight: '55vh' }}>
+
+              {/* 模板摘要 */}
+              <div className="rounded-lg border bg-muted/30 p-4">
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <span className="text-[11px] text-muted-foreground">模板</span>
+                    <p className="text-[13px] font-medium">
+                      {isCustom ? (customRoleName || '自定义') : (selectedTemplate?.name ?? '—')}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-muted-foreground">System Prompt</span>
+                    <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground whitespace-pre-wrap line-clamp-6">
+                      {agentSystemPrompt || '（无）'}
+                    </p>
+                  </div>
+                  {selectedSkills.length > 0 && (
+                    <div>
+                      <span className="text-[11px] text-muted-foreground">Skills</span>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {selectedSkills.map((s) => (
+                          <span key={s} className="rounded bg-brand/10 px-1.5 py-0.5 text-[11px] text-brand">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <footer className="flex items-center justify-between border-t px-4 py-3">
+              <Button variant="outline" size="sm" onClick={goBack}>
+                上一步
+              </Button>
+              <Button variant="brand" size="sm" onClick={doCreate}>
+                创建队友
+              </Button>
+            </footer>
+          </>
+        )}
+
+        {/* === Step 3: 上线中 === */}
+        {step === 3 && (
+          <div className="flex flex-col items-center justify-center gap-4 px-6 py-12">
+            {status === 'creating' && (
+              <>
+                <div className="grid h-12 w-12 place-items-center">
+                  <svg
+                    className="animate-spin h-8 w-8 text-brand"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                </div>
+                <div className="text-center">
+                  <p className="text-[15px] font-medium">你的队友 "{agentName}" 上线中…</p>
+                  <p className="mt-1 text-[12px] text-muted-foreground">正在创建 Agent，请稍候</p>
+                </div>
+              </>
             )}
 
-            <label className="flex flex-col gap-1">
-              <span className="text-[12px] font-medium text-muted-foreground">显示名</span>
-              <Input
-                value={favName}
-                onChange={(e) => setFavName(e.target.value)}
-                placeholder="模板显示名"
-              />
-            </label>
+            {status === 'success' && (
+              <>
+                <div className="grid h-12 w-12 place-items-center rounded-full bg-emerald-100 text-emerald-600">
+                  <Icon name="check" className="h-6 w-6" />
+                </div>
+                <p className="text-[15px] font-medium">"{agentName}" 已上线！</p>
+              </>
+            )}
 
-            <label className="flex flex-col gap-1">
-              <span className="text-[12px] font-medium text-muted-foreground">简介</span>
-              <Textarea
-                value={favDescription}
-                onChange={(e) => setFavDescription(e.target.value)}
-                placeholder="模板简介"
-                className="min-h-[60px]"
-              />
-            </label>
+            {status === 'error' && (
+              <>
+                <div className="grid h-12 w-12 place-items-center rounded-full bg-red-100 text-red-500">
+                  <Icon name="x" className="h-6 w-6" />
+                </div>
+                <div className="text-center">
+                  <p className="text-[15px] font-medium">配置失败</p>
+                  <p className="mt-1 text-[12px] text-muted-foreground">{errorMsg || '未知错误'}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleClose}>
+                    关闭
+                  </Button>
+                  <Button variant="brand" size="sm" onClick={doRetry}>
+                    重试
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
+        )}
+      </DialogContent>
 
-          <footer className="flex justify-end gap-2 border-t px-4 py-3">
-            <Button variant="outline" size="sm" onClick={() => setFavDialogOpen(false)}>
+    </Dialog>
+
+    {/* Favorite dialog */}
+    <Dialog open={favDialogOpen} onOpenChange={(o) => !o && setFavDialogOpen(false)}>
+      <DialogContent className="w-[420px]">
+        <header className="flex items-center justify-between border-b px-4 py-3">
+          <h3 className="text-[15px] font-medium">添加到常用</h3>
+          <Button variant="ghost" size="iconSm" onClick={() => setFavDialogOpen(false)}>
+            <Icon name="x" className="h-3.5 w-3.5" />
+          </Button>
+        </header>
+
+        <div className="flex flex-col gap-3 p-4">
+          {favError && (
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600">
+              {favError}
+            </div>
+          )}
+
+          <label className="flex flex-col gap-1">
+            <span className="text-[12px] font-medium text-muted-foreground">显示名</span>
+            <Input
+              value={favName}
+              onChange={(e) => setFavName(e.target.value)}
+              placeholder="模板显示名"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-[12px] font-medium text-muted-foreground">简介</span>
+            <Textarea
+              value={favDescription}
+              onChange={(e) => setFavDescription(e.target.value)}
+              placeholder="模板简介"
+              className="min-h-[60px]"
+            />
+          </label>
+        </div>
+
+        <footer className="flex justify-end gap-2 border-t px-4 py-3">
+          <Button variant="outline" size="sm" onClick={() => setFavDialogOpen(false)}>
+            取消
+          </Button>
+          <Button variant="brand" size="sm" onClick={handleSaveFavorite} disabled={favSaving || !favName.trim()}>
+            {favSaving ? '保存中…' : '确认'}
+          </Button>
+        </footer>
+      </DialogContent>
+    </Dialog>
+
+    {/* Favorite management dialog */}
+    <Dialog open={favManageOpen} onOpenChange={(o) => { if (!o) { setFavManageOpen(false); setFavCheckedIds(new Set()) } }}>
+      <DialogContent className="w-[420px]">
+        <header className="flex items-center justify-between border-b px-4 py-3">
+          <h3 className="text-[15px] font-medium">管理常用模板</h3>
+          <Button variant="ghost" size="iconSm" onClick={() => { setFavManageOpen(false); setFavCheckedIds(new Set()) }}>
+            <Icon name="x" className="h-3.5 w-3.5" />
+          </Button>
+        </header>
+
+        <div className="flex flex-col gap-2 overflow-y-auto p-4" style={{ maxHeight: '50vh' }}>
+          {favorites.length === 0 ? (
+            <p className="text-center text-[13px] text-muted-foreground py-4">暂无常用模板</p>
+          ) : (
+            favorites.map((fav) => {
+              const checked = favCheckedIds.has(fav.id)
+              return (
+                <label
+                  key={fav.id}
+                  className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-accent/50 transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 accent-brand shrink-0"
+                    checked={checked}
+                    onChange={() => {
+                      setFavCheckedIds((prev) => {
+                        const next = new Set(prev)
+                        if (next.has(fav.id)) {
+                          next.delete(fav.id)
+                        } else {
+                          next.add(fav.id)
+                        }
+                        return next
+                      })
+                    }}
+                  />
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <span className="text-[13px] font-medium truncate">
+                      {fav.favorite_name || fav.display_name_zh || fav.name}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground line-clamp-2">
+                      {fav.favorite_description || fav.description_zh || fav.description || '暂无描述'}
+                    </span>
+                  </div>
+                </label>
+              )
+            })
+          )}
+        </div>
+
+        <footer className="flex justify-between items-center border-t px-4 py-3">
+          <span className="text-[11px] text-muted-foreground">
+            {favCheckedIds.size > 0 ? `已选 ${favCheckedIds.size} 个` : '勾选要移出的模板'}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => { setFavManageOpen(false); setFavCheckedIds(new Set()) }}>
               取消
             </Button>
             <Button
               variant="brand"
               size="sm"
-              onClick={handleSaveFavorite}
-              disabled={favSaving || !favName.trim()}
-            >
-              {favSaving ? '保存中…' : '确认'}
-            </Button>
-          </footer>
-        </DialogContent>
-      </Dialog>
-
-      {/* Favorite management dialog */}
-      <Dialog
-        open={favManageOpen}
-        onOpenChange={(o) => {
-          if (!o) {
-            setFavManageOpen(false)
-            setFavCheckedIds(new Set())
-          }
-        }}
-      >
-        <DialogContent className="w-[420px]">
-          <header className="flex items-center justify-between border-b px-4 py-3">
-            <h3 className="text-[15px] font-medium">管理常用模板</h3>
-            <Button
-              variant="ghost"
-              size="iconSm"
-              onClick={() => {
-                setFavManageOpen(false)
+              disabled={favCheckedIds.size === 0}
+              onClick={async () => {
+                const ids = Array.from(favCheckedIds)
+                for (const id of ids) {
+                  try {
+                    await setFavorite(id, { is_favorite: false })
+                  } catch {
+                    // ignore individual failures
+                  }
+                }
                 setFavCheckedIds(new Set())
               }}
             >
-              <Icon name="x" className="h-3.5 w-3.5" />
+              确认移出
             </Button>
-          </header>
-
-          <div className="flex flex-col gap-2 overflow-y-auto p-4" style={{ maxHeight: '50vh' }}>
-            {favorites.length === 0 ? (
-              <p className="text-center text-[13px] text-muted-foreground py-4">暂无常用模板</p>
-            ) : (
-              favorites.map((fav) => {
-                const checked = favCheckedIds.has(fav.id)
-                return (
-                  <label
-                    key={fav.id}
-                    className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-accent/50 transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      className="mt-0.5 h-4 w-4 accent-brand shrink-0"
-                      checked={checked}
-                      onChange={() => {
-                        setFavCheckedIds((prev) => {
-                          const next = new Set(prev)
-                          if (next.has(fav.id)) {
-                            next.delete(fav.id)
-                          } else {
-                            next.add(fav.id)
-                          }
-                          return next
-                        })
-                      }}
-                    />
-                    <div className="flex flex-col gap-0.5 min-w-0">
-                      <span className="text-[13px] font-medium truncate">
-                        {fav.favorite_name || fav.display_name_zh || fav.name}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground line-clamp-2">
-                        {fav.favorite_description ||
-                          fav.description_zh ||
-                          fav.description ||
-                          '暂无描述'}
-                      </span>
-                    </div>
-                  </label>
-                )
-              })
-            )}
           </div>
+        </footer>
+      </DialogContent>
+    </Dialog>
 
-          <footer className="flex justify-between items-center border-t px-4 py-3">
-            <span className="text-[11px] text-muted-foreground">
-              {favCheckedIds.size > 0 ? `已选 ${favCheckedIds.size} 个` : '勾选要移出的模板'}
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setFavManageOpen(false)
-                  setFavCheckedIds(new Set())
-                }}
-              >
-                取消
-              </Button>
-              <Button
-                variant="brand"
-                size="sm"
-                disabled={favCheckedIds.size === 0}
-                onClick={async () => {
-                  const ids = Array.from(favCheckedIds)
-                  for (const id of ids) {
-                    try {
-                      await setFavorite(id, { is_favorite: false })
-                    } catch {
-                      // ignore individual failures
-                    }
-                  }
-                  setFavCheckedIds(new Set())
-                }}
-              >
-                确认移出
-              </Button>
-            </div>
-          </footer>
-        </DialogContent>
-      </Dialog>
+    {/* Toast notification */}
+    {toast && (
+      <div className="fixed bottom-6 right-6 z-50 animate-[var(--animate-slide-in)] rounded-lg border border-border/60 bg-background px-4 py-2.5 text-[13px] shadow-lg glass-soft">
+        {toast}
+      </div>
+    )}
 
-      {/* Toast notification */}
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 animate-[var(--animate-slide-in)] rounded-lg border border-border/60 bg-background px-4 py-2.5 text-[13px] shadow-lg glass-soft">
-          {toast}
-        </div>
-      )}
-
-      {/* 创建成功后弹出「发起私聊」选择窗 */}
-      {showStartChat && newAgentId && (
-        <StartChatModal
-          open={showStartChat}
-          onOpenChange={setShowStartChat}
-          agentName={newAgentName}
-          existingCount={conversations?.[newAgentId]?.length ?? 0}
-          onConfirm={(name, workdir) => {
-            const convId = addConversation(newAgentId, { name, workdir })
-            if (workdir?.trim()) setSection('files')
-            openConversation(newAgentId, convId)
-            setShowStartChat(false)
-          }}
-        />
-      )}
-    </>
-  )
+    {/* 创建成功后弹出「发起私聊」选择窗 */}
+    {showStartChat && newAgentId && (
+      <StartChatModal
+        open={showStartChat}
+        onOpenChange={setShowStartChat}
+        agentName={newAgentName}
+        existingCount={(conversations?.[newAgentId]?.length) ?? 0}
+        onConfirm={(name, workdir) => {
+          const convId = addConversation(newAgentId, { name, workdir })
+          if (workdir?.trim()) setSection('files')
+          openConversation(newAgentId, convId)
+          setShowStartChat(false)
+        }}
+      />
+    )}
+  </>)
 }
