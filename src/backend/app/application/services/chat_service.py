@@ -282,6 +282,11 @@ class ChatService:
                     await self._handle_replan(session, group, run, decision.requirement or text)
                 return
 
+            if decision.action == "cancel":
+                if run is not None:
+                    await self._cancel_coordinator(session, run)
+                return
+
             if decision.action == "relay":
                 active_workers = (
                     {s.worker for s in active_plan.steps if s.status == "running"}
