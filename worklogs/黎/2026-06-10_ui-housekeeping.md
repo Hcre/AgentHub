@@ -23,7 +23,13 @@
 - LeftPanel 搜索框去掉 viewport 依赖的 `clamp()` → 固定 `h-8`
 - `min-w-0 flex-1` 随侧栏宽度自适应缩放
 
+### 新建文件夹白屏修复
+- **根因**: 后端 `POST /api/fs/mkdir` 声明 `parent: str, name: str` → FastAPI 读 query params，前端发 JSON body → 422 返回 `detail: [{loc, msg, type}, ...]` 数组对象 → 前端 `setCreateErr(data.detail)` 把对象数组塞进 React children → React 抛出 "Objects are not valid as a React child" → 白屏
+- **后端修复**: `FsMkdirRequest` Pydantic 模型（对齐已有 `FsReadRequest` 模式），body 解析
+- **前端修复**: 错误提取安全化 — string / array(422) / unknown 三档，始终产出 string
+- tsc + Python 语法检查通过
+
 ## 给下一位的交接
 - 分支 `feature/ui/token-diff-cleanup` 已提 PR #20，未合并已删
-- 新分支 `feature/misc/daily-housekeeping` 包含本次 worklog + STATUS 更新
-- 所有改动在 main 上（之前直接 push 了）
+- 当前分支 `feature/misc/daily-housekeeping` 包含 UI 维护 + 新建文件夹白屏修复
+- 后端需重启（`uvicorn` 不带 `--reload`）使 `FsMkdirRequest` 生效
