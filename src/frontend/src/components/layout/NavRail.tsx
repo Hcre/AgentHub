@@ -19,8 +19,8 @@ const RAIL_ITEMS: RailItem[] = [
   { key: 'chat', icon: 'chat', label: '会话', section: 'chat' },
   { key: 'agent', icon: 'users', label: 'AI 队友', section: 'agent-detail' },
   { key: 'group', icon: 'channels', label: '群组', section: 'groups' },
-  { key: 'inbox', icon: 'inbox', label: '收件箱', section: 'inbox' },
   { key: 'skill', icon: 'lock', label: 'Skill', section: 'skills-market' },
+  { key: 'inbox', icon: 'inbox', label: '收件箱', section: 'inbox' },
 ]
 
 export function NavRail() {

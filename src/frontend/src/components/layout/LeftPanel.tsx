@@ -222,10 +222,10 @@ export function LeftPanel() {
 
   return (
     <aside className="glass-panel flex h-full w-full flex-col overflow-hidden rounded-2xl border shadow-sm">
-      {/* 顶部：搜索框 + 收起按钮 */}
-      <div className="flex items-center gap-1 px-3 pb-2 pt-3">
-        <div className="flex h-[clamp(28px,2.3vw,36px)] flex-1 items-center gap-2 rounded-md border glass-soft px-2.5 text-muted-foreground transition-colors focus-within:border-brand/40">
-          <Icon name="search" className="h-3.5 w-3.5" />
+      {/* 顶部：搜索框 + 收起按钮（随侧边栏宽度自适应） */}
+      <div className="flex items-center gap-1.5 px-3 pb-2 pt-3">
+        <div className="flex h-8 min-w-0 flex-1 items-center gap-1.5 rounded-md border glass-soft px-2 text-muted-foreground transition-colors focus-within:border-brand/40">
+          <Icon name="search" className="h-3.5 w-3.5 flex-shrink-0" />
           <input
             placeholder="跳转到…"
             data-testid="leftpanel-search"
@@ -239,7 +239,7 @@ export function LeftPanel() {
           onClick={toggleSidebar}
           title="收起会话列表"
           aria-label="收起会话列表"
-          className="grid h-[30px] w-[clamp(28px,2.3vw,36px)] flex-shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Icon name="panelLeftClose" className="h-3.5 w-3.5" />
         </button>
