@@ -895,14 +895,13 @@ class FsMkdirRequest(BaseModel):
 
 @FS_ROUTER.post("/mkdir")
 async def fs_mkdir(body: FsMkdirRequest) -> dict:
-    parent, name = body.parent, body.name
     """在 parent 下新建文件夹 name。"""
     import os as _os
 
-    parent_real = _resolve_path(parent)
+    parent_real = _resolve_path(body.parent)
     if not _os.path.isdir(parent_real):
         raise HTTPException(status_code=404, detail=f"父目录不存在：{parent_real}")
-    new_path = _os.path.join(parent_real, name)
+    new_path = _os.path.join(parent_real, body.name)
     if _os.path.exists(new_path):
         raise HTTPException(status_code=409, detail=f"已存在：{new_path}")
     try:
@@ -998,7 +997,9 @@ async def fs_git_diff(path: str, staged: bool = False) -> dict:
     if staged:
         args.append("--staged")
     try:
-        proc = _sp.run(args, capture_output=True, text=True, timeout=10, encoding="utf-8", errors="replace")
+        proc = _sp.run(
+            args, capture_output=True, text=True, timeout=10, encoding="utf-8", errors="replace"
+        )
     except FileNotFoundError:
         return {"ok": False, "reason": "git 未安装或不在 PATH"}
     except _sp.TimeoutExpired:

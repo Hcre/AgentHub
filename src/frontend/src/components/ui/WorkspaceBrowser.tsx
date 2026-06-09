@@ -76,7 +76,14 @@ export function WorkspaceBrowser({ open, onClose, onSelect }: {
       })
       const data = await r.json()
       if (!r.ok) {
-        setCreateErr(data?.detail ?? `创建失败（${r.status}）`)
+        const detail = data?.detail
+        const msg =
+          typeof detail === 'string'
+            ? detail
+            : Array.isArray(detail)
+              ? detail.map((d: { msg?: string }) => d.msg ?? '').filter(Boolean).join('; ')
+              : `创建失败（${r.status}）`
+        setCreateErr(msg || `创建失败（${r.status}）`)
         return
       }
       // 创建成功：刷新列表 + 立刻选中新文件夹
