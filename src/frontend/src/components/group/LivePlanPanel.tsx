@@ -229,7 +229,7 @@ export function LivePlanPanel({
         </button>
       </div>
       {!collapsed && (
-        <ol>
+        <ol className="max-h-80 overflow-y-auto">
           {steps.map((step) => (
             <StepRow
               key={step.id}

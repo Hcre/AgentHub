@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     # --- 上下文 / L1 记忆 ---
     l1_window_size: int = 20
     max_tokens: int = 16000
-    max_tool_turns: int = 10
+    max_tool_turns: int = 50  # 复杂任务（博客全栈构建）需要更多轮次
     claude_cli_timeout: int = 1200  # 20 分钟，长任务（博客全栈构建）需要更长时间
     proxy_base_url: str = "http://127.0.0.1:9001"
 

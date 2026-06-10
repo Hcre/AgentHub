@@ -378,6 +378,7 @@ class ClaudeCodeRuntime(AgentRuntime):
                 content=f"⚠️ 工作目录不可用: {request.working_directory}\n请检查路径是否存在。",
             )
 
+        logger.info("Claude CLI spawn cmd: %s", " ".join(cmd))
         try:
             self._process = await asyncio.create_subprocess_exec(
                 *cmd,
