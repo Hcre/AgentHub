@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
 from app.application.services.session_state import PlanView, StepView
+from app.application.services.supervisor_service import SupervisorService
+from app.core.config import settings
 from app.core.events import get_event_bus
 from app.domain.entities.agent import Agent
 from app.domain.entities.group import Group
@@ -31,7 +33,7 @@ from app.domain.task_engine.dag import TaskDef
 from app.domain.task_engine.executor import AgentExecutor
 from app.domain.task_engine.orchestrator import Orchestrator, ReplanDiff
 from app.domain.task_engine.planner import SeedPlanner
-from app.domain.task_engine.ports import ProgressSink, RunResult
+from app.domain.task_engine.ports import ProgressSink, RunResult, Supervisor, SupervisorConfig
 from app.domain.task_engine.verifier import MechanicalVerifier
 from app.infrastructure.db.base import session_factory
 from app.infrastructure.llm.factory import build_adapter_for_agent
@@ -412,11 +414,35 @@ async def build_default_orchestrator(
     )
     verifier = MechanicalVerifier(workspace=workspace)
     worker_ids = {a.name: str(a.id) for a in members}  # 给 plan step.who 翻译用
+
+    # ── Supervisor 接线（可选）────────────────────────────────────────────
+    supervisor: Supervisor | None = None
+    sv_config = SupervisorConfig(
+        supervisor_agent_id=settings.supervisor_agent_name,
+        enabled=settings.supervisor_enabled and bool(settings.supervisor_agent_name),
+        max_turns=settings.supervisor_max_turns,
+    )
+    if sv_config.enabled:
+        supervisor = SupervisorService(
+            session_id=session.id,
+            group_id=group.id,
+            coordinator_id=group.coordinator_id,
+            config=sv_config,
+            resolve_agent=by_name.get,
+            adapter_factory=build_adapter_for_agent,
+        )
+        logger.info(
+            "Supervisor 已接线 session=%s agent=%s max_turns=%s",
+            session.id, sv_config.supervisor_agent_id, sv_config.max_turns,
+        )
+
     return Orchestrator(
         planner=planner,
         executor=executor,
         verifier=verifier,
         ctx=ctx,
+        supervisor=supervisor,
+        session_id=session.id,
         # WS 带外推送；worker_ids 让 plan step.who 是 agent id（前端 lookupActor 按 id 查）
         progress=make_ws_progress_sink(session.id, group.coordinator_id, worker_ids),
         # R4：关键事件入 transcript（独立 DB session 落 SYSTEM 消息 + 实时广播，挂协调者身份）
