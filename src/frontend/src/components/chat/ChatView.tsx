@@ -98,6 +98,18 @@ export function ChatView({ agent }: { agent: Agent }) {
     if (!sendMessage(text, attachment, replyTo)) send(agent.id, activeConversationId, text, attachment, replyTo)
   }
 
+  // 对话式局部修改：预览面板 CodeView 选区编辑浮层经 window 事件把结构化 prompt
+  // 注入当前会话（复用 onSend 链路 → 真实 WS / mock 降级）。
+  useEffect(() => {
+    const onEditRequest = (e: Event) => {
+      const text = (e as CustomEvent<{ text: string }>).detail?.text
+      if (!text || !activeConversationId) return
+      if (!sendMessage(text)) send(agent.id, activeConversationId, text)
+    }
+    window.addEventListener('agent-edit-request', onEditRequest)
+    return () => window.removeEventListener('agent-edit-request', onEditRequest)
+  }, [activeConversationId, sendMessage, send, agent.id])
+
   const handleCreateSkill = () => {
     if (!activeConversationId) return
     const text = '请帮我创建一个新的 Skill'

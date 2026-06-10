@@ -7,6 +7,7 @@ import { fsApi, type PptxSlide } from '../../api/fs'
 import { Button, Icon } from '../ui'
 import { FileTree } from './FileTree'
 import { SlideView } from './SlideView'
+import { buildEditPrompt, computeLineRange, relativePath } from '../../lib/selectionEdit'
 import { useUIStore } from '../../stores/uiStore'
 
 /** 文件树固定宽度（与 AppShell 全局拖拽的右栏宽度解耦） */
@@ -157,7 +158,7 @@ export function FilePreview({ workdir, initialPath, onOpenFile }: FilePreviewPro
               </div>
             )}
             {file && !file.loading && !file.error && (
-              <FileContentView path={file.path} name={file.name} content={file.content} slides={file.slides} flashKey={flashKey} />
+              <FileContentView path={file.path} name={file.name} content={file.content} slides={file.slides} workdir={workdir} flashKey={flashKey} />
             )}
           </div>
         </div>
@@ -235,9 +236,13 @@ function Breadcrumb({
 
 // ── 代码视图 ──────────────────────────────────────────────────────
 
-function CodeView({ content, path }: { content: string; path?: string }) {
+function CodeView({ content, path, workdir }: { content: string; path?: string; workdir?: string }) {
   const [flash, setFlash] = useState(true)
   const [wrap, setWrap] = useState(false)
+  const preRef = useRef<HTMLPreElement | null>(null)
+  const [sel, setSel] = useState<
+    { text: string; startLine: number; endLine: number; x: number; y: number } | null
+  >(null)
   const lines = content.split('\n')
 
   // 挂载时触发闪动，短暂延迟后移除
@@ -245,6 +250,35 @@ function CodeView({ content, path }: { content: string; path?: string }) {
     const t = setTimeout(() => setFlash(false), 800)
     return () => clearTimeout(t)
   }, [])
+
+  // 选区 → 浮层："✨ 修改选中"（对话式局部修改入口）
+  const onMouseUp = () => {
+    const selection = window.getSelection()
+    const text = selection?.toString() ?? ''
+    if (!text.trim() || !preRef.current || selection!.rangeCount === 0) {
+      setSel(null)
+      return
+    }
+    const range = selection!.getRangeAt(0)
+    if (!preRef.current.contains(range.commonAncestorContainer)) {
+      setSel(null)
+      return
+    }
+    const lr = computeLineRange(content, text)
+    if (!lr) {
+      setSel(null)
+      return
+    }
+    const rect = range.getBoundingClientRect()
+    const host = preRef.current.getBoundingClientRect()
+    setSel({
+      text,
+      startLine: lr.startLine,
+      endLine: lr.endLine,
+      x: rect.left - host.left + preRef.current.scrollLeft,
+      y: rect.bottom - host.top + preRef.current.scrollTop,
+    })
+  }
 
   // highlight.js 高亮（memo 避免大文件重复计算）
   const highlighted = useMemo(() => {
@@ -289,7 +323,7 @@ function CodeView({ content, path }: { content: string; path?: string }) {
       </div>
 
       {/* 代码主体 */}
-      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1">
         {/* 行号 */}
         <div className="sticky left-0 select-none border-r border-border/40 bg-white px-3 py-3 text-right text-muted-foreground/60 dark:bg-black">
           {lines.map((_, i) => (
@@ -298,13 +332,92 @@ function CodeView({ content, path }: { content: string; path?: string }) {
         </div>
         {/* 高亮代码 */}
         <pre
+          ref={preRef}
+          onMouseUp={onMouseUp}
           className={cn(
-            'min-w-0 flex-1 overflow-x-auto px-4 py-3 bg-white dark:bg-black',
+            'relative min-w-0 flex-1 overflow-x-auto px-4 py-3 bg-white dark:bg-black',
             wrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre',
           )}
         >
           <code dangerouslySetInnerHTML={{ __html: highlighted }} />
+          {sel && (
+            <SelectionEditPopover
+              x={sel.x}
+              y={sel.y}
+              startLine={sel.startLine}
+              endLine={sel.endLine}
+              onClose={() => setSel(null)}
+              onSubmit={(request) => {
+                const prompt = buildEditPrompt({
+                  relPath: relativePath(path ?? '', workdir),
+                  startLine: sel.startLine,
+                  endLine: sel.endLine,
+                  selectedText: sel.text,
+                  request,
+                })
+                // 经现有会话 WS 通道发给当前 Agent（ChatView 监听并走 onSend 链路）
+                window.dispatchEvent(new CustomEvent('agent-edit-request', { detail: { text: prompt } }))
+                setSel(null)
+              }}
+            />
+          )}
         </pre>
+      </div>
+    </div>
+  )
+}
+
+/** 选区编辑浮层：输入修改需求 → 提交后组装 prompt 经会话发给 Agent。 */
+function SelectionEditPopover({
+  x, y, startLine, endLine, onSubmit, onClose,
+}: {
+  x: number
+  y: number
+  startLine: number
+  endLine: number
+  onSubmit: (request: string) => void
+  onClose: () => void
+}) {
+  const [val, setVal] = useState('')
+  const range = startLine === endLine ? `第 ${startLine} 行` : `第 ${startLine}–${endLine} 行`
+  return (
+    <div
+      data-testid="selection-edit-popover"
+      style={{ left: Math.max(4, x), top: y + 6 }}
+      className="absolute z-20 w-72 rounded-lg border bg-popover p-2 shadow-lg"
+      onMouseUp={(e) => e.stopPropagation()}
+    >
+      <div className="mb-1.5 flex items-center justify-between text-[11.5px] text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <span className="text-brand">✨</span> 修改选中（{range}）
+        </span>
+        <button type="button" onClick={onClose} aria-label="关闭" className="hover:text-foreground">
+          ✕
+        </button>
+      </div>
+      <textarea
+        autoFocus
+        rows={2}
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        placeholder="描述要怎么改，例如：把循环换成 map…"
+        className="w-full resize-none rounded border bg-background px-2 py-1 font-sans text-[12.5px] outline-none focus:border-brand/40"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && val.trim()) onSubmit(val.trim())
+          if (e.key === 'Escape') onClose()
+        }}
+      />
+      <div className="mt-1.5 flex items-center justify-end gap-2">
+        <span className="mr-auto text-[10.5px] text-muted-foreground/60">⌘/Ctrl+↵ 发送</span>
+        <button
+          type="button"
+          data-testid="selection-edit-send"
+          disabled={!val.trim()}
+          onClick={() => val.trim() && onSubmit(val.trim())}
+          className="rounded bg-brand px-2.5 py-1 text-[12px] font-medium text-brand-foreground disabled:opacity-50"
+        >
+          发送给 Agent
+        </button>
       </div>
     </div>
   )
@@ -312,18 +425,19 @@ function CodeView({ content, path }: { content: string; path?: string }) {
 
 // ── 文件内容分发 ──────────────────────────────────────────────────
 
-function FileContentView({ path, name, content, slides, flashKey }: {
+function FileContentView({ path, name, content, slides, workdir, flashKey }: {
   path: string
   name: string
   content: string
   slides?: PptxSlide[]
+  workdir?: string
   flashKey: number
 }) {
   const ext = fileExt(name)
   if (IMAGE_EXTS.has(ext)) return <ImageView path={path} name={name} />
   if (PPTX_EXTS.has(ext)) return <SlideView slides={slides ?? []} />
   if (MARKDOWN_EXTS.has(ext)) return <MarkdownView content={content} />
-  return <CodeView content={content} path={path} key={flashKey} />
+  return <CodeView content={content} path={path} workdir={workdir} key={flashKey} />
 }
 
 // ── 图片预览 ──────────────────────────────────────────────────────
