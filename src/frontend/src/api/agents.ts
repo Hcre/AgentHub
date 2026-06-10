@@ -40,4 +40,15 @@ export const agentsApi = {
   remove: (id: string) => api.del<void>(`/api/agents/${id}`),
   /** 连通性检查：获取 Agent 配置确认可用 */
   ping: (id: string) => api.get<ApiAgent>(`/api/agents/${id}`),
+  /** 对话式创建：自然语言描述 → LLM 抽取结构化草稿（前端预览后再 create 落库）。 */
+  draftFromChat: (description: string) =>
+    api.post<AgentDraft>("/api/agents/draft-from-chat", { description }),
 };
+
+export interface AgentDraft {
+  name: string;
+  role: string;
+  avatar: string;
+  system_prompt: string;
+  capability_tags: string[];
+}

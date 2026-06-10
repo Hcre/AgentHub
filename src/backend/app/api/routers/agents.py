@@ -7,18 +7,37 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from app.api.deps import get_agent_service
+from app.api.deps import get_agent_draft_service, get_agent_service
 from app.application.commands import (
     CreateAgentCommand,
     DeleteAgentCommand,
     UpdateAgentCommand,
 )
 from app.application.services import AgentService
-from app.schemas.agent import AgentCreateRequest, AgentOut, AgentUpdateRequest
+from app.application.services.agent_draft_service import AgentDraftService
+from app.core.exceptions import PlanParseError
+from app.schemas.agent import (
+    AgentCreateRequest,
+    AgentDraftOut,
+    AgentDraftRequest,
+    AgentOut,
+    AgentUpdateRequest,
+)
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
 ServiceDep = Annotated[AgentService, Depends(get_agent_service)]
+DraftServiceDep = Annotated[AgentDraftService, Depends(get_agent_draft_service)]
+
+
+@router.post("/draft-from-chat", response_model=AgentDraftOut)
+async def draft_agent_from_chat(body: AgentDraftRequest, svc: DraftServiceDep) -> AgentDraftOut:
+    """对话式创建：自然语言描述 → LLM 抽取结构化草稿（前端预览后再调 POST /api/agents 落库）。"""
+    try:
+        draft = await svc.draft(body.description)
+    except PlanParseError as exc:
+        raise HTTPException(status_code=422, detail=f"草稿解析失败: {exc}") from exc
+    return AgentDraftOut(**draft)
 
 
 @router.post("", response_model=AgentOut, status_code=status.HTTP_201_CREATED)

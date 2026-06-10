@@ -31,6 +31,7 @@ from app.application.services import (
     TaskService,
     UsageService,
 )
+from app.application.services.agent_draft_service import AgentDraftService
 from app.application.services.context_builder import ContextBuilder
 from app.application.services.engine_task_dispatcher import EngineTaskDispatcher
 from app.application.services.memory_selector import MemorySelector
@@ -189,6 +190,13 @@ def get_task_repo(session: DbSession) -> PostgresTaskRepository:
 
 # 引擎派发器单例：内部用独立 session_factory 后台跑，无请求态，可进程级共享。
 _engine_dispatcher = EngineTaskDispatcher()
+
+
+def get_agent_draft_service() -> AgentDraftService:
+    """对话式创建：用协调者 LLM 抽取 Agent 草稿。"""
+    from app.infrastructure.llm.text_llm_adapter import build_text_llm
+
+    return AgentDraftService(build_text_llm())
 
 
 def get_task_service(

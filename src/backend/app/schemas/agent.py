@@ -51,3 +51,17 @@ class AgentOut(BaseModel):
     template_name: str | None = None
     created_from_template_id: UUID | None = None
     created_at: datetime
+
+
+class AgentDraftRequest(BaseModel):
+    """对话式创建：自然语言描述 → 抽取草稿。"""
+
+    description: str = Field(min_length=1, max_length=2000)
+
+
+class AgentDraftOut(BaseModel):
+    name: str
+    role: str
+    avatar: str
+    system_prompt: str
+    capability_tags: list[str]

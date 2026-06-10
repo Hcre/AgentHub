@@ -10,6 +10,7 @@ import { CLI_LABEL } from '../icons/cli/cliLabels'
 import { Avatar, Button, Dialog, DialogContent, Icon } from '../ui'
 import type { IconName } from '../../types'
 import { CreateAgentModal, type PreSelectedTemplate } from './CreateAgentModal'
+import { ConversationalAgentCreate } from './ConversationalAgentCreate'
 import { TemplateManagementTab } from '../template/TemplateManagementTab'
 
 type PageTab = 'agents' | 'templates'
@@ -35,6 +36,7 @@ export function AgentsListPage() {
   const [batchMode, setBatchMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [createOpen, setCreateOpen] = useState(false)
+  const [convOpen, setConvOpen] = useState(false)
   const [preSelectedTemplate, setPreSelectedTemplate] = useState<PreSelectedTemplate | undefined>(undefined)
   const [pendingChat, setPendingChat] = useState<{ agentId: string; agentName: string } | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{ agentId: string; agentName: string } | null>(null)
@@ -205,6 +207,15 @@ export function AgentsListPage() {
                 <Icon name="check" className="h-3.5 w-3.5" />
                 批量管理
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="conv-create-entry"
+                onClick={() => setConvOpen(true)}
+                title="用一句话描述，AI 帮你生成队友草稿"
+              >
+                ✨ 对话式创建
+              </Button>
               <Button variant="brand" size="sm" onClick={() => setCreateOpen(true)}>
                 <Icon name="plus" className="h-3.5 w-3.5" />
                 创建队友
@@ -341,6 +352,7 @@ export function AgentsListPage() {
         onClose={handleCreateModalClose}
         preSelectedTemplate={preSelectedTemplate}
       />
+      <ConversationalAgentCreate open={convOpen} onClose={() => setConvOpen(false)} />
       {pendingChat && (
         <StartChatModal
           open
