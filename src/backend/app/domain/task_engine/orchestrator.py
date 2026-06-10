@@ -35,6 +35,8 @@ from app.domain.task_engine.scheduler import (
 logger = logging.getLogger(__name__)
 
 FinishCallback = Callable[[RunResult], Awaitable[None]]
+# AR-05：每次状态变更同步外抛一条事件 dict（含 kind/task + 额外字段），由 infra 落 task_events。
+EventSink = Callable[[dict], None]
 
 
 @dataclass(frozen=True)
@@ -94,6 +96,7 @@ class Orchestrator:
         ctx: PlanContext,
         progress: ProgressSink | None = None,
         message_sink: MessageSink | None = None,
+        event_sink: EventSink | None = None,
     ) -> None:
         self._planner = planner
         self._executor = executor
@@ -101,6 +104,9 @@ class Orchestrator:
         self._ctx = ctx
         self._progress = progress
         self._message_sink = message_sink  # R4：关键事件写 transcript（messages 表 + 群聊）
+        # AR-05 事件溯源：每次 _record 同步外抛（fire-and-forget 落 task_events）。
+        # 默认 None（测试/无持久化场景零开销，不改既有行为）。
+        self._event_sink = event_sink
         self.graph: TaskGraph | None = None
         self.events: list[dict] = []  # MVP：内存事件
         # 执行期旁路消息队列（§11.6）：CoordinatorRun 共享此引用，
@@ -490,4 +496,11 @@ class Orchestrator:
         self._record("transition", node.task.id, frm=str(frm), to=str(to))
 
     def _record(self, kind: str, task_id: str, **data: object) -> None:
-        self.events.append({"kind": kind, "task": task_id, **data})
+        event = {"kind": kind, "task": task_id, **data}
+        self.events.append(event)
+        if self._event_sink is not None:
+            # 持久化失败不能影响编排主流程：sink 内部自行兜底（fire-and-forget）。
+            try:
+                self._event_sink(event)
+            except Exception:  # noqa: BLE001 — 事件落库尽力而为，不打断编排
+                logger.exception("event_sink 抛错，已吞掉（不影响编排）")
