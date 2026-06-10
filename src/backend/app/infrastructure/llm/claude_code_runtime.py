@@ -50,7 +50,7 @@ from app.infrastructure.llm.cli_logger import get_log_path
 logger = logging.getLogger(__name__)
 
 _DEFAULT_TIMEOUT = 300  # 秒
-_DEFAULT_MAX_TURNS = 10
+_DEFAULT_MAX_TURNS = 50  # 复杂任务（博客全栈构建）需要更多轮次
 _DEFAULT_PERMISSION_MODE = "bypassPermissions"
 
 
@@ -472,11 +472,6 @@ class ClaudeCodeRuntime(AgentRuntime):
             "stream-json",
             "--verbose",
             "--print",
-            # 服务端 headless spawn：隔离用户个人 MCP 配置（~/.claude.json / 项目
-            # .mcp.json）。否则 CLI 启动时会拉起用户的 context7/fast-context 等 MCP
-            # server 并等其初始化完成才处理 prompt——npx 式按需下载会挂起，整个 CLI
-            # 卡在发 API 之前（do_epoll_wait）。strict 模式仅用 --mcp-config 指定的。
-            "--strict-mcp-config",
             "--permission-mode",
             self._permission_mode,
             "--max-turns",
