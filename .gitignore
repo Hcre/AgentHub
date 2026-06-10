@@ -103,6 +103,5 @@ docs/deliverables/video/_work/*.py
 .agenthub/templates/
 .agenthub/
 
-# === Local-only media (>100MB, ship via GitHub Release Assets) ===
-# 视频/ 目录下的录屏不入库,见 docs/deliverables/INDEX.md §🎬 演示视频
-视频/
+# 注:视频/*.mp4 走 Git LFS(见 .gitattributes),不再 ignore
+# 历史方案:GitHub Release Assets,见 docs/deliverables/INDEX.md §🎬 演示视频
