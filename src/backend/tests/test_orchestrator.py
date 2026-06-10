@@ -298,7 +298,9 @@ async def test_not_done_parks_then_feed_resumes_to_completed() -> None:
     capture = _Capture()
     orch = _orch(FakePlanner([_t("t1")]), executor, FakeVerifier(), on_finish=capture)
 
-    # start → not_done → park（节点停在 RUNNING）
+    # start → not_done → auto-nudge → re-dispatch → still not_done → park（节点停在 RUNNING）
+    # The auto-nudge adds one extra dispatch before parking (dispatch_count==1 guard
+    # prevents infinite loops — only nudges once).
     await orch.start()
     assert orch.graph.nodes["t1"].status == TaskStatus.RUNNING
     assert len(capture.results) == 0  # park 不 finish
@@ -309,7 +311,8 @@ async def test_not_done_parks_then_feed_resumes_to_completed() -> None:
     assert len(capture.results) == 1
     assert capture.results[0].reason == ExitReason.COMPLETED
     assert orch.graph.nodes["t1"].status == TaskStatus.COMPLETED
-    assert executor.answers == [None, "PostgreSQL"]
+    # Two not_done dispatches (first + auto-nudge re-dispatch) then one completed dispatch.
+    assert executor.answers == [None, None, "PostgreSQL"]
 
 
 @pytest.mark.asyncio

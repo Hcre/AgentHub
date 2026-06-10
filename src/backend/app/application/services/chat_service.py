@@ -365,8 +365,18 @@ class ChatService:
                 for mid in group.member_ids
                 if (a := await self._agents.get_by_id(mid)) is not None
             ]
+            # Pre-resolve supervisor agent from DB (may not be a group member).
+            supervisor_agent: Agent | None = None
+            if settings.supervisor_enabled and settings.supervisor_agent_name:
+                supervisor_agent = await self._agents.get_by_name(settings.supervisor_agent_name)
+                if supervisor_agent is None:
+                    logger.warning(
+                        "Supervisor agent '%s' 在 DB 中不存在，supervisor 禁用",
+                        settings.supervisor_agent_name,
+                    )
             orchestrator = await self._build_orch(
-                task=trigger.content or "", members=members, session=session, group=group
+                task=trigger.content or "", members=members, session=session, group=group,
+                supervisor_agent=supervisor_agent,
             )
         except Exception as exc:
             self._registry.release(session.id)

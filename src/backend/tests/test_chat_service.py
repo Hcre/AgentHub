@@ -337,7 +337,7 @@ async def test_group_decompose_spawns_coordinator(db_session) -> None:  # type: 
     session = Session(type=SessionType.GROUP, group_id=group.id, title="g")
     await PostgresSessionRepository(db_session).save(session)
 
-    async def _builder(*, task, members, session, group):  # type: ignore[no-untyped-def]
+    async def _builder(*, task, members, session, group, supervisor_agent=None):  # type: ignore[no-untyped-def]
         td = TaskDef(
             id="t1", title="t1", description="", suggested_worker="AgentA",
             depends_on=[], acceptance=[], no_verify=True,
@@ -394,7 +394,7 @@ async def test_group_discuss_does_not_spawn(db_session) -> None:  # type: ignore
     session = Session(type=SessionType.GROUP, group_id=group.id, title="g")
     await PostgresSessionRepository(db_session).save(session)
 
-    async def _builder(*, task, members, session, group):  # type: ignore[no-untyped-def]
+    async def _builder(*, task, members, session, group, supervisor_agent=None):  # type: ignore[no-untyped-def]
         raise AssertionError("discuss 不应组装 Orchestrator")
 
     sink = _RecordingSink()
@@ -532,7 +532,7 @@ async def test_multi_round_task_interrupts_loop(db_session) -> None:  # type: ig
 
     started = {"n": 0}
 
-    async def _builder(*, task, members, session, group):  # type: ignore[no-untyped-def]
+    async def _builder(*, task, members, session, group, supervisor_agent=None):  # type: ignore[no-untyped-def]
         started["n"] += 1
         td = TaskDef(id="t1", title="t1", description="", suggested_worker="AgentA",
                      depends_on=[], acceptance=[], no_verify=True)

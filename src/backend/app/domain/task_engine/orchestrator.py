@@ -285,6 +285,23 @@ class Orchestrator:
             )
             await self._emit_update(node, "running")
             outcome = await self._executor.run(node)
+
+            # Auto-nudge on not_done: worker forgot to call task_complete.
+            # Must happen INSIDE the while loop (before the break/continue decision)
+            # so the nudge triggers an immediate re-dispatch rather than sitting
+            # in the queue until the next external on_feed.  Only nudge once per
+            # _execute_and_settle call (dispatch_count==1 guard prevents loops).
+            if (
+                outcome.status == "not_done"
+                and not node.pending_answer
+                and worker
+                and node.dispatch_count == 1
+            ):
+                self._pending_notes.setdefault(worker, []).append(
+                    "你已经完成了所有工作。现在请**只做一件事**：调用 `task_complete` 工具交卷"
+                    "（summary 写：做了什么、产物在哪）。不要做其他任何操作，只调工具。"
+                )
+
             if self._pending_notes.get(worker):  # 仅自己定向桶触发续跑（全局桶不触发）
                 continue
             break
@@ -311,14 +328,9 @@ class Orchestrator:
             return
 
         if outcome.status == "not_done":
-            # 流结束没交卷。不转移、不失败——但主动 nudge worker 调 task_complete。
-            # 如果 worker 没提问（无 pending_answer），说明它只是忘了交卷，推一条强制指令。
-            worker = node.task.suggested_worker
-            if not node.pending_answer and worker:
-                self._pending_notes.setdefault(worker, []).append(
-                    "你已经完成了所有工作。现在请**只做一件事**：调用 `task_complete` 工具交卷"
-                    "（summary 写：做了什么、产物在哪）。不要做其他任何操作，只调工具。"
-                )
+            # 流结束没交卷。不转移、不失败——park 等 on_feed。
+            # Auto-nudge 已在 _execute_and_settle while loop 内处理（dispatch_count==1 时触发），
+            # 若走到此处说明 nudge 已送达但 worker 仍未交卷，或被用户回答打断。
             self._record("parked", node.task.id)
             return
 

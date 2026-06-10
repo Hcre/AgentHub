@@ -382,15 +382,17 @@ class TestNotDoneNudgeCompleteFlow:
 
     @pytest.mark.asyncio
     async def test_not_done_auto_enqueues_nudge_note(self) -> None:
-        """场景 3a：not_done → Orchestrator 在 _settle 里 auto-enqueue nudge note
-        到 worker 的桶。"""
+        """场景 3a：not_done → Orchestrator 在 while loop 内 auto-enqueue nudge note
+        并立即 re-dispatch 送达 worker。nudge 被消费后桶为空，节点 park。"""
 
         class NotDoneOnceExecutor:
             def __init__(self) -> None:
                 self.dispatched: list[str] = []
+                self.notes_seen: list[list[str]] = []
 
             async def run(self, node):
                 self.dispatched.append(node.task.id)
+                self.notes_seen.append(node.pending_notes or [])
                 if node.pending_answer is None:
                     return WorkerOutcome(ok=True, status="not_done",
                                         output="worker 没交卷")
@@ -415,25 +417,33 @@ class TestNotDoneNudgeCompleteFlow:
         assert len(capture.results) == 0
         assert orch.graph.nodes["t1"].status == TaskStatus.RUNNING
 
-        # 验证 auto-nudge 入队：worker 桶有内容
+        # 验证 auto-nudge：被 enqueue 后立即 re-dispatch（dispatch count ≥ 2）
+        assert len(executor.dispatched) >= 2, (
+            f"auto-nudge 应触发 re-dispatch，实际派发 {len(executor.dispatched)} 次"
+        )
+        # 第二轮 dispatch 的 notes 应包含 nudge（task_complete 提示）
+        second_notes = executor.notes_seen[1] if len(executor.notes_seen) > 1 else []
+        any_nudge = any("task_complete" in n for n in second_notes)
+        assert any_nudge, (
+            f"第二轮 dispatch 应包含 auto-nudge note，实际: {second_notes}"
+        )
+        # nudge 已被消费，桶应为空（不会残留到下次 on_feed 重复注入）
         notes = orch._pending_notes.get("w", [])
-        assert len(notes) >= 1
-        assert "task_complete" in notes[0], (
-            f"auto-nudge 必须包含 task_complete 关键字，实际: {notes[0]}"
+        assert len(notes) == 0, (
+            f"nudge 已被 re-dispatch 消费，桶应为空，实际: {notes}"
         )
 
     @pytest.mark.asyncio
     async def test_not_done_then_task_complete_via_feed(self) -> None:
-        """场景 3b：not_done → park → 用户 feed → 注入 nudge → worker 收到后交卷。
+        """场景 3b：not_done → auto-nudge re-dispatch → 仍 not_done → park
+        → 用户 feed → worker 收到答案后交卷。
 
         完整流程：
-          1. start → t1 派发 → worker 流结束未交卷 → not_done → park
-          2. supervisor 被调 on_step_completed（实际 not_done 不转状态，但 WorkerOutcome 是 ok=True，
-             只在 _settle 完成分支才调 on_step_completed。not_done 本身不调 supervisor hook。）
-          3. Orchestrator auto-enqueue nudge note 到 worker 桶
-          4. on_feed("t1", "请继续") → resume → executor.run 注入 nudge notes
-          5. worker 收到 nudge 内容 → 知道要调 task_complete
-          6. worker 返回 completed → 经 VERIFYING → COMPLETED → _finish
+          1. start → t1 派发 → not_done → auto-nudge → re-dispatch
+          2. re-dispatch（带 nudge）→ worker 仍需用户输入 → not_done → park
+             （nudge 在 re-dispatch 时已被消费）
+          3. on_feed("t1", "请继续") → resume → worker 收到用户回答 → completed
+          4. 经 VERIFYING → COMPLETED → _finish
         """
 
         class NotDoneThenCompleteExecutor:
@@ -444,7 +454,9 @@ class TestNotDoneNudgeCompleteFlow:
             async def run(self, node):
                 self.dispatched.append(node.task.id)
                 self.notes_seen.append(node.pending_notes or [])
-                if node.dispatch_count == 1 and node.pending_answer is None:
+                # Worker only completes when it has a user answer;
+                # the auto-nudge alone is not enough.
+                if node.pending_answer is None:
                     return WorkerOutcome(ok=True, status="not_done",
                                         output="worker 还没交卷")
                 return WorkerOutcome(ok=True, status="completed", output="交卷了")
@@ -462,7 +474,7 @@ class TestNotDoneNudgeCompleteFlow:
         orch = _orch(planner, executor, FakeVerifier(),
                      supervisor=supervisor, on_finish=capture)
 
-        # Step 1: start → not_done → park
+        # Step 1: start → not_done → auto-nudge re-dispatch → still not_done → park
         await orch.start()
         assert len(capture.results) == 0
         assert orch.graph.nodes["t1"].status == TaskStatus.RUNNING
@@ -475,22 +487,25 @@ class TestNotDoneNudgeCompleteFlow:
         assert capture.results[0].reason == ExitReason.COMPLETED
         assert orch.graph.nodes["t1"].status == TaskStatus.COMPLETED
 
-        # Step 4: 验证 worker 第二次 dispatch 收到了 nudge notes（含 task_complete 提示）
-        assert len(executor.notes_seen) >= 2
-        second_dispatch_notes = executor.notes_seen[1]
+        # Step 4: 验证 re-dispatch（dispatch 2）收到了 nudge notes
+        # 派发序列：1=初始 not_done, 2=带 nudge re-dispatch not_done, 3=on_feed 完成
+        assert len(executor.dispatched) == 3, (
+            f"应有 3 次派发，实际 {len(executor.dispatched)}"
+        )
+        second_dispatch_notes = executor.notes_seen[1] if len(executor.notes_seen) > 1 else []
         any_nudge = any("task_complete" in n for n in second_dispatch_notes)
         assert any_nudge, (
             f"第二次 dispatch 应该收到 auto-nudge note，实际: {second_dispatch_notes}"
         )
 
     @pytest.mark.asyncio
-    async def test_nudge_note_persists_until_next_dispatch(self) -> None:
-        """场景 3c：not_done 后 nudge note 保留在桶中，等待下次 dispatch 时 pop。
+    async def test_nudge_note_dispatched_immediately(self) -> None:
+        """场景 3c：not_done 后 nudge note 在 while loop 内 enqueue
+        并立即触发 re-dispatch 送达 worker（不再残留桶中等待下次外部触发）。
 
-        turn-end drain 规则（design §7.3）：
-        - while 循环在桶为空时 break，然后 _settle 才被调用。
-        - _settle(not_done) 把 nudge 写入桶 → 桶非空，但 while 已退出。
-        - 桶中 note 留给下次 dispatch（on_feed resume）注入。
+        v4 R1 修复：nudge 原在 _settle（while loop 之后）写入桶 → while 已退出，
+        note 永久残留直到下次 on_feed。现移至 while loop 内，dispatch_count==1 时
+        触发 → re-dispatch → nudge 消费 → 桶空。
         """
         playwright = FakePlanner([_t("t1")])
         executor = FakeExecutor({
@@ -502,18 +517,14 @@ class TestNotDoneNudgeCompleteFlow:
 
         await orch.start()
 
-        # not_done → _settle 写入 nudge note 到 worker 桶（after while loop break）
+        # not_done → auto-nudge added in while loop → re-dispatch → nudge consumed
+        # Bucket should be empty now (nudge was delivered, not left sitting).
         notes = orch._pending_notes.get("w")
-        assert notes is not None, (
-            "not_done 后 _settle 应写入 nudge note 到 worker 桶"
+        assert notes is None or len(notes) == 0, (
+            f"nudge 已被 re-dispatch 消费，桶应为空/不存在，实际: {notes}"
         )
-        assert any("task_complete" in n for n in notes), (
-            f"nudge note 应包含 task_complete 关键字，实际: {notes}"
-        )
-        # 确认桶中恰好 1 条（不会无限循环写）
-        assert len(notes) == 1, (
-            f"应只有 1 条 nudge note，实际: {len(notes)} 条 — 如果多条说明 while 循环未正确 break"
-        )
+        # Node should be parked (RUNNING, not COMPLETED — worker didn't call task_complete)
+        assert orch.graph.nodes["t1"].status == TaskStatus.RUNNING
 
     @pytest.mark.asyncio
     async def test_multi_worker_not_done_independent(self) -> None:
@@ -538,8 +549,9 @@ class TestNotDoneNudgeCompleteFlow:
                 return ""
 
         planner = FakePlanner([_t("t1", worker="worker-a"), _t("t2", worker="worker-b")])
+        executor = MixedExecutor()
         capture = _Capture()
-        orch = _orch(planner, MixedExecutor(), FakeVerifier(),
+        orch = _orch(planner, executor, FakeVerifier(),
                      supervisor=supervisor, on_finish=capture)
 
         await orch.start()
@@ -549,9 +561,16 @@ class TestNotDoneNudgeCompleteFlow:
         # t1 停在 RUNNING，t2 应为 COMPLETED
         assert orch.graph.nodes["t1"].status == TaskStatus.RUNNING
         assert orch.graph.nodes["t2"].status == TaskStatus.COMPLETED
-        # worker-a 的桶应有 auto-nudge，worker-b 的桶应为空
-        assert "worker-a" in orch._pending_notes
+        # worker-a 的桶应为空（auto-nudge 已被 re-dispatch 消费）
+        notes_a = orch._pending_notes.get("worker-a")
+        assert notes_a is None or len(notes_a) == 0, (
+            f"nudge 已被 re-dispatch 消费，worker-a 桶应为空，实际: {notes_a}"
+        )
         assert orch._pending_notes.get("worker-b") is None
+        # t1 被派发了 2 次（初始 + auto-nudge re-dispatch），t2 1 次
+        assert executor.dispatched.count("t1") == 2, (
+            f"t1 应有 2 次派发（初始 + auto-nudge re-dispatch），实际: {executor.dispatched}"
+        )
 
         # supervisor 只被调了 on_step_completed(t2)（t1 not_done 不调）
         completed_events = [

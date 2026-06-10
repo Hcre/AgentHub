@@ -390,7 +390,8 @@ async def post_worker_message_background(session_id: UUID, agent_id: object, con
 
 
 async def build_default_orchestrator(
-    *, task: str, members: list[Agent], session: Session, group: Group
+    *, task: str, members: list[Agent], session: Session, group: Group,
+    supervisor_agent: Agent | None = None,
 ) -> Orchestrator:
     """组装 5 协作者 → Orchestrator。gather_context 走 to_thread（只读 IO）。"""
     by_name = {a.name: a for a in members}
@@ -422,18 +423,28 @@ async def build_default_orchestrator(
         enabled=settings.supervisor_enabled and bool(settings.supervisor_agent_name),
         max_turns=settings.supervisor_max_turns,
     )
-    if sv_config.enabled:
+    if sv_config.enabled and supervisor_agent is not None:
+        # Merge supervisor into lookup: supervisor may not be a group member,
+        # but resolve_agent must find it.  by_name covers group members;
+        # the pre-resolved supervisor_agent covers the system-level supervisor.
+        _sv_lookup = dict(by_name)
+        _sv_lookup[supervisor_agent.name] = supervisor_agent
         supervisor = SupervisorService(
             session_id=session.id,
             group_id=group.id,
             coordinator_id=group.coordinator_id,
             config=sv_config,
-            resolve_agent=by_name.get,
+            resolve_agent=_sv_lookup.get,
             adapter_factory=build_adapter_for_agent,
         )
         logger.info(
             "Supervisor 已接线 session=%s agent=%s max_turns=%s",
             session.id, sv_config.supervisor_agent_id, sv_config.max_turns,
+        )
+    elif sv_config.enabled:
+        logger.warning(
+            "Supervisor 配置已启用但 agent '%s' 未在 DB 中找到，跳过接线",
+            settings.supervisor_agent_name,
         )
 
     return Orchestrator(
