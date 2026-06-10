@@ -502,5 +502,5 @@ class Orchestrator:
             # 持久化失败不能影响编排主流程：sink 内部自行兜底（fire-and-forget）。
             try:
                 self._event_sink(event)
-            except Exception:  # noqa: BLE001 — 事件落库尽力而为，不打断编排
+            except Exception:
                 logger.exception("event_sink 抛错，已吞掉（不影响编排）")

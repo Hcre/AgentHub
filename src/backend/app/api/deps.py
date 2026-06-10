@@ -32,6 +32,7 @@ from app.application.services import (
     UsageService,
 )
 from app.application.services.context_builder import ContextBuilder
+from app.application.services.engine_task_dispatcher import EngineTaskDispatcher
 from app.application.services.memory_selector import MemorySelector
 from app.application.services.template_service import TemplateService
 from app.core.config import settings
@@ -58,6 +59,9 @@ from app.infrastructure.repositories import (
     PostgresSessionRepository,
     PostgresTaskRepository,
     PostgresUsageRepository,
+)
+from app.infrastructure.repositories.task_event_repository import (
+    PostgresTaskEventRepository,
 )
 from app.infrastructure.repositories.template_repository import (
     PostgresTemplateRepository,
@@ -183,10 +187,19 @@ def get_task_repo(session: DbSession) -> PostgresTaskRepository:
     return PostgresTaskRepository(session)
 
 
+# 引擎派发器单例：内部用独立 session_factory 后台跑，无请求态，可进程级共享。
+_engine_dispatcher = EngineTaskDispatcher()
+
+
 def get_task_service(
     repo: Annotated[PostgresTaskRepository, Depends(get_task_repo)],
+    session: DbSession,
 ) -> TaskService:
-    return TaskService(repo)
+    return TaskService(
+        repo,
+        event_repo=PostgresTaskEventRepository(session),
+        dispatcher=_engine_dispatcher,
+    )
 
 
 def get_inbox_repo(session: DbSession) -> PostgresInboxRepository:

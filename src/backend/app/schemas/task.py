@@ -73,3 +73,16 @@ class TaskOut(BaseModel):
 class TaskListOut(BaseModel):
     items: list[TaskOut]
     total: int
+
+
+class TaskEventOut(BaseModel):
+    id: UUID
+    event_type: str
+    event_data: dict
+    actor: str
+    created_at: str
+
+
+class TaskEventListOut(BaseModel):
+    items: list[TaskEventOut]
+    total: int

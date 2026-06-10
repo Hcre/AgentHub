@@ -18,7 +18,14 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from app.api.deps import get_task_service
 from app.application.services.task_service import TaskService
 from app.domain.enums import TaskPriority, TaskStatus
-from app.schemas.task import TaskCreate, TaskListOut, TaskOut, TaskUpdate
+from app.schemas.task import (
+    TaskCreate,
+    TaskEventListOut,
+    TaskEventOut,
+    TaskListOut,
+    TaskOut,
+    TaskUpdate,
+)
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
@@ -92,3 +99,29 @@ async def update_task(task_id: UUID, body: TaskUpdate, svc: ServiceDep) -> TaskO
 async def delete_task(task_id: UUID, svc: ServiceDep) -> Response:
     await svc.delete(task_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{task_id}/dispatch", response_model=TaskOut)
+async def dispatch_task(task_id: UUID, svc: ServiceDep) -> TaskOut:
+    """把看板任务派给编排引擎真跑（M3+）。返回置 RUNNING 后的任务；终态后台回写。"""
+    task = await svc.dispatch(task_id)
+    return _to_out(task)
+
+
+@router.get("/{task_id}/events", response_model=TaskEventListOut)
+async def list_task_events(task_id: UUID, svc: ServiceDep) -> TaskEventListOut:
+    """某任务的编排事件流（AR-05 事件溯源，append-only）。"""
+    events = await svc.events(task_id)
+    return TaskEventListOut(
+        items=[
+            TaskEventOut(
+                id=e.id,
+                event_type=e.event_type,
+                event_data=e.event_data,
+                actor=e.actor,
+                created_at=e.created_at.isoformat(),
+            )
+            for e in events
+        ],
+        total=len(events),
+    )
