@@ -14,22 +14,23 @@ afterEach(cleanup)
  *   test 防止后续改 const→function 漏改 enabled。
  */
 describe('PREVIEW_MODES (t1-preview-modes BDD B-4-P2-PV01)', () => {
-  it('exports exactly 4 modes in canonical order: files, diff, deploy, webpage', () => {
+  it('exports exactly 5 modes in canonical order: files, diff, versions, deploy, webpage', () => {
     expect(PREVIEW_MODES.map((m) => m.mode)).toEqual([
       'files',
       'diff',
+      'versions',
       'deploy',
       'webpage',
     ])
   })
 
-  it('all 4 modes have enabled=true (regression for the 3 enabled:false bug)', () => {
+  it('all modes have enabled=true (regression for the 3 enabled:false bug)', () => {
     for (const m of PREVIEW_MODES) {
       expect(m.enabled, `mode ${m.mode} should be enabled`).toBe(true)
     }
   })
 
-  it.each(['files', 'diff', 'deploy', 'webpage'] as PreviewMode[])(
+  it.each(['files', 'diff', 'versions', 'deploy', 'webpage'] as PreviewMode[])(
     'mode "%s" has enabled=true (per-mode parity check)',
     (mode) => {
       const m = PREVIEW_MODES.find((x) => x.mode === mode)
@@ -53,7 +54,7 @@ describe('PreviewMode dropdown rendering (RightPanel PreviewMenu smoke)', () => 
     vi.restoreAllMocks()
   })
 
-  it('renders 4 menuitems, all enabled (no disabled attr, no 即将到来 hint)', () => {
+  it('renders all menuitems, all enabled (no disabled attr, no 即将到来 hint)', () => {
     // 微型镜像 RightPanel PreviewMenu 渲染逻辑（不引入 store 依赖）
     // 当 RightPanel 的 PreviewMenu 改为函数式 hook 时，本测试能继续工作
     const Menu = () => (
@@ -75,7 +76,7 @@ describe('PreviewMode dropdown rendering (RightPanel PreviewMenu smoke)', () => 
 
     render(<Menu />)
 
-    for (const mode of ['files', 'diff', 'deploy', 'webpage'] as PreviewMode[]) {
+    for (const mode of ['files', 'diff', 'versions', 'deploy', 'webpage'] as PreviewMode[]) {
       const btn = screen.getByTestId(`menuitem-${mode}`)
       expect(btn, `${mode} button should exist`).toBeInTheDocument()
       expect(

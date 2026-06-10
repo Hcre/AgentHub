@@ -23,6 +23,45 @@ export const fsApi = {
   /** 抽取 .pptx 每页文本（标题/正文/备注）供 SlideView 渲染。非 pptx 415 / 损坏 422 由 api 抛错。 */
   pptxSlides: (path: string) =>
     api.get<FsPptxSlidesOut>(`/api/fs/pptx-slides?path=${encodeURIComponent(path)}`),
+
+  /** 某文件的 git 提交历史；非 git 仓库 → {ok:false, reason}。 */
+  fileHistory: (path: string, limit = 50) =>
+    api.get<FsFileHistoryOut>(`/api/fs/file-history?path=${encodeURIComponent(path)}&limit=${limit}`),
+
+  /** 取某文件在某 commit 时的内容；非 git → {ok:false}。 */
+  fileAtRev: (path: string, rev: string) =>
+    api.get<FsFileAtRevOut>(`/api/fs/file-at-rev?path=${encodeURIComponent(path)}&rev=${encodeURIComponent(rev)}`),
+
+  /** 把内容写回已存在文件（版本回溯）；不存在 404。 */
+  fileWrite: (path: string, content: string) =>
+    api.post<{ ok: boolean; path: string; size: number }>('/api/fs/file-write', { path, content }),
+}
+
+export interface FileCommit {
+  sha: string
+  short: string
+  author: string
+  date: string
+  subject: string
+}
+
+export interface FsFileHistoryOut {
+  ok: boolean
+  path?: string
+  relpath?: string
+  count?: number
+  commits?: FileCommit[]
+  reason?: string
+}
+
+export interface FsFileAtRevOut {
+  ok: boolean
+  rev?: string
+  relpath?: string
+  content?: string
+  /** 该版本 → 当前工作树的 unified diff（供 DiffView 渲染对比） */
+  diff?: string
+  reason?: string
 }
 
 export interface PptxSlide {

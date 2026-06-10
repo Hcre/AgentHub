@@ -1065,3 +1065,132 @@ async def fs_pptx_slides(path: str) -> dict:
         slides.append({"index": idx, "title": title, "texts": texts, "notes": notes})
 
     return {"ok": True, "path": real, "count": len(slides), "slides": slides}
+
+
+def _git_root_and_relpath(real: str):
+    """返回 (repo_root, relpath_posix)；非 git 仓库返回 (None, None)。"""
+    import os as _os
+    import subprocess as _sp
+
+    file_dir = _os.path.dirname(real)
+    try:
+        proc = _sp.run(
+            ["git", "-C", file_dir, "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, timeout=10, encoding="utf-8", errors="replace",
+        )
+    except (FileNotFoundError, _sp.TimeoutExpired, OSError):
+        return None, None
+    if proc.returncode != 0:
+        return None, None
+    root = (proc.stdout or "").strip()
+    if not root:
+        return None, None
+    rel = _os.path.relpath(real, root).replace("\\", "/")
+    return root, rel
+
+
+@FS_ROUTER.get("/file-history")
+async def fs_file_history(path: str, limit: int = 50) -> dict:
+    """某文件的 git 提交历史（`git log --follow`）。
+
+    - 非 git 仓库 / git 缺失 → 200 + {ok:false, reason}（前端走空态）
+    - 返回 commits: [{sha, short, author, date, subject}]
+    """
+    import os as _os
+    import subprocess as _sp
+
+    if not path:
+        raise HTTPException(status_code=400, detail="path 必填")
+    real = _resolve_path(path)
+    if not _os.path.isfile(real):
+        raise HTTPException(status_code=404, detail=f"文件不存在：{real}")
+    root, rel = _git_root_and_relpath(real)
+    if root is None:
+        return {"ok": False, "reason": "不在 git 仓库内或 git 不可用"}
+    fmt = "%H%x1f%h%x1f%an%x1f%ad%x1f%s"
+    args = [
+        "git", "-C", root, "log", f"--max-count={max(1, min(limit, 200))}",
+        "--follow", f"--format={fmt}", "--date=short", "--", rel,
+    ]
+    try:
+        proc = _sp.run(args, capture_output=True, text=True, timeout=15, encoding="utf-8", errors="replace")
+    except (FileNotFoundError, _sp.TimeoutExpired, OSError) as e:
+        return {"ok": False, "reason": f"git log 失败：{e}"}
+    if proc.returncode != 0:
+        stderr = (proc.stderr or "").strip().splitlines()
+        return {"ok": False, "reason": stderr[-1] if stderr else f"git 退出码 {proc.returncode}"}
+    commits = []
+    for line in (proc.stdout or "").splitlines():
+        parts = line.split("\x1f")
+        if len(parts) == 5:
+            commits.append({
+                "sha": parts[0], "short": parts[1],
+                "author": parts[2], "date": parts[3], "subject": parts[4],
+            })
+    return {"ok": True, "path": real, "relpath": rel, "count": len(commits), "commits": commits}
+
+
+@FS_ROUTER.get("/file-at-rev")
+async def fs_file_at_rev(path: str, rev: str) -> dict:
+    """取某文件在某 commit 时的内容（`git show <rev>:<relpath>`）。"""
+    import os as _os
+    import re as _re
+    import subprocess as _sp
+
+    if not path or not rev:
+        raise HTTPException(status_code=400, detail="path + rev 必填")
+    if not _re.fullmatch(r"[0-9a-fA-F]{4,40}", rev):
+        raise HTTPException(status_code=422, detail="rev 必须是 commit sha")
+    real = _resolve_path(path)
+    root, rel = _git_root_and_relpath(real)
+    if root is None:
+        return {"ok": False, "reason": "不在 git 仓库内或 git 不可用"}
+    try:
+        proc = _sp.run(
+            ["git", "-C", root, "show", f"{rev}:{rel}"],
+            capture_output=True, text=True, timeout=15, encoding="utf-8", errors="replace",
+        )
+    except (FileNotFoundError, _sp.TimeoutExpired, OSError) as e:
+        return {"ok": False, "reason": f"git show 失败：{e}"}
+    if proc.returncode != 0:
+        stderr = (proc.stderr or "").strip().splitlines()
+        return {"ok": False, "reason": stderr[-1] if stderr else "该版本不含此文件"}
+    # 顺带返回该版本 → 当前工作树的 unified diff（前端 DiffView 直接渲染对比）
+    diff_text = ""
+    try:
+        dproc = _sp.run(
+            ["git", "-C", root, "diff", "--no-color", "--no-ext-diff", rev, "--", rel],
+            capture_output=True, text=True, timeout=15, encoding="utf-8", errors="replace",
+        )
+        if dproc.returncode == 0:
+            diff_text = dproc.stdout or ""
+    except (FileNotFoundError, _sp.TimeoutExpired, OSError):
+        diff_text = ""
+    return {"ok": True, "rev": rev, "relpath": rel, "content": proc.stdout or "", "diff": diff_text}
+
+
+class FsWriteRequest(BaseModel):
+    path: str
+    content: str
+
+
+@FS_ROUTER.post("/file-write")
+async def fs_file_write(body: FsWriteRequest) -> dict:
+    """把内容写回**已存在**的文件（版本回溯用）。
+
+    安全：只允许覆盖已存在的文本文件（不新建任意路径），>2MB 拒绝。
+    """
+    import os as _os
+
+    path = body.path
+    if not path:
+        raise HTTPException(status_code=400, detail="path 必填")
+    real = _resolve_path(path)
+    if not _os.path.isfile(real):
+        # 仅允许覆盖已存在文件，杜绝任意路径写入
+        raise HTTPException(status_code=404, detail="目标文件不存在（回溯只覆盖已有文件）")
+    if len(body.content.encode("utf-8")) > 2 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="内容超过 2MB")
+    with open(real, "w", encoding="utf-8", newline="") as f:
+        f.write(body.content)
+    return {"ok": True, "path": real, "size": _os.path.getsize(real)}

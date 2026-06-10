@@ -73,7 +73,7 @@ interface UIState {
 /** 预览 tab（RightPanel 内的 PreviewMode tab） */
 export interface PreviewTab {
   id: string
-  type: 'files' | 'diff' | 'deploy' | 'webpage'
+  type: 'files' | 'diff' | 'versions' | 'deploy' | 'webpage'
   label: string
   workdir?: string
   /** 打开的具体文件路径（仅 type=files 时有效，右键栏顶层 tab 以文件名显示） */

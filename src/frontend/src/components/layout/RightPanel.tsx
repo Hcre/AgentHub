@@ -7,19 +7,22 @@ import { PREVIEW_MODES, type PreviewMode } from '../preview/previewModes'
 import { FilePreview } from '../preview/FilePreview'
 import { DiffPanel } from '../preview/DiffPanel'
 import { DeployPanel } from '../preview/DeployPanel'
+import { VersionHistoryPanel } from '../preview/VersionHistoryPanel'
 import { useCurrentWorkdir } from './previewContext'
 import { useUIStore, type PreviewTab } from '../../stores/uiStore'
 
 const TAB_LABEL: Record<PreviewMode, string> = {
   files: '文件',
   diff: 'Diff',
+  versions: '版本',
   deploy: '部署',
   webpage: '网页',
 }
 
-const TAB_ICON: Record<PreviewMode, 'files' | 'diff' | 'rocket' | 'globe'> = {
+const TAB_ICON: Record<PreviewMode, 'files' | 'diff' | 'clock' | 'rocket' | 'globe'> = {
   files: 'files',
   diff: 'diff',
+  versions: 'clock',
   deploy: 'rocket',
   webpage: 'globe',
 }
@@ -292,6 +295,7 @@ function ActiveTabContent({ tab, onOpenFile, sessionId }: { tab: PreviewTab; onO
   if (tab.type === 'files') return <FilePreview workdir={tab.workdir} initialPath={tab.filePath} onOpenFile={onOpenFile} />
   if (tab.type === 'webpage') return <WebPageView tab={tab} />
   if (tab.type === 'diff') return <DiffPanel workdir={tab.workdir} />
+  if (tab.type === 'versions') return <VersionHistoryPanel workdir={tab.workdir} />
   if (tab.type === 'deploy') return <DeployPanel sessionId={sessionId} />
   return (
     <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted-foreground">
