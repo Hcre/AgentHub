@@ -1,9 +1,13 @@
-"""P0-4 Pin 消息 session 所有权校验测试。
+"""P0-4 Pin 消息 session 校验测试。
 
-3 路径（per spec 04-commands §6.1.6）：
-1. owner OK — U1 pin U1 自己的消息 → 204 + 落库 pinned_by_user_id=U1
-2. other user 403 — U1 pin U2 的消息 → 403
-3. anonymous 401 — 无 JWT pin → 401
+鉴权口径（commit 11b4c6c 起）：pin 是个人偏好，前端无登录流程，故**不强制 JWT、不强制
+owner**——只保留 session 归属校验（防把消息 pin 进不属于它的 session）。本文件断言这套
+放宽后的契约：
+1. owner pin 自己的消息 → 落库 pinned + pinned_by_user_id
+2. 非 owner 也能 pin（放宽后无 owner 门槛）
+3. session 不匹配 → 422
+4. 不存在的 message → 404
+5. 匿名 HTTP 请求不被 401 拦截（路由已无 CurrentUser 依赖）
 """
 
 from __future__ import annotations
@@ -34,7 +38,7 @@ from app.application.commands import (
 )
 from app.application.services import SessionService
 from app.core.events import InMemoryEventBus
-from app.core.exceptions import NotFoundError, PermissionError, ValidationError
+from app.core.exceptions import NotFoundError, ValidationError
 from app.core.security import create_access_token
 from app.domain.entities.agent import Agent
 from app.domain.entities.message import Message
@@ -99,8 +103,11 @@ async def test_pin_owner_ok(db_session) -> None:  # type: ignore[no-untyped-def]
 
 
 @pytest.mark.asyncio
-async def test_pin_other_user_403(db_session) -> None:  # type: ignore[no-untyped-def]
-    """路径 2：U1 pin U2 的消息 → 403 E_MESSAGE_PIN_NOT_OWNER"""
+async def test_pin_non_owner_allowed(db_session) -> None:  # type: ignore[no-untyped-def]
+    """路径 2（放宽后）：U1 pin U2 的消息 → 成功（无 owner 门槛）。
+
+    commit 11b4c6c 移除了 owner 校验：pin 是个人偏好，不该有"必须本人"门槛。
+    """
     user_u1 = uuid4()
     user_u2 = uuid4()
     sess_id, msg_id = await _setup_session_with_message(db_session, user_id=user_u2)
@@ -109,16 +116,14 @@ async def test_pin_other_user_403(db_session) -> None:  # type: ignore[no-untype
         PostgresMessageRepository(db_session),
         InMemoryEventBus(),
     )
-    with pytest.raises(PermissionError) as exc_info:
-        await session_svc.pin_message(
-            PinMessageCommand(session_id=sess_id, message_id=msg_id),
-            current_user=user_u1,
-        )
-    assert "E_MESSAGE_PIN_NOT_OWNER" in str(exc_info.value)
+    await session_svc.pin_message(
+        PinMessageCommand(session_id=sess_id, message_id=msg_id),
+        current_user=user_u1,
+    )
     after = await PostgresMessageRepository(db_session).get_by_id(msg_id)
     assert after is not None
-    assert after.pinned is False
-    assert after.pinned_by_user_id is None
+    assert after.pinned is True
+    assert after.pinned_by_user_id == user_u1
 
 
 @pytest.mark.asyncio
@@ -156,10 +161,26 @@ async def test_pin_nonexistent_404(db_session) -> None:  # type: ignore[no-untyp
         )
 
 
-def test_pin_route_anonymous_401(client: TestClient) -> None:
-    """路径 5（HTTP 层）：无 JWT → 401 E_AUTH_REQUIRED"""
-    fake_msg = uuid4()
-    fake_sess = uuid4()
-    resp = client.post(f"/api/messages/{fake_msg}/pin?session_id={fake_sess}")
-    assert resp.status_code == 401, resp.text
-    assert "E_AUTH_REQUIRED" in resp.text
+def test_pin_route_no_auth_required(client: TestClient) -> None:
+    """路径 5（HTTP 层）：匿名（无 JWT）请求不被 401 拦截。
+
+    commit 11b4c6c 移除了 pin 路由的 CurrentUser 依赖。这里用 fake service 覆盖
+    `get_session_service`，断言匿名 POST 直达 service 并返回 204（证明无鉴权门槛）。
+    """
+    calls: list[tuple] = []
+
+    class _FakeSvc:
+        async def pin_message(self, cmd) -> None:  # type: ignore[no-untyped-def]
+            calls.append((cmd.session_id, cmd.message_id))
+
+    from app.api.deps import get_session_service
+
+    client.app.dependency_overrides[get_session_service] = lambda: _FakeSvc()
+    try:
+        msg_id = uuid4()
+        sess_id = uuid4()
+        resp = client.post(f"/api/messages/{msg_id}/pin?session_id={sess_id}")
+        assert resp.status_code == 204, resp.text
+        assert calls == [(sess_id, msg_id)]
+    finally:
+        client.app.dependency_overrides.clear()

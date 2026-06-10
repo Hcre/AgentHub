@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Maximize2 } from 'lucide-react'
 import { Icon } from '../ui'
 import { useUIStore } from '../../stores/uiStore'
 import { uid } from '../../lib/id'
@@ -25,8 +24,8 @@ function defaultFavicon(url: string): string {
  * 网页预览卡片：在 Agent 消息流里内联展示一个可点击的链接，
  * 折叠态只显示标题 + URL + favicon + 「展开」按钮；
  * 用户点「展开」后才挂载 <iframe>，避免无谓加载第三方资源。
- * 用户点「全屏预览」则打开 Dialog 全屏 modal（90vh 高），
- * 适合右侧 panel 收折后跟随收折的场景。
+ * 用户点「侧栏」则把网页作为 preview tab 推进右侧栏（addPreviewTab + 展开右栏），
+ * 与产物预览面板统一承载，便于跟其他 tab（文件/diff/部署）并列切换。
  *
  * 设计参考：src/frontend/src/components/chat/MessageBubble.tsx:94-106 attachment 模式
  * （统一圆角 + 边框 + 小字号 + muted 配色）。

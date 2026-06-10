@@ -83,7 +83,7 @@ describe('GroupMessageItem Pin button (P0-4 group extension)', () => {
     expect(init.method).toBe('DELETE')
   })
 
-  it('rolls back optimistic state and shows error when API returns 5xx', async () => {
+  it('rolls back optimistic state and logs (no inline error) when API returns 5xx', async () => {
     const fetchMock = vi.fn(async () => ({ ok: false, status: 500 }))
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     global.fetch = fetchMock as unknown as typeof fetch
@@ -97,7 +97,8 @@ describe('GroupMessageItem Pin button (P0-4 group extension)', () => {
     await waitFor(() => {
       expect(screen.getByTestId('group-pin-btn').getAttribute('data-pinned')).toBe('false')
     })
-    expect(screen.getByTestId('group-pin-error')).toBeInTheDocument()
+    // commit 11b4c6c 起：失败只 console.error，不渲染 inline error 元素（对齐 MessageBubble）。
+    expect(screen.queryByTestId('group-pin-error')).not.toBeInTheDocument()
     expect(consoleError).toHaveBeenCalled()
     consoleError.mockRestore()
   })

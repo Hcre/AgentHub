@@ -114,7 +114,7 @@ describe('MessageBubble Pin button (P0-4)', () => {
     expect(init.method).toBe('DELETE')
   })
 
-  it('rolls back optimistic state and shows error when API returns non-2xx', async () => {
+  it('rolls back optimistic state and logs (no inline error) when API returns non-2xx', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: false,
       status: 500,
@@ -139,8 +139,9 @@ describe('MessageBubble Pin button (P0-4)', () => {
       expect(btn.getAttribute('data-pinned')).toBe('false')
     })
 
-    // 错误提示出现
-    expect(screen.getByTestId('pin-error')).toBeInTheDocument()
+    // commit 11b4c6c 起：失败不显示 inline error 元素，只 console.error（消息流是高密度
+    // 阅读区，红字提示破坏节奏）。断言无 pin-error 元素 + console.error 被调用。
+    expect(screen.queryByTestId('pin-error')).not.toBeInTheDocument()
     expect(consoleError).toHaveBeenCalled()
 
     consoleError.mockRestore()

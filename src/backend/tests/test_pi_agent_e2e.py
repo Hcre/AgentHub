@@ -65,15 +65,18 @@ async def test_factory_routing():
 
 
 async def test_subprocess_lifecycle():
-    """测试2: 子进程启动/停止"""
+    """测试2: 子进程启动/停止。
+
+    v4 起 PiAgentRuntime 只接 agent_id/agent_name/thinking_level/timeout（model/provider/
+    api_key/base_url 不再是构造参数，运行时内部解析）。stream 需真 pi 二进制，无则 skip
+    （per TD-04，与 test_factory_routing 一致）。
+    """
+    if not shutil.which("pi"):
+        pytest.skip("Pi CLI 未安装（per TD-04：v4 R2 起 factory 硬依赖 CLI）")
     from app.infrastructure.llm.pi_agent_runtime import PiAgentRuntime
 
     runtime = PiAgentRuntime(
-        model="claude-sonnet-4-20250514",
         agent_id=str(uuid4()),
-        provider="anthropic",
-        api_key="",  # 无 API key — 验证错误处理
-        base_url="",
         timeout=30,
     )
 
