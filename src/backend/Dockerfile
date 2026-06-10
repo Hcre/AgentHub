@@ -23,6 +23,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# 容器内以 root 跑 Claude Code CLI（--dangerously-skip-permissions 默认拒绝 root）。
+# IS_SANDBOX=1 是 Claude Code 官方的「沙箱/容器」豁免开关：承认是受控环境后放行 root。
+# 子进程 env 继承自 os.environ.copy()（见 claude_code_runtime._build_env），故此处即生效。
+# 放在 COPY 之后、仅新增一个廉价层，不打断上方 apt/npm/pip 的构建缓存。
+ENV IS_SANDBOX=1
+
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
