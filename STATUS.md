@@ -1,6 +1,6 @@
 # 当前状态
 
-> **最近更新: 2026-06-10 12:35**（袁, 分支 main）。完整变更历史见下方「更新日志」。
+> **最近更新: 2026-06-10 13:30**（袁, 分支 main）。完整变更历史见下方「更新日志」。
 > - 数据源: `docs/plan/背景.md` (PRD +考察要点 +交付物) + git `200aba4:STATUS.md` (旧198 行) +3 新 ADR (0016/0017/0018) + worklogs/{袁,董,黎}/ + **本轮 grep16 router ×8 client ×7 nav实证**
 > - 规则: 每次 push 或开始/结束任务时, 更新你自己那一行
 > - 强约束: pre-push markdownlint-cli2 (D-13) — MD024/036/041 严, MD013 关 (per 2026-06-08 决策"不要瘦身")
@@ -10,6 +10,7 @@
 
 ## 🗒️ 更新日志 (newest first)
 
+- **2026-06-10 13:30 — 产物预览 P2 三项补全（PPT / 版本历史 / 对话式局部修改）** (袁, 分支 main)：PRD §4 三个 ❌ 全部 ❌→✅。① **PPT 浏览** — `GET /api/fs/pptx-slides`（python-pptx）+ `SlideView`（4 pytest + 3 vitest + live 2 页翻页）。② **版本历史** — `file-history`/`file-at-rev`(含 diff)/`file-write` 3 端点 + `versions` 预览模式 + `VersionHistoryPanel`（6 pytest + live STATUS.md 50 commit 时间线 + 真 diff）。③ **对话式局部修改** — CodeView 选区→浮层→结构化 prompt→`agent-edit-request`→ChatView WS（11 vitest + live 选区→「第 4 行」→正确 prompt dispatch）。3 commit（`<pptx>`+`<versions>`+`<convedit>`）+ 3 截图，**未 push**。功能完整度 76%→**87%**（唯一剩 ❌ = 代码冲突处理）
 - **2026-06-10 12:35 — 测试可信度修复 + 私聊死路闭环** (袁, 分支 main)：① **恢复绿测真相** — baseline 实测 12 后端 + 4 前端用例失败（与"全绿"声明矛盾），全是断言已被 v4 删除行为的陈旧测试：pin 鉴权放宽后的 owner/anonymous 测试、v4 R5 移到 reactive_router 的机械停词反射测试、pi_agent 构造签名漂移、pin inline-error 已删、WebPreviewCard 全屏 Dialog 改侧栏 preview tab。全部对齐已发布行为，**后端 346 passed/3 skipped、前端 116 passed**（commit `2135d3b`）。② **私聊 1v1 死路修复 (TD-06/07)** — `chatStore.hydrateFromSessions` 回灌后端 private session（幂等 + 写 sessionIds 续聊）+ LeftPanel mount 拉取 + 空态「发起私聊」CTA；Playwright 实测 **37/37 回灌会话均带后端 sessionId（全部可续聊）**、0 console 错误、5 vitest（commit `e0a8494`，截图 `p0-private-hydration-2026-06-10.png`）。两 commit 本地 ahead，**未 push**（per [[no-push-without-ask]]）
 - **2026-06-10 07:32 — 会话归档（archive）落地** (袁, 分支 feature/chat/conversation-archive)：补完 PRD §1「对话列表」最后缺口（归档）。Conversation.archived 字段 + chatStore.setConversationArchived + LeftPanel 主列表过滤归档项 + 新增「已归档 (N)」可折叠分区 + 归档/取消归档 hover 按钮（含归档当前会话自动切走）；tsc+eslint 绿 + 3 vitest（归档/取消归档/不影响他项）+ 既有 pin 12 测试无回归 + Playwright 真实往返截图 2 张（`conv-archive-01/02`）。覆盖率 67%→71%→74%→**76%**（对话列表 ⚠️→✅）
 - **2026-06-10 00:45 — pin 三层修复闭环** (袁, 分支 main)：群组 pin UI 缺失 + 消息 pin 401 永久显示 + ~~端点强制 JWT~~ → 实为**移除** pin 鉴权（前端无登录流程，强制 JWT 让功能不可用；只保留 session 归属校验）— 10 文件 + 6 截图；~~pytest 9/9~~ **(6/10 修正：该声明失真——owner/anonymous 两测当时仍断言被移除的严格行为，实际 fail；已于 6/10 12:35 对齐放宽后契约，见顶部条目)** + live curl + Playwright click + API verify `pinned=True`；commit `11b4c6c` 已 push origin/main；详见 [worklog](worklogs/袁/2026-06-10_pin-three-layer-fix.md)
@@ -38,7 +39,7 @@
 | 维度 | 权重 | 评判要点 | 当前覆盖 | 谁做的 |
 |------|------|---------|---------|-------|
 | AI 协作能力 | 30% | 沉淀出和 ai 协作的 Spec/skill/rules 等协作规范 | ✅ `docs/conventions/` 9 篇 + `docs/specs/` 13 篇 + `worklogs/decisions/` 18 ADR + `skills/` 9 个 + `docs/templates/` 14 个 | 全员（黎/董/袁 + Mavis owner）|
-| 功能完整度 | 25% | IM 核心体验是否流畅、多 Agent 调度是否跑通 | ⚠️ **76%** (19 完整 + 3 部分 + 4 未做 + 1 计划)，详见 [PRD 6 大功能对账](#-prd-6-大核心功能-vs-现状-对账) | 全员 |
+| 功能完整度 | 25% | IM 核心体验是否流畅、多 Agent 调度是否跑通 | ✅ **87%** (22 完整 + 3 部分 + 1 未做 + 1 计划)，详见 [PRD 6 大功能对账](#-prd-6-大核心功能-vs-现状-对账) | 全员 |
 | 生成效果质量 | 20% | 聊天 UI 体验、产物预览效果 | ✅ Web 端 localhost:5174 跑通, S2 群聊 6 条消息流 (用户→Coordinator 拆解→Claude/OpenCode/MockBot 并行→合并汇报) | 黎（UI 打磨）+ 董（前端群聊）|
 | 代码理解度 | 15% | 答辩时能否解释架构选型和核心逻辑 | ✅ 5 层洋葱架构图（[01-architecture](docs/conventions/01-architecture_架构设计规范.md) §一）+ 5 主表 ER 图（[03-data-model](docs/specs/03-data-model_数据模型.md) §二）+ 命令 reference (docs/plan/.../commands-reference.md) | Mavis owner (plan_ba86c4d0 docs-writer 任务) |
 | 创新与产品感 | 10% | 超预期功能点或体验优化 | ✅ 11 个真 Agent 队友 (含 Codex/OpenCode/Pi) + CLI/SDK 双轨适配器 (ADR-0001) + Pin 消息 + 部署卡 + 4 栏响应式 (useMediaQuery, 768/1024/1280/hamburger) | 全员 |
@@ -80,20 +81,20 @@
 | | 联系人列表（头像/名称/能力标签）| ✅ 完整 | AI 队友页 11 个 + 头像 + role 标签（AgentsListPage）| 黎 + **袁 (6/9 Playwright 走 11 article 确认渲染, [已真实测试 (AI 模拟)])** |
 | **4. 产物预览与编辑** | 网页 iframe 内联卡片 | ✅ 完整 | `WebPreviewCard.tsx:80` iframe sandbox（集成验证 A 验）| 黎 |
 | | 文档渲染 | ✅ 完整 | plan_ba86c4d0 frontend-p0-p1 `d9cd8af`+`d6a1658` 落 DocumentRenderer 3-mode (per frontend-p0-p1 verifier) | Mavis owner (P0 委派) |
-| | 【P2】PPT 浏览 | ❌ 未做 | 已知 P2 | — |
+| | 【P2】PPT 浏览 | ✅ 完整 | **6/10 袁** — 后端 `GET /api/fs/pptx-slides`（python-pptx 抽每页标题/正文/备注，4 pytest）+ 前端 `SlideView`（缩略图导航 + 讲者备注，3 vitest）；live 真 .pptx 2 页渲染 + 翻页 0 console 错（`p2-pptx-slideview-2026-06-10.png`）| 袁 |
 | | 展开全屏预览 | ✅ 完整 | plan_ba86c4d0 frontend-p0-p1（Dialog fullscreen 模式）| Mavis owner |
 | | 代码编辑器 | ✅ 完整 | plan_ba86c4d0 frontend-p2 `c2d2a59`（MonacoEditor.tsx + Composer 代码模式 + 3 路径 test）| Mavis owner (P2 委派) |
 | | 【P2】Diff 视图 | ✅ 完整 | `DiffView.tsx:29-41` 彩色 emerald/rose（集成验证 B 验）| 黎 |
-| | 【P2】版本历史 | ❌ 未做 | 已知 P2 | — |
-| | 【P2】对话式局部修改（选中代码→描述修改）| ❌ 未做 | 已知 P2 | — |
+| | 【P2】版本历史 | ✅ 完整 | **6/10 袁** — 后端 3 端点 `file-history`/`file-at-rev`(含 unified diff)/`file-write`(只覆盖已存在文件，6 pytest)+ 前端 `versions` 预览模式 + `VersionHistoryPanel`（FileTree→提交时间线→DiffView 对比→恢复确认）；live 对 STATUS.md 50 commit 时间线 + 真 diff 渲染（`p2-version-history-2026-06-10.png`）| 袁 |
+| | 【P2】对话式局部修改（选中代码→描述修改）| ✅ 完整 | **6/10 袁** — CodeView 选区→「✨ 修改选中」浮层→组装结构化 prompt（相对路径+行范围+原文+需求）经 `agent-edit-request` 事件 → ChatView onSend/WS 发给当前 Agent；`lib/selectionEdit` 11 vitest + live 选区→浮层「第 4 行」→发送 dispatch 正确 prompt（`p2-conversational-edit-popover-2026-06-10.png`）| 袁 |
 | **5. 【P2】部署发布** | 聊天发送"部署"指令 → 部署卡 | ✅ 完整 | plan_ba86c4d0 backend-p2 `f45a92f`（Deploy 端点）+ frontend-p2 `c2d2a59`（部署卡前端, peer DeployCardView + 状态色）| Mavis owner (P2 委派) |
 | | 预览 URL / 静态站点 / 容器化 / 源码打包 | ⚠️ 部分 | 端点已落, 真实部署流水线未跑 E2E（M5/MVP 节奏）| — |
 | **6. 【P2】多端支持** | Web 端（主力）| ✅ 完整 | localhost:5174 vite dev 跑通 | 黎 + **袁 (6/9 vite 9500 跑通 + Playwright 走完 t7 pin happy path, [已真实测试 (AI 模拟)])** |
 | | 桌面端 | 📋 计划 | Tauri 2 计划冻结中（`feature/desktop/spec-freeze`, per ADR-0007），**等 4 Q 答稿** (Q5-1 通知 / Q5-2 身份 / Q7-1 版本号 / Q11-1 降级方案) | 黎（proposer, worklog 2026-06-06_讨论-web转桌面app可行性.md）+ 等 董/袁 reply |
 | | 移动端 H5 | ✅ 完整 | **6/8 修正**: t3-mobile-h5 `a483424`+`8124e54` 落地 useMediaQuery (React 18 useSyncExternalStore + matchMedia SSR-safe) + AppShell 4 栏 mobile/desktop 分支 + 11 vitest (5 useMediaQuery + 6 AppShell) + 4 截图 (375/768/1280/hamburger) + BDD §6.5.1.1 B-6-P2-M02 5 When/Then | 袁（t3-mobile-h5, M5 overnight）|
 
-**整体覆盖率**: ✅ 完整 19 / ⚠️ 部分 3 / ❌ 未做 4 / 📋 计划 1 = 共 27 项 → 覆盖率 = (19 + 3×0.5) / 27 = **76%**
-(6/10 修正: 对话列表 由 ⚠️→✅ by 袁 会话归档落地 (归档为最后缺口), 74%→**76%**; 6/9: 任务看板持久化 + 用户审批流 ⚠️→✅ by Tasks/Inbox CRUD; 6/8: 移动 H5 ⚠️→✅ by t3 overnight; per [ADR-0018](worklogs/decisions/0018-plan-3eaba0fa-overnight-4track-close.md))
+**整体覆盖率**: ✅ 完整 22 / ⚠️ 部分 3 / ❌ 未做 1 / 📋 计划 1 = 共 27 项 → 覆盖率 = (22 + 3×0.5) / 27 = **87%**
+(6/10 下午: PPT 浏览 + 版本历史 + 对话式局部修改 三项 ❌→✅ by 袁 产物预览补全（每项后端端点 + 前端面板 + pytest/vitest + live Playwright），76%→**87%**；唯一剩 ❌ = 代码冲突处理。6/10 上午: 对话列表 ⚠️→✅ 会话归档; 6/9: 任务看板 + 审批流 ⚠️→✅ Tasks/Inbox CRUD; 6/8: 移动 H5 ⚠️→✅; per [ADR-0018](worklogs/decisions/0018-plan-3eaba0fa-overnight-4track-close.md))
 
 ---
 
