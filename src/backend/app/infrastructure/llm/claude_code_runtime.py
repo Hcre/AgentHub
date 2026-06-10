@@ -485,16 +485,26 @@ class ClaudeCodeRuntime(AgentRuntime):
             cmd.extend(["--system-prompt", request.system_prompt])
         # MCP 工具注入：memory + step-tools（协调者）+ P2 绑定的 MCP servers
         # ⚠️ --mcp-config flag 需在实际 CLI 版本中验证（claude --help | grep mcp）
+        _aid = str(request.agent_id) if request.agent_id else ""
+        _sid = str(request.session_id) if request.session_id else ""
+        _gid = str(request.group_id) if request.group_id else ""
+        _stu = settings.mcp_step_tools_url
+        logger.info(
+            "MCP inject: agent_id=%s session_id=%s group_id=%s step_tools_url=%s bound_servers_count=%s",
+            _aid, _sid, _gid, _stu, len(request.mcp_servers or []),
+        )
         mcp_path = _write_mcp_config(
-            agent_id=str(request.agent_id) if request.agent_id else "",
+            agent_id=_aid,
             memory_url=settings.mcp_memory_url,
-            step_tools_url=settings.mcp_step_tools_url,
-            session_id=str(request.session_id) if request.session_id else "",
-            group_id=str(request.group_id) if request.group_id else "",
+            step_tools_url=_stu,
+            session_id=_sid,
+            group_id=_gid,
             bound_servers=request.mcp_servers,
         )
         if mcp_path:
             cmd.extend(["--mcp-config", mcp_path])
+        else:
+            logger.warning("MCP inject: _write_mcp_config returned None — no MCP tools for this agent")
         return cmd
 
     def _build_env(self) -> dict[str, str]:
