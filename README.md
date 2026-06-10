@@ -8,7 +8,7 @@
 
 IM 聊天式多 Agent 协作平台。用户通过类飞书聊天界面与 AI Agent 对话，支持单聊、群聊（@mentions 多 Agent）、任务自动分解与并行调度。
 
-> **服务器在线部署地址：http://149.71.241.96:5173**
+> **服务器在线部署地址：http://149.71.241.96:5173**  
 > 脚手架基于 `docs/plan/PRD_AgentHub_统一方案.md` 与 `docs/specs/01b-architecture-design_分层与数据流.md` 生成。
 >
 > 📘 **贡献者必读**：[CONTRIBUTING.md](CONTRIBUTING.md)（分支 / 提交 / PR / Review 规范）· [docs/CI-STATUS_CI状态说明.md](docs/CI-STATUS_CI状态说明.md)（CI workflow 详情）
