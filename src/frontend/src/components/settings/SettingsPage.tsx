@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button, Dialog, DialogContent, Icon } from '../ui'
+import { useAgentStore } from '../../stores/agentStore'
 
 const WINDOWS = [
   { key: '1h', label: '1 小时' } as const,
@@ -130,6 +131,15 @@ export function SettingsPage() {
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; latency_ms?: number; model?: string; error?: string } | null>(null)
 
+  // 监督者表单
+  const [supervisorOpen, setSupervisorOpen] = useState(false)
+  const [supervisorAgentId, setSupervisorAgentId] = useState('')
+  const [savedSupervisorName, setSavedSupervisorName] = useState('')
+  const [supervisorSaving, setSupervisorSaving] = useState(false)
+  const [supervisorFeedback, setSupervisorFeedback] = useState<'idle' | 'saved' | 'error'>('idle')
+  const agents = useAgentStore(s => s.agents)
+  const cliAgents = agents.filter(a => a.agentSystem === 'claude_code')
+
   // 页面加载时读取已保存凭证
   useEffect(() => {
     fetch('/api/agents/coordinator/credential')
@@ -142,9 +152,33 @@ export function SettingsPage() {
           setHasSavedKey(true)
           // 不设置 apiKey（已加密，只返回前缀），用户需重新输入
         }
+        if (data?.supervisor_agent_name) {
+          setSavedSupervisorName(data.supervisor_agent_name)
+        }
       })
       .catch(() => {})
   }, [])
+
+  const handleSupervisorSave = async () => {
+    setSupervisorSaving(true)
+    setSupervisorFeedback('idle')
+    try {
+      const selected = cliAgents.find(a => a.id === supervisorAgentId)
+      const name = selected?.name || ''
+      const r = await fetch('/api/agents/coordinator/supervisor', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supervisor_agent_name: name }),
+      })
+      if (!r.ok) throw new Error(`${r.status}`)
+      setSavedSupervisorName(name)
+      setSupervisorFeedback('saved')
+    } catch {
+      setSupervisorFeedback('error')
+    } finally {
+      setSupervisorSaving(false)
+    }
+  }
 
   // CLI 配置面板
   const [showCliConfig, setShowCliConfig] = useState(false)
@@ -342,6 +376,103 @@ export function SettingsPage() {
                   {saving ? '保存中…' : '保存'}
                 </Button>
               </div>
+            </footer>
+          </DialogContent>
+        </Dialog>
+
+        {/* ── 监督者 ── */}
+        <section>
+          <h3 className="mb-3 text-[13px] font-medium text-muted-foreground">监督者</h3>
+          <button
+            onClick={() => {
+              const saved = cliAgents.find(a => a.name === savedSupervisorName)
+              setSupervisorAgentId(saved?.id || '')
+              setSupervisorFeedback('idle')
+              setSupervisorOpen(true)
+            }}
+            className="flex w-full items-center gap-4 rounded-lg border border-border/60 glass-soft p-4 text-left transition-colors hover:bg-accent/40"
+          >
+            <div className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg bg-brand/10 text-brand">
+              <Icon name="shieldCheck" className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[13px] font-medium">
+                {savedSupervisorName || '未配置'}
+              </div>
+              <div className="mt-0.5 text-[11px] text-muted-foreground">
+                {savedSupervisorName
+                  ? `监督者: ${savedSupervisorName} · 点击更换`
+                  : '点击选择监督者 Agent'}
+              </div>
+            </div>
+            <div className={`grid h-3 w-3 flex-shrink-0 place-items-center rounded-full ${savedSupervisorName ? 'bg-emerald-500' : 'bg-muted-foreground/30'}`}>
+              {savedSupervisorName && <Icon name="check" className="h-2 w-2 text-white" strokeWidth={3} />}
+            </div>
+          </button>
+        </section>
+
+        {/* 监督者弹窗 */}
+        <Dialog open={supervisorOpen} onOpenChange={setSupervisorOpen}>
+          <DialogContent className="w-[440px]">
+            <header className="flex items-center gap-3 border-b border-border/70 p-4">
+              <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg bg-brand/10 text-brand">
+                <Icon name="shieldCheck" className="h-4 w-4" strokeWidth={2} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-[15px] font-semibold">监督者</h2>
+                <p className="mt-0.5 text-[12px] text-muted-foreground">
+                  选择担任任务监督者的 Agent（仅 CLI 本地 Agent）
+                </p>
+              </div>
+            </header>
+
+            <div className="space-y-3 p-4">
+              {/* Agent 选择 */}
+              <div>
+                <label className="block mb-1 text-[11px] text-muted-foreground">监督者 Agent</label>
+                {cliAgents.length === 0 ? (
+                  <p className="text-[12px] text-muted-foreground">
+                    暂无 CLI Agent。请先在 Agent 管理创建 Claude Code 类型的 Agent。
+                  </p>
+                ) : (
+                  <select
+                    value={supervisorAgentId}
+                    onChange={(e) => setSupervisorAgentId(e.target.value)}
+                    className="w-full rounded-md border border-border/60 bg-background px-3 py-1.5 text-[13px] text-foreground outline-none focus:border-brand/50"
+                  >
+                    <option value="">-- 不启用监督者 --</option>
+                    {cliAgents.map((a) => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* 保存反馈 */}
+              {supervisorFeedback === 'saved' && (
+                <div className="rounded-md bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+                  ✓ 已保存
+                </div>
+              )}
+              {supervisorFeedback === 'error' && (
+                <div className="rounded-md bg-red-50 px-3 py-2 text-[12px] text-red-600 dark:bg-red-950/30 dark:text-red-300">
+                  保存失败，请重试
+                </div>
+              )}
+            </div>
+
+            <footer className="flex items-center justify-end gap-2 border-t border-border/70 p-3">
+              <Button variant="ghost" size="sm" onClick={() => setSupervisorOpen(false)}>
+                取消
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleSupervisorSave}
+                disabled={supervisorSaving}
+              >
+                {supervisorSaving ? '保存中…' : '保存'}
+              </Button>
             </footer>
           </DialogContent>
         </Dialog>

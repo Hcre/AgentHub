@@ -98,6 +98,7 @@ async def get_coordinator_credential(
             "base_url": _coordinator_credential.get("base_url", ""),
             "api_key_prefix": key[:6] + "…" if len(key) > 6 else "",
             "has_key": bool(key),
+            "supervisor_agent_name": _coordinator_credential.get("supervisor_agent_name", ""),
         }
 
     # 2) 查 DB：从任一 system agent 的 settings 读取
@@ -112,16 +113,21 @@ async def get_coordinator_credential(
                 _coordinator_credential["api_key"] = decrypted
                 _coordinator_credential["model"] = creds.get("model", "")
                 _coordinator_credential["base_url"] = creds.get("base_url", "")
+                _coordinator_credential["supervisor_agent_name"] = creds.get("supervisor_agent_name", "")
                 return {
                     "provider": creds.get("provider", ""),
                     "model": creds.get("model", ""),
                     "base_url": creds.get("base_url", ""),
                     "api_key_prefix": decrypted[:6] + "…" if len(decrypted) > 6 else "",
                     "has_key": True,
+                    "supervisor_agent_name": creds.get("supervisor_agent_name", ""),
                 }
             break
 
-    return {"provider": "", "model": "", "base_url": "", "api_key_prefix": "", "has_key": False}
+    # 3) 兜底：查 env/settings 中的 supervisor_agent_name
+    from app.core.config import settings as app_settings
+    sv_name = app_settings.supervisor_agent_name
+    return {"provider": "", "model": "", "base_url": "", "api_key_prefix": "", "has_key": False, "supervisor_agent_name": sv_name}
 
 
 @router.put("/coordinator/credential")
@@ -129,15 +135,17 @@ async def set_coordinator_credential(
     body: dict,
     svc: ServiceDep,
 ) -> dict:
-    """前端点星设置协调者凭证 → 同步写入到所有系统 Agent。"""
+    """前端点星设置协调者凭证 + 监督者 Agent 名 → 同步写入到所有系统 Agent。"""
     provider = body.get("provider", "")
     api_key = body.get("api_key", "")
     model = body.get("model", "")
     base_url = body.get("base_url", "")
+    supervisor_agent_name = body.get("supervisor_agent_name")
     if not provider or not api_key:
         raise HTTPException(status_code=400, detail="provider and api_key are required")
     count = await svc.update_coordinator_credential(
-        provider=str(provider), api_key=str(api_key), model=str(model), base_url=str(base_url) if base_url else ""
+        provider=str(provider), api_key=str(api_key), model=str(model), base_url=str(base_url) if base_url else "",
+        supervisor_agent_name=str(supervisor_agent_name) if supervisor_agent_name is not None else "",
     )
     # 同步更新内存中的全局凭证（ReactiveRouter + Planner 实时读取）
     from app.application.services.reactive_router import _coordinator_credential
@@ -146,7 +154,37 @@ async def set_coordinator_credential(
     _coordinator_credential["api_key"] = str(api_key)
     _coordinator_credential["model"] = str(model)
     _coordinator_credential["base_url"] = str(base_url) if base_url else ""
+    if supervisor_agent_name is not None:
+        _coordinator_credential["supervisor_agent_name"] = str(supervisor_agent_name)
+        from app.core.config import settings
+        settings.supervisor_agent_name = str(supervisor_agent_name)
     return {"updated": count}
+
+
+@router.put("/coordinator/supervisor")
+async def set_coordinator_supervisor(
+    body: dict,
+    svc: ServiceDep,
+) -> dict:
+    """仅设置监督者 Agent 名称（不需要凭证信息）。"""
+    from app.application.services.reactive_router import _coordinator_credential
+    from app.core.config import settings
+
+    agent_name = body.get("supervisor_agent_name", "")
+    # 持久化到 DB
+    agents = await svc._repo.list()
+    count = 0
+    for a in agents:
+        if a.is_system:
+            creds = dict(a.settings.get("coordinator_credential", {}))
+            creds["supervisor_agent_name"] = str(agent_name)
+            a.settings["coordinator_credential"] = creds
+            await svc._repo.save(a)
+            count += 1
+    # 同步到内存
+    _coordinator_credential["supervisor_agent_name"] = str(agent_name)
+    settings.supervisor_agent_name = str(agent_name)
+    return {"updated": count, "supervisor_agent_name": str(agent_name)}
 
 
 @router.get("/coordinator/credential/status")

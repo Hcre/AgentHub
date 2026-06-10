@@ -97,9 +97,9 @@ class AgentService:
         return [AgentResponse.from_domain(a) for a in agents]
 
     async def update_coordinator_credential(
-        self, *, provider: str, api_key: str, model: str, base_url: str = ""
+        self, *, provider: str, api_key: str, model: str, base_url: str = "", supervisor_agent_name: str = ""
     ) -> int:
-        """将协调者凭证同步写入所有 is_system=true 的 Agent 的 settings。返回更新行数。"""
+        """将协调者凭证 + 监督者 Agent 名同步写入所有 is_system=true 的 Agent 的 settings。返回更新行数。"""
         agents = await self._repo.list()
         count = 0
         for a in agents:
@@ -109,6 +109,7 @@ class AgentService:
                 creds["api_key_encrypted"] = encrypt_secret(api_key)
                 creds["model"] = model
                 creds["base_url"] = base_url
+                creds["supervisor_agent_name"] = supervisor_agent_name
                 a.settings["coordinator_credential"] = creds
                 await self._repo.save(a)
                 count += 1
