@@ -150,6 +150,13 @@ class ContextBuilder:
         has_history = await self._messages.has_assistant_messages(
             session.id, sender_agent_id=target_agent.id
         )
+        # MCP：P2 绑定 + step-tools（task_complete 工具）
+        mcp = await self._resolve_mcp(target_agent.id)
+        if settings.mcp_step_tools_url:
+            url = f"{settings.mcp_step_tools_url}?agent_id={target_agent.id}"
+            url += f"&session_id={session.id}&group_id={group.id}"
+            mcp.append({"name": "agenthub-step-tools", "type": "sse", "url": url})
+
         return AgentRequest(
             request_id=str(uuid.uuid4()),
             session_id=session.id,
@@ -163,7 +170,7 @@ class ContextBuilder:
             working_directory=session.workspace_path or None,
             group_delta_text=group_delta_text,
             has_history=has_history,
-            mcp_servers=await self._resolve_mcp(target_agent.id),
+            mcp_servers=mcp,
         )
 
     # --- 私聊路径（向后兼容 MVP 行为） ---
