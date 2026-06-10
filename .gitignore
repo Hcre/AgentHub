@@ -102,3 +102,7 @@ docs/deliverables/video/_work/*.py
 .agenthub/templates/
 .agenthub/templates/
 .agenthub/
+
+# === Local-only media (>100MB, ship via GitHub Release Assets) ===
+# 视频/ 目录下的录屏不入库,见 docs/deliverables/INDEX.md §🎬 演示视频
+视频/

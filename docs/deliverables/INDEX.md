@@ -4,6 +4,16 @@
 
 ## 🎬 演示视频
 
+### 2026-06-10 录屏(GitHub Release Assets)
+
+- **下载**: <https://github.com/Hcre/AgentHub/releases/download/demo-2026-06-10/6.10.mp4>
+- **Release**: <https://github.com/Hcre/AgentHub/releases/tag/demo-2026-06-10>
+- **大小**: 233 MB(243,830,548 bytes) · **sha256**: `ce2e60ab4b09cf69ca8ba70dfc59c12fdf6702a1bb932370672f1964c651b0a1`
+- **录制者**: 袁 · **本地源**: `视频/6月10日.mp4`(不入库,>100MB GitHub 单文件上限)
+- **入库方式**: GitHub Release Assets — 不污染 git 历史,不占 LFS 配额。GitHub 文件名规范化为 `6.10.mp4`(剥中文字符)
+
+### 2026-06-07 录屏(本地 `video/` 目录,小文件入库)
+
 - **最终视频**: AgentHub-Demo-Video.mp4 — 200s 1920x1080 h264+aac+mov_text 字幕 zho, 17.7 MB（文件暂缺）
 - **视频脚本**: [`video/script.md`](./video/script.md) — 13KB 6 章节 demo 脚本
 - **原始录屏**: [`video/raw-recording.mp4`](./video/raw-recording.mp4) — 200s 1920x1080, 14.5 MB
