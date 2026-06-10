@@ -504,7 +504,19 @@ class ClaudeCodeRuntime(AgentRuntime):
         else:
             logger.warning("MCP inject: _write_mcp_config returned None — no MCP tools for this agent")
         if request.system_prompt:
-            cmd.extend(["--system-prompt", request.system_prompt])
+            # 写入临时文件避免 Windows 命令行 32767 字符限制截断
+            try:
+                spf = tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".md", prefix="agenthub_sp_",
+                    delete=False, dir=tempfile.gettempdir(), encoding="utf-8",
+                )
+                spf.write(request.system_prompt)
+                spf.close()
+                atexit.register(lambda p: os.unlink(p) if os.path.exists(p) else None, spf.name)
+                cmd.extend(["--system-prompt-file", spf.name])
+            except OSError:
+                # 回退：写文件失败时用内联（可能被截断但至少能启动）
+                cmd.extend(["--system-prompt", request.system_prompt])
         return cmd
 
     def _build_env(self) -> dict[str, str]:
