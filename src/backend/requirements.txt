@@ -32,6 +32,7 @@ mcp>=1.0.0
 httpx==0.28.1
 python-dotenv==1.0.1
 structlog==24.4.0
+python-pptx==1.0.2  # PPT 预览：抽取 .pptx 每页文本
 
 # === 测试 / 质量 ===
 pytest==8.3.4

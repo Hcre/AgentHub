@@ -19,6 +19,24 @@ export const fsApi = {
    *  非 git 仓库 / git 缺失 / 超时 → 200 + {ok:false, reason:string}，前端不抛异常。 */
   gitDiff: (path: string, staged = false) =>
     api.get<FsGitDiffOut>(`/api/fs/git-diff?path=${encodeURIComponent(path)}&staged=${staged}`),
+
+  /** 抽取 .pptx 每页文本（标题/正文/备注）供 SlideView 渲染。非 pptx 415 / 损坏 422 由 api 抛错。 */
+  pptxSlides: (path: string) =>
+    api.get<FsPptxSlidesOut>(`/api/fs/pptx-slides?path=${encodeURIComponent(path)}`),
+}
+
+export interface PptxSlide {
+  index: number
+  title: string
+  texts: string[]
+  notes: string
+}
+
+export interface FsPptxSlidesOut {
+  ok: boolean
+  path: string
+  count: number
+  slides: PptxSlide[]
 }
 
 export interface FsItem {

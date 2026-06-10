@@ -3,9 +3,10 @@ import hljs from 'highlight.js'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { cn } from '../../lib/cn'
-import { fsApi } from '../../api/fs'
+import { fsApi, type PptxSlide } from '../../api/fs'
 import { Button, Icon } from '../ui'
 import { FileTree } from './FileTree'
+import { SlideView } from './SlideView'
 import { useUIStore } from '../../stores/uiStore'
 
 /** 文件树固定宽度（与 AppShell 全局拖拽的右栏宽度解耦） */
@@ -14,6 +15,7 @@ const TREE_WIDTH = 200
 // ── 文件类型检测 ─────────────────────────────────────────────────
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'])
 const MARKDOWN_EXTS = new Set(['.md', '.markdown'])
+const PPTX_EXTS = new Set(['.pptx'])
 
 function fileExt(name: string): string {
   const i = name.lastIndexOf('.')
@@ -36,6 +38,8 @@ interface FileState {
   size: number
   loading: boolean
   error: string | null
+  /** .pptx 文件：后端抽取的每页文本（其余文件类型为 undefined） */
+  slides?: PptxSlide[]
 }
 
 export function FilePreview({ workdir, initialPath, onOpenFile }: FilePreviewProps) {
@@ -85,6 +89,20 @@ export function FilePreview({ workdir, initialPath, onOpenFile }: FilePreviewPro
     // 图片：跳过 API（后端 /read 返回 415），用 /raw 端点直接渲染
     if (IMAGE_EXTS.has(ext)) {
       setFile({ path, name, content: '', size: 0, loading: false, error: null })
+      return
+    }
+
+    // PPT：走专用端点抽每页文本（后端 /read 对二进制返 415）
+    if (PPTX_EXTS.has(ext)) {
+      setFile({ path, name, content: '', size: 0, loading: true, error: null })
+      try {
+        const data = await fsApi.pptxSlides(path)
+        setFile({ path, name, content: '', size: 0, loading: false, error: null, slides: data.slides })
+      } catch (e) {
+        setFile((prev) => prev?.path === path
+          ? { ...prev, loading: false, error: e instanceof Error ? e.message : '解析 PPT 失败' }
+          : prev)
+      }
       return
     }
 
@@ -139,7 +157,7 @@ export function FilePreview({ workdir, initialPath, onOpenFile }: FilePreviewPro
               </div>
             )}
             {file && !file.loading && !file.error && (
-              <FileContentView path={file.path} name={file.name} content={file.content} flashKey={flashKey} />
+              <FileContentView path={file.path} name={file.name} content={file.content} slides={file.slides} flashKey={flashKey} />
             )}
           </div>
         </div>
@@ -294,14 +312,16 @@ function CodeView({ content, path }: { content: string; path?: string }) {
 
 // ── 文件内容分发 ──────────────────────────────────────────────────
 
-function FileContentView({ path, name, content, flashKey }: {
+function FileContentView({ path, name, content, slides, flashKey }: {
   path: string
   name: string
   content: string
+  slides?: PptxSlide[]
   flashKey: number
 }) {
   const ext = fileExt(name)
   if (IMAGE_EXTS.has(ext)) return <ImageView path={path} name={name} />
+  if (PPTX_EXTS.has(ext)) return <SlideView slides={slides ?? []} />
   if (MARKDOWN_EXTS.has(ext)) return <MarkdownView content={content} />
   return <CodeView content={content} path={path} key={flashKey} />
 }

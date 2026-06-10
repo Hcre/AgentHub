@@ -1016,3 +1016,52 @@ async def fs_git_diff(path: str, staged: bool = False) -> dict:
         text = text[: 2 * 1024 * 1024]
         truncated = True
     return {"ok": True, "diff": text, "truncated": truncated, "staged": staged}
+
+
+@FS_ROUTER.get("/pptx-slides")
+async def fs_pptx_slides(path: str) -> dict:
+    """抽取 .pptx 每页文本（标题 + 正文 + 备注）为 JSON，供前端 SlideView 渲染。
+
+    纯文本方案（python-pptx），不依赖 LibreOffice。
+    - 非 .pptx 扩展名 → 415
+    - 文件不存在 → 404；>20MB → 413
+    - 损坏/非法 pptx（解析失败）→ 422
+    """
+    import os as _os
+
+    if not path:
+        raise HTTPException(status_code=400, detail="path 必填")
+    real = _resolve_path(path)
+    if not _os.path.isfile(real):
+        raise HTTPException(status_code=404, detail=f"文件不存在：{real}")
+    if not real.lower().endswith(".pptx"):
+        raise HTTPException(status_code=415, detail="仅支持 .pptx")
+    if _os.path.getsize(real) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="文件超过 20MB")
+
+    from pptx import Presentation
+    from pptx.exc import PackageNotFoundError
+
+    try:
+        prs = Presentation(real)
+    except (PackageNotFoundError, KeyError, ValueError) as e:
+        raise HTTPException(status_code=422, detail=f"无法解析 pptx：{e}")
+
+    slides = []
+    for idx, slide in enumerate(prs.slides):
+        title = ""
+        if slide.shapes.title is not None and slide.shapes.title.has_text_frame:
+            title = (slide.shapes.title.text or "").strip()
+        texts: list[str] = []
+        for shape in slide.shapes:
+            if not shape.has_text_frame:
+                continue
+            body = (shape.text or "").strip()
+            if body and body != title:
+                texts.append(body)
+        notes = ""
+        if slide.has_notes_slide:
+            notes = (slide.notes_slide.notes_text_frame.text or "").strip()
+        slides.append({"index": idx, "title": title, "texts": texts, "notes": notes})
+
+    return {"ok": True, "path": real, "count": len(slides), "slides": slides}
