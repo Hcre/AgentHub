@@ -481,10 +481,8 @@ class ClaudeCodeRuntime(AgentRuntime):
             cmd.extend(["--resume", session_key])
         else:
             cmd.extend(["--session-id", session_key])
-        if request.system_prompt:
-            cmd.extend(["--system-prompt", request.system_prompt])
-        # MCP 工具注入：memory + step-tools（协调者）+ P2 绑定的 MCP servers
-        # ⚠️ --mcp-config flag 需在实际 CLI 版本中验证（claude --help | grep mcp）
+        # MCP 工具注入：必须放在 --system-prompt 之前！
+        # Windows 命令行有 32767 字符限制，长 system prompt 会导致末尾的 --mcp-config 被截断。
         _aid = str(request.agent_id) if request.agent_id else ""
         _sid = str(request.session_id) if request.session_id else ""
         _gid = str(request.group_id) if request.group_id else ""
@@ -505,6 +503,8 @@ class ClaudeCodeRuntime(AgentRuntime):
             cmd.extend(["--mcp-config", mcp_path])
         else:
             logger.warning("MCP inject: _write_mcp_config returned None — no MCP tools for this agent")
+        if request.system_prompt:
+            cmd.extend(["--system-prompt", request.system_prompt])
         return cmd
 
     def _build_env(self) -> dict[str, str]:
