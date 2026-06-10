@@ -8,6 +8,7 @@ import type {
   Conversation,
   OutputFile,
   ReplyRef,
+  Session,
   StageTask,
   StageStatus,
   StreamEvent,
@@ -59,6 +60,8 @@ interface ChatState {
     replyTo?: ReplyRef,
   ) => void
   addConversation: (agentId: string, opts?: { name?: string; workdir?: string }) => string
+  /** 用后端已存在的 private session 回灌会话列表（幂等，用 session.id 当本地 conv id）。 */
+  hydrateFromSessions: (sessions: Session[]) => void
   toggleStage: (agentId: string, conversationId: string, taskId: string) => void
   /** 清掉某会话的未读数（用户切到该会话/回到消息流底部时调用） */
   clearUnread: (key: string) => void
@@ -479,6 +482,37 @@ export const useChatStore = create<ChatState>()(
           conversations: { ...s.conversations, [agentId]: [...existing, conv] },
         }))
         return id
+      },
+
+      // 回灌后端 private session：用 session.id 当本地 conv id → 幂等（重复 hydrate 不重复建会话），
+      // 并写入 sessionIds 让 ChatView 能直接续聊真实后端 session（修私聊"刷新即丢"死路）。
+      hydrateFromSessions: (sessions) => {
+        set((s) => {
+          const conversations = { ...s.conversations }
+          const sessionIds = { ...s.sessionIds }
+          for (const sess of sessions) {
+            if (sess.type !== 'private' || !sess.agent_id) continue
+            const agentId = sess.agent_id
+            const convId = sess.id
+            const existing = conversations[agentId] ?? []
+            const idx = existing.findIndex((c) => c.id === convId)
+            const hydrated: Conversation = {
+              id: convId,
+              name: sess.title?.trim() || '私聊',
+              subtitle: '历史会话',
+              pinned: sess.pinned || undefined,
+            }
+            if (idx >= 0) {
+              // 已存在：只回填后端真值（name/pinned），保留本地 archived 等
+              const merged = { ...existing[idx]!, name: hydrated.name, pinned: hydrated.pinned }
+              conversations[agentId] = existing.map((c, i) => (i === idx ? merged : c))
+            } else {
+              conversations[agentId] = [...existing, hydrated]
+            }
+            sessionIds[convKey(agentId, convId)] = sess.id
+          }
+          return { conversations, sessionIds }
+        })
       },
 
       toggleStage: (agentId, conversationId, taskId) => {

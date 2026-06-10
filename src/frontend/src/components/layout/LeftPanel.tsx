@@ -68,6 +68,7 @@ export function LeftPanel() {
     openConversation,
     openGroup,
     toggleSidebar,
+    setSection,
   } = useUIStore()
   const agents = useAgentStore((s) => s.agents)
   const groups = useGroupStore((s) => s.groups)
@@ -93,6 +94,7 @@ export function LeftPanel() {
   const setConversationArchived = useChatStore((s) => s.setConversationArchived)
   const sessionIds = useChatStore((s) => s.sessionIds)
   const setSessionId = useChatStore((s) => s.setSessionId)
+  const hydrateFromSessions = useChatStore((s) => s.hydrateFromSessions)
   // t7 B-4-P2-CL01：搜索（300ms debounce）+ 置顶
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -100,6 +102,19 @@ export function LeftPanel() {
     const t = setTimeout(() => setDebouncedQuery(searchQuery.trim().toLowerCase()), 300)
     return () => clearTimeout(t)
   }, [searchQuery])
+  // 启动回灌后端已存在的私聊 session → 修"刷新即丢/无法续聊"死路。后端挂时静默降级（保留本地会话）。
+  useEffect(() => {
+    let alive = true
+    sessionsApi
+      .list({ type: 'private' })
+      .then((sessions) => {
+        if (alive) hydrateFromSessions(sessions)
+      })
+      .catch((err) => console.warn('[LeftPanel] hydrate private sessions failed', err))
+    return () => {
+      alive = false
+    }
+  }, [hydrateFromSessions])
   // in-flight pin requests（按 convKey 跟踪）— 请求中禁用按钮防 race
   const [inFlightPins, setInFlightPins] = useState<Set<string>>(() => new Set())
   // 最近一次 pin 错误（与 MessageBubble.copyStatus 同 pattern：inline 显示，不引 toast 库）
@@ -355,9 +370,18 @@ export function LeftPanel() {
         {openDM && (
           <div className="space-y-px">
             {dmList.length === 0 ? (
-              <p className="px-2 py-1.5 text-[12px] text-muted-foreground/70">
-                还没有私聊 · 去 AI 队友里发起
-              </p>
+              <div className="px-2 py-1.5">
+                <p className="mb-1.5 text-[12px] text-muted-foreground/70">还没有私聊</p>
+                <button
+                  type="button"
+                  data-testid="dm-empty-cta"
+                  onClick={() => setSection('agent-detail')}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-md border border-brand/30 bg-brand/5 px-2 py-1.5 text-[12px] font-medium text-brand transition-colors hover:bg-brand/10"
+                >
+                  <Icon name="plus" className="h-3.5 w-3.5" />
+                  发起私聊
+                </button>
+              </div>
             ) : (
               filteredDmList.map(({ agent, conv, key }) => {
                 const isActive =
