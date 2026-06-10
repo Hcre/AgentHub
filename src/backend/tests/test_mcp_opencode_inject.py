@@ -78,25 +78,27 @@ def test_build_opencode_mcp_empty() -> None:
 
 
 def test_write_opencode_config_self_contained() -> None:
-    """写出文件含 provider + mcp，且为合法 JSON。"""
+    """写出文件含 mcp 段且为合法 JSON。
+
+    现行行为（见 `_write_opencode_config` 注释「不注入 provider/model——CLI 读本地配置」）：
+    配置只写 `{"mcp": ...}`，provider/apiKey 不再注入（OpenCode 读本地配置）。
+    """
     entry = build_mcp_config_entry("fs", "stdio", {"command": "mcp-fs"})
     mcp = _build_opencode_mcp([entry], "", "")
-    path = _write_opencode_config("deepseek", "sk-test", mcp)
+    path = _write_opencode_config(mcp)
     assert path is not None
     with open(path, encoding="utf-8") as f:
         config = json.load(f)
-    assert "provider" in config
+    assert "provider" not in config  # provider 不再注入
     assert config["mcp"]["fs"]["command"] == ["mcp-fs"]
-    # deepseek 模板 apiKey 已注入
-    assert config["provider"]["deepseek"]["options"]["apiKey"] == "sk-test"
 
 
-def test_write_opencode_config_generic_provider() -> None:
-    """非 deepseek provider 走通用模板，仍自包含 mcp。"""
+def test_write_opencode_config_remote_memory_entry() -> None:
+    """远程记忆 MCP（sse）写成 remote 类型条目，配置仍自包含 mcp 段。"""
     mcp = _build_opencode_mcp(None, "http://mem/sse", "a1")
-    path = _write_opencode_config("minimax", "sk-x", mcp)
+    path = _write_opencode_config(mcp)
     assert path is not None
     with open(path, encoding="utf-8") as f:
         config = json.load(f)
-    assert config["provider"]["minimax"]["options"]["apiKey"] == "sk-x"
+    assert "provider" not in config
     assert config["mcp"]["agenthub-memory"]["type"] == "remote"

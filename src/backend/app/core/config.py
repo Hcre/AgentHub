@@ -92,6 +92,18 @@ class Settings(BaseSettings):
     # 默认 .agenthub/templates（相对 cwd，可被环境变量 TEMPLATES_DIR 覆盖）
     templates_dir: str = ".agenthub/templates"
 
+    # --- 部署发布（真实静态托管）---
+    # 部署产物落盘根目录（static_site 文件 / package zip 写这里），
+    # FastAPI 以 StaticFiles 挂在 /preview 暴露。默认 _assets/deploy（gitignored）。
+    deploy_root: str = "_assets/deploy"
+    # 对外可访问的后端基址，用于拼 preview_url / download_url。
+    # 默认本机后端端口；生产可由环境变量 PUBLIC_BASE_URL 覆盖为真实域名。
+    public_base_url: str = "http://localhost:8000"
+
+    @property
+    def deploy_root_path(self) -> Path:
+        return Path(self.deploy_root).resolve()
+
     @property
     def skills_dir_path(self) -> Path:
         return Path(self.skills_dir).resolve()

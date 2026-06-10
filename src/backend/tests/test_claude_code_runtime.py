@@ -146,23 +146,29 @@ class TestBuildEnv:
         env = runtime._build_env()
         assert "PATH" in env
 
-    def test_proxy_mode_env(self) -> None:
+    def test_proxy_mode_builds_proxy_url_not_env(self) -> None:
+        """代理模式：proxy 经 `_proxy_url`（CLI 配置/命令）注入，而非 env 变量。
+
+        现行行为（见 `_build_env` 注释「不注入 provider/model——CLI 读本地配置」）：
+        `_build_env` 仅透传 os.environ，不再写 ANTHROPIC_API_KEY/MODEL/BASE_URL。
+        proxy 目标改由构造期算出的 `_proxy_url` 承载。
+        """
         runtime = ClaudeCodeRuntime(
             model="claude-opus-4",
             agent_id="agent-001",
             proxy_base="http://127.0.0.1:8000",
         )
+        assert runtime._proxy_url == "http://127.0.0.1:8000/proxy/agents/agent-001"
         env = runtime._build_env()
-        assert env["ANTHROPIC_API_KEY"] == "agenthub-proxy"
-        assert env["ANTHROPIC_MODEL"] == "claude-opus-4"
-        assert "agent-001" in env["ANTHROPIC_BASE_URL"]
+        # env 不再被注入代理凭证（旧行为已移除）
+        assert env.get("ANTHROPIC_API_KEY") != "agenthub-proxy"
 
     def test_global_mode_preserves_shell_env(self) -> None:
-        """全局模式不覆盖 ANTHROPIC_API_KEY/BASE_URL，继承 os.environ。"""
+        """全局模式：`_build_env` 透传 os.environ，不覆盖 ANTHROPIC_* 变量。"""
         runtime = ClaudeCodeRuntime(model="claude-sonnet-4")
+        assert runtime._proxy_url == ""  # 无 agent_id/proxy_base → 不走代理
         env = runtime._build_env()
-        assert env["ANTHROPIC_MODEL"] == "claude-sonnet-4"
-        # 代理模式下不设置这些
+        assert "PATH" in env  # 透传 shell 环境
         assert env.get("ANTHROPIC_API_KEY") != "agenthub-proxy"
 
 

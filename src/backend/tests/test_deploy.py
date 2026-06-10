@@ -11,29 +11,34 @@ domain 规则：DeploymentPlan.validate() 拦截空 files / 缺 entry_file。
 
 from __future__ import annotations
 
-import pytest
+import tempfile
+from pathlib import Path
 from uuid import uuid4
+
+import pytest
 
 from app.application.services import DeployService
 from app.domain.deploy.deployment import (
+    STAGE_SEQUENCES,
     Deployment,
     DeploymentPlan,
     DeploymentStage,
-    STAGE_SEQUENCES,
     transition_deployment,
 )
 from app.domain.deploy.errors import (
-    DeployBuildError,
     DeployInvalidTransitionError,
+    DeployNotFoundError,
     DeployValidationError,
 )
 from app.domain.enums import DeploymentStatus, DeploymentTarget
-from app.infrastructure.db.models import DeploymentModel
+from app.infrastructure.deploy.static_host import StaticHost
 from app.infrastructure.repositories import PostgresDeploymentRepository
 
 
 def _svc(db):  # type: ignore[no-untyped-def]
-    return DeployService(PostgresDeploymentRepository(db))
+    """构造 DeployService，注入指向临时目录的 StaticHost（避免污染 _assets）。"""
+    host = StaticHost(Path(tempfile.mkdtemp(prefix="deploy-test-")), "http://test.local")
+    return DeployService(PostgresDeploymentRepository(db), static_host=host)
 
 
 # ============ 1. domain 规则（无 DB）============
@@ -99,6 +104,30 @@ def test_stage_sequences_target_specific() -> None:
     assert STAGE_SEQUENCES[DeploymentTarget.PACKAGE][-1] == DeploymentStage.READY
 
 
+# ============ 1b. StaticHost（落盘 + URL + 路径安全）============
+
+
+def test_static_host_write_and_url() -> None:
+    host = StaticHost(Path(tempfile.mkdtemp(prefix="sh-")), "http://h.local/")
+    did = uuid4()
+    n = host.write_site(did, {"index.html": "<html>x</html>", "sub/a.css": "body{}"})
+    assert n == 2
+    site = host._site_dir(did)
+    assert (site / "index.html").exists()
+    assert (site / "sub" / "a.css").exists()
+    # 末尾斜杠被归一化
+    assert host.site_url(did, "index.html") == f"http://h.local/preview/{did}/index.html"
+
+
+def test_static_host_rejects_path_traversal() -> None:
+    from app.infrastructure.deploy.static_host import DeployStaticError
+
+    host = StaticHost(Path(tempfile.mkdtemp(prefix="sh-")), "http://h.local")
+    for bad in ["../escape.txt", "/etc/passwd", "C:/win.txt", "a/../../b"]:
+        with pytest.raises(DeployStaticError):
+            host.write_site(uuid4(), {bad: "x"})
+
+
 # ============ 2. 服务：start → ready（静态站点）============
 
 
@@ -120,9 +149,14 @@ async def test_start_static_site_reaches_ready_with_preview_url(db_session):  # 
     assert deployment.status == DeploymentStatus.READY
     assert deployment.progress == 1.0
     assert deployment.preview_url is not None
-    assert deployment.preview_url.startswith("https://agenthub-deploy.com/d")
+    # 真实托管 URL（指向 StaticFiles 挂载点 /preview/{id}/{entry}）
+    assert deployment.preview_url == f"http://test.local/preview/{deployment.id}/index.html"
     assert deployment.download_url is None
     assert deployment.error_code is None
+    # 文件真实落盘
+    site_dir = svc._static._site_dir(deployment.id)
+    assert (site_dir / "index.html").read_text(encoding="utf-8").startswith("<html>")
+    assert (site_dir / "app.js").read_text(encoding="utf-8") == "console.log('hi')"
     # 持久化校验
     repo = PostgresDeploymentRepository(db_session)
     row = await repo.get_by_id(deployment.id)
@@ -145,8 +179,15 @@ async def test_start_package_target_returns_download_url(db_session):  # type: i
     )
     assert deployment.status == DeploymentStatus.READY
     assert deployment.download_url is not None
-    assert deployment.download_url.endswith(".zip")
-    assert deployment.preview_url is not None  # placeholder 仍写
+    assert deployment.download_url == f"http://test.local/preview/{deployment.id}/site.zip"
+    assert deployment.preview_url is None  # package 无 preview，只有真实 zip 下载
+    # zip 真实落盘且可解出原文件
+    import zipfile
+
+    zip_path = svc._static._site_dir(deployment.id) / "site.zip"
+    assert zip_path.exists()
+    with zipfile.ZipFile(zip_path) as zf:
+        assert set(zf.namelist()) == {"index.html", "app.js"}
 
 
 # ============ 3. 服务：start → failed（构建错）============
@@ -175,6 +216,40 @@ async def test_start_static_site_missing_asset_fails(db_session):  # type: ignor
 
 
 @pytest.mark.asyncio
+async def test_start_container_marks_unsupported(db_session):  # type: ignore[no-untyped-def]
+    """container：宿主无 Docker → 诚实标记 failed（不发假 URL）。"""
+    svc = _svc(db_session)
+    deployment = await svc.start(
+        session_id=uuid4(),
+        target=DeploymentTarget.CONTAINER,
+        entry_file=None,
+        framework="node",
+        files={"Dockerfile": "FROM node:20"},
+    )
+    assert deployment.status == DeploymentStatus.FAILED
+    assert deployment.error_code == "E_DEPLOY_CONTAINER_UNSUPPORTED"
+    assert deployment.preview_url is None
+    assert deployment.download_url is None
+
+
+@pytest.mark.asyncio
+async def test_delete_cleans_disk(db_session):  # type: ignore[no-untyped-def]
+    """软删后真实产物目录被清盘。"""
+    svc = _svc(db_session)
+    deployment = await svc.start(
+        session_id=uuid4(),
+        target=DeploymentTarget.STATIC_SITE,
+        entry_file="index.html",
+        framework=None,
+        files={"index.html": "<html>ok</html>"},
+    )
+    site_dir = svc._static._site_dir(deployment.id)
+    assert site_dir.exists()
+    await svc.delete(deployment.id)
+    assert not site_dir.exists()
+
+
+@pytest.mark.asyncio
 async def test_start_empty_files_raises_validation(db_session):  # type: ignore[no-untyped-def]
     """边界：files 为空 → plan.validate() 抛错（不创建记录）。"""
     svc = _svc(db_session)
@@ -194,7 +269,7 @@ async def test_start_empty_files_raises_validation(db_session):  # type: ignore[
 @pytest.mark.asyncio
 async def test_get_deployment_not_found(db_session):  # type: ignore[no-untyped-def]
     svc = _svc(db_session)
-    with pytest.raises(Exception):  # DeployNotFoundError
+    with pytest.raises(DeployNotFoundError):
         await svc.get(uuid4())
 
 

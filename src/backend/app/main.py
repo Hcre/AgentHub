@@ -19,6 +19,7 @@ from app.api.routers import (
     agents,
     attachments,
     cli,
+    deploy,
     groups,
     inbox,
     mcp,
@@ -152,6 +153,7 @@ app.include_router(attachments.router)  # 附件上传/下载（P0-3）
 app.include_router(usage.router)  # Token 消耗监控（P1-2，t9 track）
 app.include_router(FS_ROUTER)
 app.include_router(inbox.router)
+app.include_router(deploy.router)  # 部署发布 /api/deployments（真实静态托管 → /preview）
 app.include_router(mcp.router)  # MCP 市场/安装/绑定 REST（/api/mcp/*，§2.6 冻结契约）
 app.include_router(ws_router)
 # MCP 记忆协议服务端（SSE）独占 /api/mcp-memory，与上面 /api/mcp REST 分离，
@@ -162,6 +164,14 @@ if _mcp_asgi is not None:
 _step_tools_asgi = get_mcp_step_tools_asgi()
 if _step_tools_asgi is not None:
     app.mount("/api/step-tools", _step_tools_asgi)
+
+# 部署产物静态托管（真实 preview_url 落点）：DeployService 把 static_site / package
+# 文件写到 settings.deploy_root，这里以 StaticFiles 挂在 /preview 对外暴露，浏览器可直接打开。
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+_deploy_root = settings.deploy_root_path
+_deploy_root.mkdir(parents=True, exist_ok=True)
+app.mount("/preview", StaticFiles(directory=str(_deploy_root), html=True), name="preview")
 
 
 @app.get("/health", tags=["health"])

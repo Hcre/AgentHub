@@ -8,9 +8,35 @@ import {
   Clock,
   Trash2,
   RefreshCw,
+  Plus,
 } from 'lucide-react'
-import { deployApi, type Deployment, type DeployStatus } from '../../api/deploy'
+import { deployApi, type Deployment, type DeployStatus, type DeployTarget } from '../../api/deploy'
 import { cn } from '../../lib/cn'
+
+/** 新建部署默认模板：可一键部署的最小可访问页面（preview_url 打开即见）。 */
+const DEFAULT_SITE_HTML = `<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AgentHub 部署预览</title>
+    <style>
+      body { font-family: system-ui, sans-serif; display: grid; place-items: center;
+             min-height: 100vh; margin: 0; background: #0f172a; color: #e2e8f0; }
+      .card { text-align: center; padding: 2rem 3rem; border-radius: 16px;
+              background: #1e293b; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+      h1 { margin: 0 0 .5rem; font-size: 1.6rem; }
+      p { margin: 0; color: #94a3b8; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>🚀 部署成功</h1>
+      <p>这是由 AgentHub 部署发布的真实静态站点。</p>
+    </div>
+  </body>
+</html>
+`
 
 /**
  * DeployPanel — 部署 tab 内容
@@ -85,6 +111,11 @@ export function DeployPanel({ sessionId }: { sessionId?: string | null }) {
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  // 新建部署表单
+  const [showCreate, setShowCreate] = useState(false)
+  const [createTarget, setCreateTarget] = useState<DeployTarget>('static_site')
+  const [createHtml, setCreateHtml] = useState(DEFAULT_SITE_HTML)
+  const [creating, setCreating] = useState(false)
 
   const validSession = isUuid(sessionId ?? null) ? (sessionId as string) : null
 
@@ -138,6 +169,27 @@ export function DeployPanel({ sessionId }: { sessionId?: string | null }) {
     }
   }
 
+  // 新建部署：把表单内容作为 index.html 提交 → 后端真实落盘 + 出 preview_url
+  const handleCreate = async () => {
+    if (!validSession) return
+    setCreating(true)
+    setError(null)
+    try {
+      await deployApi.start({
+        session_id: validSession,
+        target: createTarget,
+        entry_file: createTarget === 'static_site' ? 'index.html' : undefined,
+        files: { 'index.html': createHtml },
+      })
+      setShowCreate(false)
+      await load() // 拉回含新部署的列表（后端同步推进，已是 ready/failed 终态）
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '创建部署失败')
+    } finally {
+      setCreating(false)
+    }
+  }
+
   if (!validSession) {
     return (
       <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted-foreground">
@@ -158,16 +210,29 @@ export function DeployPanel({ sessionId }: { sessionId?: string | null }) {
           <span>部署历史</span>
           <span className="font-mono text-[11px]">· {items.length} 条</span>
         </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          disabled={loading}
-          aria-label="刷新"
-          title="刷新"
-          className="grid h-6 w-6 place-items-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
-        >
-          <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            data-testid="deploy-new"
+            onClick={() => setShowCreate(true)}
+            className="inline-flex h-6 items-center gap-1 rounded border border-border/70 px-2 text-[11px] text-foreground hover:bg-accent"
+            title="新建部署"
+            aria-label="新建部署"
+          >
+            <Plus className="h-3 w-3" />
+            新建
+          </button>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            aria-label="刷新"
+            title="刷新"
+            className="grid h-6 w-6 place-items-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+          >
+            <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} />
+          </button>
+        </div>
       </div>
       {error && (
         <div className="mx-3 mt-2 rounded border border-rose-300 bg-rose-50/60 px-2 py-1 text-[11.5px] text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300">
@@ -331,6 +396,73 @@ export function DeployPanel({ sessionId }: { sessionId?: string | null }) {
           </ul>
         )}
       </div>
+      {showCreate && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="新建部署"
+          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+          onClick={() => !creating && setShowCreate(false)}
+        >
+          <div
+            className="flex max-h-[80vh] w-[36rem] max-w-[92vw] flex-col rounded-lg border bg-card p-4 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-semibold">新建部署</h3>
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              编辑下方 HTML 后提交，后端会真实落盘并返回可访问的 preview 链接。
+            </p>
+            <div className="mt-3 flex items-center gap-2 text-[12px]">
+              <span className="text-muted-foreground">类型：</span>
+              <label className="inline-flex items-center gap-1">
+                <input
+                  type="radio"
+                  name="deploy-target"
+                  checked={createTarget === 'static_site'}
+                  onChange={() => setCreateTarget('static_site')}
+                />
+                静态站点
+              </label>
+              <label className="inline-flex items-center gap-1">
+                <input
+                  type="radio"
+                  name="deploy-target"
+                  checked={createTarget === 'package'}
+                  onChange={() => setCreateTarget('package')}
+                />
+                源码打包
+              </label>
+            </div>
+            <textarea
+              data-testid="deploy-html-input"
+              value={createHtml}
+              onChange={(e) => setCreateHtml(e.target.value)}
+              spellCheck={false}
+              className="mt-3 h-56 w-full resize-none rounded border border-border/70 bg-background p-2 font-mono text-[11.5px] leading-relaxed"
+            />
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCreate(false)}
+                disabled={creating}
+                className="rounded border border-border/70 bg-card px-3 py-1.5 text-[12px] hover:bg-muted disabled:opacity-50"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                data-testid="deploy-submit"
+                onClick={() => void handleCreate()}
+                disabled={creating || createHtml.trim() === ''}
+                className="inline-flex items-center gap-1 rounded bg-emerald-600 px-3 py-1.5 text-[12px] text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {creating && <Loader2 className="h-3 w-3 animate-spin" />}
+                {creating ? '部署中…' : '部署'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {confirmDelete && (
         <div
           role="dialog"
