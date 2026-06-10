@@ -469,9 +469,9 @@ graph LR
         <span class="ico">!</span>
         <span><b>诚实更正</b>：上一份报告把 M1#3 标为「阻塞、无法触发」是<b>我的测试方法错误</b> —— 当时未点选会话就发送。真相是：选中会话时 M1#3 一直可用（WS 回话 + pin/reply/delete 按钮齐全）；只有落地页无会话这一路径有真 bug，现已修。</span>
       </div>
-      <div class="note bad">
-        <span class="ico">!</span>
-        <span><b>仍存在的后端环境问题（与本前端修复无关）</b>：容器内 Claude CLI 以 root 运行，报 <code>--dangerously-skip-permissions cannot be used with root/sudo</code>，导致部分真实 agent 回话是错误内容。WS 管线本身已通（agent 能回「Drafting…」/错误信息）。这是后端容器<b>运行环境配置</b>问题，建议后续以非 root 用户跑 CLI 或调整 flag。</span>
+      <div class="note good">
+        <span class="ico">✓</span>
+        <span><b>后端 CLI root 问题已修</b>：容器内 Claude CLI 以 root 跑曾报 <code>--dangerously-skip-permissions cannot be used with root/sudo</code>。Dockerfile 加 <code>ENV IS_SANDBOX=1</code>（Claude Code 官方沙箱豁免）+ 重建镜像后，<code>claude --dangerously-skip-permissions</code> 已由「root/sudo 拒绝」转为「Not logged in」—— 已过 root 闸，仅余鉴权（需配 API key，属凭证范畴，本环境无 .env key）。WS 管线本身一直是通的。</span>
       </div>
     </div>
 
@@ -494,15 +494,16 @@ graph LR
             <span class="chip gd">M1#1 真浏览器 + 截图</span>
             <span class="chip gd">M1#3 两路径真浏览器 + 截图</span>
             <span class="chip gd">DB 0024 列/索引在库</span>
+            <span class="chip gd">重建镜像 M4 永久生效</span>
+            <span class="chip gd">CLI root 闸已过（IS_SANDBOX）</span>
           </div>
         </div>
         <div class="card warn">
           <h4>未达成 / 受限（据实标）</h4>
           <div class="chip-row" style="margin-top:6px">
-            <span class="chip wn">CLI 以 root 跑 → agent 回话报错（后端环境）</span>
+            <span class="chip wn">agent 真回话需配 API key（本环境无 .env key）</span>
             <span class="chip wn">M3-B/C 仅端点验证（缺 python-pptx/git 真出片）</span>
             <span class="chip wn">M3-A 纯前端 prompt 组装未走 UI</span>
-            <span class="chip wn">M4 修复 docker cp 进 live 容器，永久生效需重建镜像</span>
           </div>
         </div>
       </div>
@@ -541,12 +542,11 @@ graph LR
           <p style="font-size:12px;line-height:1.75"><b>产出者</b> · 袁（xiangbianpangde）<br><b>验收者</b> · 等用户验收后推<br><b>验证档级</b> · 后端 367 测试全绿 · M4 闭环 live 验过 · 4 张真浏览器截图 · 受限项据实标</p>
         </div>
         <div class="card brand" style="box-shadow:none">
-          <h4>等你决定</h4>
+          <h4>后续追加（已做 2 项）</h4>
           <ol style="margin:6px 0 0 18px;font-size:12px;color:var(--txt-dim);line-height:1.75">
-            <li>是否 <b>push</b> 这 5 个 commit（含 M4/M1#3/测试修复）</li>
-            <li>M4 修复是否<b>重建后端镜像</b>让其永久生效</li>
-            <li>容器 Claude CLI <b>非 root 运行</b>修复（让 agent 真回话）</li>
-            <li>是否落 <b>ADR-0019</b> 记录 M4 两个修复</li>
+            <li><b class="b-pill ok">已做</b> 重建后端镜像 → M4 路由 + 后台 session 修复随镜像永久生效（重建后 deploy 闭环复测 200 + 真 HTML）</li>
+            <li><b class="b-pill ok">已做</b> 容器 CLI root：<code>ENV IS_SANDBOX=1</code> → claude 由「root/sudo 拒绝」转「Not logged in」（已过 root 闸）</li>
+            <li>待你决定：是否 <b>push</b> 这批 commit；是否配 <b>API key</b> 让 agent 真回话（凭证范畴）；是否落 <b>ADR-0019</b></li>
           </ol>
         </div>
       </div>
