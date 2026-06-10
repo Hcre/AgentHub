@@ -13,7 +13,7 @@ const STATUS_ORDER: TaskStatus[] = ['todo', 'doing', 'blocked', 'done']
 const agentsById = Object.fromEntries(agents.map((a) => [a.id, a]))
 
 export function TasksTabView() {
-  const { tasks, view, showClosed, filter, setView, setShowClosed, moveTask, addTask, load } =
+  const { tasks, view, showClosed, filter, setView, setShowClosed, moveTask, addTask, load, dispatchTask } =
     useTaskStore()
   const [createOpen, setCreateOpen] = useState(false)
   const [dragOver, setDragOver] = useState<TaskStatus | null>(null)
@@ -124,6 +124,7 @@ export function TasksTabView() {
                         task={t}
                         assignee={t.assignee ? agentsById[t.assignee] : undefined}
                         onClick={() => cycle(t)}
+                        onDispatch={() => dispatchTask(t.id)}
                       />
                     ))
                   )}

@@ -100,4 +100,24 @@ export const tasksApi = {
   },
 
   remove: (id: string) => api.del<void>(`/api/tasks/${id}`),
+
+  /** 派发任务给编排引擎真跑（后端置 RUNNING，终态后台回写）。返回置 RUNNING 后的任务。 */
+  dispatch: async (id: string): Promise<Task> =>
+    toUiTask(await api.post<BackendTask>(`/api/tasks/${id}/dispatch`, {})),
+
+  /** 任务的编排事件流（AR-05 事件溯源）。 */
+  events: (id: string) => api.get<TaskEventList>(`/api/tasks/${id}/events`),
+}
+
+export interface TaskEvent {
+  id: string
+  event_type: string
+  event_data: Record<string, unknown>
+  actor: string
+  created_at: string
+}
+
+interface TaskEventList {
+  items: TaskEvent[]
+  total: number
 }

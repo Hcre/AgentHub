@@ -34,6 +34,7 @@ interface TaskState {
   addTask: (status: TaskStatus, assignee?: string) => void
   createTask: (input: CreateTaskInput) => void
   removeTask: (id: string) => void
+  dispatchTask: (id: string) => void
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
@@ -92,5 +93,18 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       console.error('删除任务失败', err)
       set({ tasks: prev })
     })
+  },
+
+  // 派发任务给编排引擎真跑：乐观置 doing，后端返回真值回填；失败回滚。
+  dispatchTask: (id) => {
+    const prev = get().tasks
+    set({ tasks: prev.map((t) => (t.id === id ? { ...t, status: 'doing' } : t)) })
+    tasksApi
+      .dispatch(id)
+      .then((task) => set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? task : t)) })))
+      .catch((err) => {
+        console.error('派发任务失败', err)
+        set({ tasks: prev })
+      })
   },
 }))
