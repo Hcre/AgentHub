@@ -1,6 +1,6 @@
 # 当前状态
 
-> **最近更新: 2026-06-10 16:10**（袁, 分支 main）。完整变更历史见下方「更新日志」。
+> **最近更新: 2026-06-10 16:45**（袁, 分支 main）。完整变更历史见下方「更新日志」。
 > - 数据源: `docs/plan/背景.md` (PRD +考察要点 +交付物) + git `200aba4:STATUS.md` (旧198 行) +3 新 ADR (0016/0017/0018) + worklogs/{袁,董,黎}/ + **本轮 grep16 router ×8 client ×7 nav实证**
 > - 规则: 每次 push 或开始/结束任务时, 更新你自己那一行
 > - 强约束: pre-push markdownlint-cli2 (D-13) — MD024/036/041 严, MD013 关 (per 2026-06-08 决策"不要瘦身")
@@ -10,6 +10,7 @@
 
 ## 🗒️ 更新日志 (newest first)
 
+- **2026-06-10 16:45 — 对话式创建 Agent 落地（⚠️→✅）** (袁, 分支 main)：补 PRD §3「用户自建 Agent 对话式创建」。后端 `AgentDraftService`（自然语言→协调者 LLM(默认 DeepSeek 非 Claude)→`planner.extract_json` 抽 name/role/avatar/system_prompt/tags）+ `POST /api/agents/draft-from-chat`（422 解析失败）+ 5 pytest（fake LLM）。前端 `ConversationalAgentCreate` 模态（描述→生成草稿→可改预览→复用 POST /api/agents 创建）+ AgentsListPage「✨ 对话式创建」入口 + 4 vitest。live 真 DeepSeek E2E：「擅长数据库索引优化」→草稿{name:索引优化专家, role, system_prompt, 5 标签}，0 console 错。功能完整度 87%→**89%**（剩 ❌ = 代码冲突处理；⚠️ = 消息操作 E2E + 部署真实流水线；📋 = 桌面端）。未 push
 - **2026-06-10 16:10 — 任务编排 FSM/DAG 派发落地（看板→真派发，M3+）** (袁, 分支 main)：补 PRD §2 编排深水区。**事件溯源 (AR-05)**：`TaskEvent` 实体 + `TaskEventRepository` + `task_events` append-only 落库 + Orchestrator 新增可选 `event_sink`（默认 None，356 测试零回归）。**派发**：`TaskService.dispatch` 状态机（pending→running→completed/failed）+ 事件记录 + `EngineTaskDispatcher`（看板 Task → `build_default_orchestrator`+`CoordinatorRun` 后台真跑，独立 session 持久化，复用 chat 同款引擎）+ `POST /api/tasks/{id}/dispatch` + `GET /api/tasks/{id}/events`。**前端**：`tasksApi.dispatch/events` + `taskStore.dispatchTask` + TaskCard「▶ 派发执行」按钮。**验证**：5 pytest（service 状态机/事件序/防重/append-only）+ 4 vitest（按钮）+ live（dispatch 无会话→优雅 failed + 3 事件 append；UI 按钮→endpoint→卡片移列，0 console 错）。诚实标注：真多 Agent run 复用 chat 引擎，未 live 触发（避 LLM/Claude billing）。4 commit，未 push
 - **2026-06-10 13:30 — 产物预览 P2 三项补全（PPT / 版本历史 / 对话式局部修改）** (袁, 分支 main)：PRD §4 三个 ❌ 全部 ❌→✅。① **PPT 浏览** — `GET /api/fs/pptx-slides`（python-pptx）+ `SlideView`（4 pytest + 3 vitest + live 2 页翻页）。② **版本历史** — `file-history`/`file-at-rev`(含 diff)/`file-write` 3 端点 + `versions` 预览模式 + `VersionHistoryPanel`（6 pytest + live STATUS.md 50 commit 时间线 + 真 diff）。③ **对话式局部修改** — CodeView 选区→浮层→结构化 prompt→`agent-edit-request`→ChatView WS（11 vitest + live 选区→「第 4 行」→正确 prompt dispatch）。3 commit（`<pptx>`+`<versions>`+`<convedit>`）+ 3 截图，**未 push**。功能完整度 76%→**87%**（唯一剩 ❌ = 代码冲突处理）
 - **2026-06-10 12:35 — 测试可信度修复 + 私聊死路闭环** (袁, 分支 main)：① **恢复绿测真相** — baseline 实测 12 后端 + 4 前端用例失败（与"全绿"声明矛盾），全是断言已被 v4 删除行为的陈旧测试：pin 鉴权放宽后的 owner/anonymous 测试、v4 R5 移到 reactive_router 的机械停词反射测试、pi_agent 构造签名漂移、pin inline-error 已删、WebPreviewCard 全屏 Dialog 改侧栏 preview tab。全部对齐已发布行为，**后端 346 passed/3 skipped、前端 116 passed**（commit `2135d3b`）。② **私聊 1v1 死路修复 (TD-06/07)** — `chatStore.hydrateFromSessions` 回灌后端 private session（幂等 + 写 sessionIds 续聊）+ LeftPanel mount 拉取 + 空态「发起私聊」CTA；Playwright 实测 **37/37 回灌会话均带后端 sessionId（全部可续聊）**、0 console 错误、5 vitest（commit `e0a8494`，截图 `p0-private-hydration-2026-06-10.png`）。两 commit 本地 ahead，**未 push**（per [[no-push-without-ask]]）
@@ -40,7 +41,7 @@
 | 维度 | 权重 | 评判要点 | 当前覆盖 | 谁做的 |
 |------|------|---------|---------|-------|
 | AI 协作能力 | 30% | 沉淀出和 ai 协作的 Spec/skill/rules 等协作规范 | ✅ `docs/conventions/` 9 篇 + `docs/specs/` 13 篇 + `worklogs/decisions/` 18 ADR + `skills/` 9 个 + `docs/templates/` 14 个 | 全员（黎/董/袁 + Mavis owner）|
-| 功能完整度 | 25% | IM 核心体验是否流畅、多 Agent 调度是否跑通 | ✅ **87%** (22 完整 + 3 部分 + 1 未做 + 1 计划)，详见 [PRD 6 大功能对账](#-prd-6-大核心功能-vs-现状-对账) | 全员 |
+| 功能完整度 | 25% | IM 核心体验是否流畅、多 Agent 调度是否跑通 | ✅ **89%** (23 完整 + 2 部分 + 1 未做 + 1 计划)，详见 [PRD 6 大功能对账](#-prd-6-大核心功能-vs-现状-对账) | 全员 |
 | 生成效果质量 | 20% | 聊天 UI 体验、产物预览效果 | ✅ Web 端 localhost:5174 跑通, S2 群聊 6 条消息流 (用户→Coordinator 拆解→Claude/OpenCode/MockBot 并行→合并汇报) | 黎（UI 打磨）+ 董（前端群聊）|
 | 代码理解度 | 15% | 答辩时能否解释架构选型和核心逻辑 | ✅ 5 层洋葱架构图（[01-architecture](docs/conventions/01-architecture_架构设计规范.md) §一）+ 5 主表 ER 图（[03-data-model](docs/specs/03-data-model_数据模型.md) §二）+ 命令 reference (docs/plan/.../commands-reference.md) | Mavis owner (plan_ba86c4d0 docs-writer 任务) |
 | 创新与产品感 | 10% | 超预期功能点或体验优化 | ✅ 11 个真 Agent 队友 (含 Codex/OpenCode/Pi) + CLI/SDK 双轨适配器 (ADR-0001) + Pin 消息 + 部署卡 + 4 栏响应式 (useMediaQuery, 768/1024/1280/hamburger) | 全员 |
@@ -78,7 +79,7 @@
 | | 用户审批流 (收件箱批准/驳回) | ✅ 完整 | 袁 6/9 全栈：`InboxService`+`inbox_items` 表 + 前端批准/驳回接 resolve + NavRail 入口；Playwright 批准→后端 resolved `tasks-inbox-03/04` | 袁 |
 | | 代码冲突处理 | ❌ 未做 | 已知缺口 | — |
 | **3. 多 Agent 接入** | 适配器层（Claude Code + Codex + OpenCode + Pi）| ✅ 完整 | CLI/SDK 双轨（per ADR-0001）+ 11 个队友含 Codex/OpenCode/Pi | 董（CLI 接入）+ 黎（OpenCode fix）|
-| | 用户自建 Agent（对话式创建）| ⚠️ 部分 | CreateAgentModal 存在（E2E 验证 04-modal）| 董（Agent 创建全链路 6 处 bug 修复 + 9 测试）|
+| | 用户自建 Agent（对话式创建）| ✅ 完整 | 表单向导 CreateAgentModal + **6/10 袁 对话式创建落地**：后端 `AgentDraftService`+`POST /api/agents/draft-from-chat`（自然语言→DeepSeek 抽取 name/role/avatar/system_prompt/tags，5 pytest）+ 前端 `ConversationalAgentCreate` 模态（描述→生成草稿→可改预览→创建，4 vitest）；live 真 DeepSeek E2E（"擅长数据库索引优化"→草稿"索引优化专家"+5 标签，0 console 错） | 董（表单向导 6 bug+9 测）+ 袁（对话式创建全栈）|
 | | 联系人列表（头像/名称/能力标签）| ✅ 完整 | AI 队友页 11 个 + 头像 + role 标签（AgentsListPage）| 黎 + **袁 (6/9 Playwright 走 11 article 确认渲染, [已真实测试 (AI 模拟)])** |
 | **4. 产物预览与编辑** | 网页 iframe 内联卡片 | ✅ 完整 | `WebPreviewCard.tsx:80` iframe sandbox（集成验证 A 验）| 黎 |
 | | 文档渲染 | ✅ 完整 | plan_ba86c4d0 frontend-p0-p1 `d9cd8af`+`d6a1658` 落 DocumentRenderer 3-mode (per frontend-p0-p1 verifier) | Mavis owner (P0 委派) |
@@ -94,7 +95,7 @@
 | | 桌面端 | 📋 计划 | Tauri 2 计划冻结中（`feature/desktop/spec-freeze`, per ADR-0007），**等 4 Q 答稿** (Q5-1 通知 / Q5-2 身份 / Q7-1 版本号 / Q11-1 降级方案) | 黎（proposer, worklog 2026-06-06_讨论-web转桌面app可行性.md）+ 等 董/袁 reply |
 | | 移动端 H5 | ✅ 完整 | **6/8 修正**: t3-mobile-h5 `a483424`+`8124e54` 落地 useMediaQuery (React 18 useSyncExternalStore + matchMedia SSR-safe) + AppShell 4 栏 mobile/desktop 分支 + 11 vitest (5 useMediaQuery + 6 AppShell) + 4 截图 (375/768/1280/hamburger) + BDD §6.5.1.1 B-6-P2-M02 5 When/Then | 袁（t3-mobile-h5, M5 overnight）|
 
-**整体覆盖率**: ✅ 完整 22 / ⚠️ 部分 3 / ❌ 未做 1 / 📋 计划 1 = 共 27 项 → 覆盖率 = (22 + 3×0.5) / 27 = **87%**
+**整体覆盖率**: ✅ 完整 23 / ⚠️ 部分 2 / ❌ 未做 1 / 📋 计划 1 = 共 27 项 → 覆盖率 = (23 + 2×0.5) / 27 = **89%**
 (6/10 下午: PPT 浏览 + 版本历史 + 对话式局部修改 三项 ❌→✅ by 袁 产物预览补全（每项后端端点 + 前端面板 + pytest/vitest + live Playwright），76%→**87%**；唯一剩 ❌ = 代码冲突处理。6/10 上午: 对话列表 ⚠️→✅ 会话归档; 6/9: 任务看板 + 审批流 ⚠️→✅ Tasks/Inbox CRUD; 6/8: 移动 H5 ⚠️→✅; per [ADR-0018](worklogs/decisions/0018-plan-3eaba0fa-overnight-4track-close.md))
 
 ---
